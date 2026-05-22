@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cấu hình Quản lý Cơ sở - TaskFlow AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Geist:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-background": "#1c1b1b",
+                        "primary": "#004ccd",
+                        "surface": "#fcf9f8",
+                        "surface-tint": "#0052dd",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "tertiary-container": "#c84000",
+                        "primary-container": "#0f62fe",
+                        "on-secondary-container": "#fdf6ff",
+                        "inverse-surface": "#313030",
+                        "on-tertiary-fixed": "#390c00",
+                        "secondary": "#731be5",
+                        "on-secondary-fixed-variant": "#5d00c2",
+                        "tertiary-fixed": "#ffdbd0",
+                        "outline": "#737687",
+                        "surface-container": "#f0edec",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed": "#270058",
+                        "inverse-primary": "#b4c5ff",
+                        "surface-dim": "#dcd9d9",
+                        "secondary-fixed-dim": "#d4bbff",
+                        "on-primary-fixed-variant": "#003da9",
+                        "primary-fixed": "#dbe1ff",
+                        "on-surface-variant": "#424656",
+                        "on-surface": "#1c1b1b",
+                        "background": "#fcf9f8",
+                        "secondary-fixed": "#ebdcff",
+                        "surface-bright": "#fcf9f8",
+                        "on-tertiary-fixed-variant": "#832700",
+                        "error": "#ba1a1a",
+                        "tertiary": "#9e3100",
+                        "surface-container-high": "#eae7e7",
+                        "inverse-on-surface": "#f3f0ef",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#8d42ff",
+                        "surface-container-highest": "#e5e2e1",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#c3c6d8",
+                        "surface-container-low": "#f6f3f2",
+                        "on-primary-container": "#f3f3ff",
+                        "surface-variant": "#e5e2e1",
+                        "on-tertiary-container": "#fff1ed",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb59d",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed": "#00174c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "container-max": "1440px",
+                        "stack-md": "16px",
+                        "stack-lg": "24px",
+                        "gutter": "24px",
+                        "margin-desktop": "32px",
+                        "stack-sm": "8px",
+                        "unit": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "label-md": ["Geist"],
+                        "code-sm": ["Geist"],
+                        "headline-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #fcf9f8; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .ai-pulse {
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="text-on-background font-body-md antialiased overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md text-primary dark:text-inverse-primary font-label-md text-label-md docked full-width top-0 sticky z-40 border-b border-outline-variant dark:border-outline flat no shadows focus-within:ring-2 focus-within:ring-primary flex justify-between items-center h-16 px-margin-desktop ml-64 hidden md:flex">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-black text-primary dark:text-primary-fixed-dim">TaskFlow AI</span>
+<div class="relative ml-8 flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container rounded-full text-on-surface text-body-sm focus:outline-none focus:ring-2 focus:ring-primary w-64 border border-outline-variant" placeholder="Tìm kiếm cơ sở, thiết bị..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed cursor-pointer rounded-full hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined">notifications</span></button>
+<button class="p-2 text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed cursor-pointer rounded-full hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined">auto_awesome</span></button>
+<button class="p-2 text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed cursor-pointer rounded-full hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined">account_circle</span></button>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="bg-surface dark:bg-inverse-surface text-primary dark:text-inverse-primary font-body-md text-body-md h-screen w-64 fixed left-0 top-0 border-r border-outline-variant dark:border-outline shadow-sm flex flex-col h-full py-stack-lg hidden md:flex z-50">
+<div class="px-6 mb-8 flex items-center gap-3">
+<img alt="User profile avatar" class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A professional headshot of a mature male executive with a warm smile, wearing a tailored blue suit. The lighting is bright and modern, suggesting a corporate office setting in a light mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkkmuCieqhxyN8apT5Xby0doqqrWhktTQoARHa0uw0EaOMIjd5-ewqHo9TCYipQTeqTfuF5Z2HxVFBEVxcsDY-TvK62b8d8KOPpYXrMKtk2-rplEYXkeRIWyoTIMYRmOE8v139-yDCVr2QWYMJdHupj0UaFVPx28wa37Z1pEOrZIWlqIN6apVdBXzABwA1Ix7HRFICNNjQv9KGNGgyGO7q3IcKhFII_C2J6sC1hj8Slfcd4OK2b-qdP8HvONc0DdNLS045536Jw_8"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim text-sm">TaskFlow AI</h1>
+<p class="text-body-sm text-on-surface-variant text-xs">Enterprise Hub</p>
+</div>
+</div>
+<div class="px-4 mb-6">
+<button class="w-full bg-primary text-on-primary py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-label-md shadow-sm hover:bg-primary-container hover:text-on-primary-container transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                New Task
+            </button>
+</div>
+<ul class="flex-1 px-3 space-y-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-primary dark:text-primary-fixed font-bold border-r-4 border-primary dark:border-primary-fixed bg-primary-container/10 Active: opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+                    Tasks
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assessment</span>
+                    Reports
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-3 rounded-lg text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+</li>
+</ul>
+<div class="px-3 mt-auto border-t border-outline-variant pt-4">
+<ul class="space-y-1">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+                        Support
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+                        Sign Out
+                    </a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="md:ml-64 p-margin-mobile md:p-margin-desktop min-h-screen">
+<div class="max-w-[1440px] mx-auto">
+<!-- Page Header -->
+<div class="mb-stack-lg flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background mb-1">Cơ sở: Chi nhánh Trung tâm TP</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Tổng quan hoạt động và tình trạng thiết bị hôm nay.</p>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-3 py-1 bg-surface-container-high rounded-full text-label-md font-label-md text-on-surface flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-primary block"></span>
+                        Đang hoạt động (8:00 - 22:00)
+                    </span>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Daily Work & Real-time -->
+<div class="lg:col-span-8 space-y-gutter">
+<!-- Daily Work Report -->
+<section class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm relative overflow-hidden">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">assignment_turned_in</span>
+                                Báo cáo công việc hàng ngày
+                            </h3>
+<span class="text-body-sm font-body-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">Hôm nay, 14:30</span>
+</div>
+<div class="space-y-4">
+<!-- Task Item 1 -->
+<div class="flex items-start gap-4 p-4 rounded-lg bg-surface hover:bg-surface-container-low transition-colors border border-outline-variant">
+<div class="mt-1">
+<input class="w-5 h-5 rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+</div>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md text-on-surface mb-1">Kiểm tra vệ sinh khu vực sảnh chính</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-3">Đảm bảo sàn nhà khô ráo, không có rác, thảm sạch sẽ.</p>
+<div class="flex gap-2">
+<button class="text-body-sm font-label-md bg-primary-container text-on-primary-container px-3 py-1.5 rounded flex items-center gap-1 hover:bg-primary hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined text-[18px]">photo_camera</span>
+                                            Chụp ảnh nghiệm thu
+                                        </button>
+</div>
+</div>
+<span class="px-2 py-1 bg-tertiary-container/10 text-tertiary font-label-md text-code-sm rounded-full">High Priority</span>
+</div>
+<!-- Task Item 2 -->
+<div class="flex items-start gap-4 p-4 rounded-lg bg-surface hover:bg-surface-container-low transition-colors border border-outline-variant">
+<div class="mt-1">
+<input checked="" class="w-5 h-5 rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+</div>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md text-on-surface mb-1 line-through opacity-70">Khởi động hệ thống điều hòa khu vực spa</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-3 opacity-70">Cài đặt nhiệt độ ở mức 22°C trước khi khách đến.</p>
+<div class="flex gap-2">
+<div class="relative w-16 h-16 rounded border border-outline-variant overflow-hidden">
+<img alt="AC Thermostat" class="w-full h-full object-cover" data-alt="A close-up shot of a modern, digital thermostat on a pristine white wall, displaying 22 degrees Celsius. The lighting is soft and natural, emphasizing the sleek interface of the device in a modern, clean environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxDu4X5VZbG-QPNeuhnY1BM77l4XMoYlHynPE2ZQozI9T7AmgiFN4uZyZsiqSlcZ9sN5mU-ZOKgh5HRYFukdI-eWJiCU7mVP2jq4W8yYhvgFSYz1R8rfXd-ZRw8IlXWUppxAfm7X-WVWsew3tkf5HOuJJhzPHtrKFpkwJl50yCN8HuOK9CWpDDegrxkOZ-2idNqFpAVo6WQYj70Bj9yhu6iZ64Cf-vktmEoN7_y92lv8-CrXvxarVXBPEwXp-2qcBw--YT_g3Q1Hs"/>
+<div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer">
+<span class="material-symbols-outlined text-white">zoom_in</span>
+</div>
+</div>
+<span class="text-body-sm font-label-md text-primary flex items-center gap-1 mt-auto">
+<span class="material-symbols-outlined text-[16px]">check_circle</span> Đã duyệt
+                                        </span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Real-time Customer Tracking -->
+<section class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">group</span>
+                                Theo dõi khách hàng (Real-time)
+                            </h3>
+<div class="flex items-center gap-2">
+<span class="relative flex h-3 w-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-secondary"></span>
+</span>
+<span class="text-label-md font-label-md text-secondary">Live</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Input Area -->
+<div class="space-y-4">
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-2">Nhập mã khách / Quét thẻ</label>
+<div class="flex gap-2">
+<input class="flex-1 h-12 rounded-lg border border-outline-variant bg-surface px-4 font-body-md focus:ring-2 focus:ring-primary focus:border-transparent outline-none" placeholder="Vd: KH00123" type="text"/>
+<button class="w-12 h-12 bg-surface-container flex items-center justify-center rounded-lg border border-outline-variant hover:bg-surface-container-high transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">qr_code_scanner</span>
+</button>
+</div>
+</div>
+<div class="bg-surface p-4 rounded-lg border border-outline-variant">
+<p class="font-label-md text-label-md text-on-surface-variant mb-2">Trạng thái Check-in gần nhất</p>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-secondary-container text-on-secondary-container rounded-full flex items-center justify-center font-bold">NT</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Nguyễn Văn A (KH00122)</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Vào khu vực Gym lúc 14:28</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Display Area -->
+<div class="bg-surface rounded-lg border border-outline-variant p-4">
+<h4 class="font-label-md text-label-md text-on-surface mb-4">Mật độ hiện tại</h4>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between font-body-sm text-body-sm mb-1">
+<span class="text-on-surface-variant">Khu vực Lễ tân</span>
+<span class="text-on-surface font-medium">5/20</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 25%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-body-sm text-body-sm mb-1">
+<span class="text-on-surface-variant">Phòng Gym</span>
+<span class="text-on-surface font-medium">18/30</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 60%"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-body-sm text-body-sm mb-1">
+<span class="text-on-surface-variant">Khu vực Spa</span>
+<span class="text-error font-medium">12/10 (Quá tải)</span>
+</div>
+<div class="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-error h-full rounded-full" style="width: 100%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Equipment Status & AI Insights -->
+<div class="lg:col-span-4 space-y-gutter">
+<!-- Equipment Status -->
+<section class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant shadow-sm">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-tertiary">ac_unit</span>
+                            Trạng thái thiết bị
+                        </h3>
+<div class="grid grid-cols-2 gap-4">
+<!-- AC Unit 1 -->
+<div class="p-4 rounded-lg bg-surface border border-outline-variant hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-primary">mode_fan</span>
+<span class="w-2 h-2 rounded-full bg-primary mt-1"></span>
+</div>
+<p class="font-label-md text-label-md text-on-surface">Máy lạnh Sảnh</p>
+<p class="font-headline-lg text-headline-lg text-primary mt-1">24°C</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-2">Bình thường</p>
+</div>
+<!-- AC Unit 2 -->
+<div class="p-4 rounded-lg bg-error-container/20 border border-error/30 hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="material-symbols-outlined text-error">mode_fan</span>
+<span class="w-2 h-2 rounded-full bg-error mt-1"></span>
+</div>
+<p class="font-label-md text-label-md text-on-surface">Máy lạnh Spa</p>
+<p class="font-headline-lg text-headline-lg text-error mt-1">--°C</p>
+<p class="font-body-sm text-body-sm text-error mt-2">Mất kết nối</p>
+</div>
+<!-- Room Status -->
+<div class="col-span-2 p-4 rounded-lg bg-surface border border-outline-variant mt-2">
+<div class="flex items-center gap-3 mb-3">
+<span class="material-symbols-outlined text-on-surface-variant">meeting_room</span>
+<h4 class="font-label-md text-label-md text-on-surface">Tình trạng phòng</h4>
+</div>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-primary-container text-on-primary-container rounded text-code-sm font-label-md">P.101 (Đang dọn)</span>
+<span class="px-2 py-1 bg-surface-variant text-on-surface-variant rounded text-code-sm font-label-md">P.102 (Trống)</span>
+<span class="px-2 py-1 bg-tertiary-container/20 text-tertiary rounded text-code-sm font-label-md">P.103 (Sử dụng)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- AI Insights Panel (Glassmorphism) -->
+<section class="glass-panel rounded-xl p-6 relative overflow-hidden group">
+<!-- Decorative AI background glow -->
+<div class="absolute -top-10 -right-10 w-32 h-32 bg-secondary/20 rounded-full blur-2xl group-hover:bg-secondary/30 transition-colors duration-500"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-headline-md text-headline-md text-secondary flex items-center gap-2">
+<span class="material-symbols-outlined">smart_toy</span>
+                                    AI Nhắc việc
+                                </h3>
+<div class="relative w-6 h-6 flex items-center justify-center">
+<div class="absolute w-full h-full border-2 border-secondary rounded-full ai-pulse"></div>
+<span class="w-2 h-2 bg-secondary rounded-full"></span>
+</div>
+</div>
+<div class="space-y-4">
+<!-- Insight 1 -->
+<div class="bg-white/50 dark:bg-black/20 p-4 rounded-lg border border-white/40 backdrop-blur-sm">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary mt-0.5">psychology</span>
+<div>
+<p class="font-body-sm text-body-sm text-on-background mb-2">
+                                                "Chào bạn, khu vực Spa hiện đang khá đông (12/10). Bạn có muốn điều hướng nhân viên lễ tân hỗ trợ phục vụ nước uống không? Điều này sẽ giúp khách cảm thấy thoải mái hơn khi chờ đợi."
+                                            </p>
+<div class="flex gap-2">
+<button class="text-code-sm font-label-md bg-secondary text-white px-3 py-1.5 rounded flex items-center gap-1 hover:bg-on-secondary-fixed-variant transition-colors shadow-sm">
+                                                    ✨ Điều phối ngay
+                                                </button>
+<button class="text-code-sm font-label-md bg-transparent text-on-surface-variant border border-outline-variant px-3 py-1.5 rounded hover:bg-surface-variant transition-colors">
+                                                    Bỏ qua
+                                                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Insight 2 -->
+<div class="bg-white/50 dark:bg-black/20 p-4 rounded-lg border border-white/40 backdrop-blur-sm">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-error mt-0.5">warning</span>
+<div>
+<p class="font-body-sm text-body-sm text-on-background mb-2">
+                                                "Phát hiện Máy lạnh Spa mất kết nối hơn 15 phút. Bạn nên kiểm tra ngay để tránh ảnh hưởng trải nghiệm khách hàng nhé."
+                                            </p>
+<button class="text-code-sm font-label-md bg-transparent text-error border border-error/50 px-3 py-1.5 rounded hover:bg-error-container transition-colors">
+                                                Tạo phiếu bảo trì
+                                            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+<!-- NavigationDrawer (AI Advisor - Hidden by default, triggers on mobile or specific action) -->
+<aside class="bg-white/70 dark:bg-black/40 backdrop-blur-xl text-secondary dark:text-secondary-fixed-dim font-body-sm text-body-sm h-screen w-80 fixed right-0 top-0 border-l border-white/20 dark:border-white/10 shadow-xl flex flex-col h-full z-50 transition-all duration-300 ease-in-out translate-x-full" id="aiDrawer">
+<!-- Drawer content would go here, initialized hidden for this layout structure -->
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<img alt="AI Assistant Avatar" class="w-10 h-10 rounded-full object-cover border-2 border-secondary" data-alt="A futuristic, stylized 3D avatar representing an AI assistant. It features a sleek, geometric head with soft glowing blue and purple light panels against a pristine white background. The aesthetic is clean, modern, and high-tech." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAw8CyjZmsXVAoJigDMwzs_64293Vko9UjEy2DDXQIYJP8iEadgZFnZTi1EM7HidLyvyEl3DwGEmgzfjgQNwikAgHsGB8okL7x79gv7Kua_GJcq704m6Mo5lXqZW42eYUFxV03z_S3nJxdjBkSFZLfQP7zw_nJyyN6TaOlyq4TjmI9XHcdECIoY8H_fBlkcL1EM2mcWIdP3lSuTE1wjZzoUuVk3wyWg7qN_px_lh3KGfFmowL0zkpLwQg_FHOpXDz_apfMqF5HNLbU"/>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-secondary font-bold">AI Advisor</h2>
+<p class="text-on-surface-variant">Intelligent Insights</p>
+</div>
+</div>
+<ul>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 bg-secondary-container text-on-secondary-container rounded-lg font-medium" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+                        AI Advisor
+                    </a>
+</li>
+</ul>
+</div>
+</aside>
+</body></html>

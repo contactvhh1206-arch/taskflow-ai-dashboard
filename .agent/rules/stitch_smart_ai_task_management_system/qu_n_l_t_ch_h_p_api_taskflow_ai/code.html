@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý Tích hợp &amp; API - TaskFlow AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed-dim": "#ffb59d",
+                      "tertiary-fixed": "#ffdbd0",
+                      "on-primary-fixed": "#00174c",
+                      "error": "#ba1a1a",
+                      "on-tertiary": "#ffffff",
+                      "secondary-fixed-dim": "#d4bbff",
+                      "outline": "#737687",
+                      "on-secondary-fixed-variant": "#5d00c2",
+                      "surface-container-low": "#f6f3f2",
+                      "on-primary": "#ffffff",
+                      "inverse-on-surface": "#f3f0ef",
+                      "on-primary-fixed-variant": "#003da9",
+                      "secondary": "#731be5",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "on-primary-container": "#f3f3ff",
+                      "primary-fixed": "#dbe1ff",
+                      "surface-bright": "#fcf9f8",
+                      "on-surface": "#1c1b1b",
+                      "tertiary-container": "#c84000",
+                      "surface-container-high": "#eae7e7",
+                      "on-secondary": "#ffffff",
+                      "on-secondary-fixed": "#270058",
+                      "surface": "#fcf9f8",
+                      "primary-container": "#0f62fe",
+                      "secondary-container": "#8d42ff",
+                      "tertiary": "#9e3100",
+                      "surface-container-highest": "#e5e2e1",
+                      "surface-container": "#f0edec",
+                      "on-secondary-container": "#fdf6ff",
+                      "primary": "#004ccd",
+                      "on-tertiary-container": "#fff1ed",
+                      "on-error": "#ffffff",
+                      "inverse-primary": "#b4c5ff",
+                      "surface-variant": "#e5e2e1",
+                      "surface-dim": "#dcd9d9",
+                      "on-tertiary-fixed": "#390c00",
+                      "outline-variant": "#c3c6d8",
+                      "secondary-fixed": "#ebdcff",
+                      "inverse-surface": "#313030",
+                      "on-error-container": "#93000a",
+                      "error-container": "#ffdad6",
+                      "on-surface-variant": "#424656",
+                      "on-background": "#1c1b1b",
+                      "background": "#fcf9f8",
+                      "surface-container-lowest": "#ffffff",
+                      "on-tertiary-fixed-variant": "#832700",
+                      "surface-tint": "#0052dd"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "margin-mobile": "16px",
+                      "gutter": "24px",
+                      "container-max": "1440px",
+                      "stack-sm": "8px",
+                      "margin-desktop": "32px",
+                      "unit": "8px",
+                      "stack-md": "16px",
+                      "stack-lg": "24px"
+              },
+              "fontFamily": {
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Geist"
+                      ],
+                      "code-sm": [
+                              "Geist"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "code-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+          .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+          }
+          .glass-panel {
+              background: rgba(255, 255, 255, 0.7);
+              backdrop-filter: blur(12px);
+              -webkit-backdrop-filter: blur(12px);
+              border: 1px solid rgba(255, 255, 255, 0.5);
+          }
+      </style>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="bg-surface dark:bg-inverse-surface h-screen w-64 fixed left-0 top-0 border-r border-outline-variant shadow-sm flex flex-col h-full py-stack-lg z-30 hidden md:flex">
+<div class="px-gutter mb-stack-lg">
+<div class="flex items-center gap-stack-sm mb-stack-md">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-primary font-bold">TF</div>
+<div>
+<div class="font-headline-md text-headline-md font-bold text-primary">TaskFlow AI</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Enterprise Hub</div>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary py-2 px-4 rounded-lg font-label-md text-label-md hover:bg-on-primary-fixed-variant transition-colors flex items-center justify-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                Công việc mới
+            </button>
+</div>
+<ul class="flex-1 px-stack-sm space-y-1">
+<li>
+<a class="flex items-center gap-stack-md px-stack-sm py-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-md px-stack-sm py-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-label-md text-label-md">Công việc</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-md px-stack-sm py-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-label-md text-label-md">Báo cáo</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-md px-stack-sm py-2 rounded-lg text-primary font-bold border-r-4 border-primary bg-primary-container/10" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="font-label-md text-label-md">Cài đặt</span>
+</a>
+</li>
+</ul>
+<ul class="px-stack-sm space-y-1 mt-auto">
+<li>
+<a class="flex items-center gap-stack-md px-stack-sm py-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Trợ giúp</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-md px-stack-sm py-2 rounded-lg text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Đăng xuất</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col md:ml-64 relative h-screen overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface/80 backdrop-blur-md font-label-md text-label-md full-width top-0 sticky z-40 border-b border-outline-variant flex justify-between items-center h-16 px-margin-desktop">
+<div class="flex items-center gap-stack-md">
+<div class="md:hidden font-headline-md text-headline-md font-black text-primary">TaskFlow AI</div>
+<h1 class="hidden md:block font-headline-md text-headline-md font-semibold text-on-surface">Quản lý Tích hợp &amp; API</h1>
+</div>
+<div class="flex items-center gap-stack-md">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">auto_awesome</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Main Scrollable Content -->
+<main class="flex-1 overflow-y-auto p-margin-mobile md:p-margin-desktop bg-surface-container-lowest">
+<div class="max-w-container-max mx-auto grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Connected Services & Webhooks (Spans 8 cols) -->
+<div class="lg:col-span-8 flex flex-col gap-gutter">
+<!-- Connected Services Bento Box -->
+<section class="bg-surface rounded-xl border border-outline-variant p-stack-lg shadow-sm">
+<div class="flex justify-between items-center mb-stack-lg">
+<div>
+<h2 class="font-headline-md text-headline-md font-semibold text-on-surface">Dịch vụ đã Kết nối</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Quản lý các tích hợp bên thứ ba đang hoạt động của bạn.</p>
+</div>
+<button class="bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary py-2 px-4 rounded-lg font-label-md text-label-md transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                                Thêm Tích hợp
+                            </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-md">
+<!-- Service Card: Google Calendar -->
+<div class="border border-outline-variant rounded-lg p-stack-md hover:shadow-md transition-shadow bg-surface-bright flex flex-col">
+<div class="flex justify-between items-start mb-stack-md">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-white border border-outline-variant rounded flex items-center justify-center p-1">
+<img alt="Google Calendar Logo" class="w-full h-full object-contain" data-alt="A clean, isolated vector graphic icon of the Google Calendar logo. The icon features a white square with rounded corners and a fold in the top right corner. The date '31' is prominently displayed in the center in a crisp blue font. The overall aesthetic is flat, modern, and suitable for a corporate interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAal6TFfpW8twn1TXTiItTwMhGBxRKeabJt7UF2FiWfJ4Qn70N8QAyi5mkO-snsULdJrQWsh5i8OQML9wd4la0PfQ5E4wpJuFjaKw02hnuCsXIAKVQQaE4_omTp_yRtdQUt9Xo2eILsYRBHlQUuRmVT381Cd2HD0Uu84hCDWYFiXy1tuD-fSDusWObqSAUlzWjAOStmS8EA0dB1YMCUC4rmzZx44B4VBNNQ90iM7eMOzjQD9iZCuxhQgblVZDVlhtW6WARnhpkSG4"/>
+</div>
+<div>
+<h3 class="font-label-md text-label-md font-semibold text-on-surface">Google Calendar</h3>
+<span class="inline-flex items-center gap-1 text-[12px] font-medium text-primary mt-1 bg-primary-container/20 px-2 py-0.5 rounded-full">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                                                Đã kết nối
+                                            </span>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md flex-1">Đồng bộ hóa các cuộc họp và thời hạn của bạn một cách tự động.</p>
+<div class="border-t border-outline-variant pt-stack-sm flex justify-between items-center">
+<span class="font-code-sm text-code-sm text-on-surface-variant">Đồng bộ lần cuối: 2 phút trước</span>
+<button class="text-primary font-label-md text-label-md hover:underline">Cấu hình</button>
+</div>
+</div>
+<!-- Service Card: Slack -->
+<div class="border border-outline-variant rounded-lg p-stack-md hover:shadow-md transition-shadow bg-surface-bright flex flex-col">
+<div class="flex justify-between items-start mb-stack-md">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-white border border-outline-variant rounded flex items-center justify-center p-1">
+<img alt="Slack Logo" class="w-full h-full object-contain" data-alt="A clean, isolated vector graphic icon of the Slack logo. The icon is a colorful hashtag-like symbol made of rounded geometric shapes in red, blue, green, and yellow, set against a transparent or white background. The style is modern, scalable, and fits a professional software interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4n-nscIBGdagaXzC783-ND73N50xTWbVb6LlshjP1pf_OfejO3t2fo-4gnIxgpW_RLtvamboE72pgWeXT_-8trejBvKHOzvCWLu2m16Z7_MT18geGMfExCraHx745tYKymFJAvFqwEYBBFJnWuJbdRbovcHMPRzmUDCf3wKuSvfD2dDjcqaMHcbL5nD5gb-_ErWiUhXM-r1jR8RiHdkrTJqZ-n0C3g6a3m5kBYl3lJEcOKAgL8N0iZEh5ljyQBZSeHkhgcmgHWhA"/>
+</div>
+<div>
+<h3 class="font-label-md text-label-md font-semibold text-on-surface">Slack</h3>
+<span class="inline-flex items-center gap-1 text-[12px] font-medium text-primary mt-1 bg-primary-container/20 px-2 py-0.5 rounded-full">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                                                Đã kết nối
+                                            </span>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md flex-1">Nhận thông báo công việc trong các kênh đã chọn.</p>
+<div class="border-t border-outline-variant pt-stack-sm flex justify-between items-center">
+<span class="font-code-sm text-code-sm text-on-surface-variant">3 quy tắc đang hoạt động</span>
+<button class="text-primary font-label-md text-label-md hover:underline">Cấu hình</button>
+</div>
+</div>
+<!-- Service Card: Microsoft Teams -->
+<div class="border border-outline-variant rounded-lg p-stack-md bg-surface-container opacity-70 flex flex-col">
+<div class="flex justify-between items-start mb-stack-md">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-white border border-outline-variant rounded flex items-center justify-center p-1 grayscale">
+<img alt="MS Teams Logo" class="w-full h-full object-contain" data-alt="A clean, isolated vector graphic icon of the Microsoft Teams logo. The design features two overlapping stylized figures representing people in blue and purple hues, next to a blue shield bearing a white letter 'T'. The image is flat, professional, and styled for enterprise application integration views." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeSYcGfzCs7JXf-7cgG5ob4nPgB6n_gcucWcgIob4ce7qrmoVunCXXDQbbXB9_o84cEKG-XYMigcqJAJ7NbRVpzw44Q3s7Wt2DqTRh6uqkvMnFQ8k_aFXaztU-AgPVyyXRxVWFy7_jurFErbGBi3T0nPt_VI3Z4hD3rroMPzYBRtun7IgudZ28ffqFNb5YEAr2_W9QAIGu-GBDcYPPGUVPlKNx6lVFDSgUSn8Z4dWoBM3MuwXNTUtjnqfs_7wBS-gXSIqMqijUZxQ"/>
+</div>
+<div>
+<h3 class="font-label-md text-label-md font-semibold text-on-surface">Microsoft Teams</h3>
+<span class="inline-flex items-center gap-1 text-[12px] font-medium text-outline mt-1 bg-surface-variant px-2 py-0.5 rounded-full">
+<span class="w-2 h-2 rounded-full bg-outline"></span>
+                                                Chưa kết nối
+                                            </span>
+</div>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-md flex-1">Cộng tác trong các công việc trực tiếp trong các cuộc trò chuyện trên Teams.</p>
+<button class="w-full mt-auto border border-outline-variant text-on-surface py-1.5 rounded font-label-md text-label-md hover:bg-surface-variant transition-colors">Kết nối</button>
+</div>
+</div>
+</section>
+<!-- Webhooks Section -->
+<section class="bg-surface rounded-xl border border-outline-variant p-stack-lg shadow-sm">
+<div class="flex justify-between items-center mb-stack-lg">
+<div>
+<h2 class="font-headline-md text-headline-md font-semibold text-on-surface">Webhooks</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Lắng nghe các sự kiện trong không gian làm việc của bạn.</p>
+</div>
+<button class="border border-outline-variant text-on-surface hover:bg-surface-variant py-2 px-4 rounded-lg font-label-md text-label-md transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">webhook</span>
+                                Webhook mới
+                            </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant text-on-surface-variant font-label-md text-label-md">
+<th class="py-3 px-4 font-medium">Tên / URL</th>
+<th class="py-3 px-4 font-medium">Sự kiện</th>
+<th class="py-3 px-4 font-medium">Trạng thái</th>
+<th class="py-3 px-4 font-medium text-right">Hành động</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm">
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="py-3 px-4">
+<div class="font-medium text-on-surface">Production Analytics</div>
+<div class="text-on-surface-variant truncate w-48 font-code-sm text-code-sm">https://api.analytics.co/ingest/v1</div>
+</td>
+<td class="py-3 px-4">
+<span class="inline-block bg-surface-variant text-on-surface px-2 py-1 rounded text-[11px] mr-1 mb-1">task.completed</span>
+<span class="inline-block bg-surface-variant text-on-surface px-2 py-1 rounded text-[11px] mr-1 mb-1">project.created</span>
+</td>
+<td class="py-3 px-4">
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+                                                Đang hoạt động
+                                            </div>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant hover:text-primary mx-1"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="text-on-surface-variant hover:text-error mx-1"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<!-- Right Column: API Keys & AI Advisor (Spans 4 cols) -->
+<div class="lg:col-span-4 flex flex-col gap-gutter">
+<!-- API Keys Management -->
+<section class="bg-surface rounded-xl border border-outline-variant p-stack-lg shadow-sm">
+<h2 class="font-headline-md text-headline-md font-semibold text-on-surface mb-1">Khóa API</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-stack-lg">Quản lý quyền truy cập cho các ứng dụng tùy chỉnh.</p>
+<div class="space-y-stack-md">
+<div class="bg-surface-container-low border border-outline-variant rounded-lg p-stack-sm">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-md text-label-md font-semibold">Khóa Production</span>
+<span class="text-outline text-[12px]">Đã tạo: Jan 15, 2024</span>
+</div>
+<div class="flex items-center gap-2">
+<input class="flex-1 bg-surface border border-outline-variant rounded px-2 py-1 font-code-sm text-code-sm text-on-surface focus:ring-primary focus:border-primary" readonly="" type="password" value="sk_live_1234567890abcdef"/>
+<button class="p-1 text-on-surface-variant hover:text-primary bg-surface rounded border border-outline-variant" title="Copy">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+</div>
+<button class="w-full border border-dashed border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary py-2 rounded-lg font-label-md text-label-md transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">Ladder</span>
+                                Tạo Khóa mới
+                            </button>
+</div>
+</section>
+<!-- AI Advisor Integration Suggestions -->
+<div class="bg-white/70 dark:bg-black/40 backdrop-blur-xl border border-secondary/20 rounded-xl p-stack-lg shadow-lg relative overflow-hidden flex flex-col">
+<!-- Decorative AI Glow -->
+<div class="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+<div class="flex items-center gap-3 mb-stack-md relative z-10">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">smart_toy</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md font-semibold text-secondary">Cố vấn AI</h3>
+<p class="text-[12px] text-on-surface-variant">Thông tin Thông minh</p>
+</div>
+</div>
+<div class="glass-panel p-stack-md rounded-lg relative z-10 mb-stack-sm">
+<p class="font-body-sm text-body-sm text-on-surface mb-2">
+                                Dựa trên các mẫu quy trình làm việc gần đây của bạn, kết nối <strong>Jira</strong> có thể tự động hóa việc tạo vé cho các vấn đề được báo cáo trong công việc của bạn.
+                            </p>
+<div class="flex gap-2">
+<span class="inline-flex items-center text-[11px] font-medium text-secondary bg-secondary-container/30 px-2 py-0.5 rounded-full">
+                                    ✨ Tối ưu Quy trình
+                                </span>
+</div>
+</div>
+<button class="w-full bg-gradient-to-r from-secondary to-primary text-white py-2 rounded-lg font-label-md text-label-md hover:opacity-90 transition-opacity mt-auto shadow-md relative z-10">
+                            Xem Gợi ý AI
+                        </button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

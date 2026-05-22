@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>403 Access Denied - TaskFlow AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Geist:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-tertiary-fixed": "#390c00",
+                        "on-secondary-fixed": "#270058",
+                        "on-primary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-primary-fixed": "#00174c",
+                        "on-primary-container": "#f3f3ff",
+                        "secondary-container": "#8d42ff",
+                        "on-secondary-container": "#fdf6ff",
+                        "on-background": "#1c1b1b",
+                        "secondary": "#731be5",
+                        "inverse-on-surface": "#f3f0ef",
+                        "tertiary-container": "#c84000",
+                        "on-surface-variant": "#424656",
+                        "surface-bright": "#fcf9f8",
+                        "on-surface": "#1c1b1b",
+                        "on-tertiary-container": "#fff1ed",
+                        "surface-dim": "#dcd9d9",
+                        "surface-container-high": "#eae7e7",
+                        "secondary-fixed-dim": "#d4bbff",
+                        "primary-container": "#0f62fe",
+                        "surface-tint": "#0052dd",
+                        "error-container": "#ffdad6",
+                        "background": "#fcf9f8",
+                        "surface-container": "#f0edec",
+                        "inverse-primary": "#b4c5ff",
+                        "on-tertiary-fixed-variant": "#832700",
+                        "surface-container-lowest": "#ffffff",
+                        "surface": "#fcf9f8",
+                        "on-error-container": "#93000a",
+                        "outline-variant": "#c3c6d8",
+                        "secondary-fixed": "#ebdcff",
+                        "tertiary-fixed": "#ffdbd0",
+                        "tertiary-fixed-dim": "#ffb59d",
+                        "surface-container-low": "#f6f3f2",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#737687",
+                        "on-secondary-fixed-variant": "#5d00c2",
+                        "primary": "#004ccd",
+                        "tertiary": "#9e3100",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary-fixed-variant": "#003da9",
+                        "surface-variant": "#e5e2e1",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#313030"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-lg": "24px",
+                        "unit": "8px",
+                        "stack-md": "16px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "stack-sm": "8px",
+                        "margin-desktop": "32px",
+                        "container-max": "1440px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-md": ["Geist"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "code-sm": ["Geist"],
+                        "headline-md": ["Inter"],
+                        "display-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "label-md": ["14px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "code-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen w-screen overflow-hidden flex bg-surface">
+<!-- TopNavBar -->
+<nav class="docked full-width top-0 sticky flex justify-between items-center w-full px-margin-desktop h-16 z-40 bg-surface/80 dark:bg-surface-container-high/80 backdrop-blur-md border-b border-outline-variant dark:border-outline shadow-sm absolute top-0 left-0">
+<div class="flex items-center gap-gutter">
+<div class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed">
+                TaskFlow AI
+            </div>
+</div>
+<div class="flex items-center gap-stack-md">
+<button aria-label="Notifications" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button aria-label="Dark Mode" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A professional headshot of a business person in a corporate setting, soft lighting, modern office background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR8JGokgjiu2hENsY3U70ctnpkyD-UV1ZblrLRoQqMO7S2y-ziTPPZ84rjuMLhBLWDvM349IE9s_mSOyOX50CUXtNaQaSZB7pRs5PjYcdfxP2e1qahDJ7Io7JKTz6u5pC9yXuPz_101Quael-PFzN0RQ1W30UNhfJRZABv2-3UMWMHNFNz_woF9d0OXCpa-c8BaqJynQ7nuAk4dTFgaoS_lunrje8kY1oGTatEsuN9hjG5ZyylnVhX7I3Ue6bOsVldPX0mEC8HOXI"/>
+</div>
+</div>
+</nav>
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 pt-20 p-stack-md z-30 bg-surface-container-low dark:bg-surface-container-lowest border-r border-outline-variant dark:border-outline">
+<div class="flex flex-col h-full justify-between">
+<div>
+<div class="mb-stack-lg px-unit hidden">
+<h2 class="text-headline-md font-headline-md font-black text-primary dark:text-primary-fixed">TaskFlow AI</h2>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Precision &amp; Insight</p>
+</div>
+<button class="w-full flex items-center justify-center gap-unit bg-primary text-on-primary py-stack-sm px-stack-md rounded-lg font-label-md text-label-md mb-stack-lg shadow-sm hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    New Task
+                </button>
+<ul class="flex flex-col gap-unit">
+<li>
+<a class="flex items-center gap-stack-md p-stack-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-label-md font-label-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-md p-stack-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-label-md font-label-md">Tasks</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-md p-stack-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-label-md font-label-md">Reports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-md p-stack-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-md font-label-md">Settings</span>
+</a>
+</li>
+</ul>
+</div>
+<ul class="flex flex-col gap-unit border-t border-outline-variant pt-stack-md">
+<li>
+<a class="flex items-center gap-stack-md p-stack-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-label-md font-label-md">Help</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-md p-stack-sm rounded-lg text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-label-md font-label-md">Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 h-full pt-16 md:pl-64 overflow-y-auto flex items-center justify-center p-gutter">
+<!-- Error Content Canvas -->
+<div class="max-w-2xl w-full flex flex-col items-center text-center space-y-stack-lg relative z-10">
+<!-- Graphic/Icon Area -->
+<div class="relative w-full max-w-[320px] aspect-square flex items-center justify-center mb-stack-md">
+<!-- Decorative glass background -->
+<div class="absolute inset-0 bg-surface-container-lowest/40 backdrop-blur-xl border border-white/20 rounded-[2rem] shadow-xl rotate-3 transform -z-10"></div>
+<div class="absolute inset-0 bg-error-container/20 backdrop-blur-md rounded-[2rem] -rotate-2 transform -z-10"></div>
+<div class="relative flex flex-col items-center">
+<span class="material-symbols-outlined text-[120px] text-error mb-4" style="font-variation-settings: 'FILL' 1;">
+                        gpp_bad
+                    </span>
+<h1 class="text-[100px] leading-[100px] font-bold text-on-surface tracking-tighter opacity-10">
+                        403
+                    </h1>
+</div>
+</div>
+<!-- Typography Area -->
+<div class="space-y-stack-sm max-w-lg">
+<h2 class="text-display-lg font-display-lg text-on-surface">Không có quyền truy cập</h2>
+<p class="text-body-lg font-body-lg text-on-surface-variant">
+                    Tài khoản của bạn không có đủ quyền hạn để xem nội dung này. Nếu bạn tin rằng đây là một lỗi, vui lòng liên hệ với quản trị viên hệ thống.
+                </p>
+</div>
+<!-- Actions Area -->
+<div class="flex flex-col sm:flex-row items-center justify-center gap-stack-md w-full pt-stack-sm">
+<button class="h-12 px-8 bg-primary-container text-on-primary-container rounded-lg font-label-md text-label-md flex items-center gap-2 hover:opacity-90 transition-opacity shadow-sm min-w-[200px] justify-center">
+<span class="material-symbols-outlined">home</span>
+                    Quay lại Trang chủ
+                </button>
+<button class="h-12 px-8 bg-surface-container-high text-on-surface rounded-lg font-label-md text-label-md flex items-center gap-2 hover:bg-surface-variant transition-colors border border-outline-variant min-w-[200px] justify-center">
+<span class="material-symbols-outlined">support_agent</span>
+                    Liên hệ Hỗ trợ
+                </button>
+</div>
+</div>
+</main>
+</body></html>

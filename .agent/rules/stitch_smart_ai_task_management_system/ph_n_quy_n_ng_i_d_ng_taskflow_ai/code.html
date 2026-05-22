@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Phân quyền người dùng - TaskFlow AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "error-container": "#ffdad6",
+                      "on-secondary-fixed-variant": "#5d00c2",
+                      "surface-container-high": "#eae7e7",
+                      "on-secondary-fixed": "#270058",
+                      "surface-tint": "#0052dd",
+                      "on-surface-variant": "#424656",
+                      "secondary-container": "#8d42ff",
+                      "on-secondary": "#ffffff",
+                      "surface-container": "#f0edec",
+                      "on-tertiary-fixed-variant": "#832700",
+                      "on-surface": "#1c1b1b",
+                      "primary-container": "#0f62fe",
+                      "error": "#ba1a1a",
+                      "primary-fixed": "#dbe1ff",
+                      "on-primary-fixed-variant": "#003da9",
+                      "on-background": "#1c1b1b",
+                      "inverse-surface": "#313030",
+                      "surface-container-low": "#f6f3f2",
+                      "secondary-fixed": "#ebdcff",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "on-error-container": "#93000a",
+                      "tertiary-fixed": "#ffdbd0",
+                      "surface-container-highest": "#e5e2e1",
+                      "surface-variant": "#e5e2e1",
+                      "tertiary-fixed-dim": "#ffb59d",
+                      "on-error": "#ffffff",
+                      "outline-variant": "#c3c6d8",
+                      "on-tertiary": "#ffffff",
+                      "surface-bright": "#fcf9f8",
+                      "outline": "#737687",
+                      "surface-dim": "#dcd9d9",
+                      "on-tertiary-container": "#fff1ed",
+                      "inverse-primary": "#b4c5ff",
+                      "secondary": "#731be5",
+                      "primary": "#004ccd",
+                      "on-secondary-container": "#fdf6ff",
+                      "tertiary": "#9e3100",
+                      "on-tertiary-fixed": "#390c00",
+                      "on-primary-container": "#f3f3ff",
+                      "on-primary-fixed": "#00174c",
+                      "tertiary-container": "#c84000",
+                      "surface-container-lowest": "#ffffff",
+                      "background": "#fcf9f8",
+                      "surface": "#fcf9f8",
+                      "secondary-fixed-dim": "#d4bbff",
+                      "inverse-on-surface": "#f3f0ef",
+                      "on-primary": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "8px",
+                      "margin-desktop": "32px",
+                      "gutter": "24px",
+                      "stack-sm": "8px",
+                      "stack-md": "16px",
+                      "stack-lg": "24px",
+                      "margin-mobile": "16px",
+                      "container-max": "1440px"
+              },
+              "fontFamily": {
+                      "label-md": [
+                              "Geist"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "code-sm": [
+                              "Geist"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "code-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex font-body-md">
+<!-- SideNavBar -->
+<nav class="bg-surface dark:bg-inverse-surface h-screen w-64 fixed left-0 top-0 border-r border-outline-variant shadow-sm flex flex-col py-stack-lg z-50">
+<div class="px-gutter mb-stack-lg flex items-center gap-unit">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">task_alt</span>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">TaskFlow AI</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Enterprise Hub</p>
+</div>
+</div>
+<div class="px-gutter mb-stack-lg">
+<button class="w-full bg-primary text-on-primary font-label-md text-label-md py-stack-sm rounded-lg hover:opacity-90 flex items-center justify-center gap-unit shadow-sm transition-opacity">
+<span class="material-symbols-outlined text-lg">add</span>
+                New Task
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto px-unit">
+<ul class="flex flex-col gap-unit">
+<li>
+<a class="flex items-center gap-stack-sm px-stack-sm py-stack-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-sm px-stack-sm py-stack-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-label-md text-label-md">Tasks</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-sm px-stack-sm py-stack-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-sm px-stack-sm py-stack-sm rounded-lg text-primary font-bold bg-primary-container/10 border-r-4 border-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</li>
+</ul>
+</div>
+<div class="px-unit mt-auto">
+<ul class="flex flex-col gap-unit">
+<li>
+<a class="flex items-center gap-stack-sm px-stack-sm py-stack-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Support</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-stack-sm px-stack-sm py-stack-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md">Sign Out</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="ml-64 flex-1 flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="bg-surface/80 backdrop-blur-md docked full-width top-0 sticky z-40 border-b border-outline-variant flex justify-between items-center h-16 px-margin-desktop focus-within:ring-2 focus-within:ring-primary transition-all">
+<div class="flex items-center gap-stack-md w-1/3">
+<div class="relative w-full max-w-md hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg pl-10 pr-4 py-2 font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-shadow" placeholder="Search tasks, users, settings..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-stack-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors duration-200 p-1 rounded-full hover:bg-surface-container-high">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="hover:text-primary transition-colors duration-200 p-1 rounded-full hover:bg-surface-container-high relative group">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-secondary rounded-full animate-pulse"></span>
+</button>
+<button class="hover:text-primary transition-colors duration-200 p-1 rounded-full hover:bg-surface-container-high">
+<span class="material-symbols-outlined text-2xl">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Page Content -->
+<main class="flex-1 p-margin-desktop">
+<div class="max-w-container-max mx-auto h-full flex flex-col">
+<div class="mb-stack-lg flex justify-between items-end">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-unit">Phân quyền người dùng</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Quản lý các vai trò và mức độ truy cập hệ thống.</p>
+</div>
+<button class="bg-primary-container text-on-primary-container hover:bg-primary hover:text-on-primary font-label-md text-label-md py-2 px-4 rounded-lg flex items-center gap-2 transition-colors border border-transparent">
+<span class="material-symbols-outlined text-sm">add</span>
+                        Thêm vai trò mới
+                    </button>
+</div>
+<div class="flex-1 grid grid-cols-12 gap-gutter h-[calc(100vh-200px)]">
+<!-- Left Column: Roles List -->
+<div class="col-span-12 lg:col-span-4 bg-surface rounded-xl border border-outline-variant shadow-sm flex flex-col overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant bg-surface-container-lowest">
+<h3 class="font-headline-md text-headline-md text-on-surface">Danh sách vai trò</h3>
+</div>
+<div class="flex-1 overflow-y-auto p-stack-sm">
+<ul class="flex flex-col gap-unit">
+<li>
+<button class="w-full text-left px-stack-md py-stack-md rounded-lg flex items-center justify-between group bg-surface-container hover:bg-surface-container-high transition-colors">
+<div>
+<span class="block font-label-md text-label-md text-on-surface mb-1">Sếp tổng</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Toàn quyền truy cập</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">chevron_right</span>
+</button>
+</li>
+<li>
+<button class="w-full text-left px-stack-md py-stack-md rounded-lg flex items-center justify-between group bg-primary-container/10 border border-primary/20 transition-colors shadow-[0_0_12px_rgba(15,98,254,0.05)]">
+<div>
+<span class="block font-label-md text-label-md text-primary font-semibold mb-1">Tổng quản lý chuỗi</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Quản lý đa cơ sở</span>
+</div>
+<span class="material-symbols-outlined text-primary">chevron_right</span>
+</button>
+</li>
+<li>
+<button class="w-full text-left px-stack-md py-stack-md rounded-lg flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div>
+<span class="block font-label-md text-label-md text-on-surface mb-1">Trưởng phòng ban</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Quản lý tác vụ phòng</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all">chevron_right</span>
+</button>
+</li>
+<li>
+<button class="w-full text-left px-stack-md py-stack-md rounded-lg flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div>
+<span class="block font-label-md text-label-md text-on-surface mb-1">Quản lý cơ sở</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Quản lý hoạt động chi nhánh</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all">chevron_right</span>
+</button>
+</li>
+<li>
+<button class="w-full text-left px-stack-md py-stack-md rounded-lg flex items-center justify-between group hover:bg-surface-container-high transition-colors">
+<div>
+<span class="block font-label-md text-label-md text-on-surface mb-1">Nhân viên</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Truy cập cơ bản</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all">chevron_right</span>
+</button>
+</li>
+</ul>
+</div>
+</div>
+<!-- Right Column: Permission Details -->
+<div class="col-span-12 lg:col-span-8 bg-surface rounded-xl border border-outline-variant shadow-sm flex flex-col overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant bg-surface-container-lowest flex justify-between items-center sticky top-0 z-10">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+                                    Chi tiết quyền: <span class="text-primary">Tổng quản lý chuỗi</span>
+</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Cấu hình các chức năng mà vai trò này được phép sử dụng.</p>
+</div>
+<button class="bg-primary text-on-primary font-label-md text-label-md py-2 px-6 rounded-lg hover:opacity-90 transition-opacity shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">save</span>
+                                Lưu thay đổi
+                            </button>
+</div>
+<div class="flex-1 overflow-y-auto p-stack-lg space-y-stack-lg bg-surface-container-lowest/50">
+<!-- Permission Group 1 -->
+<div class="bg-surface border border-outline-variant rounded-lg p-stack-md shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
+<div class="flex items-center gap-2 mb-stack-md pb-stack-sm border-b border-outline-variant/50">
+<span class="material-symbols-outlined text-on-surface-variant">assignment_turned_in</span>
+<h4 class="font-label-md text-label-md text-on-surface text-lg">Quản lý Tác vụ</h4>
+</div>
+<div class="space-y-stack-sm">
+<div class="flex items-center justify-between py-2">
+<div class="pr-stack-md">
+<span class="block font-body-md text-body-md text-on-surface">Tạo mới tác vụ</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Cho phép tạo các tác vụ mới trong không gian làm việc.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between py-2 border-t border-outline-variant/30">
+<div class="pr-stack-md">
+<span class="block font-body-md text-body-md text-on-surface">Chỉnh sửa tác vụ</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Sửa đổi chi tiết, trạng thái của các tác vụ hiện có.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between py-2 border-t border-outline-variant/30">
+<div class="pr-stack-md">
+<span class="block font-body-md text-body-md text-on-surface">Xóa tác vụ</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Xóa hoàn toàn tác vụ khỏi hệ thống.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between py-2 border-t border-outline-variant/30">
+<div class="pr-stack-md">
+<span class="block font-body-md text-body-md text-on-surface">Phân công tác vụ</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Giao việc cho người dùng khác trong tổ chức.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Permission Group 2 (AI Focus) -->
+<div class="bg-secondary/5 border border-secondary/20 rounded-lg p-stack-md relative overflow-hidden backdrop-blur-sm">
+<div class="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+<div class="flex items-center gap-2 mb-stack-md pb-stack-sm border-b border-secondary/20">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<h4 class="font-label-md text-label-md text-secondary font-semibold text-lg flex items-center gap-2">
+                                        Cố vấn AI
+                                        <span class="bg-secondary/20 text-secondary text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Smart</span>
+</h4>
+</div>
+<div class="space-y-stack-sm relative z-10">
+<div class="flex items-center justify-between py-2">
+<div class="pr-stack-md">
+<span class="block font-body-md text-body-md text-on-surface">Xem Insights (Phân tích thông minh)</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Đọc các đề xuất và phân tích do AI tổng hợp.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-secondary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between py-2 border-t border-secondary/10">
+<div class="pr-stack-md">
+<span class="block font-body-md text-body-md text-on-surface">Cấu hình hành vi AI</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Điều chỉnh mức độ can thiệp và phong cách gợi ý của AI.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-secondary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between py-2 border-t border-secondary/10">
+<div class="pr-stack-md">
+<span class="block font-body-md text-body-md text-on-surface">Truy xuất Real-time Pull</span>
+<span class="block font-body-sm text-body-sm text-on-surface-variant">Yêu cầu AI kéo dữ liệu thời gian thực từ các hệ thống liên kết.</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-secondary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

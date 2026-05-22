@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý Cơ sở - TaskFlow AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Geist:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-surface": "#1c1b1b",
+                      "surface-variant": "#e5e2e1",
+                      "inverse-on-surface": "#f3f0ef",
+                      "outline": "#737687",
+                      "on-primary-fixed-variant": "#003da9",
+                      "surface-container": "#f0edec",
+                      "error-container": "#ffdad6",
+                      "on-secondary-fixed-variant": "#5d00c2",
+                      "on-primary-container": "#f3f3ff",
+                      "primary": "#004ccd",
+                      "on-error": "#ffffff",
+                      "tertiary": "#9e3100",
+                      "surface-dim": "#dcd9d9",
+                      "on-tertiary-fixed-variant": "#832700",
+                      "error": "#ba1a1a",
+                      "secondary": "#731be5",
+                      "on-secondary-fixed": "#270058",
+                      "on-secondary-container": "#fdf6ff",
+                      "background": "#fcf9f8",
+                      "on-tertiary-fixed": "#390c00",
+                      "tertiary-fixed": "#ffdbd0",
+                      "on-primary": "#ffffff",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "surface-container-high": "#eae7e7",
+                      "on-background": "#1c1b1b",
+                      "on-primary-fixed": "#00174c",
+                      "secondary-fixed-dim": "#d4bbff",
+                      "on-error-container": "#93000a",
+                      "surface-container-low": "#f6f3f2",
+                      "on-tertiary-container": "#fff1ed",
+                      "primary-fixed": "#dbe1ff",
+                      "primary-container": "#0f62fe",
+                      "inverse-primary": "#b4c5ff",
+                      "surface-container-highest": "#e5e2e1",
+                      "surface-bright": "#fcf9f8",
+                      "secondary-fixed": "#ebdcff",
+                      "tertiary-fixed-dim": "#ffb59d",
+                      "surface-tint": "#0052dd",
+                      "surface": "#fcf9f8",
+                      "inverse-surface": "#313030",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface-variant": "#424656",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "tertiary-container": "#c84000",
+                      "secondary-container": "#8d42ff",
+                      "outline-variant": "#c3c6d8"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "8px",
+                      "stack-md": "16px",
+                      "gutter": "24px",
+                      "container-max": "1440px",
+                      "margin-mobile": "16px",
+                      "margin-desktop": "32px",
+                      "stack-sm": "8px",
+                      "stack-lg": "24px"
+              },
+              "fontFamily": {
+                      "label-md": [
+                              "Geist"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "code-sm": [
+                              "Geist"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "code-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen">
+<!-- SideNavBar -->
+<nav class="hidden md:flex h-screen w-64 fixed left-0 top-0 bg-surface border-r border-outline-variant shadow-sm flex-col py-margin-desktop z-20">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">TaskFlow AI</h1>
+<p class="text-on-surface-variant text-body-sm mt-1">Enterprise Tier</p>
+</div>
+<div class="flex flex-col gap-2 mt-4 px-2 flex-grow">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+<span class="font-label-md text-label-md">Tasks</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-label-md text-label-md">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-primary bg-primary-container/10 border-r-4 border-primary hover:bg-surface-container-high transition-colors rounded-lg opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+<div class="px-4 mt-auto">
+<button class="w-full bg-primary text-on-primary py-3 rounded-lg font-label-md text-label-md flex justify-center items-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-[0_4px_12px_rgba(0,76,205,0.1)]">
+<span class="material-symbols-outlined">add</span>
+                New Task
+            </button>
+</div>
+</nav>
+<!-- TopAppBar -->
+<header class="hidden md:flex fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-surface/70 backdrop-blur-md justify-between items-center px-gutter border-b border-outline-variant z-10">
+<div class="flex items-center">
+<h2 class="font-headline-md text-headline-md font-bold text-primary">TaskFlow AI</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:bg-surface-variant/50 rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-variant/50 rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-variant/50 rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 pt-20 px-4 md:px-8 pb-12">
+<!-- Header Section -->
+<div class="flex justify-between items-center mb-8">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Quản lý Cơ sở</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Giám sát và cấu hình hệ thống cơ sở trực thuộc.</p>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2 rounded-lg font-label-md text-label-md hover:bg-on-primary-fixed-variant transition-colors flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined">add_business</span>
+                Thêm Cơ sở
+            </button>
+</div>
+<!-- Data Grid -->
+<div class="bg-surface rounded-xl border border-outline-variant shadow-[0_4px_12px_rgba(0,0,0,0.05)] overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="py-4 px-6 font-label-md text-label-md text-on-surface-variant font-medium">Tên Cơ sở</th>
+<th class="py-4 px-6 font-label-md text-label-md text-on-surface-variant font-medium">Địa chỉ / Khu vực</th>
+<th class="py-4 px-6 font-label-md text-label-md text-on-surface-variant font-medium">Quản lý trực tiếp (PIC)</th>
+<th class="py-4 px-6 font-label-md text-label-md text-on-surface-variant font-medium">Trạng thái</th>
+<th class="py-4 px-6 font-label-md text-label-md text-on-surface-variant font-medium text-right">Thao tác</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">storefront</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface font-medium">Cơ sở Quận 1</span>
+</div>
+</td>
+<td class="py-4 px-6 text-on-surface-variant font-body-sm text-body-sm">123 Lê Lợi, Phường Bến Nghé, Quận 1, TP.HCM</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-2">
+<img alt="Avatar" class="w-8 h-8 rounded-full border border-outline-variant" data-alt="A small circular avatar portrait of a professional corporate manager in a modern light-mode interface setting, smiling confidently." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSB2xiCjveev09RX5dyI3LMomgotL8_5k33cONsoG6bLOoZxa-cvFcodICQ6xDyxlqKD2Dq6NEd3Gw7GIpPqCxOcrBpID5kow6M1Gr07Fk0ZwRO8oHidjSSZ635BnI18VkKDXDomcgLicbi2fLC5dcBGYiird7tzlpsc0sesEKn4so-xM2axkNJEIbRdRWFfPSXw0kDn3EeRhXW-uHhy1kQOlbbgowuTpEt2jYlXv9GKD35TcZBoGjxh0NiJOfDUE2QxSXI2TNi2A"/>
+<span class="font-body-sm text-body-sm text-on-surface">Nguyễn Văn A</span>
+</div>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-high text-primary font-code-sm text-code-sm border border-outline-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                                    Đang hoạt động
+                                </span>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-error transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="py-4 px-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">storefront</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface font-medium">Cơ sở Quận 3</span>
+</div>
+</td>
+<td class="py-4 px-6 text-on-surface-variant font-body-sm text-body-sm">456 Điện Biên Phủ, Phường 22, Quận 3, TP.HCM</td>
+<td class="py-4 px-6">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant font-label-md text-label-md border border-outline-variant">
+                                        TB
+                                    </div>
+<span class="font-body-sm text-body-sm text-on-surface">Trần Thị B</span>
+</div>
+</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-on-error-container font-code-sm text-code-sm border border-error/20">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                    Tạm ngừng
+                                </span>
+</td>
+<td class="py-4 px-6 text-right">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">edit</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-error transition-colors opacity-0 group-hover:opacity-100">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-6 py-4 border-t border-outline-variant flex items-center justify-between bg-surface-container-lowest">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Hiển thị 1-2 trên tổng 2 cơ sở</p>
+<div class="flex gap-2">
+<button class="p-1 rounded text-outline hover:bg-surface-variant transition-colors disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="p-1 rounded text-on-surface hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Overlay & Side Drawer (Thêm Mới Cơ Sở) -->
+<!-- Note: Assuming this is the open state based on the prompt requesting the form -->
+<div aria-hidden="true" class="fixed inset-0 bg-inverse-surface/40 backdrop-blur-sm z-40"></div>
+<aside class="fixed top-0 right-0 h-screen w-full md:w-[480px] bg-surface shadow-[0_0_24px_rgba(0,0,0,0.1)] z-50 flex flex-col border-l border-outline-variant transform transition-transform duration-300">
+<!-- Drawer Header -->
+<div class="px-6 py-5 border-b border-outline-variant flex justify-between items-center bg-surface-bright">
+<h3 class="font-headline-md text-headline-md text-on-surface font-semibold">Thêm Mới Cơ Sở</h3>
+<button class="p-2 text-on-surface-variant hover:bg-surface-variant/50 rounded-full transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Drawer Content (Form) -->
+<div class="flex-grow overflow-y-auto p-6">
+<form class="space-y-6">
+<!-- Input Tên Cơ Sở -->
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-2">Tên Cơ sở <span class="text-error">*</span></label>
+<input class="w-full h-12 px-4 bg-surface rounded-lg border border-outline text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all" placeholder="Nhập tên cơ sở..." type="text"/>
+</div>
+<!-- Input Địa chỉ -->
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-2">Địa chỉ / Khu vực</label>
+<textarea class="w-full p-4 bg-surface rounded-lg border border-outline text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all resize-none h-24" placeholder="Nhập địa chỉ chi tiết..."></textarea>
+</div>
+<!-- Dropdown Chọn PIC -->
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-2">Quản lý trực tiếp (PIC)</label>
+<div class="relative">
+<select class="w-full h-12 pl-4 pr-10 bg-surface rounded-lg border border-outline text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all appearance-none">
+<option disabled="" selected="" value="">Chọn quản lý...</option>
+<option value="1">Nguyễn Văn A</option>
+<option value="2">Trần Thị B</option>
+</select>
+<div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Toggle Trạng thái -->
+<div class="p-4 bg-surface-container rounded-lg border border-outline-variant flex justify-between items-center">
+<div>
+<p class="font-label-md text-label-md text-on-surface font-medium">Trạng thái Hoạt động</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Cơ sở sẽ được hiển thị trên hệ thống ngay lập tức.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- AI Suggestion Area (Glassmorphism twist) -->
+<div class="mt-8 p-4 rounded-xl border border-white/20 bg-primary-fixed/30 backdrop-blur-md relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+<div class="flex items-start gap-3 relative z-10">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<div>
+<p class="font-label-md text-label-md text-on-primary-fixed font-semibold mb-1">AI Suggestion</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Dựa trên địa chỉ, hệ thống gợi ý cấu hình múi giờ (GMT+7) và phân bổ nhân sự từ cụm Quận 1.</p>
+<button class="mt-2 text-primary text-label-md font-label-md hover:underline" type="button">Áp dụng gợi ý</button>
+</div>
+</div>
+</div>
+</form>
+</div>
+<!-- Drawer Footer (Actions) -->
+<div class="px-6 py-4 border-t border-outline-variant bg-surface flex justify-end gap-3">
+<button class="px-6 py-2 rounded-lg font-label-md text-label-md text-on-surface hover:bg-surface-variant transition-colors border border-outline">
+                Hủy bỏ
+            </button>
+<button class="px-6 py-2 rounded-lg font-label-md text-label-md bg-primary text-on-primary hover:bg-on-primary-fixed-variant transition-colors shadow-sm">
+                Lưu Cơ sở
+            </button>
+</div>
+</aside>
+</body></html>

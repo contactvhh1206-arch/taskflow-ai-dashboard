@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Hồ sơ người dùng &amp; Cài đặt tài khoản - TaskFlow AI</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary": "#ffffff",
+                    "on-tertiary-container": "#fff1ed",
+                    "tertiary-container": "#c84000",
+                    "inverse-on-surface": "#f3f0ef",
+                    "primary": "#004ccd",
+                    "secondary-fixed-dim": "#d4bbff",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "secondary-container": "#8d42ff",
+                    "on-secondary-fixed-variant": "#5d00c2",
+                    "surface-container": "#f0edec",
+                    "primary-fixed": "#dbe1ff",
+                    "primary-container": "#0f62fe",
+                    "on-tertiary-fixed": "#390c00",
+                    "on-primary-fixed-variant": "#003da9",
+                    "surface-tint": "#0052dd",
+                    "outline": "#737687",
+                    "outline-variant": "#c3c6d8",
+                    "tertiary": "#9e3100",
+                    "on-surface": "#1c1b1b",
+                    "inverse-primary": "#b4c5ff",
+                    "on-error": "#ffffff",
+                    "on-tertiary-fixed-variant": "#832700",
+                    "surface-container-low": "#f6f3f2",
+                    "surface": "#fcf9f8",
+                    "tertiary-fixed-dim": "#ffb59d",
+                    "error": "#ba1a1a",
+                    "on-secondary-container": "#fdf6ff",
+                    "secondary": "#731be5",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "surface-dim": "#dcd9d9",
+                    "surface-container-high": "#eae7e7",
+                    "on-primary-fixed": "#00174c",
+                    "on-surface-variant": "#424656",
+                    "tertiary-fixed": "#ffdbd0",
+                    "on-error-container": "#93000a",
+                    "background": "#fcf9f8",
+                    "surface-bright": "#fcf9f8",
+                    "secondary-fixed": "#ebdcff",
+                    "inverse-surface": "#313030",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-highest": "#e5e2e1",
+                    "on-background": "#1c1b1b",
+                    "surface-variant": "#e5e2e1",
+                    "on-primary-container": "#f3f3ff",
+                    "on-secondary-fixed": "#270058",
+                    "error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-lg": "24px",
+                    "unit": "8px",
+                    "margin-mobile": "16px",
+                    "container-max": "1440px",
+                    "stack-sm": "8px",
+                    "stack-md": "16px",
+                    "margin-desktop": "32px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "code-sm": ["Geist"],
+                    "body-sm": ["Inter"],
+                    "label-md": ["Geist"],
+                    "headline-lg": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "code-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased flex overflow-hidden">
+<!-- SideNavBar (Left) -->
+<nav class="hidden md:flex flex-col bg-surface-container-low border-r border-outline-variant fixed left-0 top-0 h-full w-64 p-stack-md z-50">
+<div class="flex flex-col gap-stack-lg mb-8">
+<div>
+<h1 class="text-headline-md font-headline-md font-black text-primary">TaskFlow AI</h1>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Precision &amp; Insight</p>
+</div>
+<button class="w-full py-2 px-4 bg-primary text-on-primary rounded-lg text-label-md font-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New Task
+            </button>
+</div>
+<ul class="flex flex-col gap-unit flex-1">
+<!-- Inactive Tab -->
+<li>
+<a class="flex items-center gap-3 p-2 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-label-md font-label-md">Dashboard</span>
+</a>
+</li>
+<!-- Inactive Tab -->
+<li>
+<a class="flex items-center gap-3 p-2 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="text-label-md font-label-md">Tasks</span>
+</a>
+</li>
+<!-- Inactive Tab -->
+<li>
+<a class="flex items-center gap-3 p-2 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-label-md font-label-md">Reports</span>
+</a>
+</li>
+<!-- Active Tab -->
+<li>
+<a class="flex items-center gap-3 p-2 rounded-lg bg-secondary-container text-on-secondary-container scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="text-label-md font-label-md">Settings</span>
+</a>
+</li>
+</ul>
+<ul class="flex flex-col gap-unit mt-auto pt-4 border-t border-outline-variant">
+<li>
+<a class="flex items-center gap-3 p-2 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-label-md font-label-md">Help</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 p-2 rounded-lg text-on-surface-variant hover:bg-surface-variant/50 hover:translate-x-1 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-label-md font-label-md">Logout</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col min-w-0 md:ml-64 xl:mr-80 h-screen overflow-hidden">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center w-full px-margin-desktop h-16 z-40 bg-surface/80 backdrop-blur-md border-b border-outline-variant shadow-sm sticky top-0">
+<div class="flex items-center gap-4">
+<span class="md:hidden text-headline-md font-headline-md font-bold text-primary">TaskFlow AI</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container transition-colors rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container transition-colors rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant ml-2 cursor-pointer hover:opacity-80 transition-all duration-200">
+<img alt="User profile avatar" class="w-full h-full object-cover" data-alt="A brightly lit headshot portrait of a modern corporate professional wearing a tailored suit. The background is a slightly blurred, high-key white modern office space with subtle natural light. The mood is confident, clean, and empowering, fitting a premium productivity application interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB6NRCjjO9hInPLSmnm0lScSdd_L-DFXfMiDKsgZQHxbomBRSphin7XhJgc7QvE-zphnsIcgUk4RCwENaroLxSaO3DEJtLrQUjUylainwX1d-Nwd3FqAZhqoaTIZj8dEIgjnSZkQ0I_tFMs6dSwYvWgfqDK5xUgAmhJ49HdvpmV1erNARlHv17FTSQflnzRdpyhUk8G5s-r3SASVTCZYdBIaQULPAEDU5QVjf8aEUP4OcWdQ6J6oYLkhgS2p4madM8DXJO7fkQRkZQ"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-y-auto p-margin-mobile md:p-margin-desktop pb-32">
+<div class="max-w-4xl mx-auto flex flex-col gap-stack-lg">
+<!-- Page Header -->
+<div>
+<h2 class="text-headline-lg-mobile md:text-headline-lg font-headline-lg-mobile md:font-headline-lg text-on-surface">Cài đặt tài khoản</h2>
+<p class="text-body-md font-body-md text-on-surface-variant mt-1">Quản lý thông tin cá nhân, bảo mật và tùy chọn hệ thống của bạn.</p>
+</div>
+<!-- Personal Information Card -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant bg-surface-container-low/50">
+<h3 class="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">person</span>
+                            Thông tin cá nhân
+                        </h3>
+</div>
+<div class="p-stack-lg flex flex-col gap-stack-lg">
+<!-- Avatar Upload Section -->
+<div class="flex items-center gap-stack-md">
+<div class="w-20 h-20 rounded-full bg-surface-variant overflow-hidden border border-outline-variant relative group">
+<img alt="Current Avatar" class="w-full h-full object-cover" data-alt="A brightly lit headshot portrait of a modern corporate professional wearing a tailored suit. The background is a slightly blurred, high-key white modern office space with subtle natural light. The mood is confident, clean, and empowering, fitting a premium productivity application interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFZ6WTEtvhB8wmTBPvvnnwEHcp6EvbjtFP7QdJyUS6k7nbTxgoHffmZxdm4y7eDPX7NmcUulTCEljK-PgkIiAQta44X54q_83A5_SPkvyT1fPmfcdARQ9cHy5HT1td0CiFHueKNyZWlNMle5iVL6FTMn2Tpm1oH_SvDSY6lz2TUU1O4W9rmYrCKHqb9ylvD-Lc-Pw4DZhO1NYYO88C6b4gomQHh3p_jE0Yj261kWOP17rwtYKWWJnskYuoZ996Q8iz3gC8gRbVfXs"/>
+<div class="absolute inset-0 bg-inverse-surface/50 hidden group-hover:flex items-center justify-center cursor-pointer transition-all">
+<span class="material-symbols-outlined text-on-primary">photo_camera</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<button class="px-4 py-2 bg-surface-container border border-outline-variant text-on-surface text-label-md font-label-md rounded-lg hover:bg-surface-container-highest transition-colors w-max">
+                                    Tải lên ảnh mới
+                                </button>
+<p class="text-code-sm font-code-sm text-on-surface-variant">JPG, GIF hoặc PNG. Tối đa 2MB.</p>
+</div>
+</div>
+<!-- Form Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<div class="flex flex-col gap-unit">
+<label class="text-label-md font-label-md text-on-surface" for="firstName">Tên hiển thị</label>
+<input class="h-12 px-4 rounded-lg border border-outline bg-surface focus:ring-2 focus:ring-primary focus:border-transparent text-body-md font-body-md text-on-surface transition-all" id="firstName" type="text" value="Nguyễn Văn A"/>
+</div>
+<div class="flex flex-col gap-unit">
+<label class="text-label-md font-label-md text-on-surface" for="email">Địa chỉ Email</label>
+<input class="h-12 px-4 rounded-lg border border-outline bg-surface focus:ring-2 focus:ring-primary focus:border-transparent text-body-md font-body-md text-on-surface transition-all" id="email" type="email" value="nguyenvana@taskflow.ai"/>
+</div>
+<div class="flex flex-col gap-unit md:col-span-2">
+<label class="text-label-md font-label-md text-on-surface" for="role">Vai trò (Chỉ đọc)</label>
+<input class="h-12 px-4 rounded-lg border border-outline-variant bg-surface-container-low text-body-md font-body-md text-on-surface-variant cursor-not-allowed" disabled="" id="role" type="text" value="Quản trị viên Hệ thống"/>
+</div>
+</div>
+</div>
+</section>
+<!-- Security Settings Card -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant bg-surface-container-low/50">
+<h3 class="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">security</span>
+                            Cài đặt bảo mật
+                        </h3>
+</div>
+<div class="p-stack-lg flex flex-col gap-stack-lg">
+<div class="flex flex-col gap-unit">
+<h4 class="text-label-md font-label-md text-on-surface">Đổi mật khẩu</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mb-2">Đảm bảo tài khoản của bạn đang sử dụng mật khẩu dài, ngẫu nhiên để an toàn.</p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<div class="flex flex-col gap-unit">
+<label class="sr-only">Mật khẩu hiện tại</label>
+<input class="h-12 px-4 rounded-lg border border-outline bg-surface focus:ring-2 focus:ring-primary focus:border-transparent text-body-md font-body-md text-on-surface" placeholder="Mật khẩu hiện tại" type="password"/>
+</div>
+<div class="flex flex-col gap-unit">
+<label class="sr-only">Mật khẩu mới</label>
+<input class="h-12 px-4 rounded-lg border border-outline bg-surface focus:ring-2 focus:ring-primary focus:border-transparent text-body-md font-body-md text-on-surface" placeholder="Mật khẩu mới" type="password"/>
+</div>
+</div>
+<div class="mt-2">
+<button class="px-4 py-2 bg-surface-variant text-on-surface-variant text-label-md font-label-md rounded-lg hover:bg-surface-container-highest transition-colors">
+                                    Cập nhật mật khẩu
+                                </button>
+</div>
+</div>
+<hr class="border-outline-variant"/>
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<h4 class="text-label-md font-label-md text-on-surface">Xác thực hai yếu tố (2FA)</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Thêm một lớp bảo mật bổ sung cho tài khoản của bạn.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</section>
+<!-- Preferences Card -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<div class="p-stack-md border-b border-outline-variant bg-surface-container-low/50 flex items-center justify-between">
+<h3 class="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">tune</span>
+                            Tùy chọn hiển thị
+                        </h3>
+<!-- AI Sparkle Tag -->
+<span class="px-3 py-1 bg-secondary-fixed/50 text-on-secondary-fixed text-code-sm font-code-sm rounded-full flex items-center gap-1 border border-secondary-fixed-dim/30 backdrop-blur-sm">
+<span class="material-symbols-outlined text-[14px]">magic_button</span> AI Tối ưu
+                        </span>
+</div>
+<div class="p-stack-lg flex flex-col gap-stack-lg">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<div class="flex flex-col gap-unit">
+<label class="text-label-md font-label-md text-on-surface" for="language">Ngôn ngữ giao diện</label>
+<select class="h-12 px-4 rounded-lg border border-outline bg-surface focus:ring-2 focus:ring-primary focus:border-transparent text-body-md font-body-md text-on-surface appearance-none" id="language">
+<option value="vi">Tiếng Việt</option>
+<option value="en">English (US)</option>
+</select>
+</div>
+<div class="flex flex-col gap-unit">
+<label class="text-label-md font-label-md text-on-surface" for="timezone">Múi giờ</label>
+<select class="h-12 px-4 rounded-lg border border-outline bg-surface focus:ring-2 focus:ring-primary focus:border-transparent text-body-md font-body-md text-on-surface appearance-none" id="timezone">
+<option value="asia-hcm">(GMT+07:00) Indochina Time - Hồ Chí Minh</option>
+<option value="asia-tokyo">(GMT+09:00) Japan Standard Time - Tokyo</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- Form Actions -->
+<div class="flex items-center justify-end gap-3 mt-4">
+<button class="px-6 py-2 bg-transparent text-on-surface-variant hover:bg-surface-variant/50 text-label-md font-label-md rounded-lg transition-colors">
+                        Hủy
+                    </button>
+<button class="px-6 py-2 bg-primary text-on-primary hover:bg-surface-tint shadow-sm text-label-md font-label-md rounded-lg transition-colors">
+                        Lưu thay đổi
+                    </button>
+</div>
+</div>
+</main>
+</div>
+<!-- NavigationDrawer (Right Panel - AI Advisor) -->
+<aside class="hidden xl:flex flex-col w-80 bg-surface/70 backdrop-blur-xl border-l border-white/20 shadow-xl p-stack-lg z-50 fixed right-0 top-0 h-full">
+<div class="flex flex-col gap-2 mb-stack-lg">
+<h2 class="text-headline-md font-headline-md text-secondary">AI Advisor</h2>
+<p class="text-label-md font-label-md uppercase tracking-widest text-secondary opacity-80">✨ Intelligent Insights</p>
+</div>
+<div class="flex-1 flex flex-col gap-4">
+<!-- AI Insight Card 1 -->
+<div class="p-4 rounded-xl bg-surface-container-lowest/80 border border-white/40 shadow-sm hover:backdrop-brightness-110 transition-all cursor-pointer group">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary mt-1 group-hover:scale-110 transition-transform">schedule</span>
+<div>
+<h4 class="text-label-md font-label-md text-on-surface mb-1">Tối ưu hóa Múi giờ</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Hầu hết đồng nghiệp của bạn đang ở GMT+9. Bạn có muốn điều chỉnh báo cáo theo múi giờ này?</p>
+</div>
+</div>
+</div>
+<!-- AI Insight Card 2 -->
+<div class="p-4 rounded-xl bg-surface-container-lowest/80 border border-white/40 shadow-sm hover:backdrop-brightness-110 transition-all cursor-pointer group">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary mt-1 group-hover:scale-110 transition-transform">lock_person</span>
+<div>
+<h4 class="text-label-md font-label-md text-on-surface mb-1">Gợi ý Bảo mật</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Tài khoản của bạn đã an toàn với 2FA. Đợt kiểm tra mật khẩu tiếp theo: 45 ngày tới.</p>
+</div>
+</div>
+</div>
+</div>
+<button class="mt-auto w-full py-3 px-4 bg-primary text-on-primary rounded-full text-label-md font-label-md hover:bg-primary-container transition-colors shadow-sm flex items-center justify-center gap-2">
+            Today's Progress
+            <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</aside>
+</body></html>

@@ -1,0 +1,146 @@
+-- ==============================================================================
+-- DATABASE SCHEMA: TASKFLOW AI (Hệ Thống Quản Lý Công Việc)
+-- Hỗ trợ kiến trúc Multi-facility & Phân quyền RBAC
+-- ==============================================================================
+
+-- 1. Bảng Cơ sở (Facilities)
+CREATE TABLE facilities (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'ACTIVE'
+);
+
+-- 2. Bảng Vai trò (Roles)
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL, -- SUPER_ADMIN, GENERAL_MANAGER, FACILITY_MANAGER, DEPT_HEAD
+    description TEXT
+);
+
+-- 3. Bảng Người dùng (Users)
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    role_id INT REFERENCES roles(id),
+    facility_id INT REFERENCES facilities(id), -- NULL nếu là Sếp tổng (Super Admin)
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Bảng Công việc (Tasks)
+CREATE TABLE tasks (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(50) DEFAULT 'todo', -- todo, in_progress, review, done
+    urgency BOOLEAN DEFAULT FALSE,
+    deadline DATE,
+    pic_id INT REFERENCES users(id), -- Người phụ trách (Person In Charge)
+    facility_id INT REFERENCES facilities(id) NOT NULL, -- Task thuộc cơ sở nào
+    created_by INT REFERENCES users(id),
+    created_by_role VARCHAR(50), -- 'CEO', 'VCEO', 'MANAGER', etc.
+    priority_level VARCHAR(50) DEFAULT 'PRIORITY', -- 'URGENT', 'PRIORITY'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Bảng Nhật ký nhắc việc AI (AI Ping Logs)
+CREATE TABLE ai_ping_logs (
+    id SERIAL PRIMARY KEY,
+    task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
+    pic_id INT REFERENCES users(id),
+    message TEXT NOT NULL,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_read BOOLEAN DEFAULT FALSE
+);
+
+-- 6. Bảng Chat trong Task (Contextual Task-Chat)
+CREATE TABLE task_comments (
+    id SERIAL PRIMARY KEY,
+    task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id INT REFERENCES users(id),
+    content TEXT NOT NULL,
+    attachments JSONB, -- Lưu URL ảnh nghiệm thu
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- CƠ CHẾ BẢO MẬT CẤP ĐỘ DÒNG (ROW-LEVEL SECURITY - RLS) CHO CƠ SỞ DỮ LIỆU
+-- Đảm bảo Quản lý cơ sở chỉ lấy được Data của cơ sở mình ở tầng Database (nếu dùng PostgreSQL)
+-- ==============================================================================
+
+-- Bật RLS trên bảng tasks
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+
+-- Tạo Policy cho Sếp Tổng / Tổng quản lý (Được xem toàn bộ)
+CREATE POLICY super_admin_all_tasks ON tasks
+    FOR ALL
+    USING (
+        EXISTS (
+            SELECT 1 FROM users u 
+            JOIN roles r ON u.role_id = r.id 
+            WHERE u.id = current_user_id() 
+            AND r.name IN ('SUPER_ADMIN', 'GENERAL_MANAGER')
+        )
+    );
+
+-- Tạo Policy cho Quản lý cơ sở (Chỉ xem task thuộc facility_id của mình)
+CREATE POLICY facility_manager_own_tasks ON tasks
+    FOR ALL
+    USING (
+        facility_id = (SELECT facility_id FROM users WHERE id = current_user_id())
+    );
+
+-- 7. Bảng Báo cáo Đầu giờ (Daily Check-ins)
+CREATE TABLE daily_checkins (
+    id SERIAL PRIMARY KEY,
+    facility_id INT REFERENCES facilities(id) NOT NULL,
+    user_id INT REFERENCES users(id) NOT NULL, -- Quản lý thực hiện check-in
+    shift VARCHAR(10) DEFAULT 'Ca 1', -- Ca 1 hoặc Ca 2
+    clocker_present INT DEFAULT 0, -- Số lượng Clocker đi làm
+    clocker_absent_excused INT DEFAULT 0, -- Clocker nghỉ có phép
+    clocker_absent_unexcused INT DEFAULT 0, -- Clocker nghỉ không phép
+    ktv_present INT DEFAULT 0, -- Số lượng KTV đi làm
+    ktv_ids_present TEXT, -- Mã số KTV đi làm
+    ktv_absent_excused INT DEFAULT 0, -- KTV nghỉ có phép
+    ktv_ids_absent_excused TEXT, -- Mã số KTV nghỉ có phép
+    ktv_absent_unexcused INT DEFAULT 0, -- KTV nghỉ không phép
+    ktv_ids_absent_unexcused TEXT, -- Mã số KTV nghỉ không phép
+    machinery_ok BOOLEAN DEFAULT FALSE, -- Máy móc tốt
+    cleaning_done BOOLEAN DEFAULT FALSE, -- Vệ sinh xong
+    repair_needed TEXT, -- Thiết bị cần sửa chữa
+    incidents TEXT, -- Sự cố phát sinh
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Policy cho check-in
+ALTER TABLE daily_checkins ENABLE ROW LEVEL SECURITY;
+CREATE POLICY super_admin_all_checkins ON daily_checkins
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN', 'GENERAL_MANAGER'))
+    );
+CREATE POLICY facility_manager_own_checkins ON daily_checkins
+    FOR ALL USING (
+        facility_id = (SELECT facility_id FROM users WHERE id = current_user_id())
+    );
+
+-- 8. Bảng Theo dõi Token AI (AI Token Tracking)
+CREATE TABLE ai_token_usage_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id),
+    username VARCHAR(100),
+    prompt_tokens INT DEFAULT 0,
+    completion_tokens INT DEFAULT 0,
+    total_tokens INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Policy cho bảng Token AI
+ALTER TABLE ai_token_usage_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY super_admin_all_tokens ON ai_token_usage_logs
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN', 'ADMIN'))
+    );

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Nhập Báo Cáo Doanh Thu 6 Cơ Sở - FiscalFlow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-surface-variant": "#45464d",
+                      "secondary-fixed": "#89f5e7",
+                      "on-error": "#ffffff",
+                      "background": "#f8f9ff",
+                      "secondary": "#006a61",
+                      "surface-container-high": "#dce9ff",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-container": "#86f2e4",
+                      "primary": "#000000",
+                      "on-tertiary-fixed-variant": "#574425",
+                      "error": "#ba1a1a",
+                      "tertiary": "#000000",
+                      "primary-fixed-dim": "#bec6e0",
+                      "on-error-container": "#93000a",
+                      "on-tertiary-fixed": "#271901",
+                      "outline-variant": "#c6c6cd",
+                      "on-tertiary-container": "#98805d",
+                      "on-secondary-fixed": "#00201d",
+                      "inverse-on-surface": "#eaf1ff",
+                      "surface-tint": "#565e74",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-container": "#006f66",
+                      "on-secondary-fixed-variant": "#005049",
+                      "on-primary-fixed-variant": "#3f465c",
+                      "primary-fixed": "#dae2fd",
+                      "surface-container-low": "#eff4ff",
+                      "surface-dim": "#cbdbf5",
+                      "outline": "#76777d",
+                      "surface-container-highest": "#d3e4fe",
+                      "on-primary-fixed": "#131b2e",
+                      "on-surface": "#0b1c30",
+                      "surface-bright": "#f8f9ff",
+                      "on-primary-container": "#7c839b",
+                      "inverse-primary": "#bec6e0",
+                      "tertiary-container": "#271901",
+                      "on-background": "#0b1c30",
+                      "tertiary-fixed": "#fcdeb5",
+                      "surface-variant": "#d3e4fe",
+                      "primary-container": "#131b2e",
+                      "surface": "#f8f9ff",
+                      "secondary-fixed-dim": "#6bd8cb",
+                      "tertiary-fixed-dim": "#dec29a",
+                      "on-secondary": "#ffffff",
+                      "on-primary": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "surface-container": "#e5eeff",
+                      "inverse-surface": "#213145"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "stack-gap": "16px",
+                      "grid-gutter": "20px",
+                      "section-margin": "32px",
+                      "unit": "4px",
+                      "container-padding": "24px"
+              },
+              "fontFamily": {
+                      "label-caps": [
+                              "Inter"
+                      ],
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "data-tabular": [
+                              "Inter"
+                      ],
+                      "headline-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "data-tabular": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-sm": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col w-64 h-screen z-50 overflow-y-auto bg-surface-container-lowest border-r border-outline-variant fixed left-0 top-0">
+<div class="p-container-padding">
+<div class="flex items-center gap-3 mb-8">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold tracking-tight text-on-surface">FiscalFlow</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant">Institutional Ledger</p>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary font-body-sm text-body-sm py-2 px-4 rounded mb-6 flex items-center justify-center gap-2 hover:bg-surface-tint transition-colors duration-200">
+<span class="material-symbols-outlined">add</span>
+                Add Entry
+            </button>
+<ul class="space-y-1">
+<li>
+<a class="text-on-surface-variant flex items-center px-4 py-3 rounded-DEFAULT hover:bg-surface-container-high transition-all duration-200" href="#">
+<span class="material-symbols-outlined mr-3">dashboard</span>
+<span class="font-body-sm text-body-sm">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="border-l-2 border-secondary text-secondary bg-surface-container-low font-bold flex items-center px-4 py-3 rounded-r-DEFAULT transition-all" href="#">
+<span class="material-symbols-outlined mr-3">assessment</span>
+<span class="font-body-sm text-body-sm">Reports</span>
+</a>
+</li>
+<li>
+<a class="text-on-surface-variant flex items-center px-4 py-3 rounded-DEFAULT hover:bg-surface-container-high transition-all duration-200" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span class="font-body-sm text-body-sm">Settings</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex-1 flex flex-col md:ml-64 w-full h-full relative">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center px-container-padding h-16 w-[calc(100%-16rem)] z-40 bg-surface-container-lowest border-b border-outline-variant fixed top-0 right-0 hidden md:flex">
+<div class="flex items-center">
+<h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface mr-6 border-b-2 border-secondary text-primary pb-[18px] mt-[18px]">Ledger Overview</h2>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface rounded border border-outline-variant text-body-sm font-body-sm focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary w-64" placeholder="Search entries..." type="text"/>
+</div>
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors duration-150">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors duration-150">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<button class="text-secondary font-body-sm text-body-sm border border-secondary px-3 py-1.5 rounded hover:bg-surface-container-low transition-colors duration-150 ml-2">
+                    Export CSV
+                </button>
+<div class="w-8 h-8 rounded-full bg-surface-variant border border-outline-variant overflow-hidden ml-2 flex-shrink-0">
+<!-- Placeholder for profile image -->
+</div>
+</div>
+</header>
+<!-- Canvas Area -->
+<main class="flex-1 overflow-y-auto p-section-margin bg-background mt-16 pb-24">
+<div class="max-w-[1200px] mx-auto">
+<!-- Header & Controls -->
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-stack-gap gap-4">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Nhập Báo Cáo Doanh Thu 6 Cơ Sở</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Vui lòng nhập số liệu chính xác cho từng cơ sở. Các trường không phát sinh nhập 0.</p>
+</div>
+<div class="flex flex-col">
+<label class="font-label-caps text-label-caps text-on-surface-variant mb-1" for="report-date">Ngày Báo Cáo</label>
+<input class="border border-outline-variant rounded px-3 py-2 font-body-sm text-body-sm focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" id="report-date" type="date" value="2024-05-15"/>
+</div>
+</div>
+<!-- Aggregated Metrics (Top Summary) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-grid-gutter mb-section-margin">
+<!-- Metric Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-DEFAULT flex flex-col justify-between h-full">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-2 uppercase tracking-wider">Tổng Doanh Thu Hệ Thống</span>
+<div class="flex items-baseline justify-between">
+<span class="font-headline-md text-headline-md text-on-surface">1,250,000,000</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant ml-1">VND</span>
+</div>
+</div>
+<!-- Metric Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-DEFAULT flex flex-col justify-between h-full">
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-2 uppercase tracking-wider">Tổng Chi Phí Hệ Thống</span>
+<div class="flex items-baseline justify-between">
+<span class="font-headline-md text-headline-md text-on-surface">420,000,000</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant ml-1">VND</span>
+</div>
+</div>
+<!-- Metric Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-DEFAULT flex flex-col justify-between h-full relative overflow-hidden">
+<div class="absolute right-0 top-0 w-1/3 h-full bg-secondary opacity-5"></div>
+<span class="font-label-caps text-label-caps text-on-surface-variant mb-2 uppercase tracking-wider">Lợi Nhuận Dự Kiến</span>
+<div class="flex items-baseline justify-between">
+<span class="font-headline-md text-headline-md text-secondary">830,000,000</span>
+<span class="font-body-sm text-body-sm text-secondary ml-1">VND</span>
+</div>
+</div>
+</div>
+<!-- Data Entry Table -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-DEFAULT overflow-x-auto shadow-sm">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-variant border-b border-outline-variant sticky top-0">
+<tr>
+<th class="py-3 px-4 font-label-caps text-label-caps text-on-surface-variant w-1/5">Tên Cơ Sở</th>
+<th class="py-3 px-4 font-label-caps text-label-caps text-on-surface-variant text-right w-1/5">Tổng Doanh Thu (VND)</th>
+<th class="py-3 px-4 font-label-caps text-label-caps text-on-surface-variant text-right w-1/5">Tổng Chi Phí (VND)</th>
+<th class="py-3 px-4 font-label-caps text-label-caps text-on-surface-variant text-right w-1/5">Còn Lại (VND)</th>
+<th class="py-3 px-4 font-label-caps text-label-caps text-on-surface-variant w-1/5">Ghi Chú</th>
+</tr>
+</thead>
+<tbody class="font-data-tabular text-data-tabular">
+<!-- Row 1 -->
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="py-2 px-4 text-on-surface font-medium">Cơ sở 1 - Quận 1</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="250,000,000"/>
+</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="80,000,000"/>
+</td>
+<td class="py-2 px-4 text-right text-on-surface">170,000,000</td>
+<td class="py-2 px-4">
+<input class="w-full border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" placeholder="..." type="text"/>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b border-outline-variant bg-surface-container hover:bg-surface-container-high transition-colors">
+<td class="py-2 px-4 text-on-surface font-medium">Cơ sở 2 - Quận 3</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="180,000,000"/>
+</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="65,000,000"/>
+</td>
+<td class="py-2 px-4 text-right text-on-surface">115,000,000</td>
+<td class="py-2 px-4">
+<input class="w-full border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" placeholder="..." type="text"/>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="py-2 px-4 text-on-surface font-medium">Cơ sở 3 - Quận 5</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="210,000,000"/>
+</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="70,000,000"/>
+</td>
+<td class="py-2 px-4 text-right text-on-surface">140,000,000</td>
+<td class="py-2 px-4">
+<input class="w-full border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" placeholder="..." type="text"/>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="border-b border-outline-variant bg-surface-container hover:bg-surface-container-high transition-colors">
+<td class="py-2 px-4 text-on-surface font-medium">Cơ sở 4 - Quận 10</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="290,000,000"/>
+</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="95,000,000"/>
+</td>
+<td class="py-2 px-4 text-right text-on-surface">195,000,000</td>
+<td class="py-2 px-4">
+<input class="w-full border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" placeholder="..." type="text"/>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors">
+<td class="py-2 px-4 text-on-surface font-medium">Cơ sở 5 - Tân Bình</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="150,000,000"/>
+</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="55,000,000"/>
+</td>
+<td class="py-2 px-4 text-right text-on-surface">95,000,000</td>
+<td class="py-2 px-4">
+<input class="w-full border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" placeholder="..." type="text"/>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="border-b border-outline-variant bg-surface-container hover:bg-surface-container-high transition-colors">
+<td class="py-2 px-4 text-on-surface font-medium">Cơ sở 6 - Phú Nhuận</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="170,000,000"/>
+</td>
+<td class="py-2 px-4">
+<input class="w-full text-right border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" type="text" value="55,000,000"/>
+</td>
+<td class="py-2 px-4 text-right text-on-surface">115,000,000</td>
+<td class="py-2 px-4">
+<input class="w-full border border-outline-variant rounded px-2 py-1.5 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary bg-surface-container-lowest" placeholder="..." type="text"/>
+</td>
+</tr>
+<!-- Total Row -->
+<tr class="bg-surface-dim border-t-2 border-outline font-bold">
+<td class="py-3 px-4 text-on-surface uppercase font-label-caps text-label-caps">TỔNG CỘNG</td>
+<td class="py-3 px-4 text-right text-on-surface">1,250,000,000</td>
+<td class="py-3 px-4 text-right text-on-surface">420,000,000</td>
+<td class="py-3 px-4 text-right text-secondary">830,000,000</td>
+<td class="py-3 px-4"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Action Buttons -->
+<div class="mt-stack-gap flex justify-end gap-4 border-t border-outline-variant pt-stack-gap">
+<button class="px-6 py-2 border border-outline font-body-sm text-body-sm text-on-surface bg-transparent hover:bg-surface-container-low transition-colors rounded-DEFAULT">
+                        Hủy
+                    </button>
+<button class="px-6 py-2 bg-primary text-on-primary font-body-sm text-body-sm hover:bg-surface-tint transition-colors rounded-DEFAULT flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">save</span>
+                        Lưu Báo Cáo
+                    </button>
+</div>
+</div>
+</main>
+</div>
+</body></html>
