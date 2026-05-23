@@ -1,10 +1,34 @@
 import React, { useState } from 'react';
 import { fetchHistory } from '../services/dataService.js';
 
-export default function AIAdvisor() {
+export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryHandled }) {
   const [query, setQuery] = useState('');
+
+  const getGreetingText = (userObj) => {
+    const hour = new Date().getHours();
+    let timeGreeting = 'Chào buổi sáng';
+    if (hour >= 12 && hour < 18) timeGreeting = 'Chào buổi chiều';
+    if (hour >= 18) timeGreeting = 'Chào buổi tối';
+
+    if (!userObj) return `${timeGreeting}! Tôi là Trợ lý Cố vấn AI Cấp cao đây! Bạn cần tôi hỗ trợ thông tin gì ạ?`;
+
+    const isMarketing = userObj.role === 'DEPARTMENT_HEAD';
+    const isBoss = userObj.role === 'SUPER_ADMIN' || userObj.role === 'GENERAL_MANAGER' || userObj.role === 'VICE_PRESIDENT';
+    
+    let displayName = userObj?.name || userObj?.username;
+    if (!displayName) {
+       if (isMarketing) displayName = 'Trưởng phòng Marketing';
+       else if (isBoss) displayName = 'Sếp';
+       else displayName = 'bạn';
+    }
+
+    if (isMarketing) return `${timeGreeting}, ${displayName}! Tôi là Trợ lý Cố vấn AI Cấp cao đây! Dữ liệu vận hành toàn chuỗi đã được đồng bộ. Anh/chị cần tôi trích xuất báo cáo doanh thu, kiểm tra lỗi thiết bị, hay theo dõi tiến độ công việc của cơ sở nào ạ?`;
+    if (isBoss) return `${timeGreeting}, Sếp ${displayName}! Tôi là Trợ lý Cố vấn AI Cấp cao đây! Dữ liệu vận hành toàn chuỗi đã được đồng bộ. Sếp cần tôi hỗ trợ thông tin gì ạ?`.replace('Sếp Sếp', 'Sếp').replace('Sếp !', 'Sếp!');
+    return `${timeGreeting}, ${displayName}! Tôi là Trợ lý Cố vấn AI Cấp cao đây! Dữ liệu vận hành toàn chuỗi đã được đồng bộ. Bạn cần tôi hỗ trợ thông tin gì ạ?`;
+  };
+
   const [chatLog, setChatLog] = useState([
-    { role: 'ai', content: 'Chào sếp. Tôi là AI Advisor. Tôi có toàn quyền truy cập vào Global Data Stream (Company_Master_Logs). Sếp cần tôi phân tích dữ liệu điểm danh hay nhật ký vận hành của cơ sở nào?' }
+    { role: 'ai', content: getGreetingText(user) }
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -99,9 +123,22 @@ export default function AIAdvisor() {
   };
 
 
-  const handleAsk = () => {
-    if (!query.trim() && !attachment) return;
-    const userQuery = query.trim() || 'Vui lòng phân tích tệp đính kèm này.';
+  React.useEffect(() => {
+    if (externalQueryTrigger) {
+        handleAsk(externalQueryTrigger);
+        if (onExternalQueryHandled) onExternalQueryHandled();
+    }
+  }, [externalQueryTrigger]);
+
+  const handleAsk = (overrideQuery) => {
+    let actualQuery = query;
+    if (typeof overrideQuery === 'string') {
+        actualQuery = overrideQuery;
+    } else if (overrideQuery && overrideQuery.preventDefault) {
+        overrideQuery.preventDefault();
+    }
+    if (!actualQuery.trim() && !attachment) return;
+    const userQuery = actualQuery.trim() || 'Vui lòng phân tích tệp đính kèm này.';
     setChatLog(prev => [...prev, { role: 'user', content: userQuery, attachment: attachment }]);
     setQuery('');
     setIsTyping(true);
@@ -164,7 +201,40 @@ export default function AIAdvisor() {
           </div>
         )}
       </div>
-      <div className="p-4 border-t border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]">
+      <div className={`p-4 ${chatLog.length > 1 ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
+        {chatLog.length <= 1 && (
+          <div className="mb-4 flex flex-wrap gap-2 justify-center">
+             {[
+               'Báo cáo doanh thu hôm nay',
+               'Cơ sở nào đang trễ task?',
+               'Tình hình nhân sự',
+               'Cơ sở nào chưa Check-in?',
+               'Phân tích task trễ hạn',
+               'Công việc đang làm của phòng ban',
+               'Công việc cần làm của cơ sở',
+               'Tình trạng và số lượng nghĩ ko phép, có phép',
+               'Cơ sở nào đang cần hỗ trợ'
+             ].map((prompt, idx) => {
+               const colors = [
+                  'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50',
+                  'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/50',
+                  'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50',
+                  'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/50',
+                  'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/50',
+                  'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/50',
+                  'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50',
+                  'bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 border-pink-200 dark:border-pink-800 hover:bg-pink-100 dark:hover:bg-pink-900/50',
+                  'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+               ];
+               const colorClass = colors[idx % colors.length];
+               return (
+                  <button key={idx} onClick={() => handleAsk(prompt)} className={`px-4 py-2 rounded-full font-medium text-sm border transition-colors shadow-sm hover:shadow ${colorClass}`}>
+                     {prompt}
+                  </button>
+               );
+             })}
+          </div>
+        )}
         {attachment && (
           <div className="mb-3 flex items-center gap-3 bg-surface-container dark:bg-[#252525] p-2 rounded-xl border border-outline-variant dark:border-gray-700 max-w-sm relative">
             {attachment.type.startsWith('image/') ? (

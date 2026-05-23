@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -377,7 +377,57 @@ function MainDashboard() {
               </ErrorBoundary>
             ) : activeTab === 'reports' && user.role === 'SUPER_ADMIN' ? (
               <ErrorBoundary>
-                <AIAdvisor />
+                <div className="flex flex-col h-full w-full max-w-5xl mx-auto py-2">
+                  <div className="bg-white dark:bg-[#1e1e1e] shadow-md rounded-2xl overflow-hidden border border-outline-variant dark:border-gray-700 h-[60vh] flex flex-col shrink-0 mb-6">
+                    <AIAdvisor user={user} />
+                  </div>
+                  <div className="mt-4 mb-12">
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary">dashboard_customize</span>
+                      Truy cập nhanh (Thẻ cơ sở & Phó Tổng)
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {(() => {
+                        let activeFacilities = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
+                        activeFacilities = activeFacilities.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
+                        const facilities = activeFacilities.map(f => {
+                           const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'revoked' && (t.facility === f.name || t.facilityId === f.name));
+                           return { name: f.name, count: pendingTasks.length, icon: 'corporate_fare', type: 'facility' };
+                        });
+                        
+                        const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+                        const vpUsers = allUsers.filter(u => u.role === 'VICE_PRESIDENT');
+                        const executiveCards = vpUsers.map(vp => {
+                           const facName = `Sếp ${vp.name || vp.username}`;
+                           const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'revoked' && (t.facility === facName || t.facilityId === facName));
+                           return { name: facName, count: pendingTasks.length, icon: 'work', type: 'executive' };
+                        });
+                        const depts = [
+                           { name: 'Phòng Marketing', id: 'MARKETING', icon: 'campaign' },
+                           { name: 'Phòng Kế Toán', id: 'FINANCE', icon: 'account_balance' }
+                        ].map(d => {
+                           const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'revoked' && t.department_tag === d.id);
+                           return { name: d.name, count: pendingTasks.length, icon: d.icon, type: 'dept' };
+                        });
+
+                        const cards = [...facilities, ...depts, ...executiveCards].filter(c => c.count > 0 || c.type === 'facility' || c.type === 'dept' || c.type === 'executive');
+
+                        return cards.map((c, i) => (
+                          <div key={i} className="bg-white dark:bg-[#252525] p-5 rounded-xl border border-outline-variant dark:border-gray-700 hover:shadow-md hover:border-primary transition-all cursor-pointer group">
+                             <div className="flex justify-between items-start mb-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${c.type === 'facility' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : c.type === 'dept' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'}`}>
+                                   <span className="material-symbols-outlined text-[18px]">{c.icon}</span>
+                                </div>
+                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${c.count > 0 ? 'bg-error/10 text-error' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>{c.count}</span>
+                             </div>
+                             <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 group-hover:text-primary transition-colors">{c.name}</h4>
+                             <p className="text-xs text-gray-500 mt-1">{c.count} việc cần xử lý</p>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                </div>
               </ErrorBoundary>
             ) : (
               <>
