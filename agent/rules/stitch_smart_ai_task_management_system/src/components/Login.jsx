@@ -1,4 +1,4 @@
-﻿import React, { useState, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { AuthContext } from '../App.jsx';
 
 export default function Login() {
@@ -29,6 +29,8 @@ export default function Login() {
           data = { success: true, token: 'mock-admin', user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' } };
         } else if (username === 'manager1' && password === 'manager123') {
           data = { success: true, token: 'mock-manager', user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' } };
+        } else if (username === 'sysadmin' && password === 'admin123') {
+          data = { success: true, token: 'mock-sysadmin', user: { name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' } };
         } else {
           throw new Error('Tài khoản hoặc mật khẩu không chính xác.');
         }
@@ -44,6 +46,8 @@ export default function Login() {
         login({ name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }, 'mock-admin');
       } else if (username === 'manager1' && password === 'manager123') {
         login({ name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' }, 'mock-manager');
+      } else if (username === 'sysadmin' && password === 'admin123') {
+        login({ name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' }, 'mock-sysadmin');
       } else {
         setError(err.message || 'Tài khoản hoặc mật khẩu không chính xác.');
       }
