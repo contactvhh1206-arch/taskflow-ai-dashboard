@@ -25,8 +25,10 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
                   const tTitle = (t.title || '').toLowerCase();
                   return t.department_tag === deptId || t.pic === user?.name || t.picId === user?.username || (deptId === 'MARKETING' && (tTitle.includes('marketing') || tTitle.includes('ads') || tTitle.includes('quảng cáo') || tTitle.includes('kịch bản') || tTitle.includes('video'))) || (deptId === 'FINANCE' && (tTitle.includes('doanh thu') || tTitle.includes('kế toán') || tTitle.includes('tài chính')));
                }
-               const tFac = (t?.facilityId || t?.facility || '').toLowerCase();
-               return tFac === facCode || tFac === user?.username?.toLowerCase();
+               const tFacName = (t?.facilityId || '').toLowerCase();
+               const tFacCode = (t?.facility || '').toLowerCase();
+               const uName = (user?.username || '').toLowerCase();
+               return tFacName === facCode || tFacCode === facCode || tFacName === uName || tFacCode === uName;
             });
 
             const now = new Date();
