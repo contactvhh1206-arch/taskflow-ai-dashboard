@@ -344,7 +344,7 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
                                 </span>
                               )}
                             </p>
-                            <p className="text-sm text-gray-500">PIC: {getDisplayName(t.pic)} | Deadline: {t.deadline}</p>
+                            <p className="text-sm text-gray-500">PIC: {(t.pic || 'Chưa phân công')} | Deadline: {t.deadline}</p>
                           </div>
                           <span className="px-3 py-1 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-lg text-xs font-bold">KHẨN CẤP</span>
                         </li>
