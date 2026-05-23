@@ -304,12 +304,18 @@ function MainDashboard() {
         },
         body: JSON.stringify(taskPayload)
       });
+      
+      if (res.status === 500 || !res.ok) {
+         showToast('Lỗi máy chủ, vui lòng thử lại');
+         return;
+      }
+      
       const data = await res.json();
       if (data.success) {
         setTasks(prev => [data.data, ...prev]);
         showToast('Tạo công việc thành công');
       } else {
-        showToast('Tạo công việc thất bại');
+        showToast('Tạo công việc thất bại: ' + (data.error || ''));
       }
     } catch (e) {
       console.error(e);
@@ -327,14 +333,23 @@ function MainDashboard() {
               'x-facility-id': user.facility_id || 'ALL'
             }
           });
+          
+          if (res.status === 500 || !res.ok) {
+             setTasks([]);
+             showToast('Lỗi máy chủ khi tải dữ liệu, vui lòng thử lại');
+             return;
+          }
+          
           const data = await res.json();
           if (data.success) {
             setTasks(data.data);
           } else {
             setTasks([]);
+            showToast('Lấy dữ liệu thất bại: ' + (data.error || ''));
           }
         } catch (e) {
           console.error(e);
+          showToast('Lỗi kết nối khi lấy dữ liệu');
         }
       };
       fetchTasks();

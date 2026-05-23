@@ -77,17 +77,32 @@ app.put('/api/facilities/:id/restore', (req, res) => {
   res.json({ success: true, data: fac });
 });
 
-const authenticateUser = (req, res, next) => {
-    const userRole = req.headers['x-user-role']; 
-    const facilityRaw = req.headers['x-facility-id'];
-    let facilityId = parseInt(facilityRaw, 10);
-    if (isNaN(facilityId)) facilityId = facilityRaw;
-  
-    if (!userRole) return res.status(401).json({ error: 'Unauthorized' });
-  
-    req.user = { role: userRole, facility_id: facilityId };
-    next();
-  };
+const authenticateUser = async (req, res, next) => {
+    try {
+        const userRole = req.headers['x-user-role']; 
+        const facilityRaw = req.headers['x-facility-id'];
+        let facilityId = parseInt(facilityRaw, 10);
+        
+        if (!userRole) return res.status(401).json({ error: 'Unauthorized' });
+
+        if (isNaN(facilityId) && facilityRaw && facilityRaw !== 'ALL') {
+            const facRes = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facilityRaw]);
+            if (facRes.rows.length > 0) {
+                facilityId = facRes.rows[0].id;
+            } else {
+                facilityId = null;
+            }
+        } else if (facilityRaw === 'ALL') {
+            facilityId = 'ALL';
+        }
+      
+        req.user = { role: userRole, facility_id: facilityId };
+        next();
+    } catch (err) {
+        console.error("Auth middleware error:", err);
+        return res.status(500).json({ error: 'Lỗi xác thực nội bộ.' });
+    }
+};
 
 app.get('/api/users/directory', authenticateUser, async (req, res) => {
   try {
@@ -114,14 +129,19 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
       LEFT JOIN facilities f ON t.facility_id = f.id
       WHERE 1=1
     `;
-    const params = [];
-
-    if (role === 'FACILITY_MANAGER' && facility_id && facility_id !== 'ALL') {
-      params.push(facility_id);
-      query += ` AND t.facility_id = $${params.length}`;
-    }
-
-    query += ` ORDER BY t.created_at DESC`;
+      const params = [];
+      if (role === 'FACILITY_MANAGER') {
+        if (!facility_id || facility_id === 'ALL') {
+            return res.status(403).json({ error: "Lỗi phân quyền: Không xác định được cơ sở hợp lệ." });
+        }
+        params.push(facility_id);
+        query += ` AND t.facility_id = $${params.length}`;
+      } else if (facility_id && facility_id !== 'ALL') {
+        params.push(facility_id);
+        query += ` AND t.facility_id = $${params.length}`;
+      }
+      
+      query += ` ORDER BY t.created_at DESC`;
 
     const { rows } = await pool.query(query, params);
     res.json({ success: true, data: rows });
@@ -135,37 +155,45 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
   try {
     const { title, desc, pic, deadline, status, urgent, facility } = req.body;
     
-    let pic_id = null;
-    if (pic) {
-      const picUser = await pool.query('SELECT id FROM users WHERE name = $1 OR username = $1 LIMIT 1', [pic]);
-      if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
-    }
-
-    let facility_id = req.user.facility_id !== 'ALL' ? req.user.facility_id : null;
-    if (facility && facility !== 'HQ' && facility !== 'ALL') {
-      const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
-      if (facRecord.rows.length > 0) facility_id = facRecord.rows[0].id;
-    }
-    
-    if (!facility_id || facility_id === 'ALL') {
-       facility_id = 1; 
-    }
+      let pic_id = null;
+      if (pic) {
+        const picUser = await pool.query('SELECT id FROM users WHERE name = $1 OR username = $1 LIMIT 1', [pic]);
+        if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
+      }
+  
+      let insert_facility_id = null;
+      if (req.user.role === 'FACILITY_MANAGER') {
+          insert_facility_id = req.user.facility_id;
+          if (!insert_facility_id || insert_facility_id === 'ALL') {
+              return res.status(403).json({ error: "Lỗi phân quyền: Không xác định được cơ sở để tạo thẻ." });
+          }
+      } else {
+          if (facility && facility !== 'HQ' && facility !== 'ALL') {
+              let parsedFac = parseInt(facility, 10);
+              if (!isNaN(parsedFac)) {
+                  insert_facility_id = parsedFac;
+              } else {
+                  const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
+                  if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
+              }
+          }
+      }
 
     const insertQuery = `
-      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
       RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
     `;
-    const { rows } = await pool.query(insertQuery, [
-      title, 
-      desc || '', 
-      status || 'todo', 
-      urgent || false, 
-      deadline, 
-      pic_id, 
-      facility_id, 
-      urgent ? 'URGENT' : 'PRIORITY'
-    ]);
+      const { rows } = await pool.query(insertQuery, [
+        title, 
+        desc || '', 
+        status || 'todo', 
+        urgent || false, 
+        deadline, 
+        pic_id, 
+        insert_facility_id, 
+        urgent ? 'URGENT' : 'PRIORITY'
+      ]);
     
     const newTask = {
       ...rows[0],
