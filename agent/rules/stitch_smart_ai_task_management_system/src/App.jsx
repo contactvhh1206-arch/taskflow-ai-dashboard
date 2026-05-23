@@ -316,10 +316,41 @@ function MainDashboard() {
     setTimeout(() => setToastMessage(''), 4000);
   };
 
-  const handleAITaskConfirm = (draftTasks) => {
+  const handleAITaskConfirm = async (draftTasks) => {
     if (draftTasks && draftTasks.length > 0) {
-      setTasks([...tasks, ...draftTasks]);
-      showToast(`Đã tạo thành công ${draftTasks.length} công việc từ biên bản.`);
+      const addedTasks = [];
+      for (const draft of draftTasks) {
+        try {
+          const taskPayload = {
+            pic: user.name,
+            deadline: new Date().toISOString().split('T')[0],
+            urgent: false,
+            facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
+            ...draft
+          };
+          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-role': user.role,
+              'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+            },
+            body: JSON.stringify(taskPayload)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              addedTasks.push(data.data);
+            }
+          }
+        } catch (e) { console.error("Lỗi lưu AI task:", e); }
+      }
+      if (addedTasks.length > 0) {
+        setTasks(prev => [...addedTasks, ...prev]);
+        showToast(`Đã tạo và lưu cứng thành công ${addedTasks.length} công việc từ AI.`);
+      } else {
+        showToast(`Có lỗi xảy ra, không thể lưu công việc.`);
+      }
     }
   };
 
