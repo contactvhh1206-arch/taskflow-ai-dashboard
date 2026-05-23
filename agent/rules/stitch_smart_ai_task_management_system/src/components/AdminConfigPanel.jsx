@@ -61,18 +61,28 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
          }
          
          setIsResetting(true);
-         setTimeout(() => {
+         setTimeout(async () => {
             try {
-               // 1. Backup system configurations
-               const users = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
-               const auth = localStorage.getItem('taskflow_auth');
-               const aiConfig = localStorage.getItem('taskflow_ai_config');
-               const sysPrompts = localStorage.getItem('taskflow_system_prompts');
-               const kpiConfig = localStorage.getItem('taskflow_facility_kpis');
-
-               // 2. NUCLEAR OPTION: Purge State & Cache
-               localStorage.clear();
-               sessionStorage.clear();
+               // 1. Chỉ xóa công việc và checkin ở client (Local Storage)
+               localStorage.removeItem('taskflow_tasks');
+               localStorage.removeItem('taskflow_checkins');
+               
+               // 2. GỌI API ĐỂ XÓA SẠCH TASK TRONG POSTGRESQL (Backend)
+               try {
+                   const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks/all', {
+                       method: 'DELETE',
+                       headers: {
+                           'Content-Type': 'application/json',
+                           'x-user-role': user.role,
+                           'x-facility-id': localStorage.getItem('facility_id') || 'ALL'
+                       }
+                   });
+                   if (!res.ok) {
+                       console.error("Failed to delete tasks on backend");
+                   }
+               } catch (e) {
+                   console.error("Lỗi gọi API xóa tasks:", e);
+               }
                
                // Purge Service Workers (Mock API interceptors)
                if ('serviceWorker' in navigator) {
@@ -83,41 +93,15 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                   });
                }
                
-               // Purge Browser Cache API
+               // Purge Browser Cache API (clean uploaded docs/images cache)
                if ('caches' in window) {
                   caches.keys().then(function(names) {
                      for (let name of names) caches.delete(name);
                   });
                }
                
-               // 3. Seed exact 6 standard facilities
-               const seedFacilities = [
-                  { id: 'f_db41', name: 'DB41', address: '', pic: '' },
-                  { id: 'f_dbace', name: 'DBACE', address: '', pic: '' },
-                  { id: 'f_dbpq', name: 'DBPQ', address: '', pic: '' },
-                  { id: 'f_dbpa', name: 'DBPA', address: '', pic: '' },
-                  { id: 'f_dbpav', name: 'DBPAV', address: '', pic: '' },
-                  { id: 'f_dbpak', name: 'DBPAK', address: '', pic: '' }
-               ];
-               localStorage.setItem('taskflow_facilities', JSON.stringify(seedFacilities));
-
-               // 4. Restore Users & clear their mapped facilities
-               const updatedUsers = users.map(u => {
-                  if (u.role === 'FACILITY_MANAGER' || (typeof u.facility_id === 'string' && u.facility_id !== 'ALL')) {
-                     return { ...u, facility_id: '' };
-                  }
-                  return u;
-               });
-               localStorage.setItem('taskflow_users', JSON.stringify(updatedUsers));
-               
-               // 5. Restore configs
-               if (auth) localStorage.setItem('taskflow_auth', auth);
-               if (aiConfig) localStorage.setItem('taskflow_ai_config', aiConfig);
-               if (sysPrompts) localStorage.setItem('taskflow_system_prompts', sysPrompts);
-               if (kpiConfig) localStorage.setItem('taskflow_facility_kpis', kpiConfig);
-               
-               // 6. Transaction Commit
-               console.log("[DB] TRUNCATE Tasks committed. Status 200 OK.");
+               // Transaction Commit
+               console.log("[DB] Tác vụ làm sạch (Reset) đã hoàn tất. Giữ nguyên UX/UI.");
                window.location.reload(true); // force reload from server
             } catch (error) {
                console.error("[DB] Lỗi Transaction:", error);
