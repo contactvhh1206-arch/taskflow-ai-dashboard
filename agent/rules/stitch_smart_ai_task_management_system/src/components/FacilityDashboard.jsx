@@ -171,9 +171,9 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
                 {['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)
                   ? `Bảng tin công việc - ${user?.department || (user?.role === 'FINANCE_DEPT' ? 'Phòng Kế Toán' : 'Phòng ban')}` 
                   : ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user?.role)
-                  ? `Tổng quan - ${globalFacilityFilter === 'ALL' ? 'Tất cả cơ sở & Phòng ban' : (globalFacilityFilter || 'Tất cả cơ sở & Phòng ban')}`
-                  : `Tổng quan - ${user?.facility_name || 'Tất cả cơ sở'}`}
-              </h2>
+                    ? `Tổng quan - ${globalFacilityFilter === 'ALL' ? 'Tất cả cơ sở & Phòng ban' : (globalFacilityFilter || 'Tất cả cơ sở & Phòng ban')}`
+                    : `Tổng quan - ${user?.facility_name || user?.facility_code || 'Tất cả cơ sở'}`}
+                </h2>
               <p className="text-sm text-on-surface-variant dark:text-gray-400 mt-1">
                 {['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) ? 'Dữ liệu Real-time nội bộ phòng ban.' : 'Dữ liệu Real-time nội bộ cơ sở.'}
               </p>
