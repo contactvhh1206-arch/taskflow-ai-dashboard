@@ -106,7 +106,7 @@ const authenticateUser = async (req, res, next) => {
 
 app.get('/api/users/directory', authenticateUser, async (req, res) => {
   try {
-    const { rows: users } = await pool.query('SELECT id AS user_id, username, full_name, role_id, facility_id FROM users');
+    const { rows: users } = await pool.query('SELECT id AS user_id, email, full_name, role_id, facility_id FROM users');
     res.json({ success: true, data: users });
   } catch (error) {
     console.error("Lỗi lấy danh bạ:", error);
@@ -116,13 +116,14 @@ app.get('/api/users/directory', authenticateUser, async (req, res) => {
 
 app.get('/api/tasks', authenticateUser, async (req, res) => {
   try {
+    console.log("Header nhận được:", req.headers);
     const { role, facility_id } = req.user;
     
     let query = `
       SELECT t.id, t.title, t.description as desc, t.status, t.urgency as urgent, 
              TO_CHAR(t.deadline, 'YYYY-MM-DD') as deadline, 
              t.created_at as "createdAt", t.updated_at as "completedAt",
-             u.full_name as pic, u.username as "picId",
+             u.full_name as pic, u.email as "picId",
              f.name as facility, f.code as "facilityId"
       FROM tasks t
       LEFT JOIN users u ON t.pic_id = u.id
@@ -153,11 +154,12 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
 
 app.post('/api/tasks', authenticateUser, async (req, res) => {
   try {
+    console.log("Payload tạo task:", req.body);
     const { title, desc, pic, deadline, status, urgent, facility } = req.body;
     
       let pic_id = null;
       if (pic) {
-        const picUser = await pool.query('SELECT id FROM users WHERE full_name = $1 OR username = $1 LIMIT 1', [pic]);
+        const picUser = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
         if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
       }
   
