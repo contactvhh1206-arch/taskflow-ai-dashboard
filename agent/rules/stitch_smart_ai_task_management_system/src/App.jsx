@@ -775,15 +775,30 @@ function MainDashboard() {
                   </div>
                 </div>
                 <div className="mt-8 pt-6 border-t border-outline-variant dark:border-gray-800">
-                  <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Chuyển trạng thái (Đóng Task)</h3>
+                  <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Chuyển trạng thái Task</h3>
                   {selectedTask.status !== 'done' ? (
                     <div className="bg-surface-container dark:bg-[#252525] p-4 rounded-xl border border-dashed border-outline-variant dark:border-gray-700">
-                      {user && user.name === selectedTask.pic ? (
+                      {user && (user.name === selectedTask.pic || !selectedTask.pic || ['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'ADMIN', 'SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) ? (
                         !showClosureConfirm ? (
                           <>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Chỉ bạn (PIC) mới có quyền đóng công việc này.</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                              {user.name === selectedTask.pic ? 'Bạn là PIC của công việc này.' : 'Bạn có quyền quản lý công việc này.'}
+                            </p>
+                            
+                            {selectedTask.status === 'todo' && (
+                              <button onClick={() => { setTasks(tasks.map(t => t.id === selectedTask.id ? {...t, status: 'in_progress'} : t)); setSelectedTask({...selectedTask, status: 'in_progress'}); }} className="w-full bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mb-2">
+                                <span className="material-symbols-outlined text-[18px]">play_arrow</span> Bắt đầu làm
+                              </button>
+                            )}
+
+                            {selectedTask.status === 'in_progress' && (
+                              <button onClick={() => { setTasks(tasks.map(t => t.id === selectedTask.id ? {...t, status: 'review'} : t)); setSelectedTask({...selectedTask, status: 'review'}); }} className="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mb-2">
+                                <span className="material-symbols-outlined text-[18px]">rate_review</span> Xin Nghiệm thu
+                              </button>
+                            )}
+
                             <button onClick={() => setShowClosureConfirm(true)} className="w-full bg-success hover:bg-success/90 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
-                              <span className="material-symbols-outlined text-[18px]">check_circle</span> Hoàn thành
+                              <span className="material-symbols-outlined text-[18px]">check_circle</span> Đóng Task (Hoàn thành)
                             </button>
                           </>
                         ) : (
@@ -801,7 +816,7 @@ function MainDashboard() {
                           </div>
                         )
                       ) : (
-                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-sm"><span className="material-symbols-outlined">lock</span> <span>Chỉ PIC ({selectedTask.pic}) mới có quyền đóng task này.</span></div>
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-sm"><span className="material-symbols-outlined">lock</span> <span>Chỉ PIC ({selectedTask.pic}) mới có quyền đổi trạng thái task này.</span></div>
                       )}
                     </div>
                   ) : (
