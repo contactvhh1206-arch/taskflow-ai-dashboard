@@ -1070,10 +1070,10 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
             <h4 className="text-sm font-semibold text-on-surface dark:text-gray-100 mb-2 leading-snug">{task.title}</h4>
             <div className="flex items-center justify-between mt-4 border-t border-outline-variant dark:border-gray-700/50 pt-3">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-gray-300" title={task.pic}>
-                  {task.pic.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-gray-300" title={task.pic || 'Chưa có PIC'}>
+                  {task.pic ? task.pic.split(' ').map(n => n[0]).join('').slice(0, 2) : '?'}
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">{task.pic}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{task.pic || 'Chưa giao'}</span>
               </div>
               <div className="flex items-center gap-1 text-gray-400 hover:text-secondary transition-colors" title="Thảo luận (Task-Chat)">
                 <span className="material-symbols-outlined text-[16px]">forum</span>
