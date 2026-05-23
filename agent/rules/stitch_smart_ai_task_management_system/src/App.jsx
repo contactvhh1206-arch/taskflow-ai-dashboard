@@ -48,6 +48,21 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
     status: defaultStatus || 'todo',
     urgent: false
   });
+  
+  const [picOptions, setPicOptions] = useState([]);
+
+  useEffect(() => {
+    try {
+      const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+      let filtered = [];
+      if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+        filtered = allUsers;
+      } else {
+        filtered = allUsers.filter(u => u.facility_id === user.facility_id || u.facility_name === user.facility_name);
+      }
+      setPicOptions(filtered);
+    } catch(e) {}
+  }, [user]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -93,7 +108,17 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Người phụ trách (PIC)</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">person</span>
-                <input required type="text" name="pic" value={formData.pic} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
+                <select required name="pic" value={formData.pic} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white appearance-none">
+                  <option value="">-- Chọn PIC --</option>
+                  {picOptions.map(u => (
+                    <option key={u.username} value={u.name}>{u.name} {u.role === 'FACILITY_MANAGER' ? '(QL)' : ''}</option>
+                  ))}
+                  {/* Fallback option if user's own name is not in the list but they want to assign to themselves */}
+                  {!picOptions.find(u => u.name === user.name) && (
+                    <option value={user.name}>{user.name} (Bạn)</option>
+                  )}
+                </select>
+                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px] pointer-events-none">arrow_drop_down</span>
               </div>
             </div>
             <div>
