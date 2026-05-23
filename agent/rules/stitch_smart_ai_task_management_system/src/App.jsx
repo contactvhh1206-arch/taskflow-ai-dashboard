@@ -22,7 +22,8 @@ const getStatusConfig = (status) => {
       default: return { label: 'Chưa rõ', color: 'bg-gray-100 text-gray-700', icon: 'help' };
     }
   };
-\n// 1. Khởi tạo Auth Context
+
+// 1. Khởi tạo Auth Context
 export const AuthContext = createContext();
 
 const INITIAL_TASKS = [
