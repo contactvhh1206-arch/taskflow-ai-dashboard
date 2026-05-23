@@ -86,7 +86,7 @@ const authenticateUser = async (req, res, next) => {
         if (!userRole) return res.status(401).json({ error: 'Unauthorized' });
 
         if (isNaN(facilityId) && facilityRaw && facilityRaw !== 'ALL') {
-            const facRes = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facilityRaw]);
+            const facRes = await pool.query('SELECT id FROM facilities WHERE code ILIKE $1 OR name ILIKE $1 LIMIT 1', [facilityRaw]);
             if (facRes.rows.length > 0) {
                 facilityId = facRes.rows[0].id;
             } else {
@@ -106,7 +106,7 @@ const authenticateUser = async (req, res, next) => {
 
 app.get('/api/users/directory', authenticateUser, async (req, res) => {
   try {
-    const { rows: users } = await pool.query('SELECT id AS user_id, username, name AS full_name, role, facility_id FROM users');
+    const { rows: users } = await pool.query('SELECT id AS user_id, username, full_name, role_id, facility_id FROM users');
     res.json({ success: true, data: users });
   } catch (error) {
     console.error("Lỗi lấy danh bạ:", error);
@@ -122,7 +122,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
       SELECT t.id, t.title, t.description as desc, t.status, t.urgency as urgent, 
              TO_CHAR(t.deadline, 'YYYY-MM-DD') as deadline, 
              t.created_at as "createdAt", t.updated_at as "completedAt",
-             u.name as pic, u.username as "picId",
+             u.full_name as pic, u.username as "picId",
              f.name as facility, f.code as "facilityId"
       FROM tasks t
       LEFT JOIN users u ON t.pic_id = u.id
@@ -157,7 +157,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     
       let pic_id = null;
       if (pic) {
-        const picUser = await pool.query('SELECT id FROM users WHERE name = $1 OR username = $1 LIMIT 1', [pic]);
+        const picUser = await pool.query('SELECT id FROM users WHERE full_name = $1 OR username = $1 LIMIT 1', [pic]);
         if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
       }
   
