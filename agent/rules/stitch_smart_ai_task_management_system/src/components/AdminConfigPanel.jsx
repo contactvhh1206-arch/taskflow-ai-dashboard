@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const SYSTEM_ROLES = [
+  { value: 'FACILITY_MANAGER', label: 'Quản lý cơ sở' },
+  { value: 'DEPARTMENT_HEAD', label: 'Bộ phận Marketing' },
+  { value: 'FINANCE_DEPT', label: 'Bộ phận Tài chính - Kế toán' },
+  { value: 'GENERAL_MANAGER', label: 'Tổng quản lý chuỗi' },
+  { value: 'VICE_PRESIDENT', label: 'Phó tổng' },
+  { value: 'SUPER_ADMIN', label: 'Sếp tổng' },
+  { value: 'ADMIN', label: 'Admin Hệ thống' }
+];
+
 export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskComments, user }) {
       const [users, setUsers] = useState([]);
       const [facilities, setFacilities] = useState([]);
