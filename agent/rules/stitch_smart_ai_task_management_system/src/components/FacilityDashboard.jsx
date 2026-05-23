@@ -15,7 +15,7 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
             // Safe array fallback and Row-level security
             const safeTasks = Array.isArray(tasks) ? tasks : [];
             const isHighLevel = user?.role !== 'DEPARTMENT_HEAD' && (user?.facility_id === 'ALL' || ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user?.role));
-            const facCode = (user?.facility_code || '').toLowerCase();
+            const facCode = (user?.facility_code || user?.facility_id || '').toLowerCase();
             const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
             const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : ''));
             
@@ -28,7 +28,8 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
                const tFacName = (t?.facilityId || '').toLowerCase();
                const tFacCode = (t?.facility || '').toLowerCase();
                const uName = (user?.username || '').toLowerCase();
-               return tFacName === facCode || tFacCode === facCode || tFacName === uName || tFacCode === uName;
+               const uNameFull = (user?.name || '').toLowerCase();
+               return tFacName === facCode || tFacCode === facCode || tFacName === uName || tFacCode === uName || tFacName === uNameFull || tFacCode === uNameFull || uNameFull.includes(tFacCode) || uNameFull.includes(tFacName);
             });
 
             const now = new Date();

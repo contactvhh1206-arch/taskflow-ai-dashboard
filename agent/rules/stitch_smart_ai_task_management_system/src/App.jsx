@@ -601,7 +601,7 @@ function MainDashboard() {
               </ErrorBoundary>
             ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) ? (
               <ErrorBoundary>
-                <FacilityDashboard user={user} tasks={tasks} onNavigate={(tab) => setActiveTab(tab)} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter="ALL" />
+                <FacilityDashboard user={user} tasks={tasks} onNavigate={(tab) => setActiveTab(tab)} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={user.role === 'FACILITY_MANAGER' ? (user.facility_code || user.facility_id || '') : "ALL"} />
               </ErrorBoundary>
             ) : activeTab === 'revenue-overview' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) ? (
               <ErrorBoundary>
