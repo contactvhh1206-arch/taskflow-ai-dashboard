@@ -150,8 +150,7 @@ function MainDashboard() {
     if (!user) return 'tasks';
     if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) return 'reports';
     if (user.role === 'ADMIN') return 'admin';
-    if (user.role === 'DEPARTMENT_HEAD') return 'dashboard';
-    if (user.role === 'FINANCE_DEPT') return 'dashboard';
+    if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(user.role)) return 'dashboard';
     return 'tasks';
   });
   const [aiSessions, setAiSessions] = useState(JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]'));
@@ -931,13 +930,21 @@ export default function AppContainer() {
     if (authData) {
       try {
         const parsed = JSON.parse(authData);
-        if (parsed && parsed.user) setUser(parsed.user);
+        if (parsed && parsed.user) {
+          if (parsed.user.role) {
+            parsed.user.role = parsed.user.role.trim().toUpperCase();
+          }
+          setUser(parsed.user);
+        }
       } catch (e) { }
     }
     setLoading(false);
   }, []);
 
   const login = (userData, token) => {
+    if (userData && userData.role) {
+      userData.role = userData.role.trim().toUpperCase();
+    }
     localStorage.setItem('taskflow_auth', JSON.stringify({ token, user: userData }));
     setUser(userData);
   };
