@@ -361,6 +361,35 @@ function MainDashboard() {
     }
   };
 
+  const handleUpdateTaskStatus = async (taskId, newStatus, evidenceName = null) => {
+    try {
+      const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': user.role,
+          'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+        },
+        body: JSON.stringify({ status: newStatus, evidence: evidenceName })
+      });
+      
+      if (!res.ok) throw new Error('API Error');
+      
+      const data = await res.json();
+      if (data.success) {
+        setTasks(tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence} : t));
+        setSelectedTask({...selectedTask, status: newStatus, evidence: evidenceName || selectedTask.evidence});
+      } else {
+        showToast('Lỗi khi cập nhật trạng thái');
+      }
+    } catch (e) {
+      console.error(e);
+      // Fallback for offline mode
+      setTasks(tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence} : t));
+      setSelectedTask({...selectedTask, status: newStatus, evidence: evidenceName || selectedTask.evidence});
+    }
+  };
+
   useEffect(() => {
     if (user) {
       const fetchTasks = async () => {
@@ -814,13 +843,13 @@ function MainDashboard() {
                             </p>
                             
                             {selectedTask.status === 'todo' && (
-                              <button onClick={() => { setTasks(tasks.map(t => t.id === selectedTask.id ? {...t, status: 'in_progress'} : t)); setSelectedTask({...selectedTask, status: 'in_progress'}); }} className="w-full bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mb-2">
+                              <button onClick={() => handleUpdateTaskStatus(selectedTask.id, 'in_progress')} className="w-full bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mb-2">
                                 <span className="material-symbols-outlined text-[18px]">play_arrow</span> Bắt đầu làm
                               </button>
                             )}
 
                             {selectedTask.status === 'in_progress' && (
-                              <button onClick={() => { setTasks(tasks.map(t => t.id === selectedTask.id ? {...t, status: 'review'} : t)); setSelectedTask({...selectedTask, status: 'review'}); }} className="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mb-2">
+                              <button onClick={() => handleUpdateTaskStatus(selectedTask.id, 'review')} className="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mb-2">
                                 <span className="material-symbols-outlined text-[18px]">rate_review</span> Xin Nghiệm thu
                               </button>
                             )}
@@ -839,7 +868,7 @@ function MainDashboard() {
                             </label>
                             <div className="flex gap-2 pt-2">
                               <button onClick={() => { setShowClosureConfirm(false); setEvidenceFile(null); }} className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white">Hủy</button>
-                              <button onClick={() => { setTasks(tasks.map(t => t.id === selectedTask.id ? {...t, status: 'done', evidence: evidenceFile ? evidenceFile.name : null} : t)); setSelectedTask({...selectedTask, status: 'done', evidence: evidenceFile ? evidenceFile.name : null}); setShowClosureConfirm(false); setEvidenceFile(null); }} className="flex-[2] bg-success hover:bg-success/90 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"><span className="material-symbols-outlined text-[18px]">done_all</span> Xác nhận đóng</button>
+                              <button onClick={() => { handleUpdateTaskStatus(selectedTask.id, 'done', evidenceFile ? evidenceFile.name : null); setShowClosureConfirm(false); setEvidenceFile(null); }} className="flex-[2] bg-success hover:bg-success/90 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"><span className="material-symbols-outlined text-[18px]">done_all</span> Xác nhận đóng</button>
                             </div>
                           </div>
                         )

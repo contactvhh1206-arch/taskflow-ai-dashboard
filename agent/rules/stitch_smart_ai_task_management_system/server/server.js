@@ -152,6 +152,31 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
   }
 });
 
+app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, evidence } = req.body;
+    
+    const updateQuery = `
+      UPDATE tasks 
+      SET status = $1, 
+          updated_at = NOW() 
+      WHERE id = $2 
+      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
+    `;
+    const { rows } = await pool.query(updateQuery, [status, id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    }
+    
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error("Lỗi cập nhật trạng thái:", error);
+    res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
+  }
+});
+
 app.post('/api/tasks', authenticateUser, async (req, res) => {
   try {
     console.log("Payload tạo task:", req.body);
