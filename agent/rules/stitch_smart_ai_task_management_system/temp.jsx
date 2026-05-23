@@ -1,4 +1,4 @@
-
+﻿
     const { useState, useEffect, createContext, useContext } = React;
 
     const AuthContext = createContext();
@@ -903,7 +903,7 @@
         setLoading(true);
 
         try {
-          const response = await fetch('http://localhost:3000/api/login', {
+          const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
@@ -1686,7 +1686,7 @@
 
       const fetchFacilityStatuses = async () => {
         try {
-          const response = await fetch('http://localhost:3000/api/checkin/status', { headers: { 'x-user-role': user.role, 'x-facility-id': user.facility_id || 'ALL' } });
+          const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/checkin/status', { headers: { 'x-user-role': user.role, 'x-facility-id': user.facility_id || 'ALL' } });
           if (response.ok) {
             const data = await response.json();
             setFacilityStatuses(data.data);
@@ -2425,3 +2425,4 @@
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<AppContainer />);
   
+

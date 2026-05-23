@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch'; 
 import dotenv from 'dotenv';
@@ -268,7 +268,7 @@ app.post('/api/internal/extract-revenue', express.json({limit: '50mb'}), async (
       headers: { 
         "Authorization": `Bearer ${OPENROUTER_API_KEY}`, 
         "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:3000",
+        "HTTP-Referer": "https://taskflow-ai-dashboard.onrender.com",
         "X-Title": "Stitch Smart AI"
       },
       body: JSON.stringify(payload)
@@ -460,3 +460,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 TaskFlow AI Server đang chạy tại http://localhost:${PORT}`);
 });
+

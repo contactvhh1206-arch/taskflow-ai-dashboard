@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+﻿import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -269,7 +269,7 @@ function MainDashboard() {
 
   const fetchFacilityStatuses = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/checkin/status', {
+      const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/checkin/status', {
         headers: { 'x-user-role': user.role, 'x-facility-id': user.facility_id || 'ALL' }
       });
       if (response.ok) {
@@ -849,3 +849,4 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
     </div>
   );
 }
+
