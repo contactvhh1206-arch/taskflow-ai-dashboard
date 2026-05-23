@@ -162,6 +162,30 @@ function MainDashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalStatus, setCreateModalStatus] = useState('todo');
   const [toastMessage, setToastMessage] = useState('');
+  const [taskComments, setTaskComments] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('stitch_comments') || '{}'); } catch { return {}; }
+  });
+  const [facilityList, setFacilityList] = useState([]);
+
+  const fetchFacilities = () => {
+    let localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
+    if (localFacs.length === 0) {
+      localFacs = [
+        { id: 'f1', name: 'DUBAI 41', is_active: true },
+        { id: 'f2', name: 'DUBAI ACE', is_active: true },
+        { id: 'f3', name: 'DUBAI PA', is_active: true },
+        { id: 'f4', name: 'DUBAI PAK', is_active: true },
+        { id: 'f5', name: 'DUBAI PAV', is_active: true },
+        { id: 'f6', name: 'DUBAI PHU QUOC', is_active: true }
+      ];
+      localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
+    }
+    setFacilityList(localFacs);
+  };
+
+  useEffect(() => {
+    fetchFacilities();
+  }, []);
   
   // Dashboard time filter and stats
   const [timeFilter, setTimeFilter] = useState('week'); // 'week' | 'month'
@@ -532,11 +556,11 @@ function MainDashboard() {
               </ErrorBoundary>
             ) : activeTab === 'kpi-settings' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role) ? (
               <ErrorBoundary>
-                <KPISettings user={user} facilityList={facilityList} showToast={showToast} refreshFacilities={() => {}} />
+                <KPISettings user={user} facilityList={facilityList} showToast={showToast} refreshFacilities={fetchFacilities} />
               </ErrorBoundary>
             ) : activeTab === 'archives' && ['ADMIN', 'FINANCE_DEPT'].includes(user.role) ? (
               <ErrorBoundary>
-                <ArchivedFacilitiesDashboard facilityList={facilityList} showToast={showToast} refreshFacilities={() => {}} />
+                <ArchivedFacilitiesDashboard facilityList={facilityList} showToast={showToast} refreshFacilities={fetchFacilities} />
               </ErrorBoundary>
             ) : (
               <>
