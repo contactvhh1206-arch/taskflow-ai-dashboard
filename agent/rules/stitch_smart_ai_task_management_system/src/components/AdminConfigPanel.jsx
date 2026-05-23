@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ErrorBoundary } from '../App.jsx';
 
 const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'];
 

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import HeatmapKPI from './HeatmapKPI';
+import AIBatchPreviewModal from './AIBatchPreviewModal';
 
 export default function RevenueOverviewDashboard({ user, facilityList }) {
       const [selectedMonth, setSelectedMonth] = React.useState(new Date().toISOString().substring(0, 7));

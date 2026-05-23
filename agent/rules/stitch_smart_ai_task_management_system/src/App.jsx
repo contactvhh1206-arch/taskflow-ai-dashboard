@@ -117,7 +117,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
 }
 
 // --- ERROR BOUNDARY ---
-class ErrorBoundary extends React.Component {
+export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
