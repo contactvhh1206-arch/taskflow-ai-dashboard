@@ -55,8 +55,8 @@ app.post('/api/facilities', async (req, res) => {
   try {
     const code = name.trim().toUpperCase();
     const result = await pool.query(
-      'INSERT INTO facilities (name, code, is_active) VALUES ($1, $2, $3) RETURNING *',
-      [name.trim(), code, true]
+      'INSERT INTO facilities (name, code, status) VALUES ($1, $2, $3) RETURNING *',
+      [name.trim(), code, 'ACTIVE']
     );
     const newFac = result.rows[0];
     mockFacilities.push(newFac); // Keep mock in sync
@@ -98,8 +98,8 @@ const authenticateUser = async (req, res, next) => {
             } else {
                 // Auto-create facility if not found, to bridge frontend string IDs to backend INT IDs
                 const insertRes = await pool.query(
-                    'INSERT INTO facilities (name, code, is_active) VALUES ($1, $2, $3) RETURNING id', 
-                    [facilityRaw, facilityRaw, true]
+                    'INSERT INTO facilities (name, code, status) VALUES ($1, $2, $3) RETURNING id', 
+                    [facilityRaw, facilityRaw, 'ACTIVE']
                 );
                 facilityId = insertRes.rows[0].id;
             }
@@ -612,9 +612,9 @@ app.listen(PORT, async () => {
     if (rowCount === 0) {
       console.log("Seeding facilities table...");
       for (const fac of mockFacilities) {
-        await pool.query('INSERT INTO facilities (name, code, is_active) VALUES ($1, $2, $3)', [fac.name, fac.name, fac.is_active]);
+        await pool.query('INSERT INTO facilities (name, code, status) VALUES ($1, $2, $3)', [fac.name, fac.name, fac.is_active ? 'ACTIVE' : 'INACTIVE']);
       }
-      await pool.query('INSERT INTO facilities (name, code, is_active) VALUES ($1, $2, $3)', ['Cơ sở 1', 'Cơ sở 1', true]);
+      await pool.query('INSERT INTO facilities (name, code, status) VALUES ($1, $2, $3)', ['Cơ sở 1', 'Cơ sở 1', 'ACTIVE']);
       console.log("Facilities seeded.");
     }
   } catch (e) {
