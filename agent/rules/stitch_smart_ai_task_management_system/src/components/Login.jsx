@@ -23,6 +23,7 @@ export default function Login() {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
+          localStorage.setItem('facility_id', data.user.facility_id || 'ALL');
           login(data.user, data.token);
           return;
         } else {
@@ -45,6 +46,7 @@ export default function Login() {
             setError('Tài khoản này đã bị khóa!');
             return;
           }
+          localStorage.setItem('facility_id', foundUser.facility_id || 'ALL');
           login(foundUser, 'mock-token-' + foundUser.username);
           return;
         }
@@ -54,10 +56,13 @@ export default function Login() {
 
       // Hardcoded fallback
       if (trimmedUser === 'admin' && trimmedPass === 'admin123') {
+        localStorage.setItem('facility_id', 'ALL');
         login({ name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }, 'mock-admin');
       } else if (trimmedUser === 'manager1' && trimmedPass === 'manager123') {
+        localStorage.setItem('facility_id', 'Cơ sở 1');
         login({ name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' }, 'mock-manager');
       } else if (trimmedUser === 'sysadmin' && trimmedPass === 'admin123') {
+        localStorage.setItem('facility_id', 'ALL');
         login({ name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' }, 'mock-sysadmin');
       } else {
         setError('Tài khoản hoặc mật khẩu không chính xác.');
