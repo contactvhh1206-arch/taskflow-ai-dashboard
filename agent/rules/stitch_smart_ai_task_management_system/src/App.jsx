@@ -675,62 +675,6 @@ function MainDashboard() {
                   </button>
                 </div>
 
-                {/* 3 Widgets Công việc */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                  <div className="p-5 bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 shadow-sm flex flex-col justify-between group hover:border-primary/30 transition-colors">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                          <span className="material-symbols-outlined text-[20px]">folder_open</span>
-                        </div>
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Công việc Mở</span>
-                      </div>
-                    </div>
-                    <div>
-                      {isStatsLoading ? (
-                        <div className="animate-pulse h-10 w-16 bg-gray-200 dark:bg-gray-700 rounded mt-1"></div>
-                      ) : (
-                        <h3 className="text-4xl font-bold text-on-surface dark:text-white">{dashboardStats.open}</h3>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-5 bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 shadow-sm flex flex-col justify-between group hover:border-success/30 transition-colors">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center text-success">
-                          <span className="material-symbols-outlined text-[20px]">task_alt</span>
-                        </div>
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Hoàn thành</span>
-                      </div>
-                    </div>
-                    <div>
-                      {isStatsLoading ? (
-                        <div className="animate-pulse h-10 w-16 bg-gray-200 dark:bg-gray-700 rounded mt-1"></div>
-                      ) : (
-                        <h3 className="text-4xl font-bold text-on-surface dark:text-white">{dashboardStats.completed}</h3>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-5 bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 shadow-sm flex flex-col justify-between group hover:border-error/30 transition-colors">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center text-error">
-                          <span className="material-symbols-outlined text-[20px]">assignment_late</span>
-                        </div>
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Trễ hạn</span>
-                      </div>
-                    </div>
-                    <div>
-                      {isStatsLoading ? (
-                        <div className="animate-pulse h-10 w-16 bg-gray-200 dark:bg-gray-700 rounded mt-1"></div>
-                      ) : (
-                        <h3 className="text-4xl font-bold text-on-surface dark:text-white">{dashboardStats.overdue}</h3>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
