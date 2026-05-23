@@ -4,6 +4,14 @@ import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
 import AIAdvisor from './components/AIAdvisor.jsx';
 import ChangePasswordModal from './components/ChangePasswordModal.jsx';
+import AdminConfigPanel from './components/AdminConfigPanel.jsx';
+import ApiConfigPanel from './components/ApiConfigPanel.jsx';
+import AIUsageLogs from './components/AIUsageLogs.jsx';
+import RAGManagerPanel from './components/RAGManagerPanel.jsx';
+import FacilityDashboard from './components/FacilityDashboard.jsx';
+import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
+import KPISettings from './components/KPISettings.jsx';
+import ArchivedFacilitiesDashboard from './components/ArchivedFacilitiesDashboard.jsx';
 
 // 1. Khởi tạo Auth Context
 export const AuthContext = createContext();
@@ -498,6 +506,38 @@ function MainDashboard() {
                   </div>
                 </div>
               </ErrorBoundary>
+            ) : activeTab === 'admin' && user.role === 'ADMIN' ? (
+              <ErrorBoundary>
+                <AdminConfigPanel showToast={showToast} tasks={tasks} setTasks={setTasks} setTaskComments={setTaskComments} user={user} />
+              </ErrorBoundary>
+            ) : activeTab === 'api_config' && user.role === 'ADMIN' ? (
+              <ErrorBoundary>
+                <ApiConfigPanel showToast={showToast} />
+              </ErrorBoundary>
+            ) : activeTab === 'ai_logs' && user.role === 'ADMIN' ? (
+              <ErrorBoundary>
+                <AIUsageLogs />
+              </ErrorBoundary>
+            ) : activeTab === 'rag_manager' && user.role === 'ADMIN' ? (
+              <ErrorBoundary>
+                <RAGManagerPanel showToast={showToast} />
+              </ErrorBoundary>
+            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) ? (
+              <ErrorBoundary>
+                <FacilityDashboard user={user} tasks={tasks} onNavigate={(tab) => setActiveTab(tab)} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={globalFacilityFilter} />
+              </ErrorBoundary>
+            ) : activeTab === 'revenue-overview' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) ? (
+              <ErrorBoundary>
+                <RevenueOverviewDashboard user={user} facilityList={facilityList} />
+              </ErrorBoundary>
+            ) : activeTab === 'kpi-settings' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role) ? (
+              <ErrorBoundary>
+                <KPISettings user={user} facilityList={facilityList} showToast={showToast} refreshFacilities={() => {}} />
+              </ErrorBoundary>
+            ) : activeTab === 'archives' && ['ADMIN', 'FINANCE_DEPT'].includes(user.role) ? (
+              <ErrorBoundary>
+                <ArchivedFacilitiesDashboard facilityList={facilityList} showToast={showToast} refreshFacilities={() => {}} />
+              </ErrorBoundary>
             ) : (
               <>
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
@@ -847,6 +887,18 @@ export default function AppContainer() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
+    if (localFacs.length === 0) {
+      localFacs = [
+        { id: 'f1', name: 'DUBAI 41', is_active: true },
+        { id: 'f2', name: 'DUBAI ACE', is_active: true },
+        { id: 'f3', name: 'DUBAI PA', is_active: true },
+        { id: 'f4', name: 'DUBAI PAK', is_active: true },
+        { id: 'f5', name: 'DUBAI PAV', is_active: true },
+        { id: 'f6', name: 'DUBAI PHU QUOC', is_active: true }
+      ];
+      localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
+    }
     const authData = localStorage.getItem('taskflow_auth');
     if (authData) {
       try {
