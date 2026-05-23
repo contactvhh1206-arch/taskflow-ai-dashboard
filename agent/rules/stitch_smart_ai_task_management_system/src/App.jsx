@@ -58,7 +58,10 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
       if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
         filtered = allUsers;
       } else {
-        filtered = allUsers.filter(u => u.facility_id === user.facility_id || u.facility_name === user.facility_name);
+        filtered = allUsers.filter(u => 
+          (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
+          (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
+        );
       }
       setPicOptions(filtered);
     } catch(e) {}
