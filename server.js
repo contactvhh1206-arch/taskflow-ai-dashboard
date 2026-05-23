@@ -49,16 +49,22 @@ app.get('/api/facilities', (req, res) => {
   res.json({ success: true, data: mockFacilities });
 });
 
-app.post('/api/facilities', (req, res) => {
+app.post('/api/facilities', async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'Tên cơ sở không được để trống.' });
-  const newFac = {
-    id: 'f' + Date.now(),
-    name: name.trim().toUpperCase(),
-    is_active: true
-  };
-  mockFacilities.push(newFac);
-  res.json({ success: true, data: newFac });
+  try {
+    const code = name.trim().toUpperCase();
+    const result = await pool.query(
+      'INSERT INTO facilities (name, code, is_active) VALUES ($1, $2, $3) RETURNING *',
+      [name.trim(), code, true]
+    );
+    const newFac = result.rows[0];
+    mockFacilities.push(newFac); // Keep mock in sync
+    res.json({ success: true, data: newFac });
+  } catch (error) {
+    console.error("Lỗi tạo cơ sở:", error);
+    res.status(500).json({ error: 'Lỗi server.' });
+  }
 });
 
 app.put('/api/facilities/:id/archive', (req, res) => {
@@ -90,7 +96,12 @@ const authenticateUser = async (req, res, next) => {
             if (facRes.rows.length > 0) {
                 facilityId = facRes.rows[0].id;
             } else {
-                facilityId = null;
+                // Auto-create facility if not found, to bridge frontend string IDs to backend INT IDs
+                const insertRes = await pool.query(
+                    'INSERT INTO facilities (name, code, is_active) VALUES ($1, $2, $3) RETURNING id', 
+                    [facilityRaw, facilityRaw, true]
+                );
+                facilityId = insertRes.rows[0].id;
             }
         } else if (facilityRaw === 'ALL') {
             facilityId = 'ALL';
@@ -592,13 +603,27 @@ app.get('/api/internal/ai-token-stats', authenticateUser, async (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 TaskFlow AI Server đang chạy tại http://localhost:${PORT}`);
   console.log(`[DB] DATABASE_URL: ${process.env.DATABASE_URL ? 'OK' : 'UNDEFINED'}`);
+  
+  try {
+    const { rowCount } = await pool.query('SELECT 1 FROM facilities LIMIT 1');
+    if (rowCount === 0) {
+      console.log("Seeding facilities table...");
+      for (const fac of mockFacilities) {
+        await pool.query('INSERT INTO facilities (name, code, is_active) VALUES ($1, $2, $3)', [fac.name, fac.name, fac.is_active]);
+      }
+      await pool.query('INSERT INTO facilities (name, code, is_active) VALUES ($1, $2, $3)', ['Cơ sở 1', 'Cơ sở 1', true]);
+      console.log("Facilities seeded.");
+    }
+  } catch (e) {
+    console.error("Lỗi seed database:", e);
+  }
+
   console.log(`[DB] DB_HOST: ${process.env.DB_HOST ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_NAME: ${process.env.DB_NAME ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_USER: ${process.env.DB_USER ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_PORT: ${process.env.DB_PORT ? 'OK' : 'UNDEFINED'}`);
   console.log(`[API] SUPABASE_KEY: ${process.env.SUPABASE_KEY ? 'OK' : 'UNDEFINED'}`);
-});
 
