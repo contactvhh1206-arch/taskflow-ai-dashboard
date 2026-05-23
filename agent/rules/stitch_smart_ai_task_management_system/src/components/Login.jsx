@@ -20,30 +20,36 @@ export default function Login() {
         body: JSON.stringify({ username, password })
       });
 
-      let data;
       if (response.ok) {
-        data = await response.json();
-      } else {
-        // Fallback for demo when backend is down
-        const trimmedUser = username.trim();
-        const trimmedPass = password.trim();
-        if (trimmedUser === 'admin' && trimmedPass === 'admin123') {
-          data = { success: true, token: 'mock-admin', user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' } };
-        } else if (trimmedUser === 'manager1' && trimmedPass === 'manager123') {
-          data = { success: true, token: 'mock-manager', user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' } };
-        } else if (trimmedUser === 'sysadmin' && trimmedPass === 'admin123') {
-          data = { success: true, token: 'mock-sysadmin', user: { name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' } };
+        const data = await response.json();
+        if (data.success) {
+          login(data.user, data.token);
+          return;
         } else {
-          throw new Error('Tài khoản hoặc mật khẩu không chính xác.');
+          throw new Error(data.error || 'Lỗi đăng nhập');
         }
-      }
-
-      if (data.success) {
-        login(data.user, data.token);
       } else {
-        setError(data.error);
+        throw new Error('Backend down, fallback to local');
       }
     } catch (err) {
+      // Check localStorage first
+      try {
+        const users = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+        const foundUser = users.find(u => u.username === username && (u.password === password || u.password === btoa(password)));
+        
+        if (foundUser) {
+          if (foundUser.isActive === false) {
+            setError('Tài khoản này đã bị khóa!');
+            return;
+          }
+          login(foundUser, 'mock-token-' + foundUser.username);
+          return;
+        }
+      } catch (e) {
+        console.error("Local storage auth error:", e);
+      }
+
+      // Hardcoded fallback
       const trimmedUser = username.trim();
       const trimmedPass = password.trim();
       if (trimmedUser === 'admin' && trimmedPass === 'admin123') {
@@ -53,7 +59,7 @@ export default function Login() {
       } else if (trimmedUser === 'sysadmin' && trimmedPass === 'admin123') {
         login({ name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' }, 'mock-sysadmin');
       } else {
-        setError(err.message || 'Tài khoản hoặc mật khẩu không chính xác.');
+        setError('Tài khoản hoặc mật khẩu không chính xác.');
       }
     } finally {
       setLoading(false);
