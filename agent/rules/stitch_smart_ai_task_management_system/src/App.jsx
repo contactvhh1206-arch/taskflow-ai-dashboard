@@ -138,7 +138,12 @@ function MainDashboard() {
   const [viewMode, setViewMode] = useState('kanban');
   const [darkMode, setDarkMode] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('tasks');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (user && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) return 'reports';
+    return 'tasks';
+  });
+  const [aiSessions, setAiSessions] = useState(JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]'));
+  const [activeAiSessionId, setActiveAiSessionId] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [facilityStatuses, setFacilityStatuses] = useState([]);
   const [isCheckinCompleted, setIsCheckinCompleted] = useState(false);
@@ -311,17 +316,81 @@ function MainDashboard() {
             <p className="text-xs text-on-surface-variant dark:text-gray-400">Trung tâm Điều khiển</p>
           </div>
         </div>
-        <nav className="flex-1 px-4 space-y-1">
-          <NavItem icon="dashboard" label="Tổng quan" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-          <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+          {['FACILITY_MANAGER', 'STAFF'].includes(user.role) && (
+            <>
+              <NavItem icon="dashboard" label="Tổng quan" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+              <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+            </>
+          )}
+          {user.role === 'DEPARTMENT_HEAD' && (
+            <>
+              <NavItem icon="dashboard" label="Tổng quan phòng ban" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+              <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+              <NavItem icon="analytics" label="Báo cáo hiệu suất" active={activeTab === 'dept-reports'} onClick={() => setActiveTab('dept-reports')} />
+              <NavItem icon="history" label="Nhật ký doanh thu" active={activeTab === 'revenue-log'} onClick={() => setActiveTab('revenue-log')} />
+              <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
+              <NavItem icon="archive" label="Dữ liệu Lưu trữ" active={activeTab === 'archives'} onClick={() => setActiveTab('archives')} />
+            </>
+          )}
           {user.role === 'FACILITY_MANAGER' && (
             <NavItem icon="fact_check" label="Điểm danh" active={activeTab === 'checkin'} onClick={() => setActiveTab('checkin')} />
           )}
-          {user.role === 'SUPER_ADMIN' && (
+          {['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) && (
             <>
-              <NavItem icon="analytics" label="Báo cáo AI" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
+              {user.role === 'VICE_PRESIDENT' && (
+                <>
+                  <NavItem icon="content_paste" label="Công việc" active={activeTab === 'internal-tasks'} onClick={() => { setActiveTab('internal-tasks'); }} />
+                </>
+              )}
+              <NavItem icon="space_dashboard" label="Executive Dashboard" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
               <NavItem icon="corporate_fare" label="Đa cơ sở" active={activeTab === 'facilities'} onClick={() => setActiveTab('facilities')} />
+              <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
+              <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
             </>
+          )}
+          {user.role === 'ADMIN' && (
+            <>
+              <NavItem icon="archive" label="Dữ liệu Lưu trữ" active={activeTab === 'archives'} onClick={() => setActiveTab('archives')} />
+              <NavItem icon="settings" label="Cấu hình hệ thống" active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} />
+              <NavItem icon="api" label="Cấu hình API & AI" active={activeTab === 'api_config'} onClick={() => setActiveTab('api_config')} />
+              <NavItem icon="memory" label="Nhật ký Hoạt động AI" active={activeTab === 'ai_logs'} onClick={() => setActiveTab('ai_logs')} />
+              <NavItem icon="database" label="Quản lý Tri thức (RAG)" active={activeTab === 'rag_manager'} onClick={() => setActiveTab('rag_manager')} />
+            </>
+          )}
+
+          {['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'ADMIN'].includes(user.role) && (
+             <div className="mt-6 mb-2 px-4">
+                <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-3 flex items-center justify-between tracking-widest uppercase">
+                   Lịch sử trò chuyện AI
+                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) { setActiveTab('reports'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
+                      <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                   </button>
+                </div>
+                <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
+                   {aiSessions.filter(s => s.userId === user.id).length === 0 ? (
+                      <div className="text-xs text-gray-400 dark:text-gray-600 italic px-2">Chưa có lịch sử...</div>
+                   ) : (
+                      aiSessions.filter(s => s.userId === user.id).map(session => (
+                         <div 
+                            key={session.id} 
+                            onClick={() => { 
+                               setActiveAiSessionId(session.id); 
+                               if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
+                                  setActiveTab('reports'); 
+                               } else {
+                                  setShowAITaskModal(true);
+                               }
+                            }} 
+                            className={`px-2 py-1.5 rounded-lg text-xs cursor-pointer truncate transition-colors flex items-center gap-2 ${activeAiSessionId === session.id ? 'bg-primary/10 text-primary dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                         >
+                            <span className="material-symbols-outlined text-[14px]">chat_bubble_outline</span>
+                            {session.title || 'Phiên AI mới'}
+                         </div>
+                      ))
+                   )}
+                </div>
+             </div>
           )}
         </nav>
         <div className="p-4 border-t border-outline-variant dark:border-gray-800 space-y-2">
@@ -413,7 +482,7 @@ function MainDashboard() {
                         const cards = [...facilities, ...depts, ...executiveCards].filter(c => c.count > 0 || c.type === 'facility' || c.type === 'dept' || c.type === 'executive');
 
                         return cards.map((c, i) => (
-                          <div key={i} className="bg-white dark:bg-[#252525] p-5 rounded-xl border border-outline-variant dark:border-gray-700 hover:shadow-md hover:border-primary transition-all cursor-pointer group">
+                          <div key={i} onClick={() => setActiveTab('facilities')} className="bg-white dark:bg-[#252525] p-5 rounded-xl border border-outline-variant dark:border-gray-700 hover:shadow-md hover:border-primary transition-all cursor-pointer group">
                              <div className="flex justify-between items-start mb-3">
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${c.type === 'facility' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : c.type === 'dept' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'}`}>
                                    <span className="material-symbols-outlined text-[18px]">{c.icon}</span>
