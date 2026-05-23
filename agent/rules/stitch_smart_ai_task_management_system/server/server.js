@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch'; 
 import dotenv from 'dotenv';
@@ -97,15 +97,87 @@ app.get('/api/users/directory', authenticateUser, async (req, res) => {
   }
 });
 
-app.get('/api/tasks', authenticateUser, (req, res) => {
-  const { role, facility_id } = req.user;
-  let tasksToReturn = mockTasks;
+app.get('/api/tasks', authenticateUser, async (req, res) => {
+  try {
+    const { role, facility_id } = req.user;
+    
+    let query = `
+      SELECT t.id, t.title, t.description as desc, t.status, t.urgency as urgent, 
+             TO_CHAR(t.deadline, 'YYYY-MM-DD') as deadline, 
+             t.created_at as "createdAt", t.updated_at as "completedAt",
+             u.name as pic, u.username as "picId",
+             f.name as facility, f.code as "facilityId"
+      FROM tasks t
+      LEFT JOIN users u ON t.pic_id = u.id
+      LEFT JOIN facilities f ON t.facility_id = f.id
+      WHERE 1=1
+    `;
+    const params = [];
 
-  if (role === 'FACILITY_MANAGER') {
-    tasksToReturn = mockTasks.filter(task => task.facility_id === facility_id);
+    if (role === 'FACILITY_MANAGER' && facility_id && facility_id !== 'ALL') {
+      params.push(facility_id);
+      query += ` AND t.facility_id = $${params.length}`;
+    }
+
+    query += ` ORDER BY t.created_at DESC`;
+
+    const { rows } = await pool.query(query, params);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error("Lỗi lấy danh sách task:", error);
+    res.status(500).json({ error: 'Lỗi server.' });
   }
+});
 
-  res.json({ success: true, data: tasksToReturn });
+app.post('/api/tasks', authenticateUser, async (req, res) => {
+  try {
+    const { title, desc, pic, deadline, status, urgent, facility } = req.body;
+    
+    let pic_id = null;
+    if (pic) {
+      const picUser = await pool.query('SELECT id FROM users WHERE name = $1 OR username = $1 LIMIT 1', [pic]);
+      if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
+    }
+
+    let facility_id = req.user.facility_id !== 'ALL' ? req.user.facility_id : null;
+    if (facility && facility !== 'HQ' && facility !== 'ALL') {
+      const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
+      if (facRecord.rows.length > 0) facility_id = facRecord.rows[0].id;
+    }
+    
+    if (!facility_id || facility_id === 'ALL') {
+       facility_id = 1; 
+    }
+
+    const insertQuery = `
+      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
+    `;
+    const { rows } = await pool.query(insertQuery, [
+      title, 
+      desc || '', 
+      status || 'todo', 
+      urgent || false, 
+      deadline, 
+      pic_id, 
+      facility_id, 
+      urgent ? 'URGENT' : 'PRIORITY'
+    ]);
+    
+    const newTask = {
+      ...rows[0],
+      pic: pic || 'Chưa gán',
+      picId: pic || 'unassigned',
+      facility: facility || 'HQ',
+      facilityId: facility || 'HQ'
+    };
+
+    res.json({ success: true, data: newTask });
+  } catch (error) {
+    console.error("Lỗi tạo task:", error);
+    res.status(500).json({ error: 'Lỗi server khi lưu công việc.' });
+  }
 });
 
 // API Đăng nhập giả lập

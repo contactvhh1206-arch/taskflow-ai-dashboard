@@ -285,24 +285,59 @@ function MainDashboard() {
     }
   };
 
-  const handleCreateTask = (newTask) => {
-    setTasks([...tasks, {
-      id: Date.now(),
-      pic: user.name,
-      deadline: new Date().toISOString().split('T')[0],
-      urgent: false,
-      facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
-      ...newTask
-    }]);
+  const handleCreateTask = async (newTask) => {
+    try {
+      const taskPayload = {
+        pic: user.name,
+        deadline: new Date().toISOString().split('T')[0],
+        urgent: false,
+        facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
+        ...newTask
+      };
+      
+      const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-role': user.role,
+          'x-facility-id': user.facility_id || 'ALL'
+        },
+        body: JSON.stringify(taskPayload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTasks(prev => [data.data, ...prev]);
+        showToast('Tạo công việc thành công');
+      } else {
+        showToast('Tạo công việc thất bại');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Lỗi mạng, không thể tạo công việc');
+    }
   };
 
   useEffect(() => {
     if (user) {
-      if (user.role === 'FACILITY_MANAGER') {
-        setTasks(INITIAL_TASKS.filter(t => t.facility === user.facility_id));
-      } else {
-        setTasks(INITIAL_TASKS);
-      }
+      const fetchTasks = async () => {
+        try {
+          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
+            headers: {
+              'x-user-role': user.role,
+              'x-facility-id': user.facility_id || 'ALL'
+            }
+          });
+          const data = await res.json();
+          if (data.success) {
+            setTasks(data.data);
+          } else {
+            setTasks([]);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      fetchTasks();
       fetchFacilityStatuses();
     }
   }, [user]);

@@ -9,11 +9,6 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
       const [isLoading, setIsLoading] = useState(false);
 
       useEffect(() => {
-        if (!user?.facility_name && !['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SUPER_ADMIN'].includes(user?.role)) {
-           setIsLoading(true);
-           const fallback = setTimeout(() => setIsLoading(false), 3000);
-           return () => clearTimeout(fallback);
-        }
         setIsLoading(true);
         const timer = setTimeout(() => {
           try {
@@ -145,7 +140,7 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
 
         return () => clearTimeout(timer);
       }, [tasks, user, timeFilter, user?.facility_id, user?.facility_name, globalFacilityFilter]);
-      if (isLoading || (!user?.facility_name && !['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SUPER_ADMIN'].includes(user?.role))) {
+      if (isLoading) {
         return (
           <div className="space-y-6 animate-fade-in">
             <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -222,7 +217,7 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
           ) : stats.total === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 text-gray-400 mt-6 shadow-sm">
               <span className="material-symbols-outlined text-[48px] text-gray-300 dark:text-gray-600 mb-4">inbox</span>
-              <span className="text-lg font-medium text-gray-500 dark:text-gray-400">Hiện chưa có hoạt động nào.</span>
+              <span className="text-lg font-medium text-gray-500 dark:text-gray-400">Chưa có dữ liệu</span>
               <p className="text-sm mt-2 text-gray-400">Thử thay đổi bộ lọc thời gian hoặc cơ sở để xem dữ liệu.</p>
             </div>
           ) : (
