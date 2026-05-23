@@ -78,14 +78,16 @@ app.put('/api/facilities/:id/restore', (req, res) => {
 });
 
 const authenticateUser = (req, res, next) => {
-  const userRole = req.headers['x-user-role']; 
-  const facilityId = parseInt(req.headers['x-facility-id'], 10);
-
-  if (!userRole) return res.status(401).json({ error: 'Unauthorized' });
-
-  req.user = { role: userRole, facility_id: facilityId };
-  next();
-};
+    const userRole = req.headers['x-user-role']; 
+    const facilityRaw = req.headers['x-facility-id'];
+    let facilityId = parseInt(facilityRaw, 10);
+    if (isNaN(facilityId)) facilityId = facilityRaw;
+  
+    if (!userRole) return res.status(401).json({ error: 'Unauthorized' });
+  
+    req.user = { role: userRole, facility_id: facilityId };
+    next();
+  };
 
 app.get('/api/users/directory', authenticateUser, async (req, res) => {
   try {
@@ -181,25 +183,47 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
 });
 
 // API Đăng nhập giả lập
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body; // Changed from email to username
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body; // Changed from email to username
+    
+    // Hardcode tài khoản để demo
+    if (username === 'admin' && password === 'admin123') {
+      return res.json({
+        success: true,
+        token: 'mock-jwt-token-admin',
+        user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }
+      });
+    } else if (username === 'manager1' && password === 'manager123') {
+      return res.json({
+        success: true,
+        token: 'mock-jwt-token-manager',
+        user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' } // Giữ kiểu string 'Cơ sở 1' cho khớp với frontend mock
+      });
+    }
   
-  // Hardcode tài khoản để demo
-  if (username === 'admin' && password === 'admin123') {
-    return res.json({
-      success: true,
-      token: 'mock-jwt-token-admin',
-      user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }
-    });
-  } else if (username === 'manager1' && password === 'manager123') {
-    return res.json({
-      success: true,
-      token: 'mock-jwt-token-manager',
-      user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' } // Giữ kiểu string 'Cơ sở 1' cho khớp với frontend mock
-    });
-  }
+    try {
+        const { rows } = await pool.query('SELECT * FROM users WHERE username = $1 OR email = $1', [username]);
+        if (rows.length > 0) {
+            const user = rows[0];
+            const passToCheck = user.password || user.password_hash;
+            if (passToCheck === password || passToCheck === Buffer.from(password).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === password) {
+                return res.json({
+                    success: true,
+                    token: 'jwt-token-' + user.id,
+                    user: { 
+                        name: user.full_name || user.name || user.username, 
+                        role: user.role, 
+                        facility_id: user.facility_id || 'ALL',
+                        facility_code: user.facility_code || ''
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.error("Lỗi đăng nhập DB:", e);
+    }
 
-  return res.status(401).json({ success: false, error: 'Tài khoản hoặc mật khẩu không chính xác.' });
+    return res.status(401).json({ success: false, error: 'Tài khoản hoặc mật khẩu không chính xác.' });
 });
 
 // ==============================================================================
