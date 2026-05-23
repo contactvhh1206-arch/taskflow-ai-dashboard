@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'];
+
 const SYSTEM_ROLES = [
   { value: 'FACILITY_MANAGER', label: 'Quản lý cơ sở' },
   { value: 'DEPARTMENT_HEAD', label: 'Bộ phận Marketing' },
