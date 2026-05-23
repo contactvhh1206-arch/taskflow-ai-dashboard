@@ -1023,6 +1023,16 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
+const getStatusConfig = (status) => {
+  switch (status) {
+    case 'todo': return { label: 'Cần làm', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: 'radio_button_unchecked' };
+    case 'in_progress': return { label: 'Đang tiến hành', color: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', icon: 'pending' };
+    case 'review': return { label: 'Nghiệm thu', color: 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', icon: 'rate_review' };
+    case 'done': return { label: 'Hoàn thành', color: 'bg-success-container text-success dark:bg-green-900/30 dark:text-green-400', icon: 'check_circle' };
+    default: return { label: 'Chưa rõ', color: 'bg-gray-100 text-gray-700', icon: 'help' };
+  }
+};
+
 function StatusBadge({ status }) {
   const styles = { todo: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700', in_progress: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800', review: 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800', done: 'bg-success-container text-success dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800' };
   const labels = { todo: 'Cần làm', in_progress: 'Đang tiến hành', review: 'Nghiệm thu', done: 'Hoàn thành' };
