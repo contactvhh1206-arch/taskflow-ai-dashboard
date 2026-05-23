@@ -232,7 +232,13 @@ app.post('/api/login', async (req, res) => {
     }
   
     try {
-        const { rows } = await pool.query('SELECT * FROM users WHERE username = $1 OR email = $1', [username]);
+        const { rows } = await pool.query(`
+            SELECT u.*, r.name AS role_name, f.code AS facility_code 
+            FROM users u 
+            LEFT JOIN roles r ON u.role_id = r.id 
+            LEFT JOIN facilities f ON u.facility_id = f.id
+            WHERE u.email = $1 OR u.full_name = $1
+        `, [username]);
         if (rows.length > 0) {
             const user = rows[0];
             const passToCheck = user.password || user.password_hash;
@@ -241,18 +247,21 @@ app.post('/api/login', async (req, res) => {
                     success: true,
                     token: 'jwt-token-' + user.id,
                     user: { 
-                        name: user.full_name || user.name || user.username, 
-                        role: user.role, 
+                        name: user.full_name, 
+                        role: user.role_name, 
                         facility_id: user.facility_id || 'ALL',
                         facility_code: user.facility_code || ''
                     }
                 });
+            } else {
+                console.error("Sai mật khẩu cho user:", username);
             }
         }
     } catch (e) {
         console.error("Lỗi đăng nhập DB:", e);
     }
 
+    console.error("Lỗi 401: Không tìm thấy tài khoản hoặc mật khẩu không khớp. Payload:", req.body);
     return res.status(401).json({ success: false, error: 'Tài khoản hoặc mật khẩu không chính xác.' });
 });
 
