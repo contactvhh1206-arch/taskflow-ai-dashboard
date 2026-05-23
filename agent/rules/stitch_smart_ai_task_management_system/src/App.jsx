@@ -375,8 +375,7 @@ function MainDashboard() {
       });
       
       if (res.status === 500 || !res.ok) {
-         showToast('Lỗi máy chủ, vui lòng thử lại');
-         return;
+         throw new Error('Lỗi máy chủ');
       }
       
       const data = await res.json();
@@ -384,11 +383,23 @@ function MainDashboard() {
         setTasks(prev => [data.data, ...prev]);
         showToast('Tạo công việc thành công');
       } else {
-        showToast('Tạo công việc thất bại: ' + (data.error || ''));
+        throw new Error(data.error || 'Lỗi server');
       }
     } catch (e) {
-      console.error(e);
-      showToast('Lỗi mạng, không thể tạo công việc');
+      console.error("Fallback offline create task:", e);
+      const fallbackTask = {
+        id: Date.now(),
+        pic: user.name,
+        deadline: new Date().toISOString().split('T')[0],
+        urgent: false,
+        facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
+        status: 'todo',
+        ...newTask
+      };
+      setTasks(prev => [fallbackTask, ...prev]);
+      const localTasks = JSON.parse(localStorage.getItem('taskflow_tasks') || '[]');
+      localStorage.setItem('taskflow_tasks', JSON.stringify([fallbackTask, ...localTasks]));
+      showToast('Lưu công việc tạm (Offline mode)');
     }
   };
 

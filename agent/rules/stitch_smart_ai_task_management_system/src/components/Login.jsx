@@ -46,7 +46,11 @@ export default function Login() {
             setError('Tài khoản này đã bị khóa!');
             return;
           }
-          localStorage.setItem('facility_id', foundUser.facility_id || 'ALL');
+          let facId = foundUser.facility_id;
+          if (!facId) {
+            facId = foundUser.role === 'FACILITY_MANAGER' ? (foundUser.name || foundUser.username) : 'ALL';
+          }
+          localStorage.setItem('facility_id', facId);
           login(foundUser, 'mock-token-' + foundUser.username);
           return;
         }
