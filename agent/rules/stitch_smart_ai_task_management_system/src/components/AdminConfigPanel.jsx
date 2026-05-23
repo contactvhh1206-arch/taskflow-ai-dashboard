@@ -37,7 +37,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const [resetConfirmText, setResetConfirmText] = useState('');
       const [resetPassword, setResetPassword] = useState('');
       const [isResetting, setIsResetting] = useState(false);
-      const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !window.location.protocol.includes('file');
+      const isProduction = false;
 
       const handleResetSystem = () => {
          if (isProduction) return;
