@@ -147,7 +147,11 @@ function MainDashboard() {
   const [darkMode, setDarkMode] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
-    if (user && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) return 'reports';
+    if (!user) return 'tasks';
+    if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) return 'reports';
+    if (user.role === 'ADMIN') return 'admin';
+    if (user.role === 'DEPARTMENT_HEAD') return 'dashboard';
+    if (user.role === 'FINANCE_DEPT') return 'dashboard';
     return 'tasks';
   });
   const [aiSessions, setAiSessions] = useState(JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]'));
