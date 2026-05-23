@@ -33,9 +33,12 @@ export default function Login() {
       }
     } catch (err) {
       // Check localStorage first
+      const trimmedUser = username.trim();
+      const trimmedPass = password.trim();
+      
       try {
         const users = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
-        const foundUser = users.find(u => u.username === username && (u.password === password || u.password === btoa(password)));
+        const foundUser = users.find(u => u.username.trim() === trimmedUser && (u.password === trimmedPass || u.password === btoa(trimmedPass)));
         
         if (foundUser) {
           if (foundUser.isActive === false) {
@@ -50,8 +53,6 @@ export default function Login() {
       }
 
       // Hardcoded fallback
-      const trimmedUser = username.trim();
-      const trimmedPass = password.trim();
       if (trimmedUser === 'admin' && trimmedPass === 'admin123') {
         login({ name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }, 'mock-admin');
       } else if (trimmedUser === 'manager1' && trimmedPass === 'manager123') {

@@ -175,8 +175,8 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         }
         const newUser = {
           id: 'u' + Date.now(),
-          username: newUsername,
-          password: btoa(newPassword),
+          username: newUsername.trim(),
+          password: btoa(newPassword.trim()),
           name: newName,
           role: newRole,
           facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(newRole) ? newFinanceFacilities : HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId,
@@ -291,7 +291,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
               name: editUserName,
               role: editUserRole,
               facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(editUserRole) ? editFinanceFacilities : HIGH_LEVEL_ROLES.includes(editUserRole) ? 'ALL' : editUserFacility,
-              password: editUserPassword ? btoa(editUserPassword) : u.password
+              password: editUserPassword ? btoa(editUserPassword.trim()) : u.password
             };
           }
           return u;
