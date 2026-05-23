@@ -422,13 +422,18 @@ function MainDashboard() {
         setTasks(tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence} : t));
         setSelectedTask({...selectedTask, status: newStatus, evidence: evidenceName || selectedTask.evidence});
       } else {
-        showToast('Lỗi khi cập nhật trạng thái');
+        throw new Error('Lỗi server');
       }
     } catch (e) {
-      console.error(e);
-      // Fallback for offline mode
-      setTasks(tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence} : t));
+      console.error("Fallback offline update status:", e);
+      const updatedTasks = tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence} : t);
+      setTasks(updatedTasks);
       setSelectedTask({...selectedTask, status: newStatus, evidence: evidenceName || selectedTask.evidence});
+      
+      // Update local storage for offline persistence
+      const localTasks = JSON.parse(localStorage.getItem('taskflow_tasks') || '[]');
+      const updatedLocal = localTasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence} : t);
+      localStorage.setItem('taskflow_tasks', JSON.stringify(updatedLocal));
     }
   };
 
