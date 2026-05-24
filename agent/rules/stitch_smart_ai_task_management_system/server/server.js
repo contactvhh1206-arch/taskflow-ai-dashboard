@@ -203,6 +203,14 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
                   const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
                   if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
               }
+          } else if (facility === 'HQ' || facility === 'ALL') {
+              const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
+              if (hqFac.rows.length > 0) {
+                  insert_facility_id = hqFac.rows[0].id;
+              } else {
+                  const anyFac = await pool.query("SELECT id FROM facilities LIMIT 1");
+                  if (anyFac.rows.length > 0) insert_facility_id = anyFac.rows[0].id;
+              }
           }
       }
 
@@ -238,6 +246,20 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
 });
 
 // API Đăng nhập giả lập
+app.delete('/api/tasks/all', authenticateUser, async (req, res) => {
+  try {
+    const { role } = req.user;
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+       return res.status(403).json({ error: 'Không đủ quyền' });
+    }
+    await pool.query('TRUNCATE TABLE tasks RESTART IDENTITY CASCADE');
+    res.json({ success: true, message: 'Đã xóa tất cả tasks' });
+  } catch (error) {
+    console.error("Lỗi xóa tasks:", error);
+    res.status(500).json({ error: 'Lỗi máy chủ khi xóa tasks' });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body; // Changed from email to username
     
