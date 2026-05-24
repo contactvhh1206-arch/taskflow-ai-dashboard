@@ -134,9 +134,14 @@ app.put('/api/facilities/:id/restore', async (req, res) => {
 app.delete('/api/facilities/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    // Clear references to bypass foreign key constraints
+    await pool.query(`UPDATE users SET facility_id = NULL WHERE facility_id = $1`, [id]).catch(e => console.log('Ignore users update error:', e.message));
+    await pool.query(`UPDATE tasks SET facility_id = NULL WHERE facility_id = $1`, [id]).catch(e => console.log('Ignore tasks update error:', e.message));
+    
     await pool.query(`DELETE FROM facilities WHERE id = $1`, [id]);
     res.json({ success: true });
   } catch (error) {
+    console.error('Delete facility error:', error);
     res.status(500).json({ error: 'Không thể xóa cơ sở vì đang có dữ liệu liên quan.' });
   }
 });
