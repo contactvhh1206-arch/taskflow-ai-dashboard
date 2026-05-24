@@ -547,24 +547,7 @@ app.post('/api/login', async (req, res) => {
 // 1.5. API DAILY CHECK-IN (BÁO CÁO ĐẦU GIỜ)
 // ==============================================================================
 
-app.post('/api/checkin', authenticateUser, (req, res) => {
-  const { role, facility_id } = req.user;
-  
-  if (role !== 'FACILITY_MANAGER') {
-    return res.status(403).json({ error: 'Chỉ Quản lý cơ sở mới được phép Check-in.' });
-  }
-
-  const checkinData = {
-    id: mockCheckins.length + 1,
-    facility_id,
-    date: new Date().toISOString().split('T')[0], // Lưu theo ngày
-    timestamp: new Date().toISOString(),
-    ...req.body
-  };
-
-  mockCheckins.push(checkinData);
-  res.json({ success: true, message: 'Check-in thành công', isCheckinCompleted: true, data: checkinData });
-});
+// POST /api/checkin was removed because it is now handled by POST /api/logs
 
 app.get('/api/checkin/status', authenticateUser, async (req, res) => {
   try {
