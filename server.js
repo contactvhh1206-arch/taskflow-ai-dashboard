@@ -261,10 +261,15 @@ app.delete('/api/tasks/all', authenticateUser, async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body; // Changed from email to username
-    
-    // Hardcode tài khoản để demo
-    if (username === 'admin' && password === 'admin123') {
+      let { username, password } = req.body;
+      
+      // Sanitize username for mobile keyboards (trim spaces and convert to lowercase)
+      if (username) {
+        username = username.trim().toLowerCase();
+      }
+      
+      // Hardcode tài khoản để demo
+      if (username === 'admin' && password === 'admin123') {
       return res.json({
         success: true,
         token: 'mock-jwt-token-admin',
