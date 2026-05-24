@@ -764,9 +764,14 @@ function MainDashboard() {
                         <span className="material-symbols-outlined text-[18px]">view_kanban</span> Bảng
                       </button>
                     </div>
-                    <button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-md shadow-primary/20 transition-all">
-                      <span className="material-symbols-outlined text-[18px]">add</span> Mới
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={() => setShowAITaskModal(true)} className="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-md shadow-secondary/20 transition-all">
+                          <span className="material-symbols-outlined text-[18px]">auto_awesome</span> <span className="hidden sm:inline">Trích xuất Biên bản</span>
+                        </button>
+                        <button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-md shadow-primary/20 transition-all">
+                          <span className="material-symbols-outlined text-[18px]">add</span> Mới
+                        </button>
+                      </div>
                   </div>
                 </div>
 
