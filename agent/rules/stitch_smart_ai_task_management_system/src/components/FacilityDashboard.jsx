@@ -8,6 +8,31 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
       const [timeFilter, setTimeFilter] = useState('today');
       const [isLoading, setIsLoading] = useState(false);
 
+      const handleRequestSupport = async (taskId) => {
+        try {
+          const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/support`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-role': user?.role,
+              'x-facility-id': localStorage.getItem('facility_id') || user?.facility_id || 'ALL'
+            }
+          });
+          if (!res.ok) throw new Error('API Error');
+          const data = await res.json();
+          if (data.success) {
+            if (window.showToast) window.showToast('Đã gửi yêu cầu hỗ trợ đến Ban Giám Đốc!', 'success');
+            // Update local task state visually
+            setAiPings(prev => prev.map(p => p.task.id === taskId ? { ...p, task: { ...p.task, needsSupport: true } } : p));
+          } else {
+            if (window.showToast) window.showToast('Lỗi gửi yêu cầu hỗ trợ', 'error');
+          }
+        } catch (error) {
+          console.error("Lỗi:", error);
+          if (window.showToast) window.showToast('Lỗi máy chủ khi gửi yêu cầu', 'error');
+        }
+      };
+
       useEffect(() => {
         setIsLoading(true);
         const timer = setTimeout(async () => {
@@ -323,7 +348,24 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
                         </div>
                         <div className="flex-1">
                           <p className="text-sm text-gray-800 dark:text-gray-200 leading-relaxed font-medium">{ping.message}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">schedule</span> {ping.time}</p>
+                          <div className="flex items-center justify-between mt-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">schedule</span> {ping.time}</p>
+                            {!ping.task.needsSupport ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRequestSupport(ping.task.id);
+                                }}
+                                className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">support_agent</span> Yêu cầu hỗ trợ
+                              </button>
+                            ) : (
+                              <span className="text-xs font-bold text-success flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">check_circle</span> Đã báo cáo lên Ban GĐ
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -354,6 +396,11 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
                               {t.is_boss_assigned && (
                                 <span className="relative group/star flex items-center justify-center" title="Nhiệm vụ chỉ đạo trực tiếp từ Sếp Tổng">
                                   <span className="material-symbols-outlined text-yellow-400 text-[16px] drop-shadow-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                                </span>
+                              )}
+                              {t.needsSupport && (
+                                <span className="px-2 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-md text-[10px] font-bold flex items-center gap-1 border border-red-200 dark:border-red-800/50">
+                                  <span className="material-symbols-outlined text-[12px]">support_agent</span> Cần hỗ trợ
                                 </span>
                               )}
                             </p>

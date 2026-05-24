@@ -847,7 +847,14 @@ function MainDashboard() {
                         {tasks.map(task => (
                           <tr key={task.id} onClick={() => setSelectedTask(task)} className="cursor-pointer border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                             <td className="px-6 py-4">
-                              <div className="font-medium text-on-surface dark:text-white">{task.title}</div>
+                              <div className="font-medium text-on-surface dark:text-white flex items-center gap-2">
+                                {task.title}
+                                {task.needsSupport && (
+                                  <span className="px-2 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-md text-[10px] font-bold flex items-center gap-1 border border-red-200 dark:border-red-800/50">
+                                    <span className="material-symbols-outlined text-[12px]">support_agent</span> Cần hỗ trợ
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-xs text-gray-500">{task.desc}</div>
                             </td>
                             <td className="px-6 py-4">{task.pic}</td>
@@ -877,7 +884,14 @@ function MainDashboard() {
                     <span className="material-symbols-outlined">close</span>
                   </button>
                 </div>
-                <h2 className="text-xl font-bold text-on-surface dark:text-white mb-2">{selectedTask.title}</h2>
+                <h2 className="text-xl font-bold text-on-surface dark:text-white mb-2 flex items-center gap-2">
+                  {selectedTask.title}
+                  {selectedTask.needsSupport && (
+                    <span className="px-2 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-md text-xs font-bold flex items-center gap-1 border border-red-200 dark:border-red-800/50">
+                      <span className="material-symbols-outlined text-[14px]">support_agent</span> Cần hỗ trợ
+                    </span>
+                  )}
+                </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">{selectedTask.desc}</p>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-3 bg-surface-container-low dark:bg-[#252525] rounded-xl">
@@ -1152,9 +1166,12 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
       <div className="flex flex-col gap-3">
         {columnTasks.map(task => (
           <div key={task.id} onClick={() => setSelectedTask(task)} className="bg-white dark:bg-[#252525] p-4 rounded-xl border border-outline-variant dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
-            <div className="flex justify-between items-start mb-2">
+            <div className="flex justify-between items-start mb-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-primary dark:text-blue-400 bg-primary/10 dark:bg-primary/20 px-2 py-1 rounded-md">{task.facility}</span>
-              {task.urgent && <span className="material-symbols-outlined text-error text-[16px]" title="Khẩn cấp">error</span>}
+              <div className="flex items-center gap-1">
+                {task.needsSupport && <span className="px-2 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-md text-[10px] font-bold flex items-center gap-1 border border-red-200 dark:border-red-800/50"><span className="material-symbols-outlined text-[10px]">support_agent</span></span>}
+                {task.urgent && <span className="material-symbols-outlined text-error text-[16px]" title="Khẩn cấp">error</span>}
+              </div>
             </div>
             <h4 className="text-sm font-semibold text-on-surface dark:text-gray-100 mb-2 leading-snug">{task.title}</h4>
             <div className="flex items-center justify-between mt-4 border-t border-outline-variant dark:border-gray-700/50 pt-3">

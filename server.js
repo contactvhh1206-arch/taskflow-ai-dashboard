@@ -31,6 +31,7 @@ const initDB = async () => {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
     await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS address VARCHAR(255)`);
     await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS pic VARCHAR(255)`);
+    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS needs_support BOOLEAN DEFAULT false`);
     await pool.query(`CREATE TABLE IF NOT EXISTS daily_logs (
       id SERIAL PRIMARY KEY,
       org_unit VARCHAR(255),
@@ -338,6 +339,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
       SELECT t.id, t.title, t.description as desc, t.status, t.urgency as urgent, 
              TO_CHAR(t.deadline, 'YYYY-MM-DD') as deadline, 
              t.created_at as "createdAt", t.updated_at as "completedAt",
+             t.needs_support as "needsSupport",
              u.full_name as pic, u.email as "picId",
              f.name as facility, f.code as "facilityId"
       FROM tasks t
@@ -389,6 +391,29 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error("Lỗi cập nhật trạng thái:", error);
     res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
+  }
+});
+
+app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateQuery = `
+      UPDATE tasks 
+      SET needs_support = true, 
+          updated_at = NOW() 
+      WHERE id = $1 
+      RETURNING id, title, needs_support as "needsSupport"
+    `;
+    const { rows } = await pool.query(updateQuery, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    }
+
+    res.json({ success: true, message: 'Đã gửi yêu cầu hỗ trợ đến Ban Giám Đốc', data: rows[0] });
+  } catch (error) {
+    console.error("Lỗi server khi yêu cầu hỗ trợ:", error);
+    res.status(500).json({ error: 'Lỗi máy chủ nội bộ' });
   }
 });
 
