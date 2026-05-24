@@ -208,6 +208,24 @@ function MainDashboard() {
     try { return JSON.parse(localStorage.getItem('stitch_comments') || '{}'); } catch { return {}; }
   });
   const [facilityList, setFacilityList] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('taskflow_notifications') || '[]'); } catch { return []; }
+  });
+
+  useEffect(() => {
+    const checkNotifications = () => {
+      try { setNotifications(JSON.parse(localStorage.getItem('taskflow_notifications') || '[]')); } catch {}
+    };
+    window.addEventListener('storage', checkNotifications);
+    window.addEventListener('taskflow_notify', checkNotifications);
+    const interval = setInterval(checkNotifications, 5000);
+    return () => {
+      window.removeEventListener('storage', checkNotifications);
+      window.removeEventListener('taskflow_notify', checkNotifications);
+      clearInterval(interval);
+    };
+  }, []);
 
   const fetchFacilities = () => {
     let localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
@@ -638,10 +656,55 @@ function MainDashboard() {
             <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-surface-variant dark:hover:bg-gray-800 text-gray-500 transition-colors">
               <span className="material-symbols-outlined">{darkMode ? 'light_mode' : 'dark_mode'}</span>
             </button>
-            <button className="p-2 rounded-full hover:bg-surface-variant dark:hover:bg-gray-800 text-gray-500 relative transition-colors">
-              <span className="material-symbols-outlined">notifications</span>
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-error rounded-full border-2 border-white dark:border-[#121212]"></span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 rounded-full hover:bg-surface-variant dark:hover:bg-gray-800 text-gray-500 relative transition-colors"
+              >
+                <span className="material-symbols-outlined">notifications</span>
+                {notifications.length > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-error rounded-full border-2 border-white dark:border-[#121212]"></span>}
+              </button>
+              
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-[#1e1e1e] rounded-xl shadow-lg border border-outline-variant dark:border-gray-800 z-50 overflow-hidden text-left">
+                  <div className="p-4 border-b border-outline-variant dark:border-gray-800 flex justify-between items-center bg-surface-container dark:bg-gray-800/50">
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-200">Thông báo</h3>
+                    {notifications.length > 0 && (
+                      <button 
+                        onClick={() => {
+                          setNotifications([]);
+                          localStorage.setItem('taskflow_notifications', '[]');
+                        }}
+                        className="text-xs text-primary hover:underline font-medium"
+                      >
+                        Đánh dấu đã đọc
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                        <span className="material-symbols-outlined text-4xl mb-2 opacity-50">notifications_paused</span>
+                        <p className="text-sm">Không có thông báo mới</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-outline-variant dark:divide-gray-800">
+                        {notifications.map((notif, idx) => (
+                          <div key={idx} className="p-4 hover:bg-surface-variant dark:hover:bg-gray-800/50 transition-colors cursor-pointer group">
+                            <p className="text-sm text-gray-800 dark:text-gray-200 font-medium group-hover:text-primary transition-colors">{notif.title}</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{notif.message}</p>
+                            <p className="text-[10px] text-gray-400 mt-2 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[10px]">schedule</span>
+                              {notif.time || 'Vừa xong'}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

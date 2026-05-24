@@ -22,6 +22,17 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
           const data = await res.json();
           if (data.success) {
             if (window.showToast) window.showToast('Đã gửi yêu cầu hỗ trợ đến Ban Giám Đốc!', 'success');
+            
+            // Push Notification to Local Storage
+            const newNotif = {
+              title: 'Yêu cầu hỗ trợ mới',
+              message: `Cơ sở ${user?.facility_id || 'chưa rõ'} cần hỗ trợ cho công việc #${taskId}`,
+              time: new Date().toLocaleTimeString('vi-VN')
+            };
+            const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+            localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
+            window.dispatchEvent(new Event('taskflow_notify'));
+
             // Update local task state visually
             setAiPings(prev => prev.map(p => p.task.id === taskId ? { ...p, task: { ...p.task, needsSupport: true } } : p));
           } else {
