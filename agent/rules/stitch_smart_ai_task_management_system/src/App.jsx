@@ -44,7 +44,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
     title: '',
     desc: '',
     pic: user.name,
-    deadline: new Date().toISOString().split('T')[0],
+    deadline: new Date().toISOString().slice(0, 16),
     status: defaultStatus || 'todo',
     urgent: false
   });
@@ -126,7 +126,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Deadline</label>
-              <input required type="date" name="deadline" value={formData.deadline} onChange={handleChange} className="w-full px-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
+              <input required type="datetime-local" name="deadline" value={formData.deadline} onChange={handleChange} className="w-full px-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
             </div>
           </div>
 
@@ -972,7 +972,7 @@ function MainDashboard() {
                   </div>
                   <div className="flex items-center justify-between p-3 bg-error-container/50 dark:bg-red-900/10 rounded-xl border border-error/20">
                     <span className="text-sm font-medium text-error">Hạn chót</span>
-                    <span className="text-sm font-bold text-error">{selectedTask.deadline}</span>
+                    <span className="text-sm font-bold text-error">{selectedTask.deadline ? selectedTask.deadline.replace('T', ' lúc ') : ''}</span>
                   </div>
                 </div>
                 <div className="mt-8 pt-6 border-t border-outline-variant dark:border-gray-800">

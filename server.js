@@ -390,7 +390,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
     
     let query = `
       SELECT t.id, t.title, t.description as desc, t.status, t.urgency as urgent, 
-             TO_CHAR(t.deadline, 'YYYY-MM-DD') as deadline, 
+             TO_CHAR(t.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
              t.created_at as "createdAt", t.updated_at as "completedAt",
              t.needs_support as "needsSupport",
              u.full_name as pic, u.email as "picId",
@@ -432,7 +432,7 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
       SET status = $1, 
           updated_at = NOW() 
       WHERE id = $2 
-      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
+      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
     `;
     const { rows } = await pool.query(updateQuery, [status, id]);
     
@@ -510,7 +510,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     const insertQuery = `
       INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
+      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
     `;
       const { rows } = await pool.query(insertQuery, [
         title, 
@@ -679,8 +679,8 @@ app.post('/api/ai/auto-tasking', authenticateUser, async (req, res) => {
       return res.status(400).json({ error: 'Vui lòng cung cấp biên bản cuộc họp.' });
     }
 
-    const systemPrompt = `Bạn là một AI Điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
-Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DD), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY').`;
+    const systemPrompt = `Bạn là một AI điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
+Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY').`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",

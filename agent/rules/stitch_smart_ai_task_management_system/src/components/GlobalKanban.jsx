@@ -20,8 +20,9 @@ export function GlobalKanbanColumn({ title, status, tasks, setSelectedTask, onOp
     const todayStr = new Date().toISOString().split('T')[0];
     const getPriority = (task) => {
       if (!task.deadline) return 4;
-      if (task.deadline < todayStr) return 1;
-      if (task.deadline === todayStr) return 2;
+      const taskDate = task.deadline.slice(0, 10);
+      if (taskDate < todayStr) return 1;
+      if (taskDate === todayStr) return 2;
       return 3;
     };
     const pA = getPriority(a);
@@ -50,9 +51,10 @@ export function GlobalKanbanColumn({ title, status, tasks, setSelectedTask, onOp
 
   const getDeadlineBadge = (deadline) => {
     if (!deadline) return null;
+    const taskDate = deadline.slice(0, 10);
     const todayStr = new Date().toISOString().split('T')[0];
-    if (deadline < todayStr) return <span className="bg-error/10 text-error px-2 py-0.5 rounded text-[10px] font-bold border border-error/20">Đã trễ</span>;
-    if (deadline === todayStr) return <span className="bg-orange-500/10 text-orange-600 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-500/20">Sắp trễ</span>;
+    if (taskDate < todayStr) return <span className="bg-error/10 text-error px-2 py-0.5 rounded text-[10px] font-bold border border-error/20">Đã trễ</span>;
+    if (taskDate === todayStr) return <span className="bg-orange-500/10 text-orange-600 px-2 py-0.5 rounded text-[10px] font-bold border border-orange-500/20">Sắp trễ</span>;
     return null;
   };
 
