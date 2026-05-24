@@ -126,7 +126,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Deadline</label>
-              <input required type="datetime-local" name="deadline" value={formData.deadline} onChange={handleChange} className="w-full px-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
+              <input required lang="en-GB" type="datetime-local" name="deadline" value={formData.deadline} onChange={handleChange} className="w-full px-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
             </div>
           </div>
 
