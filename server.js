@@ -182,37 +182,37 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     console.log("Payload tạo task:", req.body);
     const { title, desc, pic, deadline, status, urgent, facility } = req.body;
     
-      let pic_id = null;
-      if (pic) {
+    let pic_id = null;
+    if (pic) {
         const picUser = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
         if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
-      }
+    }
   
-      let insert_facility_id = null;
-      if (req.user.role === 'FACILITY_MANAGER') {
-          insert_facility_id = req.user.facility_id;
-          if (!insert_facility_id || insert_facility_id === 'ALL') {
-              return res.status(403).json({ error: "Lỗi phân quyền: Không xác định được cơ sở để tạo thẻ." });
-          }
-      } else {
-          if (facility && facility !== 'HQ' && facility !== 'ALL') {
-              let parsedFac = parseInt(facility, 10);
-              if (!isNaN(parsedFac)) {
-                  insert_facility_id = parsedFac;
-              } else {
-                  const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
-                  if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
-              }
-          } else if (facility === 'HQ' || facility === 'ALL') {
-              const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
-              if (hqFac.rows.length > 0) {
-                  insert_facility_id = hqFac.rows[0].id;
-              } else {
-                  const anyFac = await pool.query("SELECT id FROM facilities LIMIT 1");
-                  if (anyFac.rows.length > 0) insert_facility_id = anyFac.rows[0].id;
-              }
-          }
-      }
+    let insert_facility_id = null;
+    if (req.user.role === 'FACILITY_MANAGER') {
+        insert_facility_id = req.user.facility_id;
+    } else {
+        if (facility && facility !== 'HQ' && facility !== 'ALL') {
+            let parsedFac = parseInt(facility, 10);
+            if (!isNaN(parsedFac)) {
+                insert_facility_id = parsedFac;
+            } else {
+                const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
+                if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
+            }
+        }
+    }
+
+    // FALLBACK: If insert_facility_id is still null (due to 'ALL', 'HQ', or unmapped facility name like 'DB41')
+    if (!insert_facility_id || insert_facility_id === 'ALL') {
+        const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
+        if (hqFac.rows.length > 0) {
+            insert_facility_id = hqFac.rows[0].id;
+        } else {
+            const anyFac = await pool.query("SELECT id FROM facilities LIMIT 1");
+            if (anyFac.rows.length > 0) insert_facility_id = anyFac.rows[0].id;
+        }
+    }
 
     const insertQuery = `
       INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, created_at, updated_at)
