@@ -84,7 +84,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-lg rounded-2xl shadow-2xl border border-outline-variant dark:border-gray-800 p-6 flex flex-col max-h-[90vh]">
+      <div className="bg-white dark:bg-[#1e1e1e] w-full max-w-xl rounded-2xl shadow-2xl border border-outline-variant dark:border-gray-800 p-6 flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-on-surface dark:text-white flex items-center gap-2">
             <span className="material-symbols-outlined text-primary">add_task</span>
@@ -106,12 +106,12 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
             <textarea name="desc" value={formData.desc} onChange={handleChange} className="w-full h-24 px-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white resize-none" placeholder="Ghi chú thêm (không bắt buộc)..." />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Người phụ trách (PIC)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 text-truncate truncate">Người phụ trách (PIC)</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">person</span>
-                <select required name="pic" value={formData.pic} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white appearance-none">
+                <select required name="pic" value={formData.pic} onChange={handleChange} className="w-full pl-9 pr-10 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white appearance-none truncate">
                   <option value="">-- Chọn PIC --</option>
                   {picOptions.map(u => (
                     <option key={u.username} value={u.name}>{u.name} {u.role === 'FACILITY_MANAGER' ? '(QL)' : ''}</option>
@@ -128,11 +128,11 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Deadline</label>
               <div className="flex gap-2 items-center">
                 <input required type="date" value={formData.deadline.slice(0,10)} onChange={(e) => setFormData({...formData, deadline: e.target.value + 'T' + formData.deadline.slice(11)})} className="flex-1 px-3 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
-                <select value={formData.deadline.slice(11,13)} onChange={(e) => setFormData({...formData, deadline: formData.deadline.slice(0,11) + e.target.value + formData.deadline.slice(13)})} className="w-20 shrink-0 px-2 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white">
+                <select value={formData.deadline.slice(11,13)} onChange={(e) => setFormData({...formData, deadline: formData.deadline.slice(0,11) + e.target.value + formData.deadline.slice(13)})} className="w-16 shrink-0 px-2 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white">
                   {Array.from({length:24}).map((_, i) => { const h = i.toString().padStart(2, '0'); return <option key={h} value={h}>{h}</option>; })}
                 </select>
                 <span className="font-bold dark:text-gray-400">:</span>
-                <select value={formData.deadline.slice(14,16)} onChange={(e) => setFormData({...formData, deadline: formData.deadline.slice(0,14) + e.target.value})} className="w-20 shrink-0 px-2 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white">
+                <select value={formData.deadline.slice(14,16)} onChange={(e) => setFormData({...formData, deadline: formData.deadline.slice(0,14) + e.target.value})} className="w-16 shrink-0 px-2 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white">
                   {['00','05','10','15','20','25','30','35','40','45','50','55'].map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
