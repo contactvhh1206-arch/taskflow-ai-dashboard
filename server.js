@@ -136,7 +136,7 @@ app.delete('/api/facilities/:id', async (req, res) => {
     const { id } = req.params;
     // Clear references to bypass foreign key constraints
     await pool.query(`UPDATE users SET facility_id = NULL WHERE facility_id = $1`, [id]).catch(e => console.log('Ignore users update error:', e.message));
-    await pool.query(`UPDATE tasks SET facility_id = NULL WHERE facility_id = $1`, [id]).catch(e => console.log('Ignore tasks update error:', e.message));
+    await pool.query(`DELETE FROM tasks WHERE facility_id = $1`, [id]).catch(e => console.log('Ignore tasks delete error:', e.message));
     
     await pool.query(`DELETE FROM facilities WHERE id = $1`, [id]);
     res.json({ success: true });
