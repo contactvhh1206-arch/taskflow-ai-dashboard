@@ -7,7 +7,7 @@ export default function ChangePasswordModal({ user, onClose, onSuccess }) {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
     if (!currentPassword) newErrors.current = 'Vui lòng nhập mật khẩu hiện tại';
