@@ -184,8 +184,29 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
 
       const handleUpdateFacility = async (e) => {
         e.preventDefault();
+        if (!editingFac) return;
         setIsUpdatingFac(true);
-        // Assuming update name logic is handled elsewhere or ignored in this basic refactor
+        try {
+            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${editingFac.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editFacName,
+                    address: editFacAddress,
+                    pic: editFacPic // This is the username of the PIC
+                })
+            });
+            if (res.ok) {
+                await fetchFacilities();
+                if (showToast) showToast(`Cập nhật cơ sở thành công`);
+            } else {
+                const data = await res.json();
+                if (showToast) showToast(data.error || 'Cập nhật thất bại');
+            }
+        } catch (e) {
+            console.error(e);
+            if (showToast) showToast('Lỗi kết nối khi cập nhật.');
+        }
         setEditingFac(null);
         setIsUpdatingFac(false);
       };

@@ -29,6 +29,8 @@ const initDB = async () => {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS managed_facilities JSONB`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
+    await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS address VARCHAR(255)`);
+    await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS pic VARCHAR(255)`);
     // Seed roles
     const roles = ['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'FACILITY_MANAGER', 'ADMIN'];
     for (const role of roles) {
@@ -83,6 +85,27 @@ app.post('/api/facilities', async (req, res) => {
     res.json({ success: true, data: { ...rows[0], is_active: true } });
   } catch (error) {
     res.status(500).json({ error: 'Lỗi khi tạo cơ sở (có thể trùng mã).' });
+  }
+});
+
+app.put('/api/facilities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, address, pic } = req.body;
+    
+    // First check if the facility exists
+    const checkRes = await pool.query('SELECT * FROM facilities WHERE id = $1', [id]);
+    if (checkRes.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy cơ sở.' });
+
+    // Update facility
+    const { rows } = await pool.query(
+      `UPDATE facilities SET name = $1, address = $2, pic = $3 WHERE id = $4 RETURNING *`,
+      [name, address, pic, id]
+    );
+    res.json({ success: true, data: { ...rows[0], is_active: rows[0].status === 'ACTIVE' } });
+  } catch (error) {
+    console.error('Update facility error:', error);
+    res.status(500).json({ error: 'Lỗi server khi cập nhật cơ sở.' });
   }
 });
 
