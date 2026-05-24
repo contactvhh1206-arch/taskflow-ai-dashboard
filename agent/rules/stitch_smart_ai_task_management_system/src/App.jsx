@@ -203,6 +203,34 @@ function MainDashboard() {
   const [aiSessions, setAiSessions] = useState(JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]'));
   const [activeAiSessionId, setActiveAiSessionId] = useState(null);
   const [tasks, setTasks] = useState([]);
+  
+  // Derived state for filtering tasks
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  const isOldDoneTask = (task) => {
+    if (task.status !== 'done') return false;
+    if (!task.completedAt) return false;
+    try {
+      let compDate;
+      if (task.completedAt.includes('/')) {
+        const [datePart] = task.completedAt.split(' ');
+        const [day, month, year] = datePart.split('/');
+        compDate = new Date(`${year}-${month}-${day}`);
+      } else {
+        compDate = new Date(task.completedAt);
+      }
+      if (isNaN(compDate.getTime())) return false;
+      return compDate.getFullYear() !== currentYear || compDate.getMonth() !== currentMonth;
+    } catch {
+      return false;
+    }
+  };
+
+  const activeTasks = tasks.filter(t => !isOldDoneTask(t));
+  const historyTasks = tasks.filter(t => isOldDoneTask(t));
+
   const [facilityStatuses, setFacilityStatuses] = useState([]);
   const [isCheckinCompleted, setIsCheckinCompleted] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -555,12 +583,14 @@ function MainDashboard() {
             <>
               <NavItem icon="dashboard" label="Tổng quan" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
               <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+              <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
             </>
           )}
           {user.role === 'DEPARTMENT_HEAD' && (
             <>
               <NavItem icon="dashboard" label="Tổng quan phòng ban" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
               <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+              <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
               <NavItem icon="analytics" label="Báo cáo hiệu suất" active={activeTab === 'dept-reports'} onClick={() => setActiveTab('dept-reports')} />
               <NavItem icon="history" label="Nhật ký doanh thu" active={activeTab === 'revenue-log'} onClick={() => setActiveTab('revenue-log')} />
               <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
@@ -575,6 +605,7 @@ function MainDashboard() {
               {user.role === 'VICE_PRESIDENT' && (
                 <>
                   <NavItem icon="content_paste" label="Công việc" active={activeTab === 'internal-tasks'} onClick={() => { setActiveTab('internal-tasks'); }} />
+                  <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
                 </>
               )}
               <NavItem icon="space_dashboard" label="Executive Dashboard" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
@@ -815,6 +846,51 @@ function MainDashboard() {
               <ErrorBoundary>
                 <ArchivedFacilitiesDashboard facilityList={facilityList} showToast={showToast} refreshFacilities={fetchFacilities} />
               </ErrorBoundary>
+            ) : activeTab === 'task-history' ? (
+              <ErrorBoundary>
+                <div className="flex flex-col h-full w-full max-w-5xl mx-auto py-2">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+                    <div>
+                      <h2 className="text-2xl font-bold text-on-surface dark:text-white">Lịch sử công việc hoàn thành</h2>
+                      <p className="text-sm text-on-surface-variant dark:text-gray-400 mt-1">Lưu trữ các công việc đã hoàn thành từ các tháng trước.</p>
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden flex-1 shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400 border-b border-outline-variant dark:border-gray-700">
+                          <tr>
+                            <th className="px-6 py-4 font-semibold">Công việc</th>
+                            <th className="px-6 py-4 font-semibold">Người phụ trách</th>
+                            <th className="px-6 py-4 font-semibold">Deadline</th>
+                            <th className="px-6 py-4 font-semibold text-right">Ngày hoàn thành</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {historyTasks.length === 0 ? (
+                            <tr><td colSpan="4" className="text-center py-12 text-gray-500">Chưa có công việc nào trong lịch sử</td></tr>
+                          ) : historyTasks.sort((a,b) => new Date(b.completedAt) - new Date(a.completedAt)).map(task => (
+                            <tr key={task.id} className="border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                              <td className="px-6 py-4">
+                                <div className="font-medium text-on-surface dark:text-white">{task.title}</div>
+                                {task.desc && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{task.desc}</div>}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold uppercase">{task.pic.charAt(0)}</div>
+                                  <span>{task.pic}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{task.deadline}</td>
+                              <td className="px-6 py-4 text-right text-gray-500 dark:text-gray-400 font-medium">{task.completedAt}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </ErrorBoundary>
             ) : (
               <>
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
@@ -903,10 +979,10 @@ function MainDashboard() {
 
                 {viewMode === 'kanban' ? (
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Cần làm" status="todo" tasks={tasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} />
-                    <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={tasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} />
-                    <KanbanColumn title="Nghiệm thu" status="review" tasks={tasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} />
-                    <KanbanColumn title="Hoàn thành" status="done" tasks={tasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} />
+                    <KanbanColumn title="Cần làm" status="todo" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} />
+                    <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} />
+                    <KanbanColumn title="Nghiệm thu" status="review" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} />
+                    <KanbanColumn title="Hoàn thành" status="done" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} />
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden">
@@ -920,7 +996,7 @@ function MainDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {tasks.map(task => (
+                        {activeTasks.map(task => (
                           <tr key={task.id} onClick={() => setSelectedTask(task)} className="cursor-pointer border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                             <td className="px-6 py-4">
                               <div className="font-medium text-on-surface dark:text-white flex items-center gap-2">
