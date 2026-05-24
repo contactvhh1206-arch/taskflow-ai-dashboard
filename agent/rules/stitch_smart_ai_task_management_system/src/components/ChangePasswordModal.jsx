@@ -23,30 +23,39 @@ export default function ChangePasswordModal({ user, onClose, onSuccess }) {
     setErrors({});
     setIsLoading(true);
 
-    setTimeout(() => {
-      const users = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
-      const userIdx = users.findIndex(u => u.username === user.username);
+    try {
+      const token = JSON.parse(localStorage.getItem('taskflow_auth') || '{}').token;
+      const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users/change-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-user-role': user.role,
+          'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+        },
+        body: JSON.stringify({
+          username: user.username || user.name, // Fallback to name if username is missing
+          currentPassword,
+          newPassword
+        })
+      });
+
+      const data = await response.json();
       
-      if (userIdx === -1) {
-        setErrors({ current: 'Không tìm thấy thông tin tài khoản' });
+      if (!response.ok) {
+        setErrors({ current: data.error || 'Lỗi khi đổi mật khẩu' });
         setIsLoading(false);
         return;
       }
 
-      const dbUser = users[userIdx];
-      if (dbUser.password !== currentPassword && dbUser.password !== btoa(currentPassword)) {
-        setErrors({ current: 'Mật khẩu hiện tại không chính xác' });
-        setIsLoading(false);
-        return;
-      }
-
-      users[userIdx].password = btoa(newPassword);
-      localStorage.setItem('taskflow_users', JSON.stringify(users));
-      
       setIsLoading(false);
-      if (window.showToast) window.showToast('Đổi mật khẩu thành công!');
+      if (window.showToast) window.showToast('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.', 'success');
       onSuccess();
-    }, 1200);
+    } catch (error) {
+      console.error("Lỗi đổi mật khẩu:", error);
+      setErrors({ current: 'Không thể kết nối đến máy chủ.' });
+      setIsLoading(false);
+    }
   };
 
   return (

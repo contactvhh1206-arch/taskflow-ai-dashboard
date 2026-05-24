@@ -500,6 +500,39 @@ app.delete('/api/tasks/all', authenticateUser, async (req, res) => {
   }
 });
 
+app.put('/api/users/change-password', authenticateUser, async (req, res) => {
+  try {
+    const { username, currentPassword, newPassword } = req.body;
+    
+    // Find user
+    const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy thông tin tài khoản.' });
+    }
+    
+    const user = rows[0];
+    
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash || '');
+    const passToCheck = user.password || user.password_hash;
+    
+    if (!(isMatch || passToCheck === currentPassword || passToCheck === Buffer.from(currentPassword).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === currentPassword)) {
+      return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
+    }
+    
+    // Update new password
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(newPassword, salt);
+    
+    await pool.query('UPDATE users SET password_hash = $1, password = NULL WHERE id = $2', [hash, user.id]);
+    
+    res.json({ success: true, message: 'Đổi mật khẩu thành công.' });
+  } catch (error) {
+    console.error("Lỗi đổi mật khẩu:", error);
+    res.status(500).json({ error: 'Lỗi máy chủ khi đổi mật khẩu.' });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
       let { username, password } = req.body;
       
@@ -511,19 +544,19 @@ app.post('/api/login', async (req, res) => {
       return res.json({
         success: true,
         token: 'mock-jwt-token-admin',
-        user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }
+        user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL', username: 'admin' }
       });
     } else if (username === 'manager1' && password === 'manager123') {
       return res.json({
         success: true,
         token: 'mock-jwt-token-manager',
-        user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' }
+        user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1', username: 'manager1' }
       });
     } else if (username === 'sysadmin' && password === 'admin123') {
       return res.json({
         success: true,
         token: 'mock-jwt-token-sysadmin',
-        user: { name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' }
+        user: { name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL', username: 'sysadmin' }
       });
     }
   
@@ -553,7 +586,8 @@ app.post('/api/login', async (req, res) => {
                         name: user.full_name, 
                         role: user.role_name, 
                         facility_id: user.managed_facilities || user.facility_name || 'ALL',
-                        facility_code: user.facility_code || ''
+                        facility_code: user.facility_code || '',
+                        username: user.email || user.full_name
                     }
                 });
             } else {
