@@ -25,8 +25,10 @@ app.use(express.json());
 const initDB = async () => {
   try {
     console.log('[DB] Running initialization checks...');
-    // Add managed_facilities column to users if not exists
+    // Add missing columns to users if not exists
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS managed_facilities JSONB`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
     // Seed roles
     const roles = ['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'FACILITY_MANAGER', 'ADMIN'];
     for (const role of roles) {
