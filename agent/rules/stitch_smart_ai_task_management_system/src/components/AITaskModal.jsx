@@ -11,29 +11,18 @@ export default function AITaskModal({ onClose, onConfirm, user }) {
     setIsAnalyzing(true);
     
     try {
-      const systemPrompt = `Bạn là một Trợ lý Quản lý Dự án. Nhiệm vụ của bạn là đọc đoạn văn bản người dùng cung cấp và trích xuất ra danh sách các công việc cần làm.
-BẮT BUỘC trả về định dạng JSON thuần túy là một mảng (Array) các Object. Không kèm theo text giải thích nào khác.
-Hôm nay là ngày: ${new Date().toLocaleDateString()}. Hãy dùng ngày này để tính toán Hạn chót.
-Cấu trúc mỗi Object phải chuẩn xác như sau:
-[
-{ "title": "Tên công việc ngắn gọn", "description": "Chi tiết công việc", "pic": "Tên người phụ trách (nếu có)", "deadline": "YYYY-MM-DD (nếu có)", "priority": "Cao/Vừa/Thấp" }
-]`;
-
-      const API_URL = import.meta.env?.VITE_AI_API_URL || 'https://openrouter.ai/api/v1/chat/completions';
-      const API_KEY = import.meta.env?.VITE_AI_API_KEY || 'YOUR_API_KEY_HERE';
+      const API_URL = 'https://taskflow-ai-dashboard.onrender.com/api/ai/auto-tasking';
+      const token = JSON.parse(localStorage.getItem('taskflow_auth') || '{}').token;
 
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: text }
-          ],
+          meetingTranscript: text,
+          facilityId: user.facility_id || 'HQ'
         })
       });
 
@@ -42,12 +31,12 @@ Cấu trúc mỗi Object phải chuẩn xác như sau:
       }
 
       const data = await response.json();
-      let content = data.choices[0].message.content;
       
-      // Clean markdown formatting if any
-      content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-      
-      const parsedTasks = JSON.parse(content);
+      if (!data.success) {
+        throw new Error(data.error || 'Lỗi trích xuất AI');
+      }
+
+      const parsedTasks = data.data;
 
       if (!Array.isArray(parsedTasks)) {
         throw new Error('Invalid JSON format: Expected an array');
@@ -56,13 +45,13 @@ Cấu trúc mỗi Object phải chuẩn xác như sau:
       // Map Dữ liệu (Hydration)
       const mappedTasks = parsedTasks.map(task => ({
         id: Date.now() + Math.random(),
-        title: task.title || 'Task mới',
+        title: task.task_title || task.title || 'Task mới',
         desc: task.description || '',
         pic: task.pic || user.name,
         deadline: task.deadline || new Date().toISOString().split('T')[0],
         status: 'todo', // Gán mặc định status: "Cần làm"
-        urgent: task.priority === 'Cao',
-        facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
+        urgent: task.priority_level === 'URGENT' || task.priority === 'Cao',
+        facility: task.facility_id || (user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id),
         createdAt: new Date().toISOString().split('T')[0]
       }));
 
