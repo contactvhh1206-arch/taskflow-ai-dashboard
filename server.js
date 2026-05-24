@@ -31,6 +31,17 @@ const initDB = async () => {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
     await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS address VARCHAR(255)`);
     await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS pic VARCHAR(255)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS daily_logs (
+      id SERIAL PRIMARY KEY,
+      org_unit VARCHAR(255),
+      entry_type VARCHAR(255),
+      content JSONB,
+      attachments JSONB,
+      ai_vector_data TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      date VARCHAR(50),
+      display_time VARCHAR(50)
+    )`);
     // Seed roles
     const roles = ['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'FACILITY_MANAGER', 'ADMIN'];
     for (const role of roles) {
@@ -56,8 +67,30 @@ const mockTasks = [
 // Bảng Log Nhắc việc AI (Công khai cho Sếp Tổng / Tổng quản lý)
 const mockAiPingLogs = [];
 
-// Bảng Check-in Đầu giờ
-const mockCheckins = [];
+// ==============================================================================
+// DAILY LOGS API
+// ==============================================================================
+app.get('/api/logs', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM daily_logs ORDER BY id DESC');
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi server khi lấy lịch sử điểm danh' });
+  }
+});
+
+app.post('/api/logs', async (req, res) => {
+  try {
+    const { org_unit, entry_type, content, attachments, ai_vector_data, date, display_time } = req.body;
+    const { rows } = await pool.query(
+      'INSERT INTO daily_logs (org_unit, entry_type, content, attachments, ai_vector_data, date, display_time) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [org_unit, entry_type, JSON.stringify(content || {}), JSON.stringify(attachments || []), ai_vector_data, date, display_time]
+    );
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi server khi lưu điểm danh' });
+  }
+});
 
 // ==============================================================================
 // 1. FACILITIES API (DATABASE BACKED)

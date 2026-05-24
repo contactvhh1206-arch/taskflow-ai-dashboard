@@ -44,8 +44,8 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const [historyFilterHasImage, setHistoryFilterHasImage] = useState(false);
 
   useEffect(() => {
-    const fetchAll = () => {
-      const attendanceData = fetchHistory({ entry_type: 'Attendance' });
+    const fetchAll = async () => {
+      const attendanceData = await fetchHistory({ entry_type: 'Attendance' });
       setCheckins(attendanceData.map(item => ({
         id: item.id,
         facility_id: item.org_unit,
@@ -56,7 +56,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         aiVectorData: item.aiVectorData
       })));
 
-      const logsData = fetchHistory({ entry_type: 'Operation_Log' });
+      const logsData = await fetchHistory({ entry_type: 'Operation_Log' });
       setLogs(logsData.map(item => ({
         id: item.id,
         facility_id: item.org_unit,
@@ -81,7 +81,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     }
   };
 
-  const handleAddLog = () => {
+  const handleAddLog = async () => {
     if (!logContent.trim() && !logImage) return;
     
     const now = new Date();
@@ -89,7 +89,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     
     const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | NHẬT KÝ: ${logContent.trim() || 'Không có nội dung'} ${logImage ? '| CÓ ẢNH ĐÍNH KÈM' : ''}`;
     
-    const newRecord = saveData({
+    const newRecord = await saveData({
       org_unit: user.facility_id,
       entry_type: 'Operation_Log',
       content: logContent.trim(),
@@ -97,19 +97,21 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       aiVectorData
     });
     
-    const mappedLog = {
-      id: newRecord.id,
-      facility_id: newRecord.org_unit,
-      date: newRecord.date,
-      timestamp: newRecord.displayTime,
-      content: newRecord.content,
-      image: newRecord.attachments[0] || null,
-      aiVectorData: newRecord.aiVectorData
-    };
-    
-    setLogs([mappedLog, ...logs]);
-    setLogContent('');
-    setLogImage(null);
+    if (newRecord) {
+      const mappedLog = {
+        id: newRecord.id,
+        facility_id: newRecord.org_unit,
+        date: newRecord.date,
+        timestamp: newRecord.displayTime,
+        content: newRecord.content,
+        image: newRecord.attachments[0] || null,
+        aiVectorData: newRecord.aiVectorData
+      };
+      
+      setLogs([mappedLog, ...logs]);
+      setLogContent('');
+      setLogImage(null);
+    }
   };
 
   useEffect(() => {
@@ -171,7 +173,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     if (!isFormValid || isSubmitted) return;
 
     setLoading(true);
-    setTimeout(() => {
+    try {
       const now = new Date();
       const timestamp = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
       
@@ -195,7 +197,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       const eqNotesStr = getEqNotes();
       const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | CA ${selectedShift} | NGHỈ: ${currentSumManual} (CP: ${formData.manual_auth||0}, KP: ${formData.manual_unauth||0}) | HỖ TRỢ: ${getNotes() || 'Không có'} | SỰ CỐ: ${eqNotesStr || 'Không có'}`;
 
-      const newRecord = saveData({
+      const newRecord = await saveData({
         org_unit: user.facility_id,
         entry_type: 'Attendance',
         content: { ...formData, shift: selectedShift },
@@ -203,27 +205,29 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         aiVectorData
       });
       
-      const newCheckin = {
-        id: newRecord.id,
-        facility_id: newRecord.org_unit,
-        date: newRecord.date,
-        shift: selectedShift,
-        timestamp: newRecord.displayTime,
-        formData,
-        aiVectorData
-      };
-      
-      const filtered = checkins.filter(c => !(c.facility_id === user.facility_id && c.date === today && c.shift === selectedShift));
-      const newHistory = [...filtered, newCheckin];
-      setCheckins(newHistory);
-      
-      setIsSubmitted(true);
-      setSubmittedTime(timestamp);
-      if (showToast) showToast('Lưu điểm danh thành công');
-      if (onCheckinSuccess) onCheckinSuccess(newCheckin);
-      
+      if (newRecord) {
+        const newCheckin = {
+          id: newRecord.id,
+          facility_id: newRecord.org_unit,
+          date: newRecord.date,
+          shift: selectedShift,
+          timestamp: newRecord.displayTime,
+          formData,
+          aiVectorData
+        };
+        
+        const filtered = checkins.filter(c => !(c.facility_id === user.facility_id && c.date === today && c.shift === selectedShift));
+        const newHistory = [...filtered, newCheckin];
+        setCheckins(newHistory);
+        
+        setIsSubmitted(true);
+        setSubmittedTime(timestamp);
+        if (showToast) showToast('Lưu điểm danh thành công');
+        if (onCheckinSuccess) onCheckinSuccess(newCheckin);
+      }
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   const setVal = (field, val) => {

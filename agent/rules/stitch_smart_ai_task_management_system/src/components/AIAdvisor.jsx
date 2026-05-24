@@ -144,8 +144,8 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
     setIsTyping(true);
     setAttachment(null);
 
-    setTimeout(() => {
-      const allData = fetchHistory();
+    setTimeout(async () => {
+      const allData = await fetchHistory();
       const vectorDataArr = allData.map(d => d.aiVectorData).filter(Boolean);
 
       let responseContent = `Dựa trên dữ liệu hệ thống (Company_Master_Logs có ${allData.length} bản ghi): \n\n`;

@@ -10,7 +10,7 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
 
       useEffect(() => {
         setIsLoading(true);
-        const timer = setTimeout(() => {
+        const timer = setTimeout(async () => {
           try {
             // Safe array fallback and Row-level security
             const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -20,29 +20,42 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
             const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : ''));
             
             const myTasks = safeTasks.filter(t => {
-               if (isHighLevel) return true;
-               if (isDeptHead) {
-                  const tTitle = (t.title || '').toLowerCase();
-                  return t.department_tag === deptId || t.pic === user?.name || t.picId === user?.username || (deptId === 'MARKETING' && (tTitle.includes('marketing') || tTitle.includes('ads') || tTitle.includes('quảng cáo') || tTitle.includes('kịch bản') || tTitle.includes('video'))) || (deptId === 'FINANCE' && (tTitle.includes('doanh thu') || tTitle.includes('kế toán') || tTitle.includes('tài chính')));
+               if (isHighLevel && globalFacilityFilter === 'ALL') return true;
+               if (isHighLevel && globalFacilityFilter !== 'ALL') {
+                   const tTitle = (t.title || '').toLowerCase();
+                   const tFacName = (t?.facilityId || '').toLowerCase();
+                   return tFacName.includes(globalFacilityFilter.toLowerCase()) || tTitle.includes(globalFacilityFilter.toLowerCase());
                }
-               const tFacName = (t?.facilityId || '').toLowerCase();
-               const tFacCode = (t?.facility || '').toLowerCase();
-               const uName = (user?.username || '').toLowerCase();
-               const uNameFull = (user?.name || '').toLowerCase();
-               return tFacName === facCode || tFacCode === facCode || tFacName === uName || tFacCode === uName || tFacName === uNameFull || tFacCode === uNameFull || uNameFull.includes(tFacCode) || uNameFull.includes(tFacName);
+               
+               if (isDeptHead) {
+                  const tFacCode = (t?.facility || '').toLowerCase();
+                  const uName = (user?.username || '').toLowerCase();
+                  const uNameFull = (user?.name || '').toLowerCase();
+                  return tFacCode.includes(uName) || tFacCode.includes(uNameFull) || t.department_id === deptId;
+               }
+               
+               if (!t || !t.facilityId) return false;
+               return t.facilityId.toLowerCase().includes(facCode);
             });
 
             const now = new Date();
-            let startOfFrame = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-            let endOfFrame = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+            let startOfFrame = new Date();
+            let endOfFrame = new Date();
 
-            if (timeFilter === 'week') {
+            if (timeFilter === 'today') {
+              startOfFrame.setHours(0,0,0,0);
+              endOfFrame.setHours(23,59,59,999);
+            } else if (timeFilter === 'week') {
               const day = now.getDay() || 7;
-              startOfFrame = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1, 0, 0, 0);
-              endOfFrame = new Date(startOfFrame.getFullYear(), startOfFrame.getMonth(), startOfFrame.getDate() + 6, 23, 59, 59);
+              startOfFrame.setDate(now.getDate() - day + 1);
+              startOfFrame.setHours(0,0,0,0);
+              endOfFrame = new Date(startOfFrame);
+              endOfFrame.setDate(endOfFrame.getDate() + 6);
+              endOfFrame.setHours(23,59,59,999);
             } else if (timeFilter === 'month') {
-              startOfFrame = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-              endOfFrame = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+              startOfFrame.setDate(1);
+              startOfFrame.setHours(0,0,0,0);
+              endOfFrame = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
             }
 
             const startMs = startOfFrame.getTime();
@@ -121,7 +134,7 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
             setAiPings(pings);
 
             if (window.DataService) {
-              const history = window.DataService.fetchHistory({ entry_type: 'Operation_Log' });
+              const history = await window.DataService.fetchHistory({ entry_type: 'Operation_Log' });
               let filteredLogs = history;
               if (['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)) {
                  const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (user?.username === 'marketing' ? 'MARKETING' : 'ALL'));
