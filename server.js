@@ -320,7 +320,12 @@ app.put('/api/users/change-password', authenticateUser, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(newPassword, salt);
     
-    await pool.query('UPDATE users SET password_hash = $1, password = NULL WHERE id = $2', [hash, user.id]);
+    try {
+      await pool.query('UPDATE users SET password_hash = $1, password = NULL WHERE id = $2', [hash, user.id]);
+    } catch (dbErr) {
+      // Fallback if 'password' column does not exist
+      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
+    }
     
     res.json({ success: true, message: 'Đổi mật khẩu thành công.' });
   } catch (error) {
