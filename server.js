@@ -49,22 +49,16 @@ app.get('/api/facilities', (req, res) => {
   res.json({ success: true, data: mockFacilities });
 });
 
-app.post('/api/facilities', async (req, res) => {
+app.post('/api/facilities', (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'Tên cơ sở không được để trống.' });
-  try {
-    const code = name.trim().toUpperCase();
-    const result = await pool.query(
-      'INSERT INTO facilities (name, code, status) VALUES ($1, $2, $3) RETURNING *',
-      [name.trim(), code, 'ACTIVE']
-    );
-    const newFac = result.rows[0];
-    mockFacilities.push(newFac); // Keep mock in sync
-    res.json({ success: true, data: newFac });
-  } catch (error) {
-    console.error("Lỗi tạo cơ sở:", error);
-    res.status(500).json({ error: 'Lỗi server.' });
-  }
+  const newFac = {
+    id: 'f' + Date.now(),
+    name: name.trim().toUpperCase(),
+    is_active: true
+  };
+  mockFacilities.push(newFac);
+  res.json({ success: true, data: newFac });
 });
 
 app.put('/api/facilities/:id/archive', (req, res) => {
@@ -96,12 +90,7 @@ const authenticateUser = async (req, res, next) => {
             if (facRes.rows.length > 0) {
                 facilityId = facRes.rows[0].id;
             } else {
-                // Auto-create facility if not found, to bridge frontend string IDs to backend INT IDs
-                const insertRes = await pool.query(
-                    'INSERT INTO facilities (name, code, status) VALUES ($1, $2, $3) RETURNING id', 
-                    [facilityRaw, facilityRaw, 'ACTIVE']
-                );
-                facilityId = insertRes.rows[0].id;
+                facilityId = null;
             }
         } else if (facilityRaw === 'ALL') {
             facilityId = 'ALL';
@@ -160,6 +149,31 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error("Lỗi chi tiết từ DB:", error.message, error.stack);
     res.status(500).json({ error: 'Lỗi server.' });
+  }
+});
+
+app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, evidence } = req.body;
+    
+    const updateQuery = `
+      UPDATE tasks 
+      SET status = $1, 
+          updated_at = NOW() 
+      WHERE id = $2 
+      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
+    `;
+    const { rows } = await pool.query(updateQuery, [status, id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    }
+    
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error("Lỗi cập nhật trạng thái:", error);
+    res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
   }
 });
 
@@ -603,28 +617,13 @@ app.get('/api/internal/ai-token-stats', authenticateUser, async (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`🚀 TaskFlow AI Server đang chạy tại http://localhost:${PORT}`);
   console.log(`[DB] DATABASE_URL: ${process.env.DATABASE_URL ? 'OK' : 'UNDEFINED'}`);
-  
-  try {
-    const { rowCount } = await pool.query('SELECT 1 FROM facilities LIMIT 1');
-    if (rowCount === 0) {
-      console.log("Seeding facilities table...");
-      for (const fac of mockFacilities) {
-        await pool.query('INSERT INTO facilities (name, code, status) VALUES ($1, $2, $3)', [fac.name, fac.name, fac.is_active ? 'ACTIVE' : 'INACTIVE']);
-      }
-      await pool.query('INSERT INTO facilities (name, code, status) VALUES ($1, $2, $3)', ['Cơ sở 1', 'Cơ sở 1', 'ACTIVE']);
-      console.log("Facilities seeded.");
-    }
-  } catch (e) {
-    console.error("Lỗi seed database:", e);
-  }
-
   console.log(`[DB] DB_HOST: ${process.env.DB_HOST ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_NAME: ${process.env.DB_NAME ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_USER: ${process.env.DB_USER ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_PORT: ${process.env.DB_PORT ? 'OK' : 'UNDEFINED'}`);
   console.log(`[API] SUPABASE_KEY: ${process.env.SUPABASE_KEY ? 'OK' : 'UNDEFINED'}`);
-
 });
+
