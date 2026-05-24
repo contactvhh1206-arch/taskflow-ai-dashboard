@@ -129,6 +129,8 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         hr_ktv: { status: null, type: null, note: '' },
         manual_auth: 0,
         manual_unauth: 0,
+        manual_auth_note: '',
+        manual_unauth_note: '',
         eq_camera: null,
         eq_maytinh: null,
         eq_den: null,
@@ -164,7 +166,8 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     checkHR(formData.hr_letan) && checkHR(formData.hr_baove) && checkHR(formData.hr_clocker) && checkHR(formData.hr_ktv) &&
     checkEq('eq_camera') && checkEq('eq_maytinh') && checkEq('eq_den') && checkEq('eq_maylanh') &&
     formData.cleaning_done &&
-    (sumManual > 0 ? ['hr_letan', 'hr_baove', 'hr_clocker', 'hr_ktv'].some(key => formData[key].status === 'thieu') : true);
+    ((formData.manual_unauth > 0) ? (formData.manual_unauth_note && formData.manual_unauth_note.trim()) : true) &&
+    ((formData.manual_auth > 0) ? (formData.manual_auth_note && formData.manual_auth_note.trim()) : true);
 
 
 
@@ -195,7 +198,13 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       };
       const currentSumManual = (formData.manual_auth || 0) + (formData.manual_unauth || 0);
       const eqNotesStr = getEqNotes();
-      const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | CA ${selectedShift} | NGHỈ: ${currentSumManual} (CP: ${formData.manual_auth||0}, KP: ${formData.manual_unauth||0}) | HỖ TRỢ: ${getNotes() || 'Không có'} | SỰ CỐ: ${eqNotesStr || 'Không có'}`;
+      
+      let leaveNotesArr = [];
+      if (formData.manual_unauth > 0) leaveNotesArr.push(`KP: ${formData.manual_unauth_note || 'Không'}`);
+      if (formData.manual_auth > 0) leaveNotesArr.push(`CP: ${formData.manual_auth_note || 'Không'}`);
+      const leaveNotesStr = leaveNotesArr.length > 0 ? leaveNotesArr.join(', ') : '0';
+
+      const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | CA ${selectedShift} | NGHỈ: ${currentSumManual} (${leaveNotesStr}) | HỖ TRỢ: ${getNotes() || 'Không có'} | SỰ CỐ: ${eqNotesStr || 'Không có'}`;
 
       const newRecord = await saveData({
         org_unit: user.facility_id,
@@ -479,45 +488,67 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
           </div>
           
           <div className="mt-4 p-4 border border-outline-variant dark:border-gray-700 bg-surface-container-highest dark:bg-[#1a1a1a] rounded-xl flex flex-col md:flex-row gap-4">
-            <div className="flex-1 flex items-center justify-between bg-white dark:bg-[#252525] p-3 rounded-lg border border-gray-200 dark:border-gray-600">
-              <span className="text-sm font-bold text-error flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-error"></span> Số lượng Nghỉ không phép</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setVal('manual_unauth', Math.max(0, (formData.manual_unauth || 0) - 1))} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none" disabled={isSubmitted}>-</button>
-                <input 
-                  type="number" 
-                  min="0" 
-                  value={formData.manual_unauth !== undefined ? formData.manual_unauth : 0} 
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val) && val >= 0) setVal('manual_unauth', val);
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value === '' || isNaN(parseInt(e.target.value))) setVal('manual_unauth', 0);
-                  }}
-                  className="w-12 text-center font-bold text-error bg-transparent outline-none border-none appearance-none" 
-                />
-                <button type="button" onClick={() => setVal('manual_unauth', (formData.manual_unauth || 0) + 1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none">+</button>
+            <div className="flex-1 flex flex-col gap-2 bg-white dark:bg-[#252525] p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-error flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-error"></span> Số lượng Nghỉ không phép</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setVal('manual_unauth', Math.max(0, (formData.manual_unauth || 0) - 1))} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none" disabled={isSubmitted}>-</button>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    value={formData.manual_unauth !== undefined ? formData.manual_unauth : 0} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 0) setVal('manual_unauth', val);
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === '' || isNaN(parseInt(e.target.value))) setVal('manual_unauth', 0);
+                    }}
+                    className="w-12 text-center font-bold text-error bg-transparent outline-none border-none appearance-none" 
+                  />
+                  <button type="button" onClick={() => setVal('manual_unauth', (formData.manual_unauth || 0) + 1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none">+</button>
+                </div>
               </div>
+              {formData.manual_unauth > 0 && (
+                <input 
+                  type="text" 
+                  placeholder="Nhập ghi chú lý do/phương án..." 
+                  value={formData.manual_unauth_note || ''} 
+                  onChange={(e) => setVal('manual_unauth_note', e.target.value)} 
+                  className={`w-full mt-1 px-3 py-2 bg-gray-50 dark:bg-[#1a1a1a] border rounded-lg text-sm outline-none transition-all ${(!formData.manual_unauth_note || !formData.manual_unauth_note.trim()) && !isSubmitted ? 'border-error focus:ring-1 focus:ring-error' : 'border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-primary'} dark:text-white`} 
+                />
+              )}
             </div>
-            <div className="flex-1 flex items-center justify-between bg-white dark:bg-[#252525] p-3 rounded-lg border border-gray-200 dark:border-gray-600">
-              <span className="text-sm font-bold text-orange-500 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Số lượng Nghỉ có phép</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setVal('manual_auth', Math.max(0, (formData.manual_auth || 0) - 1))} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none">-</button>
-                <input 
-                  type="number" 
-                  min="0" 
-                  value={formData.manual_auth !== undefined ? formData.manual_auth : 0} 
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val) && val >= 0) setVal('manual_auth', val);
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value === '' || isNaN(parseInt(e.target.value))) setVal('manual_auth', 0);
-                  }}
-                  className="w-12 text-center font-bold text-orange-500 bg-transparent outline-none border-none appearance-none" 
-                />
-                <button type="button" onClick={() => setVal('manual_auth', (formData.manual_auth || 0) + 1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none">+</button>
+            <div className="flex-1 flex flex-col gap-2 bg-white dark:bg-[#252525] p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-orange-500 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Số lượng Nghỉ có phép</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setVal('manual_auth', Math.max(0, (formData.manual_auth || 0) - 1))} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none">-</button>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    value={formData.manual_auth !== undefined ? formData.manual_auth : 0} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 0) setVal('manual_auth', val);
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === '' || isNaN(parseInt(e.target.value))) setVal('manual_auth', 0);
+                    }}
+                    className="w-12 text-center font-bold text-orange-500 bg-transparent outline-none border-none appearance-none" 
+                  />
+                  <button type="button" onClick={() => setVal('manual_auth', (formData.manual_auth || 0) + 1)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none">+</button>
+                </div>
               </div>
+              {formData.manual_auth > 0 && (
+                <input 
+                  type="text" 
+                  placeholder="Nhập ghi chú lý do/phương án..." 
+                  value={formData.manual_auth_note || ''} 
+                  onChange={(e) => setVal('manual_auth_note', e.target.value)} 
+                  className={`w-full mt-1 px-3 py-2 bg-gray-50 dark:bg-[#1a1a1a] border rounded-lg text-sm outline-none transition-all ${(!formData.manual_auth_note || !formData.manual_auth_note.trim()) && !isSubmitted ? 'border-error focus:ring-1 focus:ring-error' : 'border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-primary'} dark:text-white`} 
+                />
+              )}
             </div>
           </div>
         </div>
@@ -553,9 +584,9 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       </form>
 
         <div className="p-6 border-t border-outline-variant dark:border-gray-800 bg-surface-container-low dark:bg-[#1a1a1a] flex flex-col items-end gap-3 shrink-0 rounded-b-2xl">
-          {!isFormValid && sumManual > 0 && !['hr_letan', 'hr_baove', 'hr_clocker', 'hr_ktv'].some(key => formData[key].status === 'thieu') && !isSubmitted && (
+          {!isFormValid && ((formData.manual_unauth > 0 && (!formData.manual_unauth_note || !formData.manual_unauth_note.trim())) || (formData.manual_auth > 0 && (!formData.manual_auth_note || !formData.manual_auth_note.trim()))) && !isSubmitted && (
             <div className="w-full text-right text-xs text-error font-medium">
-              Bạn đã nhập Số lượng nghỉ, hệ thống bắt buộc phải chọn "Cần hỗ trợ" và ghi chú phương án cho nhân sự tương ứng.
+              Bạn đã nhập Số lượng nghỉ, hệ thống bắt buộc phải ghi chú phương án/lý do cho nhân sự tương ứng.
             </div>
           )}
           {!isFormValid && ['eq_camera', 'eq_maytinh', 'eq_den', 'eq_maylanh'].some(field => formData[field] === 'su_co' && (!formData[field + '_note'] || !formData[field + '_note'].trim())) && !isSubmitted && (
