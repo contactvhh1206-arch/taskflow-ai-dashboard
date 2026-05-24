@@ -431,6 +431,12 @@ app.post('/api/login', async (req, res) => {
         token: 'mock-jwt-token-manager',
         user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' }
       });
+    } else if (username === 'sysadmin' && password === 'admin123') {
+      return res.json({
+        success: true,
+        token: 'mock-jwt-token-sysadmin',
+        user: { name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' }
+      });
     }
   
     try {
