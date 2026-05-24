@@ -183,6 +183,7 @@ function MainDashboard() {
   const { user, logout } = useContext(AuthContext);
   const [viewMode, setViewMode] = useState('kanban');
   const [darkMode, setDarkMode] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     if (!user) return 'tasks';
@@ -504,8 +505,16 @@ function MainDashboard() {
   };
 
   return (
-    <div className={`flex h-screen w-full font-sans ${darkMode ? 'dark bg-[#121212] text-white' : 'bg-surface text-on-surface'}`}>
-      <aside className="w-64 bg-surface-container-low dark:bg-[#1e1e1e] border-r border-outline-variant dark:border-gray-800 flex flex-col transition-colors">
+    <div className={`flex h-screen w-full font-sans overflow-hidden ${darkMode ? 'dark bg-[#121212] text-white' : 'bg-surface text-on-surface'}`}>
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
+      <aside className={`w-64 bg-surface-container-low dark:bg-[#1e1e1e] border-r border-outline-variant dark:border-gray-800 flex flex-col transition-transform duration-300 fixed inset-y-0 left-0 z-40 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <div className="p-6 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30">
             <span className="material-symbols-outlined">hub</span>
@@ -612,9 +621,15 @@ function MainDashboard() {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative transition-colors">
-        <header className="h-16 border-b border-outline-variant dark:border-gray-800 bg-white/80 dark:bg-[#121212]/80 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-10 transition-colors">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative w-96 hidden md:block">
+        <header className="h-16 border-b border-outline-variant dark:border-gray-800 bg-white/80 dark:bg-[#121212]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 sticky top-0 z-10 transition-colors">
+          <div className="flex items-center gap-2 md:gap-4 flex-1">
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="md:hidden p-2 -ml-2 rounded-full hover:bg-surface-variant dark:hover:bg-gray-800 text-gray-500 transition-colors"
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+            <div className="relative w-full max-w-sm hidden md:block">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
               <input type="text" placeholder="Tìm kiếm task, cơ sở, PIC..." className="w-full bg-surface-container dark:bg-gray-800 border-transparent focus:border-primary focus:ring-1 focus:ring-primary rounded-full pl-10 pr-4 py-2 text-sm outline-none transition-all dark:text-white" />
             </div>
@@ -630,7 +645,7 @@ function MainDashboard() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-6 bg-surface-container-low dark:bg-[#181818] transition-colors custom-scrollbar">
+        <div className="flex-1 overflow-auto p-4 md:p-6 bg-surface-container-low dark:bg-[#181818] transition-colors custom-scrollbar">
           <div className="max-w-6xl mx-auto">
             {activeTab === 'checkin' ? (
               <ErrorBoundary>
@@ -652,9 +667,9 @@ function MainDashboard() {
                   <div className="mt-4 mb-12">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
                       <span className="material-symbols-outlined text-primary">dashboard_customize</span>
-                      Truy cập nhanh (Thẻ cơ sở & Phó Tổng)
+                      Truy cập nhanh
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       {(() => {
                         let activeFacilities = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
                         activeFacilities = activeFacilities.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
