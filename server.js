@@ -75,7 +75,7 @@ app.get('/api/logs', async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM daily_logs ORDER BY id DESC');
     res.json({ success: true, data: rows });
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi server khi lấy lịch sử điểm danh' });
+    res.status(500).json({ error: `Lỗi server: ${error.message}` });
   }
 });
 
@@ -88,7 +88,7 @@ app.post('/api/logs', async (req, res) => {
     );
     res.json({ success: true, data: rows[0] });
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi server khi lưu điểm danh' });
+    res.status(500).json({ error: `Lỗi server: ${error.message}` });
   }
 });
 
