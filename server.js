@@ -500,11 +500,27 @@ app.delete('/api/tasks/all', authenticateUser, async (req, res) => {
   }
 });
 
+// In-memory store for hardcoded accounts (for demo purposes)
+const hardcodedPasswords = {
+  'admin': 'admin123',
+  'manager1': 'manager123',
+  'sysadmin': 'admin123'
+};
+
 app.put('/api/users/change-password', authenticateUser, async (req, res) => {
   try {
     const { username, currentPassword, newPassword } = req.body;
     
-    // Find user
+    // Check hardcoded accounts first
+    if (hardcodedPasswords[username]) {
+      if (hardcodedPasswords[username] !== currentPassword) {
+        return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
+      }
+      hardcodedPasswords[username] = newPassword;
+      return res.json({ success: true, message: 'Đổi mật khẩu thành công (tài khoản demo).' });
+    }
+    
+    // Find user in DB
     const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Không tìm thấy thông tin tài khoản.' });
@@ -540,19 +556,19 @@ app.post('/api/login', async (req, res) => {
         username = username.trim().toLowerCase();
       }
       
-      if (username === 'admin' && password === 'admin123') {
+      if (username === 'admin' && password === hardcodedPasswords['admin']) {
       return res.json({
         success: true,
         token: 'mock-jwt-token-admin',
         user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL', username: 'admin' }
       });
-    } else if (username === 'manager1' && password === 'manager123') {
+    } else if (username === 'manager1' && password === hardcodedPasswords['manager1']) {
       return res.json({
         success: true,
         token: 'mock-jwt-token-manager',
         user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1', username: 'manager1' }
       });
-    } else if (username === 'sysadmin' && password === 'admin123') {
+    } else if (username === 'sysadmin' && password === hardcodedPasswords['sysadmin']) {
       return res.json({
         success: true,
         token: 'mock-jwt-token-sysadmin',
