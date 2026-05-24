@@ -25,6 +25,14 @@ export default function ChangePasswordModal({ user, onClose, onSuccess }) {
 
     try {
       const token = JSON.parse(localStorage.getItem('taskflow_auth') || '{}').token;
+      let effectiveUsername = user.username;
+      if (!effectiveUsername) {
+        if (user.role === 'SUPER_ADMIN') effectiveUsername = 'admin';
+        else if (user.role === 'FACILITY_MANAGER') effectiveUsername = 'manager1';
+        else if (user.role === 'ADMIN') effectiveUsername = 'sysadmin';
+        else effectiveUsername = user.email || user.name;
+      }
+
       const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users/change-password', {
         method: 'PUT',
         headers: {
@@ -34,7 +42,7 @@ export default function ChangePasswordModal({ user, onClose, onSuccess }) {
           'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
         },
         body: JSON.stringify({
-          username: user.username || user.name, // Fallback to name if username is missing
+          username: effectiveUsername,
           currentPassword,
           newPassword
         })
