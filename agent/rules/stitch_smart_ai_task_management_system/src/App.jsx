@@ -111,7 +111,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 text-truncate truncate">Người phụ trách (PIC)</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">person</span>
-                <select required name="pic" value={formData.pic} onChange={handleChange} className="w-full pl-9 pr-10 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white appearance-none truncate">
+                <select required name="pic" value={formData.pic} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
                   <option value="">-- Chọn PIC --</option>
                   {picOptions.map(u => (
                     <option key={u.username} value={u.name}>{u.name} {u.role === 'FACILITY_MANAGER' ? '(QL)' : ''}</option>
@@ -121,13 +121,12 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
                     <option value={user.name}>{user.name} (Bạn)</option>
                   )}
                 </select>
-                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px] pointer-events-none">arrow_drop_down</span>
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Deadline</label>
               <div className="flex gap-2 items-center">
-                <input required type="date" value={formData.deadline.slice(0,10)} onChange={(e) => setFormData({...formData, deadline: e.target.value + 'T' + formData.deadline.slice(11)})} className="flex-1 px-3 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
+                <input required type="date" value={formData.deadline.slice(0,10)} onChange={(e) => setFormData({...formData, deadline: e.target.value + 'T' + formData.deadline.slice(11)})} className="w-4/5 px-3 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
                 <select value={formData.deadline.slice(11,13)} onChange={(e) => setFormData({...formData, deadline: formData.deadline.slice(0,11) + e.target.value + formData.deadline.slice(13)})} className="w-16 shrink-0 px-2 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white">
                   {Array.from({length:24}).map((_, i) => { const h = i.toString().padStart(2, '0'); return <option key={h} value={h}>{h}</option>; })}
                 </select>
