@@ -280,6 +280,13 @@ app.post('/api/users', async (req, res) => {
     res.status(500).json({ error: 'Lỗi tạo tài khoản (có thể username đã tồn tại).' });
   }
 });
+// In-memory store for hardcoded accounts (for demo purposes)
+const hardcodedPasswords = {
+  'admin': 'admin123',
+  'manager1': 'manager123',
+  'sysadmin': 'admin123'
+};
+
 app.put('/api/users/change-password', authenticateUser, async (req, res) => {
   try {
     const { username, currentPassword, newPassword } = req.body;
@@ -540,13 +547,6 @@ app.delete('/api/tasks/all', authenticateUser, async (req, res) => {
     res.status(500).json({ error: 'Lỗi máy chủ khi xóa tasks' });
   }
 });
-
-// In-memory store for hardcoded accounts (for demo purposes)
-const hardcodedPasswords = {
-  'admin': 'admin123',
-  'manager1': 'manager123',
-  'sysadmin': 'admin123'
-};
 
 
 app.post('/api/login', async (req, res) => {
