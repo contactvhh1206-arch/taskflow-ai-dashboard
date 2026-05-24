@@ -280,6 +280,47 @@ app.post('/api/users', async (req, res) => {
     res.status(500).json({ error: 'Lỗi tạo tài khoản (có thể username đã tồn tại).' });
   }
 });
+app.put('/api/users/change-password', authenticateUser, async (req, res) => {
+  try {
+    const { username, currentPassword, newPassword } = req.body;
+    
+    // Check hardcoded accounts first
+    if (hardcodedPasswords[username]) {
+      if (hardcodedPasswords[username] !== currentPassword) {
+        return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
+      }
+      hardcodedPasswords[username] = newPassword;
+      return res.json({ success: true, message: 'Đổi mật khẩu thành công (tài khoản demo).' });
+    }
+    
+    // Find user in DB
+    const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Không tìm thấy thông tin tài khoản.' });
+    }
+    
+    const user = rows[0];
+    
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash || '');
+    const passToCheck = user.password || user.password_hash;
+    
+    if (!(isMatch || passToCheck === currentPassword || passToCheck === Buffer.from(currentPassword).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === currentPassword)) {
+      return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
+    }
+    
+    // Update new password
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(newPassword, salt);
+    
+    await pool.query('UPDATE users SET password_hash = $1, password = NULL WHERE id = $2', [hash, user.id]);
+    
+    res.json({ success: true, message: 'Đổi mật khẩu thành công.' });
+  } catch (error) {
+    console.error("Lỗi đổi mật khẩu:", error);
+    res.status(500).json({ error: 'Lỗi máy chủ khi đổi mật khẩu.' });
+  }
+});
 
 app.put('/api/users/:id', async (req, res) => {
   try {
@@ -507,47 +548,6 @@ const hardcodedPasswords = {
   'sysadmin': 'admin123'
 };
 
-app.put('/api/users/change-password', authenticateUser, async (req, res) => {
-  try {
-    const { username, currentPassword, newPassword } = req.body;
-    
-    // Check hardcoded accounts first
-    if (hardcodedPasswords[username]) {
-      if (hardcodedPasswords[username] !== currentPassword) {
-        return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
-      }
-      hardcodedPasswords[username] = newPassword;
-      return res.json({ success: true, message: 'Đổi mật khẩu thành công (tài khoản demo).' });
-    }
-    
-    // Find user in DB
-    const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy thông tin tài khoản.' });
-    }
-    
-    const user = rows[0];
-    
-    // Verify current password
-    const isMatch = await bcrypt.compare(currentPassword, user.password_hash || '');
-    const passToCheck = user.password || user.password_hash;
-    
-    if (!(isMatch || passToCheck === currentPassword || passToCheck === Buffer.from(currentPassword).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === currentPassword)) {
-      return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
-    }
-    
-    // Update new password
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(newPassword, salt);
-    
-    await pool.query('UPDATE users SET password_hash = $1, password = NULL WHERE id = $2', [hash, user.id]);
-    
-    res.json({ success: true, message: 'Đổi mật khẩu thành công.' });
-  } catch (error) {
-    console.error("Lỗi đổi mật khẩu:", error);
-    res.status(500).json({ error: 'Lỗi máy chủ khi đổi mật khẩu.' });
-  }
-});
 
 app.post('/api/login', async (req, res) => {
       let { username, password } = req.body;
