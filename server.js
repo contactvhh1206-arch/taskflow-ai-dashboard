@@ -566,26 +566,40 @@ app.post('/api/checkin', authenticateUser, (req, res) => {
   res.json({ success: true, message: 'Check-in thành công', isCheckinCompleted: true, data: checkinData });
 });
 
-app.get('/api/checkin/status', authenticateUser, (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const { role, facility_id } = req.user;
-  
-  const facilities = ['Cơ sở 1', 'Cơ sở 2'];
-  const targetFacilities = role === 'FACILITY_MANAGER' ? [facility_id] : facilities;
+app.get('/api/checkin/status', authenticateUser, async (req, res) => {
+  try {
+    const todayStr = new Date().toLocaleDateString('vi-VN');
+    const { role, facility_id } = req.user;
+    
+    // Get facilities
+    let targetFacilities = [];
+    if (role === 'FACILITY_MANAGER') {
+       targetFacilities = [facility_id];
+    } else {
+       const facRes = await pool.query("SELECT name FROM facilities WHERE status = 'ACTIVE'");
+       targetFacilities = facRes.rows.map(r => r.name);
+    }
+    
+    const { rows } = await pool.query('SELECT * FROM daily_logs WHERE entry_type = $1 AND date = $2', ['Attendance', todayStr]);
+    
+    const statusList = targetFacilities.map(fac => {
+      const checkins = rows.filter(c => c.org_unit === fac);
+      const ca1 = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca 1'));
+      const calo = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca Lỡ'));
+      const ca2 = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca 2'));
+      return {
+        facility_id: fac,
+        ca1: ca1 ? `Đã báo cáo lúc ${ca1.display_time}` : 'Chưa báo cáo',
+        calo: calo ? `Đã báo cáo lúc ${calo.display_time}` : 'Chưa báo cáo',
+        ca2: ca2 ? `Đã báo cáo lúc ${ca2.display_time}` : 'Chưa báo cáo',
+        details: checkins
+      };
+    });
 
-  const statusList = targetFacilities.map(fac => {
-    const checkins = mockCheckins.filter(c => c.facility_id === fac && c.date === today);
-    const ca1 = checkins.find(c => c.shift === 'Ca 1');
-    const ca2 = checkins.find(c => c.shift === 'Ca 2');
-    return {
-      facility_id: fac,
-      ca1: ca1 ? 'Đã báo cáo' : 'Chưa báo cáo',
-      ca2: ca2 ? 'Đã báo cáo' : 'Chưa báo cáo',
-      details: checkins
-    };
-  });
-
-  res.json({ success: true, data: statusList });
+    res.json({ success: true, data: statusList });
+  } catch (error) {
+    res.status(500).json({ error: `Lỗi server: ${error.message}` });
+  }
 });
 
 // ==============================================================================
