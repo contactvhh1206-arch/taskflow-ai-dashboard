@@ -142,7 +142,7 @@ app.delete('/api/facilities/:id', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Delete facility error:', error);
-    res.status(500).json({ error: 'Không thể xóa cơ sở vì đang có dữ liệu liên quan.' });
+    res.status(500).json({ error: 'DB Error: ' + error.message });
   }
 });
 
