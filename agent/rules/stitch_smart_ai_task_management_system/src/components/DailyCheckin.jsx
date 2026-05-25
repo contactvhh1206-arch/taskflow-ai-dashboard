@@ -424,27 +424,27 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col gap-6 mt-6">
       {/* Tabs */}
-      <div className="flex gap-2 p-1 bg-surface-container-low dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 w-fit mx-auto shadow-sm">
+      <div className="flex flex-wrap sm:flex-nowrap justify-center gap-1 sm:gap-2 p-1.5 sm:p-1 bg-surface-container-low dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 w-full sm:w-fit mx-auto shadow-sm">
         <button 
           onClick={() => setActiveTab('checkin')} 
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'checkin' ? 'bg-white dark:bg-[#2a2a2a] text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg font-bold text-xs sm:text-sm transition-all whitespace-nowrap flex-1 sm:flex-none ${activeTab === 'checkin' ? 'bg-white dark:bg-[#2a2a2a] text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
-          <span className="material-symbols-outlined text-[20px]">fact_check</span>
+          <span className="material-symbols-outlined text-[16px] sm:text-[20px]">fact_check</span>
           Điểm Danh Hàng Ngày
         </button>
         <button 
           onClick={() => setActiveTab('history')} 
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'history' ? 'bg-white dark:bg-[#2a2a2a] text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg font-bold text-xs sm:text-sm transition-all whitespace-nowrap flex-1 sm:flex-none ${activeTab === 'history' ? 'bg-white dark:bg-[#2a2a2a] text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
-          <span className="material-symbols-outlined text-[20px]">history</span>
-          Lịch Sử Báo Cáo các Ca làm việc
+          <span className="material-symbols-outlined text-[16px] sm:text-[20px]">history</span>
+          Lịch Sử Báo Cáo
         </button>
         <button 
           onClick={() => setActiveTab('log_history')} 
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'log_history' ? 'bg-white dark:bg-[#2a2a2a] text-secondary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg font-bold text-xs sm:text-sm transition-all whitespace-nowrap flex-1 sm:flex-none ${activeTab === 'log_history' ? 'bg-white dark:bg-[#2a2a2a] text-secondary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
-          <span className="material-symbols-outlined text-[20px]">history_edu</span>
-          Lịch Sử Nhật Ký
+          <span className="material-symbols-outlined text-[16px] sm:text-[20px]">history_edu</span>
+          Nhật Ký Vận Hành
         </button>
       </div>
 
