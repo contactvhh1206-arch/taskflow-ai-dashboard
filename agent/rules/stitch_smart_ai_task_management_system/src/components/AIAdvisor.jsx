@@ -199,9 +199,38 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
          contextData = allData.filter(d => d.org_unit === facilityName);
       }
       
+      // Load financial reports
+      let financialContextStr = '';
+      try {
+         const reportsStr = localStorage.getItem('taskflow_daily_financial_reports');
+         if (reportsStr) {
+            const reports = JSON.parse(reportsStr);
+            const recentReports = reports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 10);
+            
+            recentReports.forEach(rep => {
+               if (isFacilityMode && facilityName) {
+                  const facData = rep.data?.find(d => d.facility_id === facilityName || d.facility_name === facilityName);
+                  if (facData) {
+                     financialContextStr += `Doanh thu cơ sở ${facilityName} ngày ${rep.date}: ${Number(facData.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
+                  }
+               } else {
+                  financialContextStr += `Báo cáo doanh thu ngày ${rep.date} (Tổng: ${Number(rep.totalRevenue || 0).toLocaleString('vi-VN')} VNĐ):\n`;
+                  rep.data?.forEach(d => {
+                     financialContextStr += `- ${d.facility_id || d.facility_name}: ${Number(d.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
+                  });
+               }
+            });
+         }
+      } catch (e) {
+         console.error('Error loading financial reports for AI', e);
+      }
+      
       // Build Vector context from contextData
       const vectorDataArr = contextData.map(d => d.aiVectorData || JSON.stringify(d)).filter(Boolean).slice(0, 10);
-      const systemContext = `Dữ liệu hệ thống hiện tại:\n${vectorDataArr.join('\n')}`;
+      let systemContext = `Dữ liệu hệ thống hiện tại:\n${vectorDataArr.join('\n')}`;
+      if (financialContextStr) {
+         systemContext += `\n\nDỮ LIỆU DOANH THU (TÀI CHÍNH):\n${financialContextStr}`;
+      }
       
       const messages = [
         { 
