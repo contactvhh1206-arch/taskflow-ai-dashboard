@@ -136,7 +136,7 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
     }
   }, [externalQueryTrigger]);
 
-  const handleAsk = (overrideQuery) => {
+  const handleAsk = async (overrideQuery) => {
     let actualQuery = query;
     if (typeof overrideQuery === 'string') {
         actualQuery = overrideQuery;
