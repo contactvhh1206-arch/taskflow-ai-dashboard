@@ -1122,7 +1122,7 @@ app.post('/api/kpi', authenticateUser, async (req, res) => {
     `;
     
     // We use a constant ID for now or unique month
-    const id = apply_month ? \`kpi_\${apply_month.replace('/', '_')}\` : 'kpi_default';
+    const id = apply_month ? `kpi_${apply_month.replace('/', '_')}` : 'kpi_default';
     const updatedBy = name || username || role;
     
     const { rows } = await pool.query(query, [id, apply_month, JSON.stringify(data), updatedBy]);
