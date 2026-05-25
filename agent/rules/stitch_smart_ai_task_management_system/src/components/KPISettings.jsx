@@ -28,7 +28,11 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
                 });
                 const responseJson = await res.json();
                 if (responseJson.success && responseJson.data) {
-                   savedKpis = responseJson.data.data;
+                   let kpiData = responseJson.data.data;
+                   if (typeof kpiData === 'string') {
+                      try { kpiData = JSON.parse(kpiData); } catch(e) {}
+                   }
+                   savedKpis = kpiData || {};
                    if (responseJson.data.apply_month) setApplyMonth(responseJson.data.apply_month);
                 } else {
                    savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');

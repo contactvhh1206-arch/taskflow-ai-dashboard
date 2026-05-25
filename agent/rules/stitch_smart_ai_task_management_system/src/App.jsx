@@ -315,7 +315,15 @@ function MainDashboard() {
       });
       const responseJson = await res.json();
       if (responseJson.success && responseJson.data && responseJson.data.data) {
-        localStorage.setItem('taskflow_facility_kpis', JSON.stringify(responseJson.data.data));
+        let kpiData = responseJson.data.data;
+        if (typeof kpiData === 'string') {
+          try {
+            kpiData = JSON.parse(kpiData);
+          } catch (err) {
+            console.error('Error parsing KPI data string:', err);
+          }
+        }
+        localStorage.setItem('taskflow_facility_kpis', JSON.stringify(kpiData));
         window.dispatchEvent(new Event('taskflow_kpis_updated'));
       }
     } catch (e) {
