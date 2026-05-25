@@ -20,6 +20,12 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const [logImage, setLogImage] = useState(null);
   const [logAudio, setLogAudio] = useState(null);
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = React.useRef(null);
+  const audioChunksRef = React.useRef([]);
+  const timerRef = React.useRef(null);
+
   const [formData, setFormData] = useState({
     shift: 'Ca 1',
     hr_letan: { status: null, type: null, note: '' },
@@ -72,30 +78,102 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     fetchAll();
   }, []);
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogImage(reader.result);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const max_size = 1280;
+
+          if (width > height) {
+            if (width > max_size) {
+              height *= max_size / width;
+              width = max_size;
+            }
+          } else {
+            if (height > max_size) {
+              width *= max_size / height;
+              height = max_size;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(dataUrl);
+        };
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 15000000) {
+        if (showToast) showToast('File ảnh quá lớn (Tối đa 15MB)');
+        return;
+      }
+      const compressedDataUrl = await compressImage(file);
+      setLogImage(compressedDataUrl);
     }
   };
 
-  const handleAudioUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5000000) {
-        if (showToast) showToast('File âm thanh quá lớn (Tối đa 5MB)');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogAudio(reader.result);
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
-      reader.readAsDataURL(file);
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setLogAudio(reader.result);
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      if (showToast) showToast("Không thể truy cập Microphone. Vui lòng cấp quyền.");
     }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(timerRef.current);
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const secs = (seconds % 60).toString().padStart(2, '0');
+    return `${mins}:${secs}`;
   };
 
   const handleAddLog = async () => {
@@ -104,13 +182,19 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     const now = new Date();
     const timestamp = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     
-    const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | NHẬT KÝ: ${logContent.trim() || 'Không có nội dung'} ${logImage ? '| CÓ ẢNH ĐÍNH KÈM' : ''}`;
+    let mediaStr = [];
+    if (logImage) mediaStr.push('ẢNH');
+    if (logAudio) mediaStr.push('GHI ÂM');
+
+    const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | NHẬT KÝ: ${logContent.trim() || 'Không có nội dung'} ${mediaStr.length ? `| CÓ ĐÍNH KÈM ${mediaStr.join(', ')}` : ''}`;
     
+    const attachments = [logImage, logAudio].filter(Boolean);
+
     const newRecord = await saveData({
       org_unit: user.facility_id,
       entry_type: 'Operation_Log',
       content: logContent.trim(),
-      attachments: logImage ? [logImage] : [],
+      attachments: attachments,
       aiVectorData
     });
     
@@ -121,13 +205,15 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         date: newRecord.date,
         timestamp: newRecord.displayTime,
         content: newRecord.content,
-        image: newRecord.attachments[0] || null,
+        image: attachments.find(a => typeof a === 'string' && a.startsWith('data:image')) || null,
+        audio: attachments.find(a => typeof a === 'string' && a.startsWith('data:audio')) || null,
         aiVectorData: newRecord.aiVectorData
       };
       
       setLogs([mappedLog, ...logs]);
       setLogContent('');
       setLogImage(null);
+      setLogAudio(null);
     }
   };
 
@@ -440,10 +526,15 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
                 <span className="material-symbols-outlined text-[18px]">photo_camera</span> Chụp hình
                 <input type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
               </label>
-              <label className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl cursor-pointer transition-colors text-sm font-semibold">
-                <span className="material-symbols-outlined text-[18px]">mic</span> Ghi âm
-                <input type="file" accept="audio/*" capture="microphone" onChange={handleAudioUpload} className="hidden" />
-              </label>
+              {isRecording ? (
+                <button onClick={stopRecording} className="flex items-center gap-1.5 px-3 py-2 bg-error/10 hover:bg-error/20 text-error rounded-xl transition-colors text-sm font-semibold animate-pulse">
+                  <span className="material-symbols-outlined text-[18px]">stop_circle</span> Đang thu... {formatTime(recordingTime)}
+                </button>
+              ) : (
+                <button onClick={startRecording} className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl transition-colors text-sm font-semibold">
+                  <span className="material-symbols-outlined text-[18px]">mic</span> Ghi âm
+                </button>
+              )}
             </div>
             <button onClick={handleAddLog} disabled={!logContent.trim() && !logImage && !logAudio} className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2 shrink-0">
               <span className="material-symbols-outlined text-[18px]">send</span> Ghi nhật ký
