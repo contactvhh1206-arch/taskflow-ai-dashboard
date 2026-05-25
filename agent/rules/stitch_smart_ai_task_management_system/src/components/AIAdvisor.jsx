@@ -16,7 +16,7 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
     
     if (isFacilityMode) {
       const fName = facilityName || 'bạn';
-      return `${timeGreeting}, ${displayName || 'Quản lý'}! Tôi là Cố vấn AI riêng của cơ sở ${fName}. Tôi có thể giúp bạn cung cấp góc nhìn tổng quan, tình hình doanh thu, nhật ký hoạt động, nhân viên nghỉ phép và đánh giá chuyên cần của cơ sở mình. (Lưu ý: Tôi chỉ được phép cung cấp thông tin liên quan đến cơ sở này).`;
+      return `${timeGreeting}, ${displayName || 'Quản lý'}! Tôi là Cố vấn AI riêng của cơ sở ${fName}. Tôi có thể giúp bạn cung cấp góc nhìn tổng quan, tình hình doanh thu, nhật ký hoạt động, nhân viên nghỉ phép và đánh giá chuyên cần của cơ sở mình.\n\n⚠️ LƯU Ý QUAN TRỌNG: Mọi thông tin truy vấn đều tốn phí API. Nếu cố tình truy vấn những câu hỏi không liên quan đến công việc, hoặc hỏi về công việc và doanh thu của cơ sở khác/phòng ban khác, làm hao tốn API vô ích, toàn bộ đoạn hội thoại sẽ được TỰ ĐỘNG GỬI VỀ CHO BAN GIÁM ĐỐC và lưu trữ trên hệ thống!!!`;
     }
 
     const isMarketing = userObj.role === 'DEPARTMENT_HEAD';
@@ -159,7 +159,20 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
          const isForbidden = forbiddenKeywords.some(kw => userQuery.toLowerCase().includes(kw));
          
          if (isForbidden) {
-           responseContent = `Xin lỗi, tôi là Cố vấn AI riêng của cơ sở ${facilityName || 'này'}. Tôi bị hạn chế quyền truy cập và KHÔNG ĐƯỢC PHÉP cung cấp thông tin của các cơ sở khác hay phòng ban khác. Tôi chỉ có thể hỗ trợ các thông tin nội bộ của cơ sở mình.`;
+           responseContent = `Xin lỗi, tôi là Cố vấn AI riêng của cơ sở ${facilityName || 'này'}. Tôi bị hạn chế quyền truy cập và KHÔNG ĐƯỢC PHÉP cung cấp thông tin của các cơ sở khác hay phòng ban khác. Yêu cầu truy cập trái phép này đã được ghi nhận và gửi về Ban Giám Đốc.`;
+           // Log the violation
+           try {
+             const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
+             violations.push({
+               id: Date.now(),
+               timestamp: new Date().toISOString(),
+               userId: user?.id || user?.username || 'Unknown',
+               facility: facilityName,
+               query: userQuery,
+               status: 'Violation'
+             });
+             localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
+           } catch(e) {}
          } else {
            responseContent = `Dựa trên dữ liệu nội bộ của cơ sở ${facilityName || ''}: \n\nTôi đã phân tích yêu cầu "${userQuery}".\n- Tình hình doanh thu: Đang cập nhật thực tế.\n- Tình hình nhân sự: Các ca trực đang hoạt động bình thường, không có nhân viên nghỉ không phép.\n- Đánh giá chuyên cần: Tốt.\n\nĐây là góc nhìn tổng quan cho cơ sở của bạn.`;
          }

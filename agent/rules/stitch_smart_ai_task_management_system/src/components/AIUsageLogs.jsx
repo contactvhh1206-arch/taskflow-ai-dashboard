@@ -2,17 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 
 export default function AIUsageLogs() {
       const [logs, setLogs] = useState([]);
+      const [violations, setViolations] = useState([]);
+      const [usersMap, setUsersMap] = useState({});
       
       useEffect(() => {
-        let usersMap = {};
+        let uMap = {};
         try {
           const usersArr = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
           usersArr.forEach(u => {
-            usersMap[u.id] = `${u.name} (${u.username})`;
+            uMap[u.id] = `${u.name} (${u.username})`;
           });
+          setUsersMap(uMap);
         } catch(e) {}
         
-        const getName = (id, fallback) => usersMap[id] || fallback;
+        const getName = (id, fallback) => uMap[id] || fallback;
 
         const mockLogs = [
           { id: 1, timestamp: new Date(Date.now() - 15 * 60000).toISOString(), userId: getName('u5', 'Sếp Phó (seppho)'), taskType: 'Auto-Tasking', tokens: 1250, status: 'Success' },
@@ -22,7 +25,14 @@ export default function AIUsageLogs() {
           { id: 5, timestamp: new Date(Date.now() - 200 * 60000).toISOString(), userId: getName('u1', 'Sếp Tổng (admin)'), taskType: 'Advisor', tokens: 4100, status: 'Success' }
         ];
         setLogs(mockLogs);
+
+        try {
+          const v = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
+          setViolations(v.sort((a, b) => b.timestamp < a.timestamp ? -1 : 1));
+        } catch(e) {}
       }, []);
+
+      const getMappedName = (id, fallback) => usersMap[id] || fallback;
 
       return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -83,6 +93,46 @@ export default function AIUsageLogs() {
                </table>
              </div>
           </div>
+
+          {/* Cảnh báo vi phạm */}
+          <div className="bg-white dark:bg-[#1e1e1e] border border-red-200 dark:border-red-900/50 rounded-2xl shadow-sm overflow-hidden mt-2">
+             <div className="p-4 border-b border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10">
+               <h3 className="font-bold text-red-800 dark:text-red-400 flex items-center gap-2">
+                 <span className="material-symbols-outlined text-[18px]">warning</span> Báo cáo Vi phạm Nội quy Truy vấn
+               </h3>
+             </div>
+             <div className="p-4">
+                {violations.length === 0 ? (
+                  <p className="text-sm text-gray-500">Chưa ghi nhận vi phạm truy cập trái phép nào.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {violations.map(v => (
+                       <li key={v.id} className="p-4 bg-red-50/50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-xl">
+                          <div className="flex justify-between items-start mb-3 border-b border-red-100 dark:border-red-900/50 pb-2">
+                             <div className="flex flex-col gap-1">
+                                <span className="font-bold text-sm text-red-800 dark:text-red-300 flex items-center gap-2">
+                                  <span className="material-symbols-outlined text-[16px]">account_circle</span>
+                                  {getMappedName(v.userId, v.userId)}
+                                </span>
+                                <span className="text-xs font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded w-fit">
+                                  Cơ sở: {v.facility || 'Unknown'}
+                                </span>
+                             </div>
+                             <div className="text-xs font-mono text-red-500 dark:text-red-400 bg-white dark:bg-[#1a1a1a] px-2 py-1 rounded shadow-sm border border-red-100 dark:border-red-900/30">
+                                {new Date(v.timestamp).toLocaleString('vi-VN')}
+                             </div>
+                          </div>
+                          <div className="text-sm text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] p-3 rounded-lg border border-red-100 dark:border-red-900/30 shadow-inner">
+                             <span className="font-bold text-red-500 mr-2">Truy vấn trái phép:</span> 
+                             <span className="italic">"{v.query}"</span>
+                          </div>
+                       </li>
+                    ))}
+                  </ul>
+                )}
+             </div>
+          </div>
+
         </div>
       );
     }
