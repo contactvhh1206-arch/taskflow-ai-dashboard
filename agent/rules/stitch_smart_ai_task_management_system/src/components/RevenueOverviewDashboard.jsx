@@ -294,15 +294,15 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                         </button>
                      </>
                    )}
-                   <div className="flex items-center gap-2 w-full sm:w-auto">
-                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">Tháng tra cứu:</label>
-                     <input 
-                        type="month"
-                        value={selectedMonth} 
-                        onChange={e => setSelectedMonth(e.target.value)}
-                        className="flex-1 sm:flex-none bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 outline-none focus:border-teal-500 text-sm font-medium dark:text-white cursor-pointer hover:border-teal-400 transition-colors"
-                     />
-                   </div>
+                    <div className="flex items-center justify-between gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                      <label className="text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">Tháng tra cứu:</label>
+                      <input 
+                         type="month"
+                         value={selectedMonth} 
+                         onChange={e => setSelectedMonth(e.target.value)}
+                         className="flex-1 sm:flex-none min-w-[150px] bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-2 md:px-4 py-2 outline-none focus:border-teal-500 text-sm font-medium dark:text-white cursor-pointer hover:border-teal-400 transition-colors"
+                      />
+                    </div>
                 </div>
                 {aiError && <div className="text-red-500 text-xs mt-1 font-medium">{aiError}</div>}
              </div>
