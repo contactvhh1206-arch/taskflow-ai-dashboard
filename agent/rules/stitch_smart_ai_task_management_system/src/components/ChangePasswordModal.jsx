@@ -33,6 +33,44 @@ export default function ChangePasswordModal({ user, onClose, onSuccess }) {
         else effectiveUsername = user.email || user.name;
       }
 
+      // Xử lý đổi mật khẩu cho User nội bộ (tạo qua Cấu hình người dùng)
+      const localUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+      const localUserIndex = localUsers.findIndex(u => u.username === effectiveUsername);
+      
+      if (localUserIndex !== -1) {
+        const u = localUsers[localUserIndex];
+        if (u.password !== currentPassword && u.password !== btoa(currentPassword)) {
+           setErrors({ current: 'Mật khẩu hiện tại không chính xác' });
+           setIsLoading(false);
+           return;
+        }
+        
+        // Cập nhật mật khẩu mới (Mã hoá Base64 cơ bản)
+        localUsers[localUserIndex].password = btoa(newPassword);
+        localStorage.setItem('taskflow_users', JSON.stringify(localUsers));
+        
+        setIsLoading(false);
+        if (window.showToast) window.showToast('Đổi mật khẩu thành công! Vui lòng đăng nhập lại.', 'success');
+        onSuccess();
+        return;
+      }
+
+      // Xử lý đổi mật khẩu cho Mock Users cứng
+      if (['admin', 'manager1', 'sysadmin'].includes(effectiveUsername)) {
+         if ((effectiveUsername === 'admin' && currentPassword !== 'admin123') || 
+             (effectiveUsername === 'manager1' && currentPassword !== 'manager123') ||
+             (effectiveUsername === 'sysadmin' && currentPassword !== 'admin123')) {
+           setErrors({ current: 'Mật khẩu hiện tại không chính xác' });
+           setIsLoading(false);
+           return;
+         }
+         setIsLoading(false);
+         if (window.showToast) window.showToast('Đổi mật khẩu thành công (Mock Mode)! Vui lòng đăng nhập lại.', 'success');
+         onSuccess();
+         return;
+      }
+
+      // Fallback: Gọi API cho users hệ thống thực
       const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users/change-password', {
         method: 'PUT',
         headers: {
