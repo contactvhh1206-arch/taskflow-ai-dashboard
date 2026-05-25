@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+﻿import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -392,8 +392,8 @@ function MainDashboard() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-user-role': user.role,
-              'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+              'x-user-role': encodeURIComponent(user.role || ''),
+              'x-facility-id': (localStorage.getItem('facility_id') || user.facility_id || 'ALL').replace(/[^\x20-\x7E]/g, '')
             },
             body: JSON.stringify(taskPayload)
           });
@@ -428,8 +428,8 @@ function MainDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-role': user.role,
-          'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+          'x-user-role': encodeURIComponent(user.role || ''),
+          'x-facility-id': (localStorage.getItem('facility_id') || user.facility_id || 'ALL').replace(/[^\x20-\x7E]/g, '')
         },
         body: JSON.stringify(taskPayload)
       });
@@ -469,8 +469,8 @@ function MainDashboard() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-role': user.role,
-          'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+          'x-user-role': encodeURIComponent(user.role || ''),
+          'x-facility-id': (localStorage.getItem('facility_id') || user.facility_id || 'ALL').replace(/[^\x20-\x7E]/g, '')
         },
         body: JSON.stringify({ status: newStatus, evidence: evidenceName })
       });
@@ -503,27 +503,23 @@ function MainDashboard() {
         try {
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
             headers: {
-              'x-user-role': user.role,
-              'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+              'x-user-role': encodeURIComponent(user.role || ''),
+              'x-facility-id': (localStorage.getItem('facility_id') || user.facility_id || 'ALL').replace(/[^\x20-\x7E]/g, '')
             }
           });
           
           if (res.status === 500 || !res.ok) {
-             setTasks([]);
-             showToast('Lỗi máy chủ khi tải dữ liệu, vui lòng thử lại');
-             return;
+             const offlineTasks = JSON.parse(localStorage.getItem('taskflow_tasks') || '[]'); setTasks(offlineTasks); return;
           }
           
           const data = await res.json();
           if (data.success) {
             setTasks(data.data);
           } else {
-            setTasks([]);
-            showToast('Lấy dữ liệu thất bại: ' + (data.error || ''));
+            const offlineTasks = JSON.parse(localStorage.getItem('taskflow_tasks') || '[]'); setTasks(offlineTasks);
           }
         } catch (e) {
-          console.error(e);
-          showToast('Lỗi kết nối khi lấy dữ liệu');
+          console.error(e); const offlineTasks = JSON.parse(localStorage.getItem('taskflow_tasks') || '[]'); setTasks(offlineTasks);
         }
       };
       fetchTasks();
@@ -534,7 +530,7 @@ function MainDashboard() {
   const fetchFacilityStatuses = async () => {
     try {
       const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/checkin/status', {
-        headers: { 'x-user-role': user.role, 'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL' }
+        headers: { 'x-user-role': encodeURIComponent(user.role || ''), 'x-facility-id': (localStorage.getItem('facility_id') || user.facility_id || 'ALL').replace(/[^\x20-\x7E]/g, '') }
       });
       if (response.ok) {
         const data = await response.json();
