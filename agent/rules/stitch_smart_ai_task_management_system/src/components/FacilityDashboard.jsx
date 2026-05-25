@@ -285,6 +285,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
               </button>
             </div>
           </div>
+        </div>
 
           {stats.error ? (
             <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-dashed border-red-300 dark:border-red-800/50 text-red-500 mt-6 shadow-sm">
