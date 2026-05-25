@@ -1272,11 +1272,18 @@ export default function AppContainer() {
   useEffect(() => {
     // Migration script to normalize DUBAI PHÚ QUỐC to DUBAI PQ
     try {
+       // Helper function to check if string is DUBAI PHÚ QUỐC (safe matching)
+       const isDubaiPQ = (str) => {
+          if (!str) return false;
+          const upper = String(str).toUpperCase();
+          return (upper.includes('DUBAI PH') && upper.includes('QU')) || upper === 'DUBAI PQ';
+       };
+
        // 1. taskflow_facilities
        let facs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
        let facsChanged = false;
        facs = facs.map(f => {
-          if (f.name === 'DUBAI PHÚ QUỐC' || f.name === 'DUBAI PHU QUOC') {
+          if (isDubaiPQ(f.name) && f.name !== 'DUBAI PQ') {
              facsChanged = true;
              return { ...f, name: 'DUBAI PQ' };
           }
@@ -1288,18 +1295,37 @@ export default function AppContainer() {
        let users = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
        let usersChanged = false;
        users = users.map(u => {
-          if (u.facility_name === 'DUBAI PHÚ QUỐC' || u.facility_name === 'DUBAI PHU QUOC') {
+          let updatedU = { ...u };
+          if (isDubaiPQ(updatedU.facility_name) && updatedU.facility_name !== 'DUBAI PQ') {
              usersChanged = true;
-             return { ...u, facility_name: 'DUBAI PQ' };
+             updatedU.facility_name = 'DUBAI PQ';
           }
-          return u;
+          if (isDubaiPQ(updatedU.facility_id) && updatedU.facility_id !== 'DUBAI PQ') {
+             usersChanged = true;
+             updatedU.facility_id = 'DUBAI PQ';
+          }
+          return updatedU;
        });
        if (usersChanged) localStorage.setItem('taskflow_users', JSON.stringify(users));
 
-       // 3. Current session facility_id
+       // 3. Current session facility_id and auth
        let currFac = localStorage.getItem('facility_id');
-       if (currFac === 'DUBAI PHÚ QUỐC' || currFac === 'DUBAI PHU QUOC') {
+       if (isDubaiPQ(currFac) && currFac !== 'DUBAI PQ') {
           localStorage.setItem('facility_id', 'DUBAI PQ');
+       }
+       
+       let authData = JSON.parse(localStorage.getItem('taskflow_auth') || 'null');
+       if (authData && authData.user) {
+          let authChanged = false;
+          if (isDubaiPQ(authData.user.facility_id) && authData.user.facility_id !== 'DUBAI PQ') {
+             authData.user.facility_id = 'DUBAI PQ';
+             authChanged = true;
+          }
+          if (isDubaiPQ(authData.user.facility_name) && authData.user.facility_name !== 'DUBAI PQ') {
+             authData.user.facility_name = 'DUBAI PQ';
+             authChanged = true;
+          }
+          if (authChanged) localStorage.setItem('taskflow_auth', JSON.stringify(authData));
        }
     } catch (e) { console.error('Migration error:', e); }
 
