@@ -56,11 +56,8 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
          if (isProduction) return;
          if (resetConfirmText !== 'CONFIRM RESET SYSTEM') return;
          
-         // Fallback since backend does not send password to frontend
-         const actualPassword = user.password || (['admin', 'sysadmin'].includes(user.username) ? 'admin123' : undefined);
-
-         if (btoa(resetPassword) !== actualPassword && resetPassword !== actualPassword) {
-            if (showToast) showToast('❌ Mật khẩu Admin không chính xác!');
+         if (!resetPassword || resetPassword.trim() === '') {
+            if (showToast) showToast('❌ Vui lòng nhập mật khẩu xác nhận!');
             return;
          }
          
