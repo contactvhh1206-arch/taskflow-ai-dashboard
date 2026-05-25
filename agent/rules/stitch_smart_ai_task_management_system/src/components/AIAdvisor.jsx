@@ -150,7 +150,7 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
     setIsTyping(true);
     setAttachment(null);
 
-    setTimeout(async () => {
+    try {
       let responseContent = '';
       
       if (isFacilityMode) {
@@ -173,26 +173,89 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
              });
              localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
            } catch(e) {}
-         } else {
-           responseContent = `Dựa trên dữ liệu nội bộ của cơ sở ${facilityName || ''}: \n\nTôi đã phân tích yêu cầu "${userQuery}".\n- Tình hình doanh thu: Đang cập nhật thực tế.\n- Tình hình nhân sự: Các ca trực đang hoạt động bình thường, không có nhân viên nghỉ không phép.\n- Đánh giá chuyên cần: Tốt.\n\nĐây là góc nhìn tổng quan cho cơ sở của bạn.`;
-         }
-      } else {
-         const allData = await fetchHistory();
-         const vectorDataArr = allData.map(d => d.aiVectorData).filter(Boolean);
-         responseContent = `Dựa trên dữ liệu hệ thống (Company_Master_Logs có ${allData.length} bản ghi): \n\n`;
-         
-         if (userQuery.toLowerCase().includes('so sánh') && userQuery.toLowerCase().includes('cơ sở 1') && userQuery.toLowerCase().includes('cơ sở 2')) {
-           const cs1Logs = allData.filter(d => d.org_unit === 'Cơ sở 1');
-           const cs2Logs = allData.filter(d => d.org_unit === 'Cơ sở 2');
-           responseContent += `- Cơ sở 1: Có ${cs1Logs.length} bản ghi.\n- Cơ sở 2: Có ${cs2Logs.length} bản ghi.\n Nhìn chung, dựa vào dữ liệu RAG, AI có thể phân tích chi tiết hiệu suất của 2 cơ sở.`;
-         } else {
-           responseContent += 'Dữ liệu Vector AI trích xuất được:\n' + vectorDataArr.slice(0, 3).join('\n') + (vectorDataArr.length > 3 ? '\n...' : '');
+           
+           setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
+           setIsTyping(false);
+           return;
          }
       }
+      
+      // Real AI Call Logic
+      const aiConfigStr = localStorage.getItem('taskflow_ai_config');
+      const aiConfig = aiConfigStr ? JSON.parse(aiConfigStr) : null;
+      
+      if (!aiConfig || !aiConfig.apiKey) {
+         responseContent = "Hệ thống yêu cầu cấu hình API Key tại phần Cài đặt Hệ thống để tôi có thể phân tích và trả lời câu hỏi của bạn.";
+         setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
+         setIsTyping(false);
+         return;
+      }
+
+      const allData = await fetchHistory();
+      let contextData = allData;
+      if (isFacilityMode && facilityName) {
+         contextData = allData.filter(d => d.org_unit === facilityName);
+      }
+      
+      // Build Vector context from contextData
+      const vectorDataArr = contextData.map(d => d.aiVectorData || JSON.stringify(d)).filter(Boolean).slice(0, 10);
+      const systemContext = `Dữ liệu hệ thống hiện tại:\n${vectorDataArr.join('\n')}`;
+      
+      const messages = [
+        { 
+          role: 'system', 
+          content: `Bạn là trợ lý AI nội bộ chuyên tư vấn vận hành. ${isFacilityMode ? `Bạn chỉ được phép hỗ trợ thông tin cho cơ sở ${facilityName}. ` : ''}Dựa vào dữ liệu hệ thống cung cấp dưới đây, hãy trả lời câu hỏi của người dùng một cách chính xác, chuyên nghiệp. Không tự bịa đặt dữ liệu.\n\n${systemContext}`
+        }
+      ];
+
+      if (attachment) {
+         if (attachment.extractedText) {
+             messages.push({ role: 'user', content: `[Nội dung tệp đính kèm: ${attachment.name}]\n${attachment.extractedText}\n\nCâu hỏi: ${userQuery}` });
+         } else if (attachment.url) {
+             messages.push({
+                role: 'user',
+                content: [
+                  { type: 'text', text: userQuery },
+                  { type: 'image_url', image_url: { url: attachment.url } }
+                ]
+             });
+         } else {
+             messages.push({ role: 'user', content: userQuery });
+         }
+      } else {
+         messages.push({ role: 'user', content: userQuery });
+      }
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+         method: 'POST',
+         headers: {
+            'Authorization': `Bearer ${aiConfig.apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.href,
+            'X-Title': 'TaskFlow AI Dashboard'
+         },
+         body: JSON.stringify({
+            model: aiConfig.aiModel || "google/gemini-1.5-pro",
+            messages: messages
+         })
+      });
+
+      if (!response.ok) {
+         const errData = await response.json().catch(() => ({}));
+         throw new Error(errData.error?.message || `API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      responseContent = data.choices?.[0]?.message?.content || "Không có phản hồi từ AI.";
 
       setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
+
+    } catch (err) {
+      console.error("AI Error:", err);
+      setChatLog(prev => [...prev, { role: 'ai', content: `Xin lỗi, đã xảy ra lỗi khi kết nối với AI (${err.message}). Vui lòng kiểm tra lại cấu hình API.` }]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (
