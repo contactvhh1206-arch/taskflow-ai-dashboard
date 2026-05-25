@@ -19,7 +19,11 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
              let savedKpis = {};
              try {
                 const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/kpi', {
-                   headers: { 'Authorization': `Bearer ${token}` }
+                   headers: { 
+                      'Authorization': `Bearer ${token}`,
+                      'x-user-role': user?.role || '',
+                      'x-facility-id': user?.facility_id || ''
+                   }
                 });
                 const responseJson = await res.json();
                 if (responseJson.success && responseJson.data) {
@@ -65,6 +69,8 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
                 method: 'POST',
                 headers: { 
                    'Authorization': `Bearer ${token}`,
+                   'x-user-role': user?.role || '',
+                   'x-facility-id': user?.facility_id || '',
                    'Content-Type': 'application/json' 
                 },
                 body: JSON.stringify({ apply_month: applyMonth, data: dataToSave })
@@ -97,7 +103,11 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
              const token = localStorage.getItem('taskflow_token');
              const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${facId}/archive`, { 
                 method: 'PUT',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 
+                   'Authorization': `Bearer ${token}`,
+                   'x-user-role': user?.role || '',
+                   'x-facility-id': user?.facility_id || ''
+                }
              });
              const data = await res.json();
              if (data.success) {
@@ -130,7 +140,9 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
                 method: 'POST',
                 headers: { 
                    'Content-Type': 'application/json',
-                   'Authorization': `Bearer ${token}`
+                   'Authorization': `Bearer ${token}`,
+                   'x-user-role': user?.role || '',
+                   'x-facility-id': user?.facility_id || ''
                 },
                 body: JSON.stringify({ name: newFacName })
              });

@@ -8,7 +8,11 @@ export default function ArchivedFacilitiesDashboard({ facilityList, showToast, r
              const token = localStorage.getItem('taskflow_token');
              const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${fac.id}/restore`, { 
                 method: 'PUT',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 
+                   'Authorization': `Bearer ${token}`,
+                   'x-user-role': user?.role || '',
+                   'x-facility-id': user?.facility_id || ''
+                }
              });
              const data = await res.json();
              if (data.success) {
