@@ -90,26 +90,27 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
           loadData();
        }, [facilityList, selectedMonth, refreshToggle, user, yearStr, monthStr]);
 
-       const getTarget = (facName, isWeekend) => {
-          let kpiStr = localStorage.getItem('taskflow_facility_kpis');
-          let savedKpis = {};
-          if (kpiStr) {
-             let depth = 0;
-             let parsed = kpiStr;
-             while (typeof parsed === 'string' && depth < 5) {
-                try {
-                   parsed = JSON.parse(parsed);
-                   depth++;
-                } catch(e) {
-                   break;
-                }
-             }
-             if (typeof parsed === 'object' && parsed !== null) {
-                savedKpis = parsed;
+       let kpiStr = localStorage.getItem('taskflow_facility_kpis');
+       let savedKpis = {};
+       if (kpiStr) {
+          let depth = 0;
+          let parsed = kpiStr;
+          while (typeof parsed === 'string' && depth < 5) {
+             try {
+                parsed = JSON.parse(parsed);
+                depth++;
+             } catch(e) {
+                break;
              }
           }
+          if (typeof parsed === 'object' && parsed !== null) {
+             savedKpis = parsed;
+          }
+       }
 
-          const facilityKpi = Object.values(savedKpis).find(k => k?.name?.trim().toLowerCase() === facName?.trim().toLowerCase());
+       const getTarget = (facName, isWeekend) => {
+          const normalize = (s) => (s || '').replace(/\s+/g, '').toLowerCase();
+          const facilityKpi = Object.values(savedKpis).find(k => normalize(k.name) === normalize(facName));
           
           if (facilityKpi) {
              return isWeekend ? Number(facilityKpi.weekend_target || 8000000) : Number(facilityKpi.weekday_target || 5000000);
@@ -210,6 +211,9 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
                                                    <span className={isMet ? 'text-green-400' : 'text-red-400'}>
                                                      {isMet ? '✅ Vượt chỉ tiêu' : `🔴 Chưa đạt (${new Intl.NumberFormat('vi-VN').format(rev)} < ${new Intl.NumberFormat('vi-VN').format(target)})`}
                                                    </span>
+                                                   <div className="text-[9px] text-gray-500 mt-1 pt-1 border-t border-gray-700">
+                                                      DB: {Object.keys(savedKpis).length} keys. {Object.values(savedKpis).find(k => (k?.name||'').replace(/\s+/g, '').toLowerCase() === (fac.name||'').replace(/\s+/g, '').toLowerCase()) ? 'Matched' : 'NoMatch'}
+                                                   </div>
                                                 </div>
                                              )}
                                           </div>
