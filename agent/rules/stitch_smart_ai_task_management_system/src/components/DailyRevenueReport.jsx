@@ -11,11 +11,18 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
   const [selectedDate, setSelectedDate] = useState(getYesterdayDate());
   const [formData, setFormData] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [kpiTrigger, setKpiTrigger] = useState(0);
+
+  useEffect(() => {
+     const handler = () => setKpiTrigger(prev => prev + 1);
+     window.addEventListener('taskflow_kpis_updated', handler);
+     return () => window.removeEventListener('taskflow_kpis_updated', handler);
+  }, []);
 
   // Lấy danh sách cơ sở
   const getActiveFacilities = useCallback(() => {
     if (facilityList && facilityList.length > 0) {
-      return facilityList.filter(f => !f.isExecutive).slice(0, 6);
+      return facilityList.filter(f => f.is_active !== false && !f.isExecutive);
     }
     // Fallback if no list provided
     return Array.from({length: 6}, (_, i) => ({

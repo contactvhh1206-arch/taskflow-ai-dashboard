@@ -7,7 +7,8 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
        const [newFacName, setNewFacName] = React.useState('');
        const [isAddingFac, setIsAddingFac] = React.useState(false);
        
-       const defaultFacs = facilityList.length > 0 ? facilityList : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
+       const activeFacs = facilityList.filter(f => f.is_active !== false);
+       const defaultFacs = activeFacs.length > 0 ? activeFacs : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
 
        React.useEffect(() => {
           const now = new Date();

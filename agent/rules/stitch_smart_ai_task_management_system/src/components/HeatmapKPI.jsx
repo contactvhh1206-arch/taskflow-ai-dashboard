@@ -5,6 +5,13 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
        const [weeklyData, setWeeklyData] = React.useState([]);
        const [expandedWeeks, setExpandedWeeks] = React.useState({ 1: true, 2: true, 3: true, 4: true, 5: true });
        const [loading, setLoading] = React.useState(true);
+       const [kpiTrigger, setKpiTrigger] = React.useState(0);
+       
+       React.useEffect(() => {
+          const handler = () => setKpiTrigger(prev => prev + 1);
+          window.addEventListener('taskflow_kpis_updated', handler);
+          return () => window.removeEventListener('taskflow_kpis_updated', handler);
+       }, []);
        
        const [yearStr, monthStr] = selectedMonth.split('-');
        const formattedMonthStr = `${monthStr}/${yearStr}`;

@@ -306,8 +306,26 @@ function MainDashboard() {
     setFacilityList(localFacs);
   };
 
+  const fetchKPIs = async () => {
+    try {
+      const token = localStorage.getItem('taskflow_token');
+      if (!token) return;
+      const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/kpi', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const responseJson = await res.json();
+      if (responseJson.success && responseJson.data && responseJson.data.data) {
+        localStorage.setItem('taskflow_facility_kpis', JSON.stringify(responseJson.data.data));
+        window.dispatchEvent(new Event('taskflow_kpis_updated'));
+      }
+    } catch (e) {
+      console.error('Lỗi đồng bộ KPI từ server:', e);
+    }
+  };
+
   useEffect(() => {
     fetchFacilities();
+    fetchKPIs();
   }, []);
   
   // Dashboard time filter and stats

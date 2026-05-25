@@ -198,7 +198,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
              const hasAll = allowedFacs.includes('ALL');
 
              const aggregated = {};
-             const defaultFacs = facilityList.length > 0 ? facilityList : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
+             const activeFacs = facilityList.filter(f => f.is_active !== false);
+             const defaultFacs = activeFacs.length > 0 ? activeFacs : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
              
              defaultFacs.forEach(f => {
                 if (isAllowedAll || hasAll || allowedFacs.includes(f.id) || allowedFacs.includes(f.name)) {
