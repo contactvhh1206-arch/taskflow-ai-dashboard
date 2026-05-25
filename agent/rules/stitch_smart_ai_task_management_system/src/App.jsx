@@ -1131,25 +1131,36 @@ function MainDashboard() {
                 <div className="p-4 border-t border-outline-variant dark:border-gray-800 bg-white dark:bg-[#1e1e1e] relative">
                   {showMentionMenu && (
                     <div className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl shadow-lg max-h-48 overflow-y-auto z-10 p-2">
-                      {JSON.parse(localStorage.getItem('taskflow_users') || '[]')
-                        .filter(u => u.full_name && (u.full_name.toLowerCase().includes(mentionFilter) || (u.email && u.email.toLowerCase().includes(mentionFilter))))
-                        .map((u, idx) => (
-                          <div key={u.user_id || idx} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer rounded-lg text-sm dark:text-white" onClick={() => {
-                            const textBeforeCursor = chatInput.substring(0, cursorPosition);
-                            const textAfterCursor = chatInput.substring(cursorPosition);
-                            const match = textBeforeCursor.match(/@([^@]*)$/);
-                            if (match) {
-                                const replaceStart = cursorPosition - match[0].length;
-                                const newText = chatInput.substring(0, replaceStart) + '@' + u.full_name + ' ' + textAfterCursor;
-                                setChatInput(newText);
-                            }
-                            setShowMentionMenu(false);
-                            setTimeout(() => document.getElementById('task-chat-input')?.focus(), 0);
-                          }}>
-                            <div className="font-medium text-primary">{u.full_name}</div>
-                            <div className="text-xs text-gray-500">{u.email}</div>
-                          </div>
-                        ))}
+                      {(() => {
+                        const dbUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+                        const specialMentions = [
+                          { user_id: 'all', full_name: 'All (Tất cả)', email: 'Nhắc tất cả mọi người' },
+                          { user_id: 'hq', full_name: 'Sếp Tổng', email: 'Ban Giám Đốc' },
+                          { user_id: 'vp', full_name: 'Sếp Phó', email: 'Ban Giám Đốc' },
+                          { user_id: 'acc', full_name: 'Phòng Kế toán', email: 'Bộ phận tài chính' },
+                          { user_id: 'mkt', full_name: 'Phòng Marketing', email: 'Bộ phận truyền thông' }
+                        ];
+                        const allOptions = [...specialMentions, ...dbUsers];
+                        return allOptions
+                          .filter(u => u.full_name && (u.full_name.toLowerCase().includes(mentionFilter) || (u.email && u.email.toLowerCase().includes(mentionFilter))))
+                          .map((u, idx) => (
+                            <div key={u.user_id || idx} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer rounded-lg text-sm dark:text-white" onClick={() => {
+                              const textBeforeCursor = chatInput.substring(0, cursorPosition);
+                              const textAfterCursor = chatInput.substring(cursorPosition);
+                              const match = textBeforeCursor.match(/@([^@]*)$/);
+                              if (match) {
+                                  const replaceStart = cursorPosition - match[0].length;
+                                  const newText = chatInput.substring(0, replaceStart) + '@' + (u.user_id === 'all' ? 'all' : u.full_name) + ' ' + textAfterCursor;
+                                  setChatInput(newText);
+                              }
+                              setShowMentionMenu(false);
+                              setTimeout(() => document.getElementById('task-chat-input')?.focus(), 0);
+                            }}>
+                              <div className="font-medium text-primary">{u.full_name}</div>
+                              <div className="text-xs text-gray-500">{u.email}</div>
+                            </div>
+                          ));
+                      })()}
                     </div>
                   )}
                   <div className="relative">
