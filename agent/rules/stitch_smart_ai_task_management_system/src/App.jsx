@@ -1306,9 +1306,24 @@ export default function AppContainer() {
           }
           return updatedU;
        });
-       if (usersChanged) localStorage.setItem('taskflow_users', JSON.stringify(users));
+       // 3. kanban_tasks
+       let tasks = JSON.parse(localStorage.getItem('kanban_tasks') || '[]');
+       let tasksChanged = false;
+       tasks = tasks.map(t => {
+          let updatedT = { ...t };
+          if (isDubaiPQ(updatedT.facility) && updatedT.facility !== 'DUBAI PQ') {
+             tasksChanged = true;
+             updatedT.facility = 'DUBAI PQ';
+          }
+          if (isDubaiPQ(updatedT.facilityId) && updatedT.facilityId !== 'DUBAI PQ') {
+             tasksChanged = true;
+             updatedT.facilityId = 'DUBAI PQ';
+          }
+          return updatedT;
+       });
+       if (tasksChanged) localStorage.setItem('kanban_tasks', JSON.stringify(tasks));
 
-       // 3. Current session facility_id and auth
+       // 4. Current session facility_id and auth
        let currFac = localStorage.getItem('facility_id');
        if (isDubaiPQ(currFac) && currFac !== 'DUBAI PQ') {
           localStorage.setItem('facility_id', 'DUBAI PQ');
