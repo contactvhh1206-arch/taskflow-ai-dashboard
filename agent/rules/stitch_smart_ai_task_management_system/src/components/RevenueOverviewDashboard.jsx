@@ -77,7 +77,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                
                // DYNAMIC PROMPT INJECTION
                const facNames = facilityList.map(f => f.name).join(', ');
-               const systemPrompt = `Bạn là trợ lý kế toán. Hãy quét file Excel được cung cấp và bóc tách số liệu doanh thu. Hãy KHỚP CHÍNH XÁC số liệu vào các chi nhánh hiện có sau đây của hệ thống: [${facNames}]. Tuyệt đối không tự bịa ra tên chi nhánh khác. Trả về đúng định dạng JSON: { "data": [ { "date": "YYYY-MM-DD", "revenues": { "TenChiNhanh": SỐ_TIỀN_INT } } ] }`;
+               const [yearStr, monthStr] = selectedMonth.split('-');
+               const systemPrompt = `Bạn là trợ lý kế toán. Hãy quét file Excel/CSV được cung cấp và bóc tách số liệu doanh thu. LƯU Ý RẤT QUAN TRỌNG: Dữ liệu này thuộc về THÁNG ${monthStr} NĂM ${yearStr}. Nếu trong file chỉ ghi ngày mà không ghi tháng/năm, bạn BẮT BUỘC phải tự động nội suy và điền đúng "${yearStr}-${monthStr}-DD" vào trường date. Hãy KHỚP CHÍNH XÁC số liệu vào các chi nhánh hiện có sau đây của hệ thống: [${facNames}]. Tuyệt đối không tự bịa ra tên chi nhánh khác. Trả về đúng định dạng JSON: { "data": [ { "date": "YYYY-MM-DD", "revenues": { "TenChiNhanh": SỐ_TIỀN_INT } } ] }`;
                
                const token = localStorage.getItem('taskflow_token');
                const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/internal/extract-revenue-text', {
