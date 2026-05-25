@@ -5,7 +5,11 @@ export default function ArchivedFacilitiesDashboard({ facilityList, showToast, r
 
        const handleRestore = async (fac) => {
           try {
-             const res = await fetch(`http://localhost:5001/api/facilities/${fac.id}/restore`, { method: 'PUT' });
+             const token = localStorage.getItem('taskflow_token');
+             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${fac.id}/restore`, { 
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+             });
              const data = await res.json();
              if (data.success) {
                 showToast('✅ Đã khôi phục cơ sở thành công!');

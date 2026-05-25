@@ -14,21 +14,41 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
           const currentMonth = `${now.getMonth() + 1}/${now.getFullYear()}`;
           setApplyMonth(currentMonth);
 
-          const savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');
+          const loadKpis = async () => {
+             const token = localStorage.getItem('taskflow_token');
+             let savedKpis = {};
+             try {
+                const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/kpi', {
+                   headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const responseJson = await res.json();
+                if (responseJson.success && responseJson.data) {
+                   savedKpis = responseJson.data.data;
+                   if (responseJson.data.apply_month) setApplyMonth(responseJson.data.apply_month);
+                } else {
+                   savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');
+                }
+             } catch (e) {
+                console.error('Lỗi lấy KPI từ máy chủ:', e);
+                savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');
+             }
+             
+             const initialKpis = {};
+             defaultFacs.forEach(f => {
+                initialKpis[f.id] = savedKpis[f.id] || {
+                   facility_id: f.id,
+                   name: f.name,
+                   weekday_target: 5000000,
+                   weekend_target: 8000000,
+                };
+             });
+             setKpis(initialKpis);
+          };
           
-          const initialKpis = {};
-          defaultFacs.forEach(f => {
-             initialKpis[f.id] = savedKpis[f.id] || {
-                facility_id: f.id,
-                name: f.name,
-                weekday_target: 5000000,
-                weekend_target: 8000000,
-             };
-          });
-          setKpis(initialKpis);
+          loadKpis();
        }, [facilityList]);
 
-       const handleSave = () => {
+       const handleSave = async () => {
           const dataToSave = {};
           Object.values(kpis).forEach(k => {
              dataToSave[k.facility_id] = {
@@ -38,8 +58,29 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
                 updated_by: user.name
              };
           });
-          localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
-          showToast('✅ Đã lưu cấu hình KPI thành công!');
+          
+          try {
+             const token = localStorage.getItem('taskflow_token');
+             const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/kpi', {
+                method: 'POST',
+                headers: { 
+                   'Authorization': `Bearer ${token}`,
+                   'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({ apply_month: applyMonth, data: dataToSave })
+             });
+             const data = await res.json();
+             if (data.success) {
+                showToast('✅ Đã đồng bộ cấu hình KPI lên Server thành công!');
+                localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
+             } else {
+                showToast('❌ Lỗi lưu KPI: ' + data.error);
+             }
+          } catch (e) {
+             console.error(e);
+             localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
+             showToast('✅ Đã lưu cấu hình KPI (Local - Không kết nối được Server)!');
+          }
        };
 
        const handleArchiveFacility = async (fac) => {
@@ -53,7 +94,11 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
           });
 
           try {
-             const res = await fetch(`http://localhost:5001/api/facilities/${facId}/archive`, { method: 'PUT' });
+             const token = localStorage.getItem('taskflow_token');
+             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${facId}/archive`, { 
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` }
+             });
              const data = await res.json();
              if (data.success) {
                 showToast('✅ Đã lưu trữ cơ sở thành công!');
@@ -80,9 +125,13 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
           }
           setIsAddingFac(true);
           try {
-             const res = await fetch('http://localhost:5001/api/facilities', {
+             const token = localStorage.getItem('taskflow_token');
+             const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                   'Content-Type': 'application/json',
+                   'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ name: newFacName })
              });
              const data = await res.json();

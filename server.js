@@ -55,6 +55,13 @@ const initDB = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS kpi_settings (
+      id VARCHAR(255) PRIMARY KEY,
+      apply_month VARCHAR(50),
+      data JSONB,
+      updated_by VARCHAR(255),
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
     // Seed roles
     const roles = ['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'FACILITY_MANAGER', 'ADMIN'];
     for (const role of roles) {
@@ -1072,6 +1079,58 @@ app.post('/api/reports', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error('Lỗi lưu báo cáo doanh thu:', error);
     res.status(500).json({ error: 'Lỗi server khi lưu báo cáo doanh thu.' });
+  }
+});
+
+// ==============================================================================
+// 6. KPI SETTINGS
+// ==============================================================================
+
+app.get('/api/kpi', authenticateUser, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM kpi_settings ORDER BY updated_at DESC LIMIT 1');
+    if (rows.length > 0) {
+      res.json({ success: true, data: rows[0] });
+    } else {
+      res.json({ success: true, data: null });
+    }
+  } catch (error) {
+    console.error('Lỗi lấy KPI:', error);
+    res.status(500).json({ error: 'Lỗi server khi lấy KPI.' });
+  }
+});
+
+app.post('/api/kpi', authenticateUser, async (req, res) => {
+  try {
+    const { role, name, username } = req.user;
+    if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT'].includes(role)) {
+      return res.status(403).json({ error: 'Không đủ quyền lưu cấu hình KPI.' });
+    }
+    
+    const { apply_month, data } = req.body;
+    
+    // UPSERT by apply_month or just keep adding new rows and fetch latest
+    const query = `
+      INSERT INTO kpi_settings (id, apply_month, data, updated_by, updated_at)
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (id) DO UPDATE 
+      SET apply_month = EXCLUDED.apply_month,
+          data = EXCLUDED.data,
+          updated_by = EXCLUDED.updated_by,
+          updated_at = NOW()
+      RETURNING *
+    `;
+    
+    // We use a constant ID for now or unique month
+    const id = apply_month ? \`kpi_\${apply_month.replace('/', '_')}\` : 'kpi_default';
+    const updatedBy = name || username || role;
+    
+    const { rows } = await pool.query(query, [id, apply_month, JSON.stringify(data), updatedBy]);
+    
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Lỗi lưu cấu hình KPI:', error);
+    res.status(500).json({ error: 'Lỗi server khi lưu cấu hình KPI.' });
   }
 });
 
