@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { fetchHistory } from '../services/dataService.js';
 
-export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryHandled }) {
+export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryHandled, isFacilityMode = false, facilityName = '' }) {
   const [query, setQuery] = useState('');
 
   const getGreetingText = (userObj) => {
@@ -12,10 +12,16 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
 
     if (!userObj) return `${timeGreeting}! Tôi là Trợ lý Cố vấn AI Cấp cao đây! Bạn cần tôi hỗ trợ thông tin gì ạ?`;
 
+    let displayName = userObj?.name || userObj?.username;
+    
+    if (isFacilityMode) {
+      const fName = facilityName || 'bạn';
+      return `${timeGreeting}, ${displayName || 'Quản lý'}! Tôi là Cố vấn AI riêng của cơ sở ${fName}. Tôi có thể giúp bạn cung cấp góc nhìn tổng quan, tình hình doanh thu, nhật ký hoạt động, nhân viên nghỉ phép và đánh giá chuyên cần của cơ sở mình. (Lưu ý: Tôi chỉ được phép cung cấp thông tin liên quan đến cơ sở này).`;
+    }
+
     const isMarketing = userObj.role === 'DEPARTMENT_HEAD';
     const isBoss = userObj.role === 'SUPER_ADMIN' || userObj.role === 'GENERAL_MANAGER' || userObj.role === 'VICE_PRESIDENT';
     
-    let displayName = userObj?.name || userObj?.username;
     if (!displayName) {
        if (isMarketing) displayName = 'Trưởng phòng Marketing';
        else if (isBoss) displayName = 'Sếp';
@@ -145,16 +151,30 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
     setAttachment(null);
 
     setTimeout(async () => {
-      const allData = await fetchHistory();
-      const vectorDataArr = allData.map(d => d.aiVectorData).filter(Boolean);
-
-      let responseContent = `Dựa trên dữ liệu hệ thống (Company_Master_Logs có ${allData.length} bản ghi): \n\n`;
-      if (userQuery.toLowerCase().includes('so sánh') && userQuery.toLowerCase().includes('cơ sở 1') && userQuery.toLowerCase().includes('cơ sở 2')) {
-        const cs1Logs = allData.filter(d => d.org_unit === 'Cơ sở 1');
-        const cs2Logs = allData.filter(d => d.org_unit === 'Cơ sở 2');
-        responseContent += `- Cơ sở 1: Có ${cs1Logs.length} bản ghi.\n- Cơ sở 2: Có ${cs2Logs.length} bản ghi.\n Nhìn chung, dựa vào dữ liệu RAG, AI có thể phân tích chi tiết hiệu suất của 2 cơ sở.`;
+      let responseContent = '';
+      
+      if (isFacilityMode) {
+         // Restriction logic for Facility Mode
+         const forbiddenKeywords = ['cơ sở khác', 'phòng ban', 'chuỗi', 'tất cả cơ sở', 'cơ sở 1', 'cơ sở 2', 'toàn hệ thống'];
+         const isForbidden = forbiddenKeywords.some(kw => userQuery.toLowerCase().includes(kw));
+         
+         if (isForbidden) {
+           responseContent = `Xin lỗi, tôi là Cố vấn AI riêng của cơ sở ${facilityName || 'này'}. Tôi bị hạn chế quyền truy cập và KHÔNG ĐƯỢC PHÉP cung cấp thông tin của các cơ sở khác hay phòng ban khác. Tôi chỉ có thể hỗ trợ các thông tin nội bộ của cơ sở mình.`;
+         } else {
+           responseContent = `Dựa trên dữ liệu nội bộ của cơ sở ${facilityName || ''}: \n\nTôi đã phân tích yêu cầu "${userQuery}".\n- Tình hình doanh thu: Đang cập nhật thực tế.\n- Tình hình nhân sự: Các ca trực đang hoạt động bình thường, không có nhân viên nghỉ không phép.\n- Đánh giá chuyên cần: Tốt.\n\nĐây là góc nhìn tổng quan cho cơ sở của bạn.`;
+         }
       } else {
-        responseContent += 'Dữ liệu Vector AI trích xuất được:\n' + vectorDataArr.slice(0, 3).join('\n') + (vectorDataArr.length > 3 ? '\n...' : '');
+         const allData = await fetchHistory();
+         const vectorDataArr = allData.map(d => d.aiVectorData).filter(Boolean);
+         responseContent = `Dựa trên dữ liệu hệ thống (Company_Master_Logs có ${allData.length} bản ghi): \n\n`;
+         
+         if (userQuery.toLowerCase().includes('so sánh') && userQuery.toLowerCase().includes('cơ sở 1') && userQuery.toLowerCase().includes('cơ sở 2')) {
+           const cs1Logs = allData.filter(d => d.org_unit === 'Cơ sở 1');
+           const cs2Logs = allData.filter(d => d.org_unit === 'Cơ sở 2');
+           responseContent += `- Cơ sở 1: Có ${cs1Logs.length} bản ghi.\n- Cơ sở 2: Có ${cs2Logs.length} bản ghi.\n Nhìn chung, dựa vào dữ liệu RAG, AI có thể phân tích chi tiết hiệu suất của 2 cơ sở.`;
+         } else {
+           responseContent += 'Dữ liệu Vector AI trích xuất được:\n' + vectorDataArr.slice(0, 3).join('\n') + (vectorDataArr.length > 3 ? '\n...' : '');
+         }
       }
 
       setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
@@ -167,8 +187,8 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
       <div className="p-4 border-b border-outline-variant dark:border-gray-800 bg-gradient-to-r from-secondary/10 to-transparent flex items-center gap-3">
         <span className="material-symbols-outlined text-secondary text-3xl">robot_2</span>
         <div>
-          <h2 className="font-bold text-lg dark:text-white">AI Advisor (Master AI)</h2>
-          <p className="text-xs text-gray-500">Truy cập Global Data Stream: Company_Master_Logs</p>
+          <h2 className="font-bold text-lg dark:text-white">{isFacilityMode ? 'Cố vấn AI (Cơ sở)' : 'AI Advisor (Master AI)'}</h2>
+          <p className="text-xs text-gray-500">{isFacilityMode ? 'Truy cập giới hạn: Dữ liệu nội bộ cơ sở' : 'Truy cập Global Data Stream: Company_Master_Logs'}</p>
         </div>
       </div>
       <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-4 custom-scrollbar">
@@ -204,7 +224,13 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
       <div className={`p-4 ${chatLog.length > 1 ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
         {chatLog.length <= 1 && (
           <div className="mb-4 flex flex-wrap gap-2 justify-center">
-             {[
+             {(isFacilityMode ? [
+               'Tình hình doanh thu hôm nay?',
+               'Đánh giá chuyên cần nhân viên',
+               'Ai đang nghỉ phép/không phép?',
+               'Nhật ký hoạt động gần nhất',
+               'Góc nhìn tổng quan cơ sở'
+             ] : [
                'Báo cáo doanh thu hôm nay',
                'Cơ sở nào đang trễ task?',
                'Tình hình nhân sự',
@@ -214,7 +240,7 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
                'Công việc cần làm của cơ sở',
                'Tình trạng và số lượng nghĩ ko phép, có phép',
                'Cơ sở nào đang cần hỗ trợ'
-             ].map((prompt, idx) => {
+             ]).map((prompt, idx) => {
                const colors = [
                   'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50',
                   'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/50',

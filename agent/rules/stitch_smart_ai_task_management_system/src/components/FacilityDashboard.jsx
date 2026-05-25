@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import AIAdvisor from './AIAdvisor';
 
 export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask, globalFacilityFilter }) {
       const [stats, setStats] = useState({ open: 0, closed: 0, overdue: 0, total: -1, error: false });
@@ -423,6 +424,11 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
                     </ul>
                   )}
                 </div>
+              </div>
+
+              {/* AI Advisor for Facility */}
+              <div className="mt-6 h-[600px] flex flex-col">
+                 <AIAdvisor user={user} isFacilityMode={true} facilityName={localStorage.getItem('facility_name') || user?.facilityName || 'bạn'} />
               </div>
             </>
           )}
