@@ -185,7 +185,7 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
                               
                               return (
                                 <tr key={d}>
-                                  <td className={`px-4 py-2 border border-gray-200 dark:border-gray-700 font-medium sticky left-0 z-10 whitespace-nowrap ${isWeekend ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' : 'bg-gray-50 dark:bg-[#1a1a1a]'}`}>
+                                  <td className={`px-1 md:px-4 py-2 border border-gray-200 dark:border-gray-700 font-medium sticky left-0 z-10 whitespace-nowrap text-xs md:text-sm ${isWeekend ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' : 'bg-gray-50 dark:bg-[#1a1a1a]'}`}>
                                     {d}/{monthStr} ({dayLabel})
                                   </td>
                                   {visibleFacs.map(fac => {
