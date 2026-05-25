@@ -69,7 +69,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         facility_id: item.org_unit,
         date: item.date,
         timestamp: item.displayTime,
-        content: item.content,
+        content: typeof item.content === 'object' ? '' : item.content,
         image: (item.attachments || []).find(a => typeof a === 'string' && a.startsWith('data:image')) || null,
         audio: (item.attachments || []).find(a => typeof a === 'string' && a.startsWith('data:audio')) || null,
         aiVectorData: item.aiVectorData
@@ -193,7 +193,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     const newRecord = await saveData({
       org_unit: user.facility_id,
       entry_type: 'Operation_Log',
-      content: logContent.trim(),
+      content: logContent.trim() || ' ',
       attachments: attachments,
       aiVectorData
     });
@@ -204,7 +204,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         facility_id: newRecord.org_unit,
         date: newRecord.date,
         timestamp: newRecord.displayTime,
-        content: newRecord.content,
+        content: typeof newRecord.content === 'object' ? '' : newRecord.content,
         image: attachments.find(a => typeof a === 'string' && a.startsWith('data:image')) || null,
         audio: attachments.find(a => typeof a === 'string' && a.startsWith('data:audio')) || null,
         aiVectorData: newRecord.aiVectorData
