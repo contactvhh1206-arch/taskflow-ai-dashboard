@@ -18,6 +18,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const [logs, setLogs] = useState([]);
   const [logContent, setLogContent] = useState('');
   const [logImage, setLogImage] = useState(null);
+  const [logAudio, setLogAudio] = useState(null);
 
   const [formData, setFormData] = useState({
     shift: 'Ca 1',
@@ -63,7 +64,8 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         date: item.date,
         timestamp: item.displayTime,
         content: item.content,
-        image: item.attachments[0] || null,
+        image: (item.attachments || []).find(a => typeof a === 'string' && a.startsWith('data:image')) || null,
+        audio: (item.attachments || []).find(a => typeof a === 'string' && a.startsWith('data:audio')) || null,
         aiVectorData: item.aiVectorData
       })));
     };
@@ -81,8 +83,23 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     }
   };
 
+  const handleAudioUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5000000) {
+        if (showToast) showToast('File âm thanh quá lớn (Tối đa 5MB)');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogAudio(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleAddLog = async () => {
-    if (!logContent.trim() && !logImage) return;
+    if (!logContent.trim() && !logImage && !logAudio) return;
     
     const now = new Date();
     const timestamp = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -398,19 +415,37 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
             className="w-full px-4 py-3 bg-surface-container-lowest dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white min-h-[80px] resize-y"
           />
           {logImage && (
-            <div className="relative w-max">
+            <div className="relative w-max mt-2">
               <img src={logImage} alt="Preview" className="h-24 rounded-lg border border-gray-200 dark:border-gray-700 object-cover" />
-              <button onClick={() => setLogImage(null)} className="absolute -top-2 -right-2 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center hover:bg-error/90 shadow-sm">
+              <button onClick={() => setLogImage(null)} className="absolute -top-2 -right-2 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center hover:bg-error/90 shadow-sm z-10">
                 <span className="material-symbols-outlined text-[14px]">close</span>
               </button>
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl cursor-pointer transition-colors text-sm font-semibold">
-              <span className="material-symbols-outlined text-[18px]">image</span> Đính kèm ảnh
-              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-            </label>
-            <button onClick={handleAddLog} disabled={!logContent.trim() && !logImage} className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2">
+          {logAudio && (
+            <div className="relative w-full max-w-sm mt-2">
+              <audio controls src={logAudio} className="w-full h-10" />
+              <button onClick={() => setLogAudio(null)} className="absolute -top-2 -right-2 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center hover:bg-error/90 shadow-sm z-10">
+                <span className="material-symbols-outlined text-[14px]">close</span>
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-1">
+            <div className="flex flex-wrap gap-2">
+              <label className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl cursor-pointer transition-colors text-sm font-semibold">
+                <span className="material-symbols-outlined text-[18px]">image</span> Đính kèm ảnh
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              </label>
+              <label className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl cursor-pointer transition-colors text-sm font-semibold">
+                <span className="material-symbols-outlined text-[18px]">photo_camera</span> Chụp hình
+                <input type="file" accept="image/*" capture="environment" onChange={handleImageUpload} className="hidden" />
+              </label>
+              <label className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl cursor-pointer transition-colors text-sm font-semibold">
+                <span className="material-symbols-outlined text-[18px]">mic</span> Ghi âm
+                <input type="file" accept="audio/*" capture="microphone" onChange={handleAudioUpload} className="hidden" />
+              </label>
+            </div>
+            <button onClick={handleAddLog} disabled={!logContent.trim() && !logImage && !logAudio} className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2 shrink-0">
               <span className="material-symbols-outlined text-[18px]">send</span> Ghi nhật ký
             </button>
           </div>
@@ -432,6 +467,11 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
                     {log.image && (
                       <div className="mt-3">
                         <img src={log.image} alt="Log Attachment" className="max-h-40 rounded-lg border border-gray-200 dark:border-gray-700 object-cover" />
+                      </div>
+                    )}
+                    {log.audio && (
+                      <div className="mt-3">
+                        <audio controls src={log.audio} className="w-full max-w-sm h-10" />
                       </div>
                     )}
                   </div>
@@ -827,6 +867,11 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
                             {log.image && (
                               <div className="mt-3">
                                 <img src={log.image} alt="Log Attachment" className="max-h-48 rounded-lg border border-gray-200 dark:border-gray-600 object-cover" />
+                              </div>
+                            )}
+                            {log.audio && (
+                              <div className="mt-3">
+                                <audio controls src={log.audio} className="w-full h-10" />
                               </div>
                             )}
                           </div>
