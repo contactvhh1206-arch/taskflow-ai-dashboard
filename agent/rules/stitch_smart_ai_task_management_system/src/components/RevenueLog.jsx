@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 export default function RevenueLog({ user, showToast }) {
   const [reports, setReports] = useState([]);
@@ -6,16 +6,16 @@ export default function RevenueLog({ user, showToast }) {
   const [editFormData, setEditFormData] = useState([]);
   const [editReason, setEditReason] = useState('');
 
-  const loadReports = () => {
+  const loadReports = useCallback(() => {
     const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
     // Sort descending by timestamp
     allReports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     setReports(allReports);
-  };
+  }, []);
 
   useEffect(() => {
     loadReports();
-  }, []);
+  }, [loadReports]);
 
   const handleEditClick = (report) => {
     setEditingReport(report);

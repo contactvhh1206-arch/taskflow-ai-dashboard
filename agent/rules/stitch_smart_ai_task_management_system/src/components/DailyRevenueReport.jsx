@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 export default function DailyRevenueReport({ user, facilityList, showToast }) {
   // Hàm để lấy ngày hôm qua định dạng YYYY-MM-DD
@@ -13,7 +13,7 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
   const [isSaving, setIsSaving] = useState(false);
 
   // Lấy danh sách cơ sở
-  const getActiveFacilities = () => {
+  const getActiveFacilities = useCallback(() => {
     if (facilityList && facilityList.length > 0) {
       return facilityList.filter(f => !f.isExecutive).slice(0, 6);
     }
@@ -22,13 +22,9 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
       id: `f${i+1}`,
       name: `Cơ sở ${i+1}`
     }));
-  };
+  }, [facilityList]);
 
-  useEffect(() => {
-    loadDataForDate(selectedDate);
-  }, [selectedDate, facilityList]);
-
-  const loadDataForDate = (dateStr) => {
+  const loadDataForDate = useCallback((dateStr) => {
     const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
     const existingReport = allReports.find(r => r.date === dateStr);
     
@@ -56,7 +52,11 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
       }));
       setFormData(initialData);
     }
-  };
+  }, [getActiveFacilities]);
+
+  useEffect(() => {
+    loadDataForDate(selectedDate);
+  }, [selectedDate, loadDataForDate]);
 
   const handleRevenueChange = (id, value) => {
     // Chỉ cho phép nhập số

@@ -129,6 +129,7 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
   };
 
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (externalQueryTrigger) {
         handleAsk(externalQueryTrigger);
