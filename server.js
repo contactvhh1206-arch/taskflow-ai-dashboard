@@ -708,11 +708,15 @@ app.post('/api/ai/auto-tasking', authenticateUser, async (req, res) => {
     const systemPrompt = `Bạn là một AI điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
 Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY').`;
 
+    const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
+    const aiConfig = configRows.length > 0 ? configRows[0].data : {};
+    const aiModel = aiConfig.model || "google/gemini-2.5-flash";
+
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: aiModel,
         messages: [ { role: "system", content: systemPrompt }, { role: "user", content: meetingTranscript } ],
         response_format: { type: "json_object" }
       })
@@ -825,8 +829,12 @@ app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res
       return res.status(400).json({ error: 'Thiếu dữ liệu prompt hoặc nội dung.' });
     }
 
+    const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
+    const aiConfig = configRows.length > 0 ? configRows[0].data : {};
+    const aiModel = aiConfig.model || "google/gemini-2.5-flash";
+
     const payload = {
-      model: "google/gemini-2.5-flash",
+      model: aiModel,
       messages: [
         { role: "system", content: prompt },
         { role: "user", content: content }
@@ -940,11 +948,15 @@ app.post('/api/ai/ping', authenticateUser, async (req, res) => {
       Đúng chuẩn mức độ cảnh báo được yêu cầu. Không thêm lời chào thừa thãi như "Chào bạn", đi thẳng vào vấn đề theo cách thấu cảm.
     `;
 
+    const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
+    const aiConfig = configRows.length > 0 ? configRows[0].data : {};
+    const aiModel = aiConfig.model || "google/gemini-2.5-flash";
+
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: aiModel,
         messages: [
           { role: "system", content: systemPrompt }
         ]
