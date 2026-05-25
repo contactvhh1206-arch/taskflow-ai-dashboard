@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshToggle }) {
        const [dailyData, setDailyData] = React.useState({});

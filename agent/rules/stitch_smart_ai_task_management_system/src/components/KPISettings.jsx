@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 
 export default function KPISettings({ user, facilityList, showToast, refreshFacilities }) {
        const [kpis, setKpis] = React.useState({});

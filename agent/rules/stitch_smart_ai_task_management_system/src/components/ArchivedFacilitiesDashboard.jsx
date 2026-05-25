@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 
 export default function ArchivedFacilitiesDashboard({ facilityList, showToast, refreshFacilities }) {
        const archivedFacs = facilityList.filter(f => f.is_active === false);

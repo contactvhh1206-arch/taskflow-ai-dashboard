@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AIAdvisor from './AIAdvisor';
 
-export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask, globalFacilityFilter }) {
+export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacilityFilter }) {
       const [stats, setStats] = useState({ open: 0, closed: 0, overdue: 0, total: -1, error: false });
       const [urgentTasks, setUrgentTasks] = useState([]);
       const [aiPings, setAiPings] = useState([]);

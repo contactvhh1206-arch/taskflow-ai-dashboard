@@ -851,7 +851,7 @@ function MainDashboard() {
               </ErrorBoundary>
             ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) ? (
               <ErrorBoundary>
-                <FacilityDashboard user={user} tasks={tasks} onNavigate={(tab) => setActiveTab(tab)} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={user.role === 'FACILITY_MANAGER' ? (user.facility_code || user.facility_id || '') : "ALL"} />
+                <FacilityDashboard user={user} tasks={tasks} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={user.role === 'FACILITY_MANAGER' ? (user.facility_code || user.facility_id || '') : "ALL"} />
               </ErrorBoundary>
             ) : activeTab === 'revenue-overview' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) ? (
               <ErrorBoundary>
@@ -916,7 +916,7 @@ function MainDashboard() {
               </ErrorBoundary>
             ) : activeTab === 'revenue-log' && ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SUPER_ADMIN'].includes(user.role) ? (
               <ErrorBoundary>
-                <RevenueLog user={user} facilityList={facilityList} showToast={showToast} />
+                <RevenueLog user={user} showToast={showToast} />
               </ErrorBoundary>
             ) : ['dept-reports'].includes(activeTab) ? (
               <div className="flex items-center justify-center h-[50vh] text-gray-500 flex-col gap-4">

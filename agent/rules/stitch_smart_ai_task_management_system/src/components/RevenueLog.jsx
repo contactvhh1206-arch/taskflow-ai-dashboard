@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function RevenueLog({ user, facilityList, showToast }) {
+export default function RevenueLog({ user, showToast }) {
   const [reports, setReports] = useState([]);
   const [editingReport, setEditingReport] = useState(null);
   const [editFormData, setEditFormData] = useState([]);
