@@ -563,17 +563,19 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
 });
 
 // API Đăng nhập giả lập
-app.delete('/api/tasks/all', authenticateUser, async (req, res) => {
+app.delete('/api/system/reset', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
     if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
        return res.status(403).json({ error: 'Không đủ quyền' });
     }
     await pool.query('TRUNCATE TABLE tasks RESTART IDENTITY CASCADE');
-    res.json({ success: true, message: 'Đã xóa tất cả tasks' });
+    await pool.query('DELETE FROM daily_logs WHERE entry_type != $1', ['SYSTEM_CONFIG']);
+    await pool.query('DELETE FROM daily_financial_reports');
+    res.json({ success: true, message: 'Đã dọn dẹp toàn bộ dữ liệu kiểm thử' });
   } catch (error) {
-    console.error("Lỗi xóa tasks:", error);
-    res.status(500).json({ error: 'Lỗi máy chủ khi xóa tasks' });
+    console.error("Lỗi reset system:", error);
+    res.status(500).json({ error: 'Lỗi máy chủ khi reset system' });
   }
 });
 
