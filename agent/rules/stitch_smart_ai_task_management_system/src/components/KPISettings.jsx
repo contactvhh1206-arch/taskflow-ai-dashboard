@@ -90,12 +90,14 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
              if (data.success) {
                 showToast('✅ Đã đồng bộ cấu hình KPI lên Server thành công!');
                 localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
+                window.dispatchEvent(new Event('taskflow_kpis_updated'));
              } else {
                 showToast('❌ Lỗi lưu KPI: ' + data.error);
              }
           } catch (e) {
              console.error(e);
              localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
+             window.dispatchEvent(new Event('taskflow_kpis_updated'));
              showToast('✅ Đã lưu cấu hình KPI (Local - Không kết nối được Server)!');
           }
        };

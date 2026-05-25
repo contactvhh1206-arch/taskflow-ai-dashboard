@@ -91,11 +91,28 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
        }, [facilityList, selectedMonth, refreshToggle, user, yearStr, monthStr]);
 
        const getTarget = (facName, isWeekend) => {
-          const savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');
-          const facilityKpi = Object.values(savedKpis).find(k => k.name === facName);
+          let kpiStr = localStorage.getItem('taskflow_facility_kpis');
+          let savedKpis = {};
+          if (kpiStr) {
+             let depth = 0;
+             let parsed = kpiStr;
+             while (typeof parsed === 'string' && depth < 5) {
+                try {
+                   parsed = JSON.parse(parsed);
+                   depth++;
+                } catch(e) {
+                   break;
+                }
+             }
+             if (typeof parsed === 'object' && parsed !== null) {
+                savedKpis = parsed;
+             }
+          }
+
+          const facilityKpi = Object.values(savedKpis).find(k => k?.name?.trim().toLowerCase() === facName?.trim().toLowerCase());
           
           if (facilityKpi) {
-             return isWeekend ? Number(facilityKpi.weekend_target) : Number(facilityKpi.weekday_target);
+             return isWeekend ? Number(facilityKpi.weekend_target || 8000000) : Number(facilityKpi.weekday_target || 5000000);
           }
           return isWeekend ? 8000000 : 5000000;
        };
@@ -171,7 +188,7 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
                                     {d}/{monthStr} ({dayLabel})
                                   </td>
                                   {visibleFacs.map(fac => {
-                                     const rev = dailyData[d][fac.name];
+                                     const rev = Number(dailyData[d][fac.name] || 0);
                                      const target = getTarget(fac.name, isWeekend);
                                      const isMet = rev >= target;
                                      const hasData = rev > 0;
@@ -191,7 +208,7 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
                                                    Target KPI: {new Intl.NumberFormat('vi-VN').format(target)}<br/>
                                                    Thực tế: {new Intl.NumberFormat('vi-VN').format(rev)}<br/>
                                                    <span className={isMet ? 'text-green-400' : 'text-red-400'}>
-                                                     {isMet ? '✅ Vượt chỉ tiêu' : '❌ Chưa đạt'}
+                                                     {isMet ? '✅ Vượt chỉ tiêu' : `🔴 Chưa đạt (${new Intl.NumberFormat('vi-VN').format(rev)} < ${new Intl.NumberFormat('vi-VN').format(target)})`}
                                                    </span>
                                                 </div>
                                              )}
