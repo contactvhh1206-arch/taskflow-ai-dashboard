@@ -162,12 +162,12 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
                      </tr>
                    </thead>
                    <tbody>
-                     {weeklyData.map(week => (
+                     {weeklyData.map((week, index) => (
                         <React.Fragment key={`week-${week.id}`}>
                            <tr onClick={() => setExpandedWeeks(prev => ({...prev, [week.id]: !prev[week.id]}))} className="cursor-pointer bg-orange-500 hover:bg-orange-600 dark:bg-[#d95d1e] dark:hover:bg-[#c24f15] text-white transition-colors group select-none">
                               <td className="px-1 md:px-4 py-1.5 md:py-3 border border-orange-600 dark:border-orange-800 font-bold sticky left-0 z-10 bg-orange-500 group-hover:bg-orange-600 dark:bg-[#d95d1e] dark:group-hover:bg-[#c24f15] whitespace-nowrap text-left transition-colors text-[10px] md:text-sm">
                                  <div className="flex items-center justify-between">
-                                    <span>{week.label}</span>
+                                    <span>T{index + 1} ({String(week.start).padStart(2,'0')}-{String(week.end).padStart(2,'0')})</span>
                                     <span className="material-symbols-outlined text-[14px] md:text-[18px]">{expandedWeeks[week.id] ? 'expand_less' : 'expand_more'}</span>
                                  </div>
                               </td>
