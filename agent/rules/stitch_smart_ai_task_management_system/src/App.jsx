@@ -277,7 +277,7 @@ function MainDashboard() {
         { id: 'f3', name: 'DUBAI PA', is_active: true },
         { id: 'f4', name: 'DUBAI PAK', is_active: true },
         { id: 'f5', name: 'DUBAI PAV', is_active: true },
-        { id: 'f6', name: 'DUBAI PHU QUOC', is_active: true }
+        { id: 'f6', name: 'DUBAI PQ', is_active: true }
       ];
       localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
     }
@@ -1270,6 +1270,39 @@ export default function AppContainer() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Migration script to normalize DUBAI PHÚ QUỐC to DUBAI PQ
+    try {
+       // 1. taskflow_facilities
+       let facs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
+       let facsChanged = false;
+       facs = facs.map(f => {
+          if (f.name === 'DUBAI PHÚ QUỐC' || f.name === 'DUBAI PHU QUOC') {
+             facsChanged = true;
+             return { ...f, name: 'DUBAI PQ' };
+          }
+          return f;
+       });
+       if (facsChanged) localStorage.setItem('taskflow_facilities', JSON.stringify(facs));
+
+       // 2. taskflow_users
+       let users = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+       let usersChanged = false;
+       users = users.map(u => {
+          if (u.facility_name === 'DUBAI PHÚ QUỐC' || u.facility_name === 'DUBAI PHU QUOC') {
+             usersChanged = true;
+             return { ...u, facility_name: 'DUBAI PQ' };
+          }
+          return u;
+       });
+       if (usersChanged) localStorage.setItem('taskflow_users', JSON.stringify(users));
+
+       // 3. Current session facility_id
+       let currFac = localStorage.getItem('facility_id');
+       if (currFac === 'DUBAI PHÚ QUỐC' || currFac === 'DUBAI PHU QUOC') {
+          localStorage.setItem('facility_id', 'DUBAI PQ');
+       }
+    } catch (e) { console.error('Migration error:', e); }
+
     let localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
     if (localFacs.length === 0) {
       localFacs = [
@@ -1278,7 +1311,7 @@ export default function AppContainer() {
         { id: 'f3', name: 'DUBAI PA', is_active: true },
         { id: 'f4', name: 'DUBAI PAK', is_active: true },
         { id: 'f5', name: 'DUBAI PAV', is_active: true },
-        { id: 'f6', name: 'DUBAI PHU QUOC', is_active: true }
+        { id: 'f6', name: 'DUBAI PQ', is_active: true }
       ];
       localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
     }
