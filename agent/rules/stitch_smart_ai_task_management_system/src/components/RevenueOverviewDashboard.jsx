@@ -79,26 +79,18 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                const facNames = facilityList.map(f => f.name).join(', ');
                const systemPrompt = `Bạn là trợ lý kế toán. Hãy quét file Excel được cung cấp và bóc tách số liệu doanh thu. Hãy KHỚP CHÍNH XÁC số liệu vào các chi nhánh hiện có sau đây của hệ thống: [${facNames}]. Tuyệt đối không tự bịa ra tên chi nhánh khác. Trả về đúng định dạng JSON: { "data": [ { "date": "YYYY-MM-DD", "revenues": { "TenChiNhanh": SỐ_TIỀN_INT } } ] }`;
                
-               const aiConfigStr = localStorage.getItem('taskflow_ai_config');
-               const aiConfig = aiConfigStr ? JSON.parse(aiConfigStr) : null;
-               
-               if (!aiConfig || !aiConfig.apiKey) {
-                  throw new Error("Hệ thống yêu cầu API Key. Vui lòng cấu hình tại Cài đặt Hệ thống.");
-               }
-               
-               const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+               const token = localStorage.getItem('taskflow_token');
+               const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/internal/extract-revenue-text', {
                   method: 'POST',
                   headers: {
-                     'Authorization': `Bearer ${aiConfig.apiKey}`,
+                     'Authorization': `Bearer ${token}`,
+                     'x-user-role': user?.role || '',
+                     'x-facility-id': user?.facility_id || '',
                      'Content-Type': 'application/json'
                   },
                   body: JSON.stringify({
-                     model: aiConfig.aiModel,
-                     messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: JSON.stringify(rawJsonData) }
-                     ],
-                     response_format: { type: 'json_object' }
+                     prompt: systemPrompt,
+                     content: JSON.stringify(rawJsonData)
                   })
                });
                
@@ -107,6 +99,14 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                }
                
                const responseJson = await response.json();
+               let parsedAiData = [];
+               
+               if (responseJson.success) {
+                   parsedAiData = responseJson.data;
+               } else {
+                   throw new Error(responseJson.error || "Lỗi xử lý AI.");
+               }
+
                if (responseJson.usage) {
                   fetch('https://taskflow-ai-dashboard.onrender.com/api/internal/log-tokens', {
                     method: 'POST',
@@ -122,19 +122,6 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                       total_tokens: responseJson.usage.total_tokens || 0
                     })
                   }).catch(e => console.error("Lỗi log token:", e));
-               }
-               let content = responseJson.choices[0].message.content;
-               
-               let parsedAiData = [];
-               try {
-                  if (content.startsWith('```json')) content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-                  else if (content.startsWith('```')) content = content.replace(/```/g, '').trim();
-                  
-                  const obj = JSON.parse(content);
-                  parsedAiData = obj.data || obj;
-                  if (!Array.isArray(parsedAiData)) parsedAiData = [parsedAiData];
-               } catch {
-                   setAiError('Không thể lấy lịch sử dữ liệu để phân tích doanh thu.');
                }
                
                setBatchData(parsedAiData);

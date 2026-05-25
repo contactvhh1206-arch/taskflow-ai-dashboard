@@ -803,6 +803,64 @@ app.post('/api/internal/extract-revenue', express.json({limit: '50mb'}), async (
   }
 });
 
+app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res) => {
+  try {
+    const { prompt, content } = req.body;
+    
+    if (!prompt || !content) {
+      return res.status(400).json({ error: 'Thiếu dữ liệu prompt hoặc nội dung.' });
+    }
+
+    const payload = {
+      model: "meta-llama/llama-3-8b-instruct",
+      messages: [
+        { role: "system", content: prompt },
+        { role: "user", content: content }
+      ],
+      response_format: { type: "json_object" }
+    };
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { 
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`, 
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://taskflow-ai-dashboard.onrender.com",
+        "X-Title": "Stitch Smart AI"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("OpenRouter Response Error:", errText);
+      return res.status(response.status).json({ error: 'Lỗi từ OpenRouter API.' });
+    }
+
+    const aiData = await response.json();
+    let parsedData = [];
+    
+    if (aiData.choices && aiData.choices.length > 0) {
+      const aiText = aiData.choices[0].message.content;
+      const jsonMatch = aiText.match(/\[[\s\S]*\]/) || aiText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedData = JSON.parse(jsonMatch[0]);
+        if (parsedData.data) parsedData = parsedData.data;
+        if (!Array.isArray(parsedData)) parsedData = [parsedData];
+      } else {
+         return res.status(500).json({ error: 'AI không trả về JSON hợp lệ.' });
+      }
+    }
+
+    // Trả về usage token để frontend log
+    res.json({ success: true, data: parsedData, usage: aiData.usage });
+
+  } catch (error) {
+    console.error('Lỗi khi gọi AI Extract API (Text):', error);
+    res.status(500).json({ error: 'Lỗi máy chủ nội bộ khi gọi AI API.' });
+  }
+});
+
 // ==============================================================================
 // 3. AI PING THẤU CẢM (EMPATHETIC PING) & TONE ESCALATION
 // ==============================================================================
@@ -968,7 +1026,13 @@ app.get('/api/reports', authenticateUser, async (req, res) => {
       return res.status(403).json({ error: 'Không đủ quyền xem báo cáo tài chính.' });
     }
     const { rows } = await pool.query('SELECT * FROM daily_financial_reports ORDER BY date DESC');
-    res.json({ success: true, data: rows });
+    const mappedRows = rows.map(r => ({
+      ...r,
+      totalRevenue: Number(r.total_revenue),
+      createdBy: r.created_by,
+      timestamp: Number(r.timestamp)
+    }));
+    res.json({ success: true, data: mappedRows });
   } catch (error) {
     console.error('Lỗi lấy báo cáo doanh thu:', error);
     res.status(500).json({ error: 'Lỗi server khi lấy doanh thu.' });
