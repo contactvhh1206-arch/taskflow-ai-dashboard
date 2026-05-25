@@ -300,7 +300,7 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                          type="month"
                          value={selectedMonth} 
                          onChange={e => setSelectedMonth(e.target.value)}
-                         className="flex-1 sm:flex-none min-w-[150px] bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-2 md:px-4 py-2 outline-none focus:border-teal-500 text-sm font-medium dark:text-white cursor-pointer hover:border-teal-400 transition-colors"
+                         className="flex-1 sm:flex-none min-w-[170px] bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-2 md:px-4 py-2 outline-none focus:border-teal-500 text-sm font-medium dark:text-white cursor-pointer hover:border-teal-400 transition-colors"
                       />
                     </div>
                 </div>
