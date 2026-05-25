@@ -8,6 +8,8 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
       const [recentLogs, setRecentLogs] = useState([]);
       const [timeFilter, setTimeFilter] = useState('today');
       const [isLoading, setIsLoading] = useState(false);
+      const [localFacFilter, setLocalFacFilter] = useState('ALL');
+      const [facilitiesList] = useState(() => JSON.parse(localStorage.getItem('taskflow_facilities') || '[]'));
 
       const handleRequestSupport = async (taskId) => {
         try {
@@ -66,10 +68,17 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
                }
                
                if (isDeptHead) {
-                  const tFacCode = (t?.facility || '').toLowerCase();
+                  const tFacCode = (t?.facility || t?.facilityId || '').toLowerCase();
                   const uName = (user?.username || '').toLowerCase();
                   const uNameFull = (user?.name || '').toLowerCase();
-                  return tFacCode.includes(uName) || tFacCode.includes(uNameFull) || t.department_id === deptId;
+                  let matchesDept = tFacCode.includes(uName) || tFacCode.includes(uNameFull) || t.department_id === deptId;
+                  if (!matchesDept) return false;
+                  
+                  if (localFacFilter && localFacFilter !== 'ALL') {
+                      const filterLower = localFacFilter.toLowerCase();
+                      return tFacCode.includes(filterLower) || (t?.department_id || '').toLowerCase().includes(filterLower);
+                  }
+                  return true;
                }
                
                if (!t || !t.facilityId) return false;
@@ -193,7 +202,7 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
         }, 600); // Simulate API latency
 
         return () => clearTimeout(timer);
-      }, [tasks, user, timeFilter, user?.facility_id, user?.facility_name, globalFacilityFilter]);
+      }, [tasks, user, timeFilter, user?.facility_id, user?.facility_name, globalFacilityFilter, localFacFilter]);
       if (isLoading) {
         return (
           <div className="space-y-6 animate-fade-in">
@@ -231,8 +240,22 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
               </p>
             </div>
 
-            {/* Segmented Control: Time Filter */}
-            <div className="flex items-center bg-surface-container-high dark:bg-[#252525] rounded-lg p-1 w-fit shadow-inner border border-outline-variant dark:border-gray-800">
+            <div className="flex items-center gap-3">
+              {['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) && (
+                <div className="relative flex items-center shadow-inner">
+                   <select 
+                     value={localFacFilter} 
+                     onChange={(e) => setLocalFacFilter(e.target.value)}
+                     className="pl-3 pr-8 py-1.5 bg-surface-container-high dark:bg-[#252525] border border-outline-variant dark:border-gray-800 rounded-lg text-sm font-medium focus:ring-2 focus:ring-primary outline-none appearance-none transition-all dark:text-white"
+                   >
+                     <option value="ALL">Tất cả Cơ sở / Phòng ban</option>
+                     {facilitiesList.map(f => <option key={f.id || f.facility_id} value={f.id || f.facility_id}>{f.name || f.facility_id}</option>)}
+                   </select>
+                   <span className="material-symbols-outlined absolute right-2 text-gray-500 pointer-events-none text-[18px]">expand_more</span>
+                </div>
+              )}
+              {/* Segmented Control: Time Filter */}
+              <div className="flex items-center bg-surface-container-high dark:bg-[#252525] rounded-lg p-1 w-fit shadow-inner border border-outline-variant dark:border-gray-800">
               <button
                 onClick={() => setTimeFilter('today')}
                 className={`px-5 py-1.5 text-sm font-medium rounded-md transition-all duration-300 ${timeFilter === 'today'
