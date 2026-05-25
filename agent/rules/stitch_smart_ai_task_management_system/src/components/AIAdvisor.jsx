@@ -160,7 +160,6 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
          
          if (isForbidden) {
            responseContent = `Xin lỗi, tôi là Cố vấn AI riêng của cơ sở ${facilityName || 'này'}. Tôi bị hạn chế quyền truy cập và KHÔNG ĐƯỢC PHÉP cung cấp thông tin của các cơ sở khác hay phòng ban khác. Yêu cầu truy cập trái phép này đã được ghi nhận và gửi về Ban Giám Đốc.`;
-           // Log the violation
            try {
              const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
              violations.push({
@@ -172,7 +171,9 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
                status: 'Violation'
              });
              localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
-           } catch(e) {}
+           } catch {
+             // Ignore localStorage errors
+           }
            
            setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
            setIsTyping(false);
