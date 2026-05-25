@@ -76,8 +76,8 @@ export default function ChangePasswordModal({ user, onClose, onSuccess }) {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'x-user-role': user.role,
-          'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+          'x-user-role': encodeURIComponent(user?.role || ''),
+          'x-facility-id': encodeURIComponent(localStorage.getItem('facility_id') || user.facility_id || 'ALL')
         },
         body: JSON.stringify({
           username: effectiveUsername,

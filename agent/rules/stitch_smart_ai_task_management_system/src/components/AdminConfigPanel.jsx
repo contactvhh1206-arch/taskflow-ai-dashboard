@@ -74,8 +74,8 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                        method: 'DELETE',
                        headers: {
                            'Content-Type': 'application/json',
-                           'x-user-role': user.role,
-                           'x-facility-id': localStorage.getItem('facility_id') || 'ALL'
+                           'x-user-role': encodeURIComponent(user?.role || ''),
+                           'x-facility-id': encodeURIComponent(localStorage.getItem('facility_id') || 'ALL')
                        }
                    });
                    if (!res.ok) {

@@ -15,8 +15,8 @@ export default function FacilityDashboard({ user, tasks, onNavigate, onOpenTask,
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
-              'x-user-role': user?.role,
-              'x-facility-id': localStorage.getItem('facility_id') || user?.facility_id || 'ALL'
+              'x-user-role': encodeURIComponent(user?.role),
+              'x-facility-id': encodeURIComponent(localStorage.getItem('facility_id') || user?.facility_id || 'ALL')
             }
           });
           if (!res.ok) throw new Error('API Error');
