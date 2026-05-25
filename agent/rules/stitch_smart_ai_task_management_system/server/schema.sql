@@ -37,7 +37,7 @@ CREATE TABLE tasks (
     description TEXT,
     status VARCHAR(50) DEFAULT 'todo', -- todo, in_progress, review, done
     urgency BOOLEAN DEFAULT FALSE,
-    deadline DATE,
+    deadline TIMESTAMP,
     pic_id INT REFERENCES users(id), -- Người phụ trách (Person In Charge)
     facility_id INT REFERENCES facilities(id) NOT NULL, -- Task thuộc cơ sở nào
     created_by INT REFERENCES users(id),

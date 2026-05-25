@@ -33,6 +33,7 @@ const initDB = async () => {
     await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS address VARCHAR(255)`);
     await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS pic VARCHAR(255)`);
     await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS needs_support BOOLEAN DEFAULT false`);
+    await pool.query(`ALTER TABLE tasks ALTER COLUMN deadline TYPE TIMESTAMP USING deadline::TIMESTAMP`);
     await pool.query(`CREATE TABLE IF NOT EXISTS daily_logs (
       id SERIAL PRIMARY KEY,
       org_unit VARCHAR(255),
