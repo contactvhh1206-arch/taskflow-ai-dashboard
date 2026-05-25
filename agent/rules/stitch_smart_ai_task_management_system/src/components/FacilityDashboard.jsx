@@ -453,7 +453,11 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
 
               {/* AI Advisor for Facility */}
               <div className="mt-6 h-[600px] flex flex-col">
-                 <AIAdvisor user={user} isFacilityMode={true} facilityName={localStorage.getItem('facility_name') || user?.facilityName || 'bạn'} />
+                 <AIAdvisor 
+                   user={user} 
+                   isFacilityMode={!['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)} 
+                   facilityName={['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) ? '' : (localStorage.getItem('facility_name') || user?.facilityName || 'bạn')} 
+                 />
               </div>
             </>
           )}
