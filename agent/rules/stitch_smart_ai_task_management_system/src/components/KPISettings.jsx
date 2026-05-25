@@ -201,23 +201,23 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
                    </h2>
                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Cấu hình doanh thu kỳ vọng cho Ngày thường và Cuối tuần</p>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Áp dụng từ:</span>
-                       <select 
-                          value={applyMonth} 
-                          onChange={e => setApplyMonth(e.target.value)}
-                          className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg pl-3 pr-8 py-1.5 min-w-[100px] outline-none focus:border-teal-500 text-sm font-medium dark:text-white"
-                       >
-                          <option value={applyMonth}>{applyMonth}</option>
-                       </select>
-                    </div>
-                   <button onClick={() => setShowAddFacModal(true)} className="bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
-                      <span className="material-symbols-outlined text-[18px]">add</span> Thêm Cơ Sở Mới
-                   </button>
-                   <button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
-                      <span className="material-symbols-outlined text-[18px]">save</span> Lưu Cấu Hình
-                   </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
+                     <div className="flex items-center justify-between sm:justify-start gap-2 mb-2 sm:mb-0">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Áp dụng từ:</span>
+                        <select 
+                           value={applyMonth} 
+                           onChange={e => setApplyMonth(e.target.value)}
+                           className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg pl-3 pr-8 py-1.5 min-w-[120px] outline-none focus:border-teal-500 text-sm font-medium dark:text-white"
+                        >
+                           <option value={applyMonth}>{applyMonth}</option>
+                        </select>
+                     </div>
+                    <button onClick={() => setShowAddFacModal(true)} className="bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 px-4 py-2 rounded-lg text-sm font-medium flex justify-center items-center gap-2 transition-colors whitespace-nowrap w-full sm:w-auto">
+                       <span className="material-symbols-outlined text-[18px]">add</span> Thêm Cơ Sở Mới
+                    </button>
+                    <button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex justify-center items-center gap-2 transition-colors whitespace-nowrap w-full sm:w-auto">
+                       <span className="material-symbols-outlined text-[18px]">save</span> Lưu Cấu Hình
+                    </button>
                 </div>
              </div>
 
