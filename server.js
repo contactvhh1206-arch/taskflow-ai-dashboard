@@ -62,6 +62,11 @@ const initDB = async () => {
       updated_by VARCHAR(255),
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS system_config (
+      key VARCHAR(255) PRIMARY KEY,
+      data JSONB,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
     // Seed roles
     const roles = ['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'FACILITY_MANAGER', 'ADMIN'];
     for (const role of roles) {
@@ -1131,6 +1136,53 @@ app.post('/api/kpi', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error('Lỗi lưu cấu hình KPI:', error);
     res.status(500).json({ error: 'Lỗi server khi lưu cấu hình KPI.' });
+  }
+});
+
+// ==============================================================================
+// SYSTEM CONFIG API
+// ==============================================================================
+app.get('/api/config', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM system_config');
+    const configData = {};
+    rows.forEach(row => { configData[row.key] = row.data; });
+    res.json({ success: true, data: configData });
+  } catch (error) {
+    console.error('Lỗi tải system config:', error);
+    res.status(500).json({ error: 'Lỗi server khi tải cấu hình.' });
+  }
+});
+
+app.post('/api/config', authenticateUser, async (req, res) => {
+  try {
+    const { role } = req.user || {};
+    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+       return res.status(403).json({ error: 'Không có quyền lưu cấu hình hệ thống.' });
+    }
+    
+    const { ai_config, system_prompts } = req.body;
+    
+    if (ai_config) {
+      await pool.query(`
+        INSERT INTO system_config (key, data, updated_at) 
+        VALUES ($1, $2, NOW()) 
+        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+      `, ['taskflow_ai_config', JSON.stringify(ai_config)]);
+    }
+    
+    if (system_prompts) {
+      await pool.query(`
+        INSERT INTO system_config (key, data, updated_at) 
+        VALUES ($1, $2, NOW()) 
+        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+      `, ['taskflow_system_prompts', JSON.stringify(system_prompts)]);
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Lỗi lưu system config:', error);
+    res.status(500).json({ error: 'Lỗi server khi lưu cấu hình hệ thống.' });
   }
 });
 

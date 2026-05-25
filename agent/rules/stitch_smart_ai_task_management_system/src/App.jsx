@@ -340,7 +340,29 @@ function MainDashboard() {
     }
   };
 
+  const fetchSystemConfig = async () => {
+    try {
+      const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/config');
+      const data = await res.json();
+      if (data.success && data.data) {
+        if (data.data.taskflow_ai_config) {
+          let parsed = data.data.taskflow_ai_config;
+          if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+          localStorage.setItem('taskflow_ai_config', JSON.stringify(parsed));
+        }
+        if (data.data.taskflow_system_prompts) {
+          let parsed = data.data.taskflow_system_prompts;
+          if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+          localStorage.setItem('taskflow_system_prompts', JSON.stringify(parsed));
+        }
+      }
+    } catch (e) {
+      console.error('Lỗi lấy system config từ server:', e);
+    }
+  };
+
   useEffect(() => {
+    fetchSystemConfig();
     fetchFacilities();
     fetchKPIs();
   }, []);
@@ -1459,6 +1481,7 @@ export default function AppContainer() {
     }
     localStorage.setItem('taskflow_auth', JSON.stringify({ token, user: userData }));
     setUser(userData);
+    fetchSystemConfig();
     fetchKPIs();
   };
 

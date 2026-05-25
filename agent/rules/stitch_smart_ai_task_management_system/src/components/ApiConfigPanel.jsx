@@ -71,26 +71,44 @@ export default function ApiConfigPanel({ showToast }) {
         if (savedPrompts) setPrompts({ ...DEFAULT_PROMPTS, ...savedPrompts });
       }, []);
 
-      const handleSave = (e) => {
+      const handleSave = async (e) => {
         e.preventDefault();
         setIsSaving(true);
-        setTimeout(() => {
-          const cleanModel = aiModel.trim();
-          setAiModel(cleanModel);
-          localStorage.setItem('taskflow_ai_config', JSON.stringify({ apiKey, aiModel: cleanModel, webhookUrl }));
+        const cleanModel = aiModel.trim();
+        setAiModel(cleanModel);
+        
+        const aiConfigPayload = { apiKey, aiModel: cleanModel, webhookUrl };
+        localStorage.setItem('taskflow_ai_config', JSON.stringify(aiConfigPayload));
 
-          const finalPrompts = {
-            autoTask: prompts.autoTask?.trim() || DEFAULT_PROMPTS.autoTask,
-            empatheticPing: prompts.empatheticPing?.trim() || DEFAULT_PROMPTS.empatheticPing,
-            advisorReport: prompts.advisorReport?.trim() || DEFAULT_PROMPTS.advisorReport
-          };
-          setPrompts(finalPrompts);
-          localStorage.setItem('taskflow_system_prompts', JSON.stringify(finalPrompts));
+        const finalPrompts = {
+          autoTask: prompts.autoTask?.trim() || DEFAULT_PROMPTS.autoTask,
+          empatheticPing: prompts.empatheticPing?.trim() || DEFAULT_PROMPTS.empatheticPing,
+          advisorReport: prompts.advisorReport?.trim() || DEFAULT_PROMPTS.advisorReport
+        };
+        setPrompts(finalPrompts);
+        localStorage.setItem('taskflow_system_prompts', JSON.stringify(finalPrompts));
 
-          setIsSaving(false);
-          if (showToast) showToast('✅ Lưu cấu hình và System Prompts thành công!');
-          console.log('[SYSTEM] Reloading AI Instance with new config...');
-        }, 800);
+        try {
+           const token = localStorage.getItem('taskflow_token');
+           const authStr = localStorage.getItem('taskflow_auth');
+           const auth = authStr ? JSON.parse(authStr) : null;
+           const user = auth ? auth.user : null;
+           await fetch('https://taskflow-ai-dashboard.onrender.com/api/config', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token || (auth ? auth.token : '')}`,
+                'x-user-role': user?.role || ''
+              },
+              body: JSON.stringify({ ai_config: aiConfigPayload, system_prompts: finalPrompts })
+           });
+        } catch (err) {
+           console.error("Lỗi đồng bộ cấu hình AI:", err);
+        }
+
+        setIsSaving(false);
+        if (showToast) showToast('✅ Lưu cấu hình và System Prompts thành công!');
+        console.log('[SYSTEM] Reloading AI Instance with new config...');
       };
 
       const handleRestore = (key) => {
