@@ -77,7 +77,7 @@ export default function RevenueLog({ user, showToast }) {
         loadReports();
         closeEditModal();
       }
-    } catch(e) {
+    } catch {
       if (showToast) showToast('Lỗi khi lưu dữ liệu!', 'error');
     }
   };

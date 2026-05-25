@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function ApiConfigPanel({ showToast }) {
       const [apiKey, setApiKey] = useState('');

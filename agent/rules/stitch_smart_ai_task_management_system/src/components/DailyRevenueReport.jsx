@@ -101,7 +101,7 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
         localStorage.setItem('taskflow_daily_financial_reports', JSON.stringify(allReports));
         
         if (showToast) showToast('Đã lưu Báo cáo Doanh thu thành công!', 'success');
-      } catch(e) {
+      } catch {
         if (showToast) showToast('Có lỗi xảy ra khi lưu!', 'error');
       } finally {
         setIsSaving(false);

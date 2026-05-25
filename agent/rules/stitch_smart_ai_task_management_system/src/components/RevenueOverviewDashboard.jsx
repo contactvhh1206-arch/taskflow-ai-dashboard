@@ -133,8 +133,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                   const obj = JSON.parse(content);
                   parsedAiData = obj.data || obj;
                   if (!Array.isArray(parsedAiData)) parsedAiData = [parsedAiData];
-               } catch(e) {
-                  throw new Error("AI trả về sai format JSON.");
+               } catch {
+                   setAiError('Không thể lấy lịch sử dữ liệu để phân tích doanh thu.');
                }
                
                setBatchData(parsedAiData);

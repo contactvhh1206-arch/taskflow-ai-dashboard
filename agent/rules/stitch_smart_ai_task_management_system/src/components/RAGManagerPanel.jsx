@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function RAGManagerPanel({ showToast }) {
       const [documents, setDocuments] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('taskflow_rag_docs') || '[]'); } catch(e) { return []; }
+        try { return JSON.parse(localStorage.getItem('taskflow_rag_docs') || '[]'); } catch { return []; }
       });
       const [isDragging, setIsDragging] = useState(false);
       const [isUploading, setIsUploading] = useState(false);

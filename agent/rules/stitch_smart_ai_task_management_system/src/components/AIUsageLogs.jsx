@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function AIUsageLogs() {
       const [logs, setLogs] = useState([]);
@@ -13,7 +13,7 @@ export default function AIUsageLogs() {
             uMap[u.id] = `${u.name} (${u.username})`;
           });
           setUsersMap(uMap);
-        } catch(e) {}
+        } catch {}
         
         const getName = (id, fallback) => uMap[id] || fallback;
 
@@ -29,7 +29,7 @@ export default function AIUsageLogs() {
         try {
           const v = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
           setViolations(v.sort((a, b) => b.timestamp < a.timestamp ? -1 : 1));
-        } catch(e) {}
+        } catch {}
       }, []);
 
       const getMappedName = (id, fallback) => usersMap[id] || fallback;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 export default function AIBatchPreviewModal({ data, onCancel, onConfirm, facilities }) {
        return (

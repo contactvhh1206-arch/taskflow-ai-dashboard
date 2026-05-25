@@ -1,5 +1,4 @@
-import React, { useState, useContext } from 'react';
-import { AuthContext } from '../App.jsx';
+import React, { useState } from 'react';
 
 export default function AITaskModal({ onClose, onConfirm, user }) {
   const [text, setText] = useState('');
