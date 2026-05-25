@@ -242,16 +242,15 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
 
             <div className="flex items-center gap-3">
               {['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) && (
-                <div className="relative flex items-center shadow-inner">
+                <div className="relative flex items-center">
                    <select 
                      value={localFacFilter} 
                      onChange={(e) => setLocalFacFilter(e.target.value)}
-                     className="pl-3 pr-8 py-1.5 bg-surface-container-high dark:bg-[#252525] border border-outline-variant dark:border-gray-800 rounded-lg text-sm font-medium focus:ring-2 focus:ring-primary outline-none appearance-none transition-all dark:text-white"
+                     className="px-3 py-1.5 bg-surface-container-high dark:bg-[#252525] border border-outline-variant dark:border-gray-800 rounded-lg text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white cursor-pointer"
                    >
                      <option value="ALL">Tất cả Cơ sở / Phòng ban</option>
                      {facilitiesList.map(f => <option key={f.id || f.facility_id} value={f.id || f.facility_id}>{f.name || f.facility_id}</option>)}
                    </select>
-                   <span className="material-symbols-outlined absolute right-2 text-gray-500 pointer-events-none text-[18px]">expand_more</span>
                 </div>
               )}
               {/* Segmented Control: Time Filter */}
