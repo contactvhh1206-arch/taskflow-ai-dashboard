@@ -342,18 +342,20 @@ function MainDashboard() {
 
   const fetchSystemConfig = async () => {
     try {
-      const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/config');
+      const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/logs');
       const data = await res.json();
       if (data.success && data.data) {
-        if (data.data.taskflow_ai_config) {
-          let parsed = data.data.taskflow_ai_config;
-          if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-          localStorage.setItem('taskflow_ai_config', JSON.stringify(parsed));
-        }
-        if (data.data.taskflow_system_prompts) {
-          let parsed = data.data.taskflow_system_prompts;
-          if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-          localStorage.setItem('taskflow_system_prompts', JSON.stringify(parsed));
+        const configLog = data.data.find(log => log.entry_type === 'SYSTEM_CONFIG');
+        if (configLog && configLog.content) {
+           let content = configLog.content;
+           if (typeof content === 'string') content = JSON.parse(content);
+           
+           if (content.ai_config) {
+             localStorage.setItem('taskflow_ai_config', JSON.stringify(content.ai_config));
+           }
+           if (content.system_prompts) {
+             localStorage.setItem('taskflow_system_prompts', JSON.stringify(content.system_prompts));
+           }
         }
       }
     } catch (e) {

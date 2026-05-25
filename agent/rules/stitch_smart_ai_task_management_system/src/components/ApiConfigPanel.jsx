@@ -89,18 +89,16 @@ export default function ApiConfigPanel({ showToast }) {
         localStorage.setItem('taskflow_system_prompts', JSON.stringify(finalPrompts));
 
         try {
-           const token = localStorage.getItem('taskflow_token');
-           const authStr = localStorage.getItem('taskflow_auth');
-           const auth = authStr ? JSON.parse(authStr) : null;
-           const user = auth ? auth.user : null;
-           await fetch('https://taskflow-ai-dashboard.onrender.com/api/config', {
+           await fetch('https://taskflow-ai-dashboard.onrender.com/api/logs', {
               method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token || (auth ? auth.token : '')}`,
-                'x-user-role': user?.role || ''
-              },
-              body: JSON.stringify({ ai_config: aiConfigPayload, system_prompts: finalPrompts })
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                org_unit: 'SYSTEM',
+                entry_type: 'SYSTEM_CONFIG',
+                date: new Date().toISOString().split('T')[0],
+                display_time: new Date().toLocaleTimeString('vi-VN'),
+                content: { ai_config: aiConfigPayload, system_prompts: finalPrompts } 
+              })
            });
         } catch (err) {
            console.error("Lỗi đồng bộ cấu hình AI:", err);
