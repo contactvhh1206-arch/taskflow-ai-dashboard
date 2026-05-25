@@ -65,9 +65,10 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
 
        const handleSave = async () => {
           const dataToSave = {};
-          Object.values(kpis).forEach(k => {
-             dataToSave[k.facility_id] = {
+          Object.entries(kpis).forEach(([facId, k]) => {
+             dataToSave[facId] = {
                 ...k,
+                facility_id: facId,
                 apply_month: applyMonth,
                 updated_at: Date.now(),
                 updated_by: user.name
