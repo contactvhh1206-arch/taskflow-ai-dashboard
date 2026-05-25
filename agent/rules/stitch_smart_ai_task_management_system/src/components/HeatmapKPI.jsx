@@ -148,14 +148,14 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
              </div>
              
              <div className="overflow-auto custom-scrollbar relative max-h-[500px] border border-gray-200 dark:border-gray-700 rounded-lg">
-                <table className="w-full text-sm text-center border-collapse min-w-[800px]">
-                   <thead className="bg-gray-100 dark:bg-[#252525] sticky top-0 z-20 shadow-sm text-xs md:text-sm">
+                <table className="w-full text-xs md:text-sm text-center border-collapse min-w-full md:min-w-[800px]">
+                   <thead className="bg-gray-100 dark:bg-[#252525] sticky top-0 z-20 shadow-sm text-[10px] md:text-sm">
                      <tr>
-                       <th className="px-2 md:px-4 py-3 border border-gray-200 dark:border-gray-700 font-bold sticky left-0 bg-gray-100 dark:bg-[#252525] z-30 w-[70px] min-w-[70px] md:min-w-[120px]">
+                       <th className="px-1 md:px-4 py-2 md:py-3 border border-gray-200 dark:border-gray-700 font-bold sticky left-0 bg-gray-100 dark:bg-[#252525] z-30 w-[45px] min-w-[45px] md:min-w-[120px]">
                          Ngày
                        </th>
                        {visibleFacs.map(fac => (
-                         <th key={fac.name} className="px-2 md:px-4 py-3 border border-gray-200 dark:border-gray-700 font-bold min-w-[90px] md:min-w-[120px]">
+                         <th key={fac.name} className="px-0.5 md:px-4 py-2 md:py-3 border border-gray-200 dark:border-gray-700 font-bold min-w-[40px] md:min-w-[120px]">
                            {fac.name.replace('DUBAI ', '')}
                          </th>
                        ))}
@@ -165,14 +165,14 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
                      {weeklyData.map(week => (
                         <React.Fragment key={`week-${week.id}`}>
                            <tr onClick={() => setExpandedWeeks(prev => ({...prev, [week.id]: !prev[week.id]}))} className="cursor-pointer bg-orange-500 hover:bg-orange-600 dark:bg-[#d95d1e] dark:hover:bg-[#c24f15] text-white transition-colors group select-none">
-                              <td className="px-4 py-3 border border-orange-600 dark:border-orange-800 font-bold sticky left-0 z-10 bg-orange-500 group-hover:bg-orange-600 dark:bg-[#d95d1e] dark:group-hover:bg-[#c24f15] whitespace-nowrap text-left transition-colors">
+                              <td className="px-1 md:px-4 py-1.5 md:py-3 border border-orange-600 dark:border-orange-800 font-bold sticky left-0 z-10 bg-orange-500 group-hover:bg-orange-600 dark:bg-[#d95d1e] dark:group-hover:bg-[#c24f15] whitespace-nowrap text-left transition-colors text-[10px] md:text-sm">
                                  <div className="flex items-center justify-between">
                                     <span>{week.label}</span>
-                                    <span className="material-symbols-outlined text-[18px]">{expandedWeeks[week.id] ? 'expand_less' : 'expand_more'}</span>
+                                    <span className="material-symbols-outlined text-[14px] md:text-[18px]">{expandedWeeks[week.id] ? 'expand_less' : 'expand_more'}</span>
                                  </div>
                               </td>
                               {visibleFacs.map(fac => (
-                                 <td key={`week-sum-${fac.name}`} className="px-4 py-3 border border-orange-600 dark:border-orange-800 font-bold">
+                                 <td key={`week-sum-${fac.name}`} className="px-0.5 md:px-4 py-1.5 md:py-3 border border-orange-600 dark:border-orange-800 font-bold text-[10px] md:text-sm">
                                      {week.sums[fac.name] > 0 ? new Intl.NumberFormat('vi-VN').format(week.sums[fac.name]) : '-'}
                                  </td>
                               ))}
@@ -185,7 +185,7 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
                               
                               return (
                                 <tr key={d}>
-                                  <td className={`px-1 md:px-4 py-2 border border-gray-200 dark:border-gray-700 font-medium sticky left-0 z-10 whitespace-nowrap text-xs md:text-sm ${isWeekend ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' : 'bg-gray-50 dark:bg-[#1a1a1a]'}`}>
+                                  <td className={`px-0.5 md:px-4 py-1.5 md:py-2 border border-gray-200 dark:border-gray-700 font-medium sticky left-0 z-10 whitespace-nowrap text-[10px] md:text-sm ${isWeekend ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400' : 'bg-gray-50 dark:bg-[#1a1a1a]'}`}>
                                     {d}/{monthStr} ({dayLabel})
                                   </td>
                                   {visibleFacs.map(fac => {
@@ -200,7 +200,7 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
                                      }
 
                                      return (
-                                       <td key={fac.name} className={`px-4 py-2 border border-gray-200 dark:border-gray-700 transition-colors ${bgColorClass}`}>
+                                       <td key={fac.name} className={`px-0.5 md:px-4 py-1.5 md:py-2 border border-gray-200 dark:border-gray-700 transition-colors ${bgColorClass} text-[10px] md:text-sm`}>
                                           <div className="flex flex-col items-center group relative cursor-pointer">
                                              <span>{hasData ? new Intl.NumberFormat('vi-VN').format(rev) : '-'}</span>
                                              {hasData && (
