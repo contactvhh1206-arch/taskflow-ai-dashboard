@@ -68,9 +68,9 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                localStorage.removeItem('taskflow_tasks');
                localStorage.removeItem('taskflow_checkins');
                
-               // 2. GỌI API ĐỂ XÓA SẠCH TASK TRONG POSTGRESQL (Backend)
+               // 2. GỌI API ĐỂ XÓA SẠCH DỮ LIỆU TRONG POSTGRESQL (Backend)
                try {
-                   const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks/all', {
+                   const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/system/reset', {
                        method: 'DELETE',
                        headers: {
                            'Content-Type': 'application/json',
@@ -79,10 +79,10 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                        }
                    });
                    if (!res.ok) {
-                       console.error("Failed to delete tasks on backend");
+                       console.error("Failed to reset system on backend");
                    }
                } catch (e) {
-                   console.error("Lỗi gọi API xóa tasks:", e);
+                   console.error("Lỗi gọi API reset system:", e);
                }
                
                // Purge Service Workers (Mock API interceptors)
