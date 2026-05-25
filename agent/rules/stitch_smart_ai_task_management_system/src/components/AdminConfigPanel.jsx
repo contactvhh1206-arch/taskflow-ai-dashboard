@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ErrorBoundary } from '../App.jsx';
 
 const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'];
@@ -74,7 +74,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                        method: 'DELETE',
                        headers: {
                            'Content-Type': 'application/json',
-                           'x-user-role': encodeURIComponent(user.role || ''),
+                           'x-user-role': user.role,
                            'x-facility-id': localStorage.getItem('facility_id') || 'ALL'
                        }
                    });
