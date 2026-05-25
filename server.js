@@ -712,7 +712,7 @@ Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" 
       method: "POST",
       headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "meta-llama/llama-3-8b-instruct",
+        model: "google/gemini-2.5-flash",
         messages: [ { role: "system", content: systemPrompt }, { role: "user", content: meetingTranscript } ],
         response_format: { type: "json_object" }
       })
@@ -826,7 +826,7 @@ app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res
     }
 
     const payload = {
-      model: "meta-llama/llama-3-8b-instruct",
+      model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: prompt },
         { role: "user", content: content }
@@ -944,7 +944,7 @@ app.post('/api/ai/ping', authenticateUser, async (req, res) => {
       method: "POST",
       headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "meta-llama/llama-3-8b-instruct",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt }
         ]
