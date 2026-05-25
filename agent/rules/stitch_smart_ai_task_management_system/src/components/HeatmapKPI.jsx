@@ -149,14 +149,14 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
              
              <div className="overflow-auto custom-scrollbar relative max-h-[500px] border border-gray-200 dark:border-gray-700 rounded-lg">
                 <table className="w-full text-sm text-center border-collapse min-w-[800px]">
-                   <thead className="bg-gray-100 dark:bg-[#252525] sticky top-0 z-20 shadow-sm">
+                   <thead className="bg-gray-100 dark:bg-[#252525] sticky top-0 z-20 shadow-sm text-xs md:text-sm">
                      <tr>
-                       <th className="px-4 py-3 border border-gray-200 dark:border-gray-700 font-bold sticky left-0 bg-gray-100 dark:bg-[#252525] z-30 min-w-[120px]">
+                       <th className="px-2 md:px-4 py-3 border border-gray-200 dark:border-gray-700 font-bold sticky left-0 bg-gray-100 dark:bg-[#252525] z-30 w-[70px] min-w-[70px] md:min-w-[120px]">
                          Ngày
                        </th>
                        {visibleFacs.map(fac => (
-                         <th key={fac.name} className="px-4 py-3 border border-gray-200 dark:border-gray-700 font-bold">
-                           {fac.name}
+                         <th key={fac.name} className="px-2 md:px-4 py-3 border border-gray-200 dark:border-gray-700 font-bold min-w-[90px] md:min-w-[120px]">
+                           {fac.name.replace('DUBAI ', '')}
                          </th>
                        ))}
                      </tr>
