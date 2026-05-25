@@ -308,8 +308,10 @@ function MainDashboard() {
 
   const fetchKPIs = async () => {
     try {
-      const token = localStorage.getItem('taskflow_token');
-      if (!token) return;
+      const authStr = localStorage.getItem('taskflow_auth');
+      const auth = authStr ? JSON.parse(authStr) : null;
+      const token = auth ? auth.token : '';
+      
       const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/kpi', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
