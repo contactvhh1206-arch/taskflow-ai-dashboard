@@ -311,9 +311,14 @@ function MainDashboard() {
       const authStr = localStorage.getItem('taskflow_auth');
       const auth = authStr ? JSON.parse(authStr) : null;
       const token = auth ? auth.token : '';
+      const user = auth ? auth.user : null;
       
       const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/kpi', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'x-user-role': user?.role || '',
+          'x-facility-id': user?.facility_id || ''
+        }
       });
       const responseJson = await res.json();
       if (responseJson.success && responseJson.data && responseJson.data.data) {
@@ -1454,6 +1459,7 @@ export default function AppContainer() {
     }
     localStorage.setItem('taskflow_auth', JSON.stringify({ token, user: userData }));
     setUser(userData);
+    fetchKPIs();
   };
 
   const logout = () => {
