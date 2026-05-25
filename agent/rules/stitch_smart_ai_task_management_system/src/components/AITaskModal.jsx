@@ -24,7 +24,7 @@ export default function AITaskModal({ onClose, onConfirm, user }) {
         },
         body: JSON.stringify({
           meetingTranscript: text,
-          facilityId: user.facility_id || 'HQ'
+          facilityId: localStorage.getItem('facility_id') || user.facility_id || 'HQ'
         })
       });
 
@@ -53,7 +53,7 @@ export default function AITaskModal({ onClose, onConfirm, user }) {
         deadline: task.deadline || new Date().toISOString().split('T')[0],
         status: 'todo', // Gán mặc định status: "Cần làm"
         urgent: task.priority_level === 'URGENT' || task.priority === 'Cao',
-        facility: task.facility_id || (user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id),
+        facility: task.facility_id || localStorage.getItem('facility_id') || (user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id),
         createdAt: new Date().toISOString().split('T')[0]
       }));
 
