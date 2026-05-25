@@ -112,8 +112,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      'x-user-role': encodeURIComponent(user?.role || ''),
-                      'x-facility-id': encodeURIComponent(user?.facility_id || '')
+                      'x-user-role': user?.role || '',
+                      'x-facility-id': user?.facility_id || ''
                     },
                     body: JSON.stringify({
                       username: user?.name || user?.username || 'unknown',

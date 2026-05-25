@@ -392,8 +392,8 @@ function MainDashboard() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-user-role': encodeURIComponent(user?.role || ''),
-              'x-facility-id': encodeURIComponent(localStorage.getItem('facility_id') || user.facility_id || 'ALL')
+              'x-user-role': user.role,
+              'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
             },
             body: JSON.stringify(taskPayload)
           });
@@ -428,8 +428,8 @@ function MainDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-role': encodeURIComponent(user?.role || ''),
-          'x-facility-id': encodeURIComponent(localStorage.getItem('facility_id') || user.facility_id || 'ALL')
+          'x-user-role': user.role,
+          'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
         },
         body: JSON.stringify(taskPayload)
       });
@@ -469,8 +469,8 @@ function MainDashboard() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-role': encodeURIComponent(user?.role || ''),
-          'x-facility-id': encodeURIComponent(localStorage.getItem('facility_id') || user.facility_id || 'ALL')
+          'x-user-role': user.role,
+          'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
         },
         body: JSON.stringify({ status: newStatus, evidence: evidenceName })
       });
@@ -503,8 +503,8 @@ function MainDashboard() {
         try {
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
             headers: {
-              'x-user-role': encodeURIComponent(user?.role || ''),
-              'x-facility-id': encodeURIComponent(localStorage.getItem('facility_id') || user.facility_id || 'ALL')
+              'x-user-role': user.role,
+              'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
             }
           });
           
@@ -534,7 +534,7 @@ function MainDashboard() {
   const fetchFacilityStatuses = async () => {
     try {
       const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/checkin/status', {
-        headers: { 'x-user-role': encodeURIComponent(user?.role || ''), 'x-facility-id': encodeURIComponent(localStorage.getItem('facility_id') || user.facility_id || 'ALL' )}
+        headers: { 'x-user-role': user.role, 'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL' }
       });
       if (response.ok) {
         const data = await response.json();
