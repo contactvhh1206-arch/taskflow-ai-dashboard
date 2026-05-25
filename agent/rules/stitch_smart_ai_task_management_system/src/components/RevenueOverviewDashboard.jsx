@@ -103,7 +103,41 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                let parsedAiData = [];
                
                if (responseJson.success) {
-                   parsedAiData = responseJson.data;
+                   // Normalize dates returned by AI
+                   parsedAiData = responseJson.data.map(item => {
+                      let d = String(item.date).trim();
+                      
+                      // Case 1: T2, T3, T4... (Days of week) -> We can't parse this easily, so we just try to extract any numbers. If none, fallback to 1st of month.
+                      if (/^T\d+$/i.test(d) || /^(CN|Chủ Nhật)$/i.test(d)) {
+                         d = `${yearStr}-${monthStr}-01`; // Fallback if AI literally outputs "T7"
+                      }
+                      
+                      // Case 2: DD/MM/YYYY or DD-MM-YYYY
+                      if (d.includes('/')) {
+                         const parts = d.split('/');
+                         if (parts.length === 3) {
+                            d = `${parts[2].length === 2 ? '20'+parts[2] : parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                         } else if (parts.length === 2) { // DD/MM
+                            d = `${yearStr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                         }
+                      } else if (d.includes('-')) {
+                         const parts = d.split('-');
+                         // If it's DD-MM-YYYY
+                         if (parts.length === 3 && parts[0].length <= 2) {
+                             d = `${parts[2].length === 2 ? '20'+parts[2] : parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                         }
+                      } else if (!isNaN(d) && d.length <= 2) {
+                         // Case 3: Just a day number (e.g., "15")
+                         d = `${yearStr}-${monthStr}-${d.padStart(2, '0')}`;
+                      }
+                      
+                      // Validate if it matches YYYY-MM-DD, otherwise fallback
+                      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+                          d = `${yearStr}-${monthStr}-01`;
+                      }
+                      
+                      return { ...item, date: d };
+                   });
                } else {
                    throw new Error(responseJson.error || "Lỗi xử lý AI.");
                }
