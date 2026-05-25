@@ -5,7 +5,18 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
   const getYesterdayDate = () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getTodayDate = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const [selectedDate, setSelectedDate] = useState(getYesterdayDate());
@@ -137,14 +148,14 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Ngày báo cáo:</label>
+        <div className="flex items-center justify-between gap-2 w-full sm:w-auto mt-4 md:mt-0">
+          <label className="text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">Ngày báo cáo:</label>
           <input 
             type="date" 
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            max={new Date().toISOString().split('T')[0]} // Không cho nhập ngày tương lai
-            className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 outline-none focus:border-primary text-sm font-medium dark:text-white transition-colors cursor-pointer"
+            max={getTodayDate()} // Không cho nhập ngày tương lai
+            className="flex-1 sm:flex-none min-w-[150px] bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-2 md:px-4 py-2 outline-none focus:border-primary text-sm font-medium dark:text-white transition-colors cursor-pointer"
           />
         </div>
       </div>
