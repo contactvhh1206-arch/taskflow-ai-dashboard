@@ -200,6 +200,11 @@ function MainDashboard() {
     if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(user.role)) return 'dashboard';
     return 'tasks';
   });
+  const [chatInput, setChatInput] = useState('');
+  const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
+  const [cursorPosition, setCursorPosition] = useState(0);
+
   const [aiSessions, setAiSessions] = useState(JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]'));
   const [activeAiSessionId, setActiveAiSessionId] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -1123,9 +1128,45 @@ function MainDashboard() {
                     <div className="bg-surface-container dark:bg-[#2a2a2a] p-3 rounded-2xl rounded-tl-none text-sm dark:text-gray-200"><span className="text-primary font-bold text-[11px] block mb-1">Admin Tổng</span> Nhớ kiểm tra kỹ task này nhé, Sếp đang hối.</div>
                   </div>
                 </div>
-                <div className="p-4 border-t border-outline-variant dark:border-gray-800 bg-white dark:bg-[#1e1e1e]">
+                <div className="p-4 border-t border-outline-variant dark:border-gray-800 bg-white dark:bg-[#1e1e1e] relative">
+                  {showMentionMenu && (
+                    <div className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl shadow-lg max-h-48 overflow-y-auto z-10 p-2">
+                      {JSON.parse(localStorage.getItem('taskflow_users') || '[]')
+                        .filter(u => u.full_name && (u.full_name.toLowerCase().includes(mentionFilter) || (u.email && u.email.toLowerCase().includes(mentionFilter))))
+                        .map((u, idx) => (
+                          <div key={u.user_id || idx} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer rounded-lg text-sm dark:text-white" onClick={() => {
+                            const textBeforeCursor = chatInput.substring(0, cursorPosition);
+                            const textAfterCursor = chatInput.substring(cursorPosition);
+                            const match = textBeforeCursor.match(/@([^@]*)$/);
+                            if (match) {
+                                const replaceStart = cursorPosition - match[0].length;
+                                const newText = chatInput.substring(0, replaceStart) + '@' + u.full_name + ' ' + textAfterCursor;
+                                setChatInput(newText);
+                            }
+                            setShowMentionMenu(false);
+                            setTimeout(() => document.getElementById('task-chat-input')?.focus(), 0);
+                          }}>
+                            <div className="font-medium text-primary">{u.full_name}</div>
+                            <div className="text-xs text-gray-500">{u.email}</div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                   <div className="relative">
-                    <input type="text" placeholder="Gõ @ để tag tên..." className="w-full pl-4 pr-10 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none dark:text-white" />
+                    <input id="task-chat-input" type="text" value={chatInput} onChange={(e) => {
+                      const val = e.target.value;
+                      setChatInput(val);
+                      const pos = e.target.selectionStart;
+                      setCursorPosition(pos);
+                      const textBeforeCursor = val.substring(0, pos);
+                      const match = textBeforeCursor.match(/@([^@]*)$/);
+                      if (match) {
+                          setShowMentionMenu(true);
+                          setMentionFilter(match[1].toLowerCase());
+                      } else {
+                          setShowMentionMenu(false);
+                      }
+                    }} placeholder="Gõ @ để tag tên..." className="w-full pl-4 pr-10 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none dark:text-white" />
                     <button className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80 p-1 flex items-center justify-center">
                       <span className="material-symbols-outlined text-[20px]">send</span>
                     </button>
