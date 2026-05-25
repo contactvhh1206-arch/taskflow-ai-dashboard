@@ -316,14 +316,16 @@ function MainDashboard() {
       const responseJson = await res.json();
       if (responseJson.success && responseJson.data && responseJson.data.data) {
         let kpiData = responseJson.data.data;
-        if (typeof kpiData === 'string') {
+        let depth = 0;
+        while (typeof kpiData === 'string' && depth < 5) {
           try {
             kpiData = JSON.parse(kpiData);
+            depth++;
           } catch (err) {
-            console.error('Error parsing KPI data string:', err);
+            break;
           }
         }
-        localStorage.setItem('taskflow_facility_kpis', JSON.stringify(kpiData));
+        localStorage.setItem('taskflow_facility_kpis', JSON.stringify(kpiData || {}));
         window.dispatchEvent(new Event('taskflow_kpis_updated'));
       }
     } catch (e) {

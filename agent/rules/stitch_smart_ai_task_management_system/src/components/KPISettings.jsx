@@ -29,8 +29,14 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
                 const responseJson = await res.json();
                 if (responseJson.success && responseJson.data) {
                    let kpiData = responseJson.data.data;
-                   if (typeof kpiData === 'string') {
-                      try { kpiData = JSON.parse(kpiData); } catch(e) {}
+                   let depth = 0;
+                   while (typeof kpiData === 'string' && depth < 5) {
+                      try {
+                         kpiData = JSON.parse(kpiData);
+                         depth++;
+                      } catch(e) {
+                         break;
+                      }
                    }
                    savedKpis = kpiData || {};
                    if (responseJson.data.apply_month) setApplyMonth(responseJson.data.apply_month);
