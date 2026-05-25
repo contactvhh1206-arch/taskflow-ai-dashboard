@@ -602,6 +602,18 @@ function MainDashboard() {
               <NavItem icon="archive" label="Dữ liệu Lưu trữ" active={activeTab === 'archives'} onClick={() => setActiveTab('archives')} />
             </>
           )}
+          {user.role === 'FINANCE_DEPT' && (
+            <>
+              <NavItem icon="dashboard" label="Bảng tin" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+              <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+              <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
+              <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
+              <NavItem icon="assessment" label="Báo cáo hằng ngày" active={activeTab === 'daily-reports'} onClick={() => setActiveTab('daily-reports')} />
+              <NavItem icon="history" label="Nhật ký doanh thu" active={activeTab === 'revenue-log'} onClick={() => setActiveTab('revenue-log')} />
+              <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
+              <NavItem icon="archive" label="Dữ liệu lưu trữ" active={activeTab === 'archives'} onClick={() => setActiveTab('archives')} />
+            </>
+          )}
           {user.role === 'FACILITY_MANAGER' && (
             <NavItem icon="fact_check" label="Điểm danh" active={activeTab === 'checkin'} onClick={() => setActiveTab('checkin')} />
           )}
@@ -896,6 +908,11 @@ function MainDashboard() {
                   </div>
                 </div>
               </ErrorBoundary>
+            ) : ['dept-reports', 'revenue-log', 'daily-reports'].includes(activeTab) ? (
+              <div className="flex items-center justify-center h-[50vh] text-gray-500 flex-col gap-4">
+                <span className="material-symbols-outlined text-4xl text-gray-400">construction</span>
+                <p>Tính năng đang được phát triển và đồng bộ...</p>
+              </div>
             ) : (
               <>
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
