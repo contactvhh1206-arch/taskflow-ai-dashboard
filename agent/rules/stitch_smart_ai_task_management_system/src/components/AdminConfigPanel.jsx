@@ -67,6 +67,8 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                // 1. Chỉ xóa công việc và checkin ở client (Local Storage)
                localStorage.removeItem('taskflow_tasks');
                localStorage.removeItem('taskflow_checkins');
+               localStorage.removeItem('taskflow_daily_financial_reports');
+               localStorage.removeItem('taskflow_facility_kpis');
                
                // 2. GỌI API ĐỂ XÓA SẠCH DỮ LIỆU TRONG POSTGRESQL (Backend)
                try {
