@@ -270,7 +270,27 @@ function MainDashboard() {
     };
   }, []);
 
-  const fetchFacilities = () => {
+  const fetchFacilities = async () => {
+    try {
+      const token = localStorage.getItem('taskflow_token');
+      const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        const mappedFacs = data.data.map(fac => ({
+          id: String(fac.id),
+          name: fac.name,
+          is_active: fac.is_active !== false
+        }));
+        setFacilityList(mappedFacs);
+        localStorage.setItem('taskflow_facilities', JSON.stringify(mappedFacs));
+        return;
+      }
+    } catch (e) {
+      console.error('Lỗi đồng bộ danh sách cơ sở từ server:', e);
+    }
+
     let localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
     if (localFacs.length === 0) {
       localFacs = [
