@@ -61,7 +61,7 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
              } else {
                 showToast('❌ Lỗi: ' + data.error);
              }
-          } catch(err) {
+          } catch {
              const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
              const facIndex = localFacs.findIndex(f => f.id === facId);
              if (facIndex > -1) {
@@ -94,7 +94,7 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
              } else {
                 showToast('❌ Lỗi: ' + data.error);
              }
-          } catch (err) {
+          } catch {
              const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
              const newFac = { id: 'f' + Date.now(), name: newFacName.trim().toUpperCase() };
              localFacs.push(newFac);

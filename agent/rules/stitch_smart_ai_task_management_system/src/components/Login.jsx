@@ -33,7 +33,7 @@ export default function Login() {
       } else {
         throw new Error('Backend down, fallback to local');
       }
-    } catch (err) {
+    } catch {
       // Check localStorage first
       const trimmedUser = username.trim();
       const trimmedPass = password.trim();

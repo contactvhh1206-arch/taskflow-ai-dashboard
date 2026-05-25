@@ -11,7 +11,7 @@ export default function ArchivedFacilitiesDashboard({ facilityList, showToast, r
                 showToast('✅ Đã khôi phục cơ sở thành công!');
                 if (refreshFacilities) refreshFacilities();
              }
-          } catch(err) {
+          } catch {
              const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
              const facIndex = localFacs.findIndex(f => f.id === fac.id);
              if (facIndex > -1) {
