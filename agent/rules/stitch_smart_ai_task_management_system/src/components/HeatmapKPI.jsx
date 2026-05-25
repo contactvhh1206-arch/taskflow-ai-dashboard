@@ -134,16 +134,16 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
        }
 
        return (
-          <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm shrink-0 mt-2 flex flex-col">
+          <div className="bg-white dark:bg-[#1e1e1e] p-4 md:p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm shrink-0 mt-2 flex flex-col w-full">
              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 shrink-0">
+                <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 shrink-0 text-base md:text-lg">
                   <span className="material-symbols-outlined text-teal-600">grid_on</span>
-                  Heatmap KPI Doanh Thu (Tháng {formattedMonthStr})
+                  Heatmap KPI (Tháng {formattedMonthStr})
                 </h3>
-                <div className="flex gap-4 text-xs font-medium">
+                <div className="flex flex-wrap gap-3 text-xs font-medium">
                   <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-800 inline-block rounded"></span> Đạt KPI</span>
                   <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 inline-block rounded"></span> Dưới KPI</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 inline-block rounded"></span> Chưa có số</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-700 inline-block rounded"></span> Chưa có</span>
                 </div>
              </div>
              

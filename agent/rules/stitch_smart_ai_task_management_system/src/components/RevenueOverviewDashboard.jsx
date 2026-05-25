@@ -239,8 +239,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
       return (
          <div className="flex flex-col gap-6 p-6 overflow-y-auto custom-scrollbar h-[calc(100vh-120px)] animate-fade-in bg-gray-50 dark:bg-[#121212]">
            {/* Header & Filter */}
-           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-[#1e1e1e] p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm shrink-0">
-             <div>
+           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-[#1e1e1e] p-4 md:p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm shrink-0">
+             <div className="w-full md:w-auto">
                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                  <span className="material-symbols-outlined text-teal-600">pie_chart</span> Tổng Quan Doanh Thu
                </h2>
@@ -248,26 +248,28 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                  Thống kê chi tiết tài chính đa cơ sở
                </p>
              </div>
-             <div className="flex flex-col items-end gap-1">
-                <div className="flex items-center gap-3">
+             <div className="flex flex-col items-start md:items-end gap-2 w-full md:w-auto">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
                    {user.role === 'FINANCE_DEPT' && (
                      <>
                         <input type="file" accept=".png,.jpg,.jpeg,.xlsx,.csv" className="hidden" ref={fileInputRef} onChange={processAIExtract} />
-                        <button onClick={handleAIExtractClick} className="px-4 py-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-400 rounded-lg text-sm font-bold transition flex items-center gap-2 border border-purple-200 dark:border-purple-800">
+                        <button onClick={handleAIExtractClick} className="px-4 py-2 w-full sm:w-auto justify-center bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-400 rounded-lg text-sm font-bold transition flex items-center gap-2 border border-purple-200 dark:border-purple-800">
                           <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-                          Tự động trích xuất bằng AI
+                          Trích xuất bằng AI
                         </button>
                      </>
                    )}
-                   <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-2">Tháng tra cứu:</label>
-                   <input 
-                      type="month"
-                      value={selectedMonth} 
-                      onChange={e => setSelectedMonth(e.target.value)}
-                      className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 outline-none focus:border-teal-500 text-sm font-medium dark:text-white cursor-pointer hover:border-teal-400 transition-colors"
-                   />
+                   <div className="flex items-center gap-2 w-full sm:w-auto">
+                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">Tháng tra cứu:</label>
+                     <input 
+                        type="month"
+                        value={selectedMonth} 
+                        onChange={e => setSelectedMonth(e.target.value)}
+                        className="flex-1 sm:flex-none bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 outline-none focus:border-teal-500 text-sm font-medium dark:text-white cursor-pointer hover:border-teal-400 transition-colors"
+                     />
+                   </div>
                 </div>
-                {aiError && <div className="text-red-500 text-xs text-right mt-1 font-medium">{aiError}</div>}
+                {aiError && <div className="text-red-500 text-xs mt-1 font-medium">{aiError}</div>}
              </div>
            </div>
 
