@@ -144,3 +144,23 @@ CREATE POLICY super_admin_all_tokens ON ai_token_usage_logs
     FOR ALL USING (
         EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN', 'ADMIN'))
     );
+
+-- 9. Bảng Báo cáo Doanh thu Tài chính (Daily Financial Reports)
+CREATE TABLE daily_financial_reports (
+    id VARCHAR(50) PRIMARY KEY,
+    date DATE NOT NULL UNIQUE,
+    total_revenue NUMERIC DEFAULT 0,
+    data JSONB, -- Lưu chi tiết doanh thu từng cơ sở
+    created_by VARCHAR(100),
+    timestamp BIGINT, -- Lưu timestamp epoch
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Policy cho bảng Doanh thu
+ALTER TABLE daily_financial_reports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY finance_all_reports ON daily_financial_reports
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'))
+    );
+

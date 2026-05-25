@@ -11,66 +11,77 @@ export default function HeatmapKPI({ user, facilityList, selectedMonth, refreshT
 
        React.useEffect(() => {
           setLoading(true);
-          setTimeout(() => {
-             const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
-             const year = parseInt(yearStr, 10);
-             const month = parseInt(monthStr, 10) - 1;
-             
-             const daysInMonth = new Date(year, month + 1, 0).getDate();
-             
-             const defaultFacs = facilityList.length > 0 ? facilityList : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
-             
-             const matrix = {};
-             for (let i = 1; i <= daysInMonth; i++) {
-                matrix[i] = {};
-                defaultFacs.forEach(f => { matrix[i][f.name] = 0; });
-             }
-             
-             allReports.forEach(r => {
-                const parts = r.date.split('-');
-                const rYear = parseInt(parts[0], 10);
-                const rMonth = parseInt(parts[1], 10) - 1;
-                const rDay = parseInt(parts[2], 10);
+          const loadData = async () => {
+             try {
+                const token = localStorage.getItem('taskflow_token');
+                const { fetchReports } = await import('../services/dataService.js');
+                const allReports = await fetchReports(token, user?.role, user?.facility_id) || [];
                 
-                if (rYear === year && rMonth === month && matrix[rDay]) {
-                   if (r.data && Array.isArray(r.data)) {
-                      r.data.forEach(facData => {
-                         if (matrix[rDay][facData.name] !== undefined) {
-                            matrix[rDay][facData.name] += Number(facData.revenue || 0);
-                         }
-                      });
-                   }
+                const year = parseInt(yearStr, 10);
+                const month = parseInt(monthStr, 10) - 1;
+                
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                
+                const defaultFacs = facilityList.length > 0 ? facilityList : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
+                
+                const matrix = {};
+                for (let i = 1; i <= daysInMonth; i++) {
+                   matrix[i] = {};
+                   defaultFacs.forEach(f => { matrix[i][f.name] = 0; });
                 }
-             });
+                
+                allReports.forEach(r => {
+                   if (!r.date) return;
+                   const parts = r.date.split('-');
+                   const rYear = parseInt(parts[0], 10);
+                   const rMonth = parseInt(parts[1], 10) - 1;
+                   const rDay = parseInt(parts[2], 10);
+                   
+                   if (rYear === year && rMonth === month && matrix[rDay]) {
+                      const rData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+                      if (rData && Array.isArray(rData)) {
+                         rData.forEach(facData => {
+                            if (matrix[rDay][facData.name] !== undefined) {
+                               matrix[rDay][facData.name] += Number(facData.revenue || 0);
+                            }
+                         });
+                      }
+                   }
+                });
 
-             const weeks = [
-                { id: 1, label: 'TUẦN 1 (01-07)', start: 1, end: 7, sums: {} },
-                { id: 2, label: 'TUẦN 2 (08-14)', start: 8, end: 14, sums: {} },
-                { id: 3, label: 'TUẦN 3 (15-21)', start: 15, end: 21, sums: {} },
-                { id: 4, label: 'TUẦN 4 (22-28)', start: 22, end: 28, sums: {} }
-             ];
-             if (daysInMonth > 28) {
-                const endDay = daysInMonth;
-                let rangeLabel = `29-30`;
-                if (endDay === 31) rangeLabel = `29-30-31`;
-                if (endDay === 29) rangeLabel = `29`;
-                weeks.push({ id: 5, label: `TUẦN 5 (${rangeLabel})`, start: 29, end: daysInMonth, sums: {} });
+                const weeks = [
+                   { id: 1, label: 'TUẦN 1 (01-07)', start: 1, end: 7, sums: {} },
+                   { id: 2, label: 'TUẦN 2 (08-14)', start: 8, end: 14, sums: {} },
+                   { id: 3, label: 'TUẦN 3 (15-21)', start: 15, end: 21, sums: {} },
+                   { id: 4, label: 'TUẦN 4 (22-28)', start: 22, end: 28, sums: {} }
+                ];
+                if (daysInMonth > 28) {
+                   const endDay = daysInMonth;
+                   let rangeLabel = `29-30`;
+                   if (endDay === 31) rangeLabel = `29-30-31`;
+                   if (endDay === 29) rangeLabel = `29`;
+                   weeks.push({ id: 5, label: `TUẦN 5 (${rangeLabel})`, start: 29, end: daysInMonth, sums: {} });
+                }
+                
+                weeks.forEach(w => {
+                    defaultFacs.forEach(f => {
+                       w.sums[f.name] = 0;
+                       for (let i = w.start; i <= w.end; i++) {
+                          w.sums[f.name] += matrix[i][f.name];
+                       }
+                    });
+                });
+
+                setDailyData(matrix);
+                setWeeklyData(weeks);
+                setLoading(false);
+             } catch (e) {
+                console.error(e);
+                setLoading(false);
              }
-             
-             weeks.forEach(w => {
-                 defaultFacs.forEach(f => {
-                    w.sums[f.name] = 0;
-                    for (let i = w.start; i <= w.end; i++) {
-                       w.sums[f.name] += matrix[i][f.name];
-                    }
-                 });
-             });
-
-             setDailyData(matrix);
-             setWeeklyData(weeks);
-             setLoading(false);
-          }, 300);
-       }, [facilityList, selectedMonth]);
+          };
+          loadData();
+       }, [facilityList, selectedMonth, refreshToggle, user, yearStr, monthStr]);
 
        const getTarget = (facName, isWeekend) => {
           const savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');

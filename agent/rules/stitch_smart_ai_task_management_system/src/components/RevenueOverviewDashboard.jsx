@@ -148,16 +148,13 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
          }
       };
 
-      const handleBatchUpsert = (data) => {
-         const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
+      const handleBatchUpsert = async (data) => {
+         const token = localStorage.getItem('taskflow_token');
+         const { saveReport } = await import('../services/dataService.js');
          
-         // Bước 1: Lấy mảng tất cả các report_date có trong payload gửi lên
-         const datesToDelete = data.map(row => row.date);
+         const newReports = [];
          
-         // Xóa sạch dữ liệu cũ của những ngày đó để dọn đường (DELETE WHERE IN)
-         const newReports = allReports.filter(r => !datesToDelete.includes(r.date));
-         
-         // Bước 2: Chạy lệnh BULK INSERT toàn bộ mảng data mới
+         // Bươc 2: Chạy lệnh BULK INSERT toàn bô mảng data mơi
          data.forEach(row => {
             const dateStr = row.date;
             const revData = facilityList.map(f => {
@@ -181,16 +178,19 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
             });
          });
          
-         localStorage.setItem('taskflow_daily_financial_reports', JSON.stringify(newReports));
+         await saveReport(newReports, token, user?.role, user?.facility_id);
          setBatchData(null);
-         alert(`Đã lưu thành công ${data.length} báo cáo!`);
+         alert(`Đã lưu thành công ${data.length} báo cáo lên Database!`);
          setRefreshToggle(prev => prev + 1);
       };
 
       React.useEffect(() => {
         setLoading(true);
-        setTimeout(() => {
-             const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
+        const loadData = async () => {
+             try {
+                const token = localStorage.getItem('taskflow_token');
+                const { fetchReports } = await import('../services/dataService.js');
+                const allReports = await fetchReports(token, user?.role, user?.facility_id) || [];
              
              const [yearStr, monthStr] = selectedMonth.split('-');
              const year = parseInt(yearStr, 10);
@@ -200,6 +200,7 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
              const end = new Date(year, month + 1, 0); end.setHours(23,59,59,999);
 
              const timeFiltered = allReports.filter(r => {
+                if (!r.date) return false;
                 const rParts = r.date.split('-');
                 const rDate = new Date(rParts[0], rParts[1]-1, rParts[2]);
                 return rDate >= start && rDate <= end;
@@ -218,22 +219,27 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                 }
              });
 
-             timeFiltered.forEach(report => {
-                if (report.data && Array.isArray(report.data)) {
-                   report.data.forEach(facData => {
+             timeFiltered.forEach(r => {
+                const rData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+                if (rData && Array.isArray(rData)) {
+                   rData.forEach(facData => {
                       if (aggregated[facData.name]) {
-                         const rev = Number(facData.revenue || 0);
-                         aggregated[facData.name].revenue += rev;
+                         aggregated[facData.name].revenue += Number(facData.revenue || 0);
                       }
                    });
                 }
              });
-
+             
              const finalData = Object.values(aggregated).filter(f => f.is_active || f.revenue > 0);
              setData(finalData);
              setLoading(false);
-        }, 400);
-      }, [selectedMonth, user.role, user.facility_id, facilityList]);
+             } catch (e) {
+                console.error(e);
+                setLoading(false);
+             }
+        };
+        loadData();
+      }, [selectedMonth, facilityList, refreshToggle, user]);
 
       const formatCurrency = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
       const formatCurrencyShort = (value) => {

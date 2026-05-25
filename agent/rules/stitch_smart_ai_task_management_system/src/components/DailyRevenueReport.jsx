@@ -24,35 +24,42 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
     }));
   }, [facilityList]);
 
-  const loadDataForDate = useCallback((dateStr) => {
-    const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
-    const existingReport = allReports.find(r => r.date === dateStr);
-    
-    const activeFacs = getActiveFacilities();
-    
-    if (existingReport && existingReport.data) {
-      // Merge dữ liệu cũ với danh sách cơ sở hiện tại
-      const mergedData = activeFacs.map(fac => {
-        const existingFacData = existingReport.data.find(d => d.id === fac.id || d.name === fac.name);
-        return {
+  const loadDataForDate = useCallback(async (dateStr) => {
+    try {
+      const token = localStorage.getItem('taskflow_token');
+      // Import fetchReports dynamically to avoid circular dependency if any, or use from import
+      const { fetchReports } = await import('../services/dataService.js');
+      const allReports = await fetchReports(token, user?.role, user?.facility_id) || [];
+      const existingReport = allReports.find(r => r.date === dateStr);
+      
+      const activeFacs = getActiveFacilities();
+      
+      if (existingReport && existingReport.data) {
+        // Merge dữ liệu cũ với danh sách cơ sở hiện tại
+        const mergedData = activeFacs.map(fac => {
+          const existingFacData = existingReport.data.find(d => d.id === fac.id || d.name === fac.name);
+          return {
+            id: fac.id,
+            name: fac.name,
+            revenue: existingFacData ? existingFacData.revenue : 0,
+            note: existingFacData ? (existingFacData.note || '') : ''
+          };
+        });
+        setFormData(mergedData);
+      } else {
+        // Khởi tạo mới
+        const initialData = activeFacs.map(fac => ({
           id: fac.id,
           name: fac.name,
-          revenue: existingFacData ? existingFacData.revenue : 0,
-          note: existingFacData ? (existingFacData.note || '') : ''
-        };
-      });
-      setFormData(mergedData);
-    } else {
-      // Khởi tạo mới
-      const initialData = activeFacs.map(fac => ({
-        id: fac.id,
-        name: fac.name,
-        revenue: 0,
-        note: ''
-      }));
-      setFormData(initialData);
+          revenue: 0,
+          note: ''
+        }));
+        setFormData(initialData);
+      }
+    } catch (e) {
+      console.error(e);
     }
-  }, [getActiveFacilities]);
+  }, [getActiveFacilities, user]);
 
   useEffect(() => {
     loadDataForDate(selectedDate);
@@ -68,45 +75,40 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
     setFormData(prev => prev.map(item => item.id === id ? { ...item, note: value } : item));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      try {
-        const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
-        
-        // Tính tổng doanh thu
-        const totalRev = formData.reduce((acc, curr) => acc + Number(curr.revenue || 0), 0);
-        
-        // Tạo object report mới
-        const newReport = {
-          id: 'rep_' + Date.now() + Math.random().toString(36).substr(2, 5),
-          date: selectedDate,
-          createdBy: user?.name || user?.username || 'Finance Dept',
-          timestamp: Date.now(),
-          totalRevenue: totalRev,
-          data: formData.map(d => ({
-             ...d,
-             revenue: Number(d.revenue || 0)
-          }))
-        };
-        
-        // Tìm và thay thế nếu đã có báo cáo ngày này, nếu chưa thì thêm mới
-        const existingIndex = allReports.findIndex(r => r.date === selectedDate);
-        if (existingIndex >= 0) {
-           allReports[existingIndex] = { ...allReports[existingIndex], ...newReport, id: allReports[existingIndex].id };
-        } else {
-           allReports.push(newReport);
-        }
-        
-        localStorage.setItem('taskflow_daily_financial_reports', JSON.stringify(allReports));
-        
+    try {
+      const { saveReport } = await import('../services/dataService.js');
+      
+      // Tính tổng doanh thu
+      const totalRev = formData.reduce((acc, curr) => acc + Number(curr.revenue || 0), 0);
+      
+      // Tạo object report mới
+      const newReport = {
+        id: 'rep_' + Date.now() + Math.random().toString(36).substr(2, 5),
+        date: selectedDate,
+        totalRevenue: totalRev,
+        data: formData.map(d => ({
+           ...d,
+           revenue: Number(d.revenue || 0)
+        })),
+        createdBy: user?.name || user?.username || 'Finance Dept',
+        timestamp: Date.now()
+      };
+      
+      const token = localStorage.getItem('taskflow_token');
+      const success = await saveReport(newReport, token, user?.role, user?.facility_id);
+      
+      if (success) {
         if (showToast) showToast('Đã lưu Báo cáo Doanh thu thành công!', 'success');
-      } catch {
-        if (showToast) showToast('Có lỗi xảy ra khi lưu!', 'error');
-      } finally {
-        setIsSaving(false);
+      } else {
+        if (showToast) showToast('Có lỗi xảy ra khi lưu trên Server!', 'error');
       }
-    }, 500); // Giả lập loading delay
+    } catch {
+      if (showToast) showToast('Có lỗi xảy ra khi lưu!', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const formatCurrency = (value) => {

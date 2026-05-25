@@ -202,21 +202,24 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
       // Load financial reports
       let financialContextStr = '';
       try {
-         const reportsStr = localStorage.getItem('taskflow_daily_financial_reports');
-         if (reportsStr) {
-            const reports = JSON.parse(reportsStr);
+         const token = localStorage.getItem('taskflow_token');
+         const { fetchReports } = await import('../services/dataService.js');
+         const reports = await fetchReports(token, user?.role, user?.facility_id) || [];
+         
+         if (reports && reports.length > 0) {
             const recentReports = reports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 10);
             
             recentReports.forEach(rep => {
+               const rData = typeof rep.data === 'string' ? JSON.parse(rep.data) : rep.data;
                if (isFacilityMode && facilityName) {
-                  const facData = rep.data?.find(d => d.facility_id === facilityName || d.facility_name === facilityName);
+                  const facData = rData?.find(d => d.facility_id === facilityName || d.facility_name === facilityName || d.name === facilityName);
                   if (facData) {
                      financialContextStr += `Doanh thu cơ sở ${facilityName} ngày ${rep.date}: ${Number(facData.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
                   }
                } else {
-                  financialContextStr += `Báo cáo doanh thu ngày ${rep.date} (Tổng: ${Number(rep.totalRevenue || 0).toLocaleString('vi-VN')} VNĐ):\n`;
-                  rep.data?.forEach(d => {
-                     financialContextStr += `- ${d.facility_id || d.facility_name}: ${Number(d.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
+                  financialContextStr += `Báo cáo doanh thu ngày ${rep.date} (Tổng: ${Number(rep.total_revenue || rep.totalRevenue || 0).toLocaleString('vi-VN')} VNĐ):\n`;
+                  rData?.forEach(d => {
+                     financialContextStr += `- ${d.facility_id || d.facility_name || d.name}: ${Number(d.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
                   });
                }
             });

@@ -637,6 +637,60 @@ app.get('/api/internal/ai-token-stats', authenticateUser, async (req, res) => {
   }
 });
 
+// ==============================================================================
+// 5. DAILY FINANCIAL REPORTS (POSTGRESQL)
+// ==============================================================================
+
+app.get('/api/reports', authenticateUser, async (req, res) => {
+  try {
+    const { role } = req.user;
+    if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(role)) {
+      return res.status(403).json({ error: 'Không đủ quyền xem báo cáo tài chính.' });
+    }
+    const { rows } = await pool.query('SELECT * FROM daily_financial_reports ORDER BY date DESC');
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Lỗi lấy báo cáo doanh thu:', error);
+    res.status(500).json({ error: 'Lỗi server khi lấy doanh thu.' });
+  }
+});
+
+app.post('/api/reports', authenticateUser, async (req, res) => {
+  try {
+    const { role } = req.user;
+    if (role !== 'FINANCE_DEPT' && role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Không đủ quyền lưu báo cáo.' });
+    }
+    
+    const isArray = Array.isArray(req.body);
+    const reports = isArray ? req.body : [req.body];
+    
+    const query = `
+      INSERT INTO daily_financial_reports (id, date, total_revenue, data, created_by, timestamp, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      ON CONFLICT (date) DO UPDATE 
+      SET total_revenue = EXCLUDED.total_revenue,
+          data = EXCLUDED.data,
+          created_by = EXCLUDED.created_by,
+          timestamp = EXCLUDED.timestamp,
+          updated_at = NOW()
+      RETURNING *
+    `;
+    
+    const results = [];
+    for (const report of reports) {
+      const { id, date, totalRevenue, data, createdBy, timestamp } = report;
+      const { rows } = await pool.query(query, [id, date, totalRevenue, JSON.stringify(data), createdBy, timestamp]);
+      results.push(rows[0]);
+    }
+    
+    res.json({ success: true, data: isArray ? results : results[0] });
+  } catch (error) {
+    console.error('Lỗi lưu báo cáo doanh thu:', error);
+    res.status(500).json({ error: 'Lỗi server khi lưu báo cáo doanh thu.' });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

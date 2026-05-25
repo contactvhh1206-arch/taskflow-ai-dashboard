@@ -6,12 +6,18 @@ export default function RevenueLog({ user, showToast }) {
   const [editFormData, setEditFormData] = useState([]);
   const [editReason, setEditReason] = useState('');
 
-  const loadReports = useCallback(() => {
-    const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
-    // Sort descending by timestamp
-    allReports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    setReports(allReports);
-  }, []);
+  const loadReports = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('taskflow_token');
+      const { fetchReports } = await import('../services/dataService.js');
+      const allReports = await fetchReports(token, user?.role, user?.facility_id) || [];
+      // Sort descending by timestamp
+      allReports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      setReports(allReports);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [user]);
 
   useEffect(() => {
     loadReports();
@@ -35,47 +41,46 @@ export default function RevenueLog({ user, showToast }) {
     setEditFormData(prev => prev.map(item => item.id === id ? { ...item, revenue: numValue } : item));
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editReason.trim()) {
       alert("Vui lòng nhập lý do chỉnh sửa (bắt buộc)!");
       return;
     }
 
     try {
-      const allReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
-      const index = allReports.findIndex(r => r.id === editingReport.id);
+      const { saveReport } = await import('../services/dataService.js');
+      const token = localStorage.getItem('taskflow_token');
       
-      if (index !== -1) {
-        const oldTotal = editingReport.totalRevenue;
-        const newTotal = editFormData.reduce((acc, curr) => acc + Number(curr.revenue || 0), 0);
-        
-        // Update the report data
-        const updatedReport = {
-          ...allReports[index],
-          totalRevenue: newTotal,
-          data: editFormData.map(d => ({ ...d, revenue: Number(d.revenue || 0) }))
-        };
+      const oldTotal = editingReport.totalRevenue;
+      const newTotal = editFormData.reduce((acc, curr) => acc + Number(curr.revenue || 0), 0);
+      
+      // Update the report data
+      const updatedReport = {
+        ...editingReport,
+        totalRevenue: newTotal,
+        data: editFormData.map(d => ({ ...d, revenue: Number(d.revenue || 0) }))
+      };
 
-        // Add to edit history
-        if (!updatedReport.editHistory) {
-          updatedReport.editHistory = [];
-        }
-        updatedReport.editHistory.push({
-          editedAt: Date.now(),
-          editedBy: user?.name || user?.username || 'Finance Dept',
-          reason: editReason,
-          oldTotal: oldTotal,
-          newTotal: newTotal
-        });
+      // Add to edit history
+      if (!updatedReport.editHistory) {
+        updatedReport.editHistory = [];
+      }
+      updatedReport.editHistory.push({
+        editedAt: Date.now(),
+        editedBy: user?.name || user?.username || 'Finance Dept',
+        reason: editReason,
+        oldTotal: oldTotal,
+        newTotal: newTotal
+      });
 
-        allReports[index] = updatedReport;
-        localStorage.setItem('taskflow_daily_financial_reports', JSON.stringify(allReports));
-        
+      const success = await saveReport(updatedReport, token, user?.role, user?.facility_id);
+      
+      if (success) {
         if (showToast) showToast('Đã lưu thay đổi thành công!', 'success');
-        
-        // Reload and close
         loadReports();
         closeEditModal();
+      } else {
+        if (showToast) showToast('Lỗi khi lưu dữ liệu lên máy chủ!', 'error');
       }
     } catch {
       if (showToast) showToast('Lỗi khi lưu dữ liệu!', 'error');
@@ -93,6 +98,30 @@ export default function RevenueLog({ user, showToast }) {
     return `${d.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - ${d.toLocaleDateString('vi-VN')}`;
   };
 
+  const handleMigrateData = async () => {
+    if (!window.confirm('Bạn có chắc muốn đồng bộ tất cả dữ liệu cũ từ trình duyệt này lên Server? Dữ liệu trên Server sẽ được cập nhật.')) return;
+    const allLocalReports = JSON.parse(localStorage.getItem('taskflow_daily_financial_reports') || '[]');
+    if (allLocalReports.length === 0) {
+      alert('Không có dữ liệu nội bộ (localStorage) nào để đồng bộ.');
+      return;
+    }
+    
+    try {
+      const { saveReport } = await import('../services/dataService.js');
+      const token = localStorage.getItem('taskflow_token');
+      const success = await saveReport(allLocalReports, token, user?.role, user?.facility_id);
+      if (success) {
+        if (showToast) showToast(`Đã đồng bộ ${allLocalReports.length} bản ghi thành công!`, 'success');
+        loadReports();
+      } else {
+        if (showToast) showToast('Lỗi đồng bộ lên máy chủ!', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      if (showToast) showToast('Lỗi khi đồng bộ!', 'error');
+    }
+  };
+
   const totalEditRevenue = editFormData.reduce((acc, curr) => acc + Number(curr.revenue || 0), 0);
 
   return (
@@ -103,8 +132,17 @@ export default function RevenueLog({ user, showToast }) {
             <span className="material-symbols-outlined text-blue-600">history</span> Nhật ký Doanh thu
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Lịch sử lưu trữ các bản ghi doanh thu theo ngày. Cho phép xem và chỉnh sửa khi có sai sót.
+            Lịch sử lưu trữ các bản ghi doanh thu theo ngày trên Database.
           </p>
+        </div>
+        <div>
+          <button 
+            onClick={handleMigrateData}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 rounded-lg font-bold text-sm transition-colors border border-orange-200 dark:border-orange-800"
+          >
+            <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
+            Đồng bộ LocalStorage lên Database
+          </button>
         </div>
       </div>
 

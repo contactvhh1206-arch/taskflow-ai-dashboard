@@ -54,3 +54,43 @@ export const fetchHistory = async (filters = {}) => {
   }
   return [];
 };
+
+const REPORTS_API_URL = 'https://taskflow-ai-dashboard.onrender.com/api/reports';
+
+export const fetchReports = async (token, role, facility_id) => {
+  try {
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (role) headers['x-user-role'] = role;
+    if (facility_id) headers['x-facility-id'] = facility_id;
+
+    const response = await fetch(REPORTS_API_URL, { headers });
+    if (!response.ok) throw new Error('Failed to fetch reports');
+    const result = await response.json();
+    if (result.success) return result.data;
+  } catch (error) {
+    console.error('Lỗi lấy báo cáo doanh thu:', error);
+  }
+  return [];
+};
+
+export const saveReport = async (reportData, token, role, facility_id) => {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (role) headers['x-user-role'] = role;
+    if (facility_id) headers['x-facility-id'] = facility_id;
+
+    const response = await fetch(REPORTS_API_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(reportData)
+    });
+    if (!response.ok) throw new Error('Failed to save report');
+    const result = await response.json();
+    return result.success;
+  } catch (error) {
+    console.error('Lỗi lưu báo cáo doanh thu:', error);
+    return false;
+  }
+};
