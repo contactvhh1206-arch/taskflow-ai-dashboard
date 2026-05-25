@@ -202,16 +202,16 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Cấu hình doanh thu kỳ vọng cho Ngày thường và Cuối tuần</p>
                 </div>
                 <div className="flex items-center gap-4">
-                   <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Áp dụng từ:</span>
-                      <select 
-                         value={applyMonth} 
-                         onChange={e => setApplyMonth(e.target.value)}
-                         className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 outline-none focus:border-teal-500 text-sm font-medium dark:text-white"
-                      >
-                         <option value={applyMonth}>{applyMonth}</option>
-                      </select>
-                   </div>
+                    <div className="flex items-center gap-2">
+                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Áp dụng từ:</span>
+                       <select 
+                          value={applyMonth} 
+                          onChange={e => setApplyMonth(e.target.value)}
+                          className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg pl-3 pr-8 py-1.5 min-w-[100px] outline-none focus:border-teal-500 text-sm font-medium dark:text-white"
+                       >
+                          <option value={applyMonth}>{applyMonth}</option>
+                       </select>
+                    </div>
                    <button onClick={() => setShowAddFacModal(true)} className="bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
                       <span className="material-symbols-outlined text-[18px]">add</span> Thêm Cơ Sở Mới
                    </button>
@@ -222,7 +222,7 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
              </div>
 
              <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                <table className="w-full text-sm text-left">
+                <table className="w-full text-sm text-left min-w-[700px]">
                    <thead className="bg-gray-50 dark:bg-[#252525] text-gray-700 dark:text-gray-300">
                       <tr>
                          <th className="px-6 py-4 font-bold w-1/3">Tên Cơ Sở</th>
