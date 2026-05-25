@@ -16,7 +16,7 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
     
     if (isFacilityMode) {
       const fName = facilityName || 'bạn';
-      return `${timeGreeting}, ${displayName || 'Quản lý'}! Tôi là Cố vấn AI riêng của cơ sở ${fName}. Tôi có thể giúp bạn cung cấp góc nhìn tổng quan, tình hình doanh thu, nhật ký hoạt động, nhân viên nghỉ phép và đánh giá chuyên cần của cơ sở mình.\n\n⚠️ LƯU Ý QUAN TRỌNG: Mọi thông tin truy vấn đều tốn phí API. Nếu cố tình truy vấn những câu hỏi không liên quan đến công việc, hoặc hỏi về công việc và doanh thu của cơ sở khác/phòng ban khác, làm hao tốn API vô ích, toàn bộ đoạn hội thoại sẽ được TỰ ĐỘNG GỬI VỀ CHO BAN GIÁM ĐỐC và lưu trữ trên hệ thống!!!`;
+      return `${timeGreeting}, ${displayName || 'Quản lý'}! Tôi là Cố vấn AI riêng của cơ sở ${fName}. Tôi có thể giúp bạn cung cấp góc nhìn tổng quan, tình hình doanh thu, nhật ký hoạt động, nhân viên nghỉ phép và đánh giá chuyên cần của cơ sở mình.\n\n⚠️ LƯU Ý VỀ TÀI NGUYÊN HỆ THỐNG:\nToàn bộ truy vấn đều tiêu tốn chi phí API. Hệ thống chỉ hỗ trợ giải quyết các vấn đề phục vụ công việc và thuộc đúng thẩm quyền của phòng ban/cơ sở hiện tại.\nCác yêu cầu ngoài luồng hoặc cố tình truy xuất dữ liệu/doanh thu chéo giữa các cơ sở sẽ bị từ chối tự động. Mọi lịch sử truy vấn vi phạm quy định sẽ được lưu vết và báo cáo trực tiếp lên Ban Giám đốc để xử lý.`;
     }
 
     const isMarketing = userObj.role === 'DEPARTMENT_HEAD';
