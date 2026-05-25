@@ -10,6 +10,7 @@ import AIUsageLogs from './components/AIUsageLogs.jsx';
 import RAGManagerPanel from './components/RAGManagerPanel.jsx';
 import FacilityDashboard from './components/FacilityDashboard.jsx';
 import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
+import DailyRevenueReport from './components/DailyRevenueReport.jsx';
 import KPISettings from './components/KPISettings.jsx';
 import ArchivedFacilitiesDashboard from './components/ArchivedFacilitiesDashboard.jsx';
 
@@ -908,7 +909,11 @@ function MainDashboard() {
                   </div>
                 </div>
               </ErrorBoundary>
-            ) : ['dept-reports', 'revenue-log', 'daily-reports'].includes(activeTab) ? (
+            ) : activeTab === 'daily-reports' && ['FINANCE_DEPT'].includes(user.role) ? (
+              <ErrorBoundary>
+                <DailyRevenueReport user={user} facilityList={facilityList} showToast={showToast} />
+              </ErrorBoundary>
+            ) : ['dept-reports', 'revenue-log'].includes(activeTab) ? (
               <div className="flex items-center justify-center h-[50vh] text-gray-500 flex-col gap-4">
                 <span className="material-symbols-outlined text-4xl text-gray-400">construction</span>
                 <p>Tính năng đang được phát triển và đồng bộ...</p>
