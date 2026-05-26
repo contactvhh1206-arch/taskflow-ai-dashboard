@@ -26,10 +26,29 @@ export default function AIUsageLogs() {
         ];
         setLogs(mockLogs);
 
-        try {
-          const v = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
-          setViolations(v.sort((a, b) => b.timestamp < a.timestamp ? -1 : 1));
-        } catch {}
+        const fetchViolations = async () => {
+          try {
+            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/violations', {
+              headers: {
+                'x-user-role': 'ADMIN',
+                'x-facility-id': 'ALL'
+              }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success && data.data) {
+                setViolations(data.data.sort((a, b) => b.timestamp < a.timestamp ? -1 : 1));
+                return;
+              }
+            }
+          } catch {}
+          // Fallback to local storage if API fails
+          try {
+            const v = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
+            setViolations(v.sort((a, b) => b.timestamp < a.timestamp ? -1 : 1));
+          } catch {}
+        };
+        fetchViolations();
       }, []);
 
       const getMappedName = (id, fallback) => usersMap[id] || fallback;

@@ -403,16 +403,26 @@ export default function AIAdvisor(props) {
              // Remove the tag from the final response shown to the user so it looks natural
              responseContent = responseContent.replace(/\[CẢNH BÁO VI PHẠM\]/gi, '').trim();
              try {
-               const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
-               violations.push({
+               const newViolation = {
                  id: Date.now(),
                  timestamp: new Date().toISOString(),
                  userId: user?.username || user?.id,
                  facility: facilityName,
                  query: userQuery,
                  status: 'Violation'
-               });
+               };
+               const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
+               violations.push(newViolation);
                localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
+               fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/violations', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-role': user?.role || '',
+                    'x-facility-id': localStorage.getItem('facility_id') || user?.facility_id || 'ALL'
+                  },
+                  body: JSON.stringify(newViolation)
+               }).catch(() => {});
              } catch {}
          }
       }
