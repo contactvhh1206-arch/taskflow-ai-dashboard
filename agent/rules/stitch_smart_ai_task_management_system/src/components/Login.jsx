@@ -28,7 +28,7 @@ export default function Login() {
           login(data.user, data.token);
           return;
         } else {
-          throw new Error(data.error || 'Lá»—i Ä‘Äƒng nháº­p');
+          throw new Error(data.error || 'Lỗi đăng nhập');
         }
       } else {
         throw new Error('Backend down, fallback to local');
@@ -44,7 +44,7 @@ export default function Login() {
         
         if (foundUser) {
           if (foundUser.isActive === false) {
-            setError('TÃ i khoáº£n nÃ y Ä‘Ã£ bá»‹ khÃ³a!');
+            setError('Tài khoản này đã bị khóa!');
             return;
           }
           let facId = foundUser.facility_id;
@@ -62,15 +62,15 @@ export default function Login() {
       // Hardcoded fallback
       if (trimmedUser === 'admin' && trimmedPass === 'admin123') {
         localStorage.setItem('facility_id', 'ALL');
-        login({ name: 'Sáº¿p Tá»•ng', role: 'SUPER_ADMIN', facility_id: 'ALL' }, 'mock-admin');
+        login({ name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }, 'mock-admin');
       } else if (trimmedUser === 'manager1' && trimmedPass === 'manager123') {
-        localStorage.setItem('facility_id', 'CÆ¡ sá»Ÿ 1');
-        login({ name: 'Quáº£n lÃ½ CÆ¡ sá»Ÿ 1', role: 'FACILITY_MANAGER', facility_id: 'CÆ¡ sá»Ÿ 1' }, 'mock-manager');
+        localStorage.setItem('facility_id', 'Cơ sở 1');
+        login({ name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' }, 'mock-manager');
       } else if (trimmedUser === 'sysadmin' && trimmedPass === 'admin123') {
         localStorage.setItem('facility_id', 'ALL');
-        login({ name: 'Quáº£n trá»‹ viÃªn Há»‡ thá»‘ng (IT)', role: 'ADMIN', facility_id: 'ALL' }, 'mock-sysadmin');
+        login({ name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' }, 'mock-sysadmin');
       } else {
-        setError('TÃ i khoáº£n hoáº·c máº­t kháº©u khÃ´ng chÃ­nh xÃ¡c.');
+        setError('Tài khoản hoặc mật khẩu không chính xác.');
       }
     } finally {
       setLoading(false);
@@ -105,7 +105,7 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-on-surface dark:text-gray-300 mb-1.5">TÃ i khoáº£n</label>
+            <label className="block text-sm font-medium text-on-surface dark:text-gray-300 mb-1.5">Tài khoản</label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">person</span>
               <input
@@ -114,13 +114,13 @@ export default function Login() {
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#2a2a2a] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all dark:text-white"
-                placeholder="admin"
+                placeholder="Nhập tài khoản"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-on-surface dark:text-gray-300 mb-1.5">Máº­t kháº©u</label>
+            <label className="block text-sm font-medium text-on-surface dark:text-gray-300 mb-1.5">Mật khẩu</label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">lock</span>
               <input
@@ -129,7 +129,7 @@ export default function Login() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#2a2a2a] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all dark:text-white"
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="Nhập mật khẩu"
               />
             </div>
           </div>
@@ -140,10 +140,13 @@ export default function Login() {
             className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl transition-all shadow-md shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {loading ? (
-              <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+              <>
+                <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+                Đang đăng nhập...
+              </>
             ) : (
               <>
-                ÄÄƒng nháº­p
+                Đăng nhập
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </>
             )}
@@ -154,5 +157,4 @@ export default function Login() {
     </div>
   );
 }
-
 
