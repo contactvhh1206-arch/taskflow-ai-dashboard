@@ -3,7 +3,6 @@ import cors from 'cors';
 import fetch from 'node-fetch'; 
 import dotenv from 'dotenv';
 import pg from 'pg';
-import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -19,65 +18,7 @@ const pool = new Pool({
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
-// Initialize Database Schema Updates & Roles
-const initDB = async () => {
-  try {
-    console.log('[DB] Running initialization checks...');
-    // Add missing columns to users if not exists
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS managed_facilities JSONB`);
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'`);
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`);
-    await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS address VARCHAR(255)`);
-    await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS pic VARCHAR(255)`);
-    await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS needs_support BOOLEAN DEFAULT false`);
-    await pool.query(`ALTER TABLE tasks ALTER COLUMN deadline TYPE TIMESTAMP USING deadline::TIMESTAMP`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS daily_logs (
-      id SERIAL PRIMARY KEY,
-      org_unit VARCHAR(255),
-      entry_type VARCHAR(255),
-      content JSONB,
-      attachments JSONB,
-      ai_vector_data TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      date VARCHAR(50),
-      display_time VARCHAR(50)
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS daily_financial_reports (
-      id VARCHAR(255) PRIMARY KEY,
-      date VARCHAR(50) UNIQUE,
-      total_revenue NUMERIC(15,2),
-      data JSONB,
-      created_by VARCHAR(255),
-      timestamp VARCHAR(100),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS kpi_settings (
-      id VARCHAR(255) PRIMARY KEY,
-      apply_month VARCHAR(50),
-      data JSONB,
-      updated_by VARCHAR(255),
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS system_config (
-      key VARCHAR(255) PRIMARY KEY,
-      data JSONB,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    // Seed roles
-    const roles = ['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'FACILITY_MANAGER', 'ADMIN'];
-    for (const role of roles) {
-      await pool.query(`INSERT INTO roles (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`, [role]);
-    }
-    console.log('[DB] Initialization complete.');
-  } catch (error) {
-    console.error('[DB] Initialization error:', error.message);
-  }
-};
-initDB();
+app.use(express.json());
 
 // ==============================================================================
 // 1. MOCK DATABASE & MIDDLEWARE PHÂN QUYỀN (RBAC)
@@ -92,116 +33,48 @@ const mockTasks = [
 // Bảng Log Nhắc việc AI (Công khai cho Sếp Tổng / Tổng quản lý)
 const mockAiPingLogs = [];
 
-// ==============================================================================
-// DAILY LOGS API
-// ==============================================================================
-app.get('/api/logs', async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM daily_logs ORDER BY id DESC');
-    res.json({ success: true, data: rows });
-  } catch (error) {
-    res.status(500).json({ error: `Lỗi server: ${error.message}` });
-  }
+// Bảng Check-in Đầu giờ
+const mockCheckins = [];
+
+let mockFacilities = [
+  { id: 'f1', name: 'DUBAI 41', is_active: true },
+  { id: 'f2', name: 'DUBAI ACE', is_active: true },
+  { id: 'f3', name: 'DUBAI PA', is_active: true },
+  { id: 'f4', name: 'DUBAI PAK', is_active: true },
+  { id: 'f5', name: 'DUBAI PAV', is_active: true },
+  { id: 'f6', name: 'DUBAI PHÚ QUỐC', is_active: true }
+];
+
+app.get('/api/facilities', (req, res) => {
+  res.json({ success: true, data: mockFacilities });
 });
 
-app.post('/api/logs', async (req, res) => {
-  try {
-    const { org_unit, entry_type, content, attachments, ai_vector_data, date, display_time } = req.body;
-    const { rows } = await pool.query(
-      'INSERT INTO daily_logs (org_unit, entry_type, content, attachments, ai_vector_data, date, display_time) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [org_unit, entry_type, JSON.stringify(content || {}), JSON.stringify(attachments || []), ai_vector_data, date, display_time]
-    );
-    res.json({ success: true, data: rows[0] });
-  } catch (error) {
-    res.status(500).json({ error: `Lỗi server: ${error.message}` });
-  }
+app.post('/api/facilities', (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Tên cơ sở không được để trống.' });
+  const newFac = {
+    id: 'f' + Date.now(),
+    name: name.trim().toUpperCase(),
+    is_active: true
+  };
+  mockFacilities.push(newFac);
+  res.json({ success: true, data: newFac });
 });
 
-// ==============================================================================
-// 1. FACILITIES API (DATABASE BACKED)
-// ==============================================================================
-app.get('/api/facilities', async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM facilities ORDER BY id ASC');
-    const mapped = rows.map(r => ({ ...r, is_active: r.status === 'ACTIVE' }));
-    res.json({ success: true, data: mapped });
-  } catch (error) {
-    res.status(500).json({ error: 'Lỗi server khi lấy danh sách cơ sở' });
-  }
+app.put('/api/facilities/:id/archive', (req, res) => {
+  const { id } = req.params;
+  const fac = mockFacilities.find(f => f.id === id);
+  if (!fac) return res.status(404).json({ error: 'Cơ sở không tồn tại.' });
+  fac.is_active = false;
+  res.json({ success: true, data: fac });
 });
 
-app.post('/api/facilities', async (req, res) => {
-  try {
-    const { name, address, code } = req.body;
-    if (!name) return res.status(400).json({ error: 'Tên cơ sở không được để trống.' });
-    
-    let facCode = code || name.replace(/\s+/g, '').toUpperCase();
-    const { rows } = await pool.query(
-      `INSERT INTO facilities (name, code, status) VALUES ($1, $2, 'ACTIVE') RETURNING *`, 
-      [name.trim(), facCode]
-    );
-    res.json({ success: true, data: { ...rows[0], is_active: true } });
-  } catch (error) {
-    res.status(500).json({ error: 'Lỗi khi tạo cơ sở (có thể trùng mã).' });
-  }
-});
-
-app.put('/api/facilities/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, address, pic } = req.body;
-    
-    // First check if the facility exists
-    const checkRes = await pool.query('SELECT * FROM facilities WHERE id = $1', [id]);
-    if (checkRes.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy cơ sở.' });
-
-    // Update facility
-    const { rows } = await pool.query(
-      `UPDATE facilities SET name = $1, address = $2, pic = $3 WHERE id = $4 RETURNING *`,
-      [name, address, pic, id]
-    );
-    res.json({ success: true, data: { ...rows[0], is_active: rows[0].status === 'ACTIVE' } });
-  } catch (error) {
-    console.error('Update facility error:', error);
-    res.status(500).json({ error: 'Lỗi server khi cập nhật cơ sở.' });
-  }
-});
-
-app.put('/api/facilities/:id/archive', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query(`UPDATE facilities SET status = 'INACTIVE' WHERE id = $1 RETURNING *`, [id]);
-    if(rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy cơ sở.' });
-    res.json({ success: true, data: { ...rows[0], is_active: false } });
-  } catch (error) {
-    res.status(500).json({ error: 'Lỗi server' });
-  }
-});
-
-app.put('/api/facilities/:id/restore', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query(`UPDATE facilities SET status = 'ACTIVE' WHERE id = $1 RETURNING *`, [id]);
-    if(rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy cơ sở.' });
-    res.json({ success: true, data: { ...rows[0], is_active: true } });
-  } catch (error) {
-    res.status(500).json({ error: 'Lỗi server' });
-  }
-});
-
-app.delete('/api/facilities/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    // Clear references to bypass foreign key constraints
-    await pool.query(`UPDATE users SET facility_id = NULL WHERE facility_id = $1`, [id]).catch(e => console.log('Ignore users update error:', e.message));
-    await pool.query(`DELETE FROM tasks WHERE facility_id = $1`, [id]).catch(e => console.log('Ignore tasks delete error:', e.message));
-    
-    await pool.query(`DELETE FROM facilities WHERE id = $1`, [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Delete facility error:', error);
-    res.status(500).json({ error: 'DB Error: ' + error.message });
-  }
+app.put('/api/facilities/:id/restore', (req, res) => {
+  const { id } = req.params;
+  const fac = mockFacilities.find(f => f.id === id);
+  if (!fac) return res.status(404).json({ error: 'Cơ sở không tồn tại.' });
+  fac.is_active = true;
+  res.json({ success: true, data: fac });
 });
 
 const authenticateUser = async (req, res, next) => {
@@ -231,18 +104,6 @@ const authenticateUser = async (req, res, next) => {
     }
 };
 
-// ==============================================================================
-// 1.2. USERS & ROLES API (DATABASE BACKED)
-// ==============================================================================
-app.get('/api/roles', async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM roles ORDER BY id ASC');
-    res.json({ success: true, data: rows });
-  } catch (error) {
-    res.status(500).json({ error: 'Lỗi lấy danh sách vai trò' });
-  }
-});
-
 app.get('/api/users/directory', authenticateUser, async (req, res) => {
   try {
     const { rows: users } = await pool.query('SELECT id AS user_id, email, full_name, role_id, facility_id FROM users');
@@ -253,160 +114,6 @@ app.get('/api/users/directory', authenticateUser, async (req, res) => {
   }
 });
 
-app.get('/api/users', async (req, res) => {
-  try {
-    const { rows } = await pool.query(`
-      SELECT u.id, u.email as username, u.full_name as name, r.name as role, u.status as "isActive", u.managed_facilities, f.name as facility_name
-      FROM users u
-      LEFT JOIN roles r ON u.role_id = r.id
-      LEFT JOIN facilities f ON u.facility_id = f.id
-      ORDER BY u.id ASC
-    `);
-    const mapped = rows.map(r => ({
-      ...r,
-      isActive: r.isActive === 'ACTIVE',
-      facility_id: r.managed_facilities || r.facility_name || 'ALL'
-    }));
-    res.json({ success: true, data: mapped });
-  } catch (error) {
-    res.status(500).json({ error: 'Lỗi lấy danh sách người dùng' });
-  }
-});
-
-app.post('/api/users', async (req, res) => {
-  try {
-    const { username, password, name, role, facility_id } = req.body;
-    
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(password.trim(), salt);
-    
-    const roleRes = await pool.query('SELECT id FROM roles WHERE name = $1', [role]);
-    if (roleRes.rows.length === 0) return res.status(400).json({ error: 'Vai trò không hợp lệ.' });
-    const role_id = roleRes.rows[0].id;
-    
-    let facId = null;
-    let managedFacs = null;
-    if (Array.isArray(facility_id)) {
-      managedFacs = JSON.stringify(facility_id);
-    } else if (facility_id !== 'ALL') {
-      const facRes = await pool.query('SELECT id FROM facilities WHERE name = $1', [facility_id]);
-      if (facRes.rows.length > 0) facId = facRes.rows[0].id;
-    }
-    
-    const { rows } = await pool.query(`
-      INSERT INTO users (email, password_hash, full_name, role_id, facility_id, managed_facilities, status)
-      VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE') RETURNING id
-    `, [username.trim().toLowerCase(), hash, name, role_id, facId, managedFacs]);
-    
-    res.json({ success: true, data: { id: rows[0].id } });
-  } catch (error) {
-    console.error("Lỗi tạo user:", error);
-    res.status(500).json({ error: 'Lỗi tạo tài khoản (có thể username đã tồn tại).' });
-  }
-});
-// In-memory store for hardcoded accounts (for demo purposes)
-const hardcodedPasswords = {
-  'admin': 'admin123',
-  'manager1': 'manager123',
-  'sysadmin': 'admin123'
-};
-
-app.put('/api/users/change-password', authenticateUser, async (req, res) => {
-  try {
-    const { username, currentPassword, newPassword } = req.body;
-    
-    // Check hardcoded accounts first
-    if (hardcodedPasswords[username]) {
-      if (hardcodedPasswords[username] !== currentPassword) {
-        return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
-      }
-      hardcodedPasswords[username] = newPassword;
-      return res.json({ success: true, message: 'Đổi mật khẩu thành công (tài khoản demo).' });
-    }
-    
-    // Find user in DB
-    const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy thông tin tài khoản.' });
-    }
-    
-    const user = rows[0];
-    
-    // Verify current password
-    const isMatch = await bcrypt.compare(currentPassword, user.password_hash || '');
-    const passToCheck = user.password || user.password_hash;
-    
-    if (!(isMatch || passToCheck === currentPassword || passToCheck === Buffer.from(currentPassword).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === currentPassword)) {
-      return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
-    }
-    
-    // Update new password
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(newPassword, salt);
-    
-    try {
-      await pool.query('UPDATE users SET password_hash = $1, password = NULL WHERE id = $2', [hash, user.id]);
-    } catch (dbErr) {
-      // Fallback if 'password' column does not exist
-      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
-    }
-    
-    res.json({ success: true, message: 'Đổi mật khẩu thành công.' });
-  } catch (error) {
-    console.error("Lỗi đổi mật khẩu:", error);
-    res.status(500).json({ error: 'Lỗi máy chủ khi đổi mật khẩu.' });
-  }
-});
-
-app.put('/api/users/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, role, facility_id, password, isActive } = req.body;
-    
-    const roleRes = await pool.query('SELECT id FROM roles WHERE name = $1', [role]);
-    const role_id = roleRes.rows.length > 0 ? roleRes.rows[0].id : null;
-    
-    let facId = null;
-    let managedFacs = null;
-    if (Array.isArray(facility_id)) {
-      managedFacs = JSON.stringify(facility_id);
-    } else if (facility_id && facility_id !== 'ALL') {
-      const facRes = await pool.query('SELECT id FROM facilities WHERE name = $1', [facility_id]);
-      if (facRes.rows.length > 0) facId = facRes.rows[0].id;
-    }
-
-    let status = isActive !== undefined ? (isActive ? 'ACTIVE' : 'INACTIVE') : 'ACTIVE';
-    
-    if (password) {
-      const salt = await bcrypt.genSalt(10);
-      const hash = await bcrypt.hash(password.trim(), salt);
-      await pool.query(`
-        UPDATE users SET full_name = $1, role_id = $2, facility_id = $3, managed_facilities = $4, status = $5, password_hash = $6
-        WHERE id = $7
-      `, [name, role_id, facId, managedFacs, status, hash, id]);
-    } else {
-      await pool.query(`
-        UPDATE users SET full_name = $1, role_id = $2, facility_id = $3, managed_facilities = $4, status = $5
-        WHERE id = $6
-      `, [name, role_id, facId, managedFacs, status, id]);
-    }
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Lỗi cập nhật user:", error);
-    res.status(500).json({ error: 'Lỗi cập nhật tài khoản.' });
-  }
-});
-
-app.delete('/api/users/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM users WHERE id = $1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Không thể xóa user vì đang có dữ liệu công việc liên quan.' });
-  }
-});
-
 app.get('/api/tasks', authenticateUser, async (req, res) => {
   try {
     console.log("Header nhận được:", req.headers);
@@ -414,9 +121,8 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
     
     let query = `
       SELECT t.id, t.title, t.description as desc, t.status, t.urgency as urgent, 
-             TO_CHAR(t.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
+             TO_CHAR(t.deadline, 'YYYY-MM-DD') as deadline, 
              t.created_at as "createdAt", t.updated_at as "completedAt",
-             t.needs_support as "needsSupport",
              u.full_name as pic, u.email as "picId",
              f.name as facility, f.code as "facilityId"
       FROM tasks t
@@ -456,7 +162,7 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
       SET status = $1, 
           updated_at = NOW() 
       WHERE id = $2 
-      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
+      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
     `;
     const { rows } = await pool.query(updateQuery, [status, id]);
     
@@ -468,29 +174,6 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error("Lỗi cập nhật trạng thái:", error);
     res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
-  }
-});
-
-app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateQuery = `
-      UPDATE tasks 
-      SET needs_support = true, 
-          updated_at = NOW() 
-      WHERE id = $1 
-      RETURNING id, title, needs_support as "needsSupport"
-    `;
-    const { rows } = await pool.query(updateQuery, [id]);
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy công việc.' });
-    }
-
-    res.json({ success: true, message: 'Đã gửi yêu cầu hỗ trợ đến Ban Giám Đốc', data: rows[0] });
-  } catch (error) {
-    console.error("Lỗi server khi yêu cầu hỗ trợ:", error);
-    res.status(500).json({ error: 'Lỗi máy chủ nội bộ' });
   }
 });
 
@@ -515,7 +198,12 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
                 insert_facility_id = parsedFac;
             } else {
                 const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
-                if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
+                if (facRecord.rows.length > 0) {
+                    insert_facility_id = facRecord.rows[0].id;
+                } else if (['MARKETING', 'BGD', 'FINANCE'].includes(facility)) {
+                    const newFac = await pool.query("INSERT INTO facilities (name, code) VALUES ($1, $1) RETURNING id", [facility]);
+                    insert_facility_id = newFac.rows[0].id;
+                }
             }
         }
     }
@@ -534,7 +222,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     const insertQuery = `
       INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
+      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
     `;
       const { rows } = await pool.query(insertQuery, [
         title, 
@@ -563,53 +251,41 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
 });
 
 // API Đăng nhập giả lập
-app.delete('/api/system/reset', authenticateUser, async (req, res) => {
+app.delete('/api/tasks/all', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
     if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
        return res.status(403).json({ error: 'Không đủ quyền' });
     }
     await pool.query('TRUNCATE TABLE tasks RESTART IDENTITY CASCADE');
-    await pool.query('DELETE FROM daily_logs WHERE entry_type != $1', ['SYSTEM_CONFIG']);
-    await pool.query('DELETE FROM daily_financial_reports');
-    res.json({ success: true, message: 'Đã dọn dẹp toàn bộ dữ liệu kiểm thử' });
+    res.json({ success: true, message: 'Đã xóa tất cả tasks' });
   } catch (error) {
-    console.error("Lỗi reset system:", error);
-    res.status(500).json({ error: 'Lỗi máy chủ khi reset system' });
+    console.error("Lỗi xóa tasks:", error);
+    res.status(500).json({ error: 'Lỗi máy chủ khi xóa tasks' });
   }
 });
 
-
 app.post('/api/login', async (req, res) => {
-      let { username, password } = req.body;
-      
-      if (username) {
-        username = username.trim().toLowerCase();
-      }
-      
-      if (username === 'admin' && password === hardcodedPasswords['admin']) {
+    const { username, password } = req.body; // Changed from email to username
+    
+    // Hardcode tài khoản để demo
+    if (username === 'admin' && password === 'admin123') {
       return res.json({
         success: true,
         token: 'mock-jwt-token-admin',
-        user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL', username: 'admin' }
+        user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }
       });
-    } else if (username === 'manager1' && password === hardcodedPasswords['manager1']) {
+    } else if (username === 'manager1' && password === 'manager123') {
       return res.json({
         success: true,
         token: 'mock-jwt-token-manager',
-        user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1', username: 'manager1' }
-      });
-    } else if (username === 'sysadmin' && password === hardcodedPasswords['sysadmin']) {
-      return res.json({
-        success: true,
-        token: 'mock-jwt-token-sysadmin',
-        user: { name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL', username: 'sysadmin' }
+        user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' } // Giữ kiểu string 'Cơ sở 1' cho khớp với frontend mock
       });
     }
   
     try {
         const { rows } = await pool.query(`
-            SELECT u.*, r.name AS role_name, f.code AS facility_code, f.name AS facility_name 
+            SELECT u.*, r.name AS role_name, f.code AS facility_code 
             FROM users u 
             LEFT JOIN roles r ON u.role_id = r.id 
             LEFT JOIN facilities f ON u.facility_id = f.id
@@ -617,24 +293,16 @@ app.post('/api/login', async (req, res) => {
         `, [username]);
         if (rows.length > 0) {
             const user = rows[0];
-            
-            if (user.status !== 'ACTIVE') {
-              return res.status(403).json({ success: false, error: 'Tài khoản đã bị khóa.' });
-            }
-            
-            const isMatch = await bcrypt.compare(password, user.password_hash || '');
             const passToCheck = user.password || user.password_hash;
-            
-            if (isMatch || passToCheck === password || passToCheck === Buffer.from(password).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === password) {
+            if (passToCheck === password || passToCheck === Buffer.from(password).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === password) {
                 return res.json({
                     success: true,
                     token: 'jwt-token-' + user.id,
                     user: { 
                         name: user.full_name, 
                         role: user.role_name, 
-                        facility_id: user.managed_facilities || user.facility_name || 'ALL',
-                        facility_code: user.facility_code || '',
-                        username: user.email || user.full_name
+                        facility_id: user.facility_id || 'ALL',
+                        facility_code: user.facility_code || ''
                     }
                 });
             } else {
@@ -653,42 +321,45 @@ app.post('/api/login', async (req, res) => {
 // 1.5. API DAILY CHECK-IN (BÁO CÁO ĐẦU GIỜ)
 // ==============================================================================
 
-// POST /api/checkin was removed because it is now handled by POST /api/logs
-
-app.get('/api/checkin/status', authenticateUser, async (req, res) => {
-  try {
-    const todayStr = new Date().toLocaleDateString('vi-VN');
-    const { role, facility_id } = req.user;
-    
-    // Get facilities
-    let targetFacilities = [];
-    if (role === 'FACILITY_MANAGER') {
-       targetFacilities = [facility_id];
-    } else {
-       const facRes = await pool.query("SELECT name FROM facilities WHERE status = 'ACTIVE'");
-       targetFacilities = facRes.rows.map(r => r.name);
-    }
-    
-    const { rows } = await pool.query('SELECT * FROM daily_logs WHERE entry_type = $1 AND date = $2', ['Attendance', todayStr]);
-    
-    const statusList = targetFacilities.map(fac => {
-      const checkins = rows.filter(c => c.org_unit === fac);
-      const ca1 = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca 1'));
-      const calo = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca Lỡ'));
-      const ca2 = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca 2'));
-      return {
-        facility_id: fac,
-        ca1: ca1 ? `Đã báo cáo lúc ${ca1.display_time}` : 'Chưa báo cáo',
-        calo: calo ? `Đã báo cáo lúc ${calo.display_time}` : 'Chưa báo cáo',
-        ca2: ca2 ? `Đã báo cáo lúc ${ca2.display_time}` : 'Chưa báo cáo',
-        details: checkins
-      };
-    });
-
-    res.json({ success: true, data: statusList });
-  } catch (error) {
-    res.status(500).json({ error: `Lỗi server: ${error.message}` });
+app.post('/api/checkin', authenticateUser, (req, res) => {
+  const { role, facility_id } = req.user;
+  
+  if (role !== 'FACILITY_MANAGER') {
+    return res.status(403).json({ error: 'Chỉ Quản lý cơ sở mới được phép Check-in.' });
   }
+
+  const checkinData = {
+    id: mockCheckins.length + 1,
+    facility_id,
+    date: new Date().toISOString().split('T')[0], // Lưu theo ngày
+    timestamp: new Date().toISOString(),
+    ...req.body
+  };
+
+  mockCheckins.push(checkinData);
+  res.json({ success: true, message: 'Check-in thành công', isCheckinCompleted: true, data: checkinData });
+});
+
+app.get('/api/checkin/status', authenticateUser, (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  const { role, facility_id } = req.user;
+  
+  const facilities = ['Cơ sở 1', 'Cơ sở 2'];
+  const targetFacilities = role === 'FACILITY_MANAGER' ? [facility_id] : facilities;
+
+  const statusList = targetFacilities.map(fac => {
+    const checkins = mockCheckins.filter(c => c.facility_id === fac && c.date === today);
+    const ca1 = checkins.find(c => c.shift === 'Ca 1');
+    const ca2 = checkins.find(c => c.shift === 'Ca 2');
+    return {
+      facility_id: fac,
+      ca1: ca1 ? 'Đã báo cáo' : 'Chưa báo cáo',
+      ca2: ca2 ? 'Đã báo cáo' : 'Chưa báo cáo',
+      details: checkins
+    };
+  });
+
+  res.json({ success: true, data: statusList });
 });
 
 // ==============================================================================
@@ -705,18 +376,14 @@ app.post('/api/ai/auto-tasking', authenticateUser, async (req, res) => {
       return res.status(400).json({ error: 'Vui lòng cung cấp biên bản cuộc họp.' });
     }
 
-    const systemPrompt = `Bạn là một AI điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
-Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY').`;
-
-    const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
-    const aiConfig = configRows.length > 0 ? configRows[0].data : {};
-    const aiModel = aiConfig.model || "google/gemini-2.5-flash";
+    const systemPrompt = `Bạn là một AI Điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
+Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DD), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY').`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: aiModel,
+        model: "meta-llama/llama-3-8b-instruct",
         messages: [ { role: "system", content: systemPrompt }, { role: "user", content: meetingTranscript } ],
         response_format: { type: "json_object" }
       })
@@ -821,68 +488,6 @@ app.post('/api/internal/extract-revenue', express.json({limit: '50mb'}), async (
   }
 });
 
-app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res) => {
-  try {
-    const { prompt, content } = req.body;
-    
-    if (!prompt || !content) {
-      return res.status(400).json({ error: 'Thiếu dữ liệu prompt hoặc nội dung.' });
-    }
-
-    const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
-    const aiConfig = configRows.length > 0 ? configRows[0].data : {};
-    const aiModel = aiConfig.model || "google/gemini-2.5-flash";
-
-    const payload = {
-      model: aiModel,
-      messages: [
-        { role: "system", content: prompt },
-        { role: "user", content: content }
-      ],
-      response_format: { type: "json_object" }
-    };
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { 
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`, 
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://taskflow-ai-dashboard.onrender.com",
-        "X-Title": "Stitch Smart AI"
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("OpenRouter Response Error:", errText);
-      return res.status(response.status).json({ error: 'Lỗi từ OpenRouter API.' });
-    }
-
-    const aiData = await response.json();
-    let parsedData = [];
-    
-    if (aiData.choices && aiData.choices.length > 0) {
-      const aiText = aiData.choices[0].message.content;
-      const jsonMatch = aiText.match(/\[[\s\S]*\]/) || aiText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedData = JSON.parse(jsonMatch[0]);
-        if (parsedData.data) parsedData = parsedData.data;
-        if (!Array.isArray(parsedData)) parsedData = [parsedData];
-      } else {
-         return res.status(500).json({ error: 'AI không trả về JSON hợp lệ.' });
-      }
-    }
-
-    // Trả về usage token để frontend log
-    res.json({ success: true, data: parsedData, usage: aiData.usage });
-
-  } catch (error) {
-    console.error('Lỗi khi gọi AI Extract API (Text):', error);
-    res.status(500).json({ error: 'Lỗi máy chủ nội bộ khi gọi AI API.' });
-  }
-});
-
 // ==============================================================================
 // 3. AI PING THẤU CẢM (EMPATHETIC PING) & TONE ESCALATION
 // ==============================================================================
@@ -919,45 +524,6 @@ const calculateTone = (deadlineDateStr) => {
   }
 };
 
-// API: Lưu và lấy danh sách vi phạm AI
-app.get('/api/ai/violations', authenticateUser, async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT data FROM system_config WHERE key = $1', ['ai_violations']);
-    let violations = [];
-    if (rows.length > 0 && rows[0].data) {
-       violations = rows[0].data;
-    }
-    res.json({ success: true, data: violations });
-  } catch (error) {
-    console.error('Lỗi lấy AI violations:', error);
-    res.status(500).json({ error: 'Lỗi server' });
-  }
-});
-
-app.post('/api/ai/violations', authenticateUser, async (req, res) => {
-  try {
-    const violation = req.body;
-    const { rows } = await pool.query('SELECT data FROM system_config WHERE key = $1', ['ai_violations']);
-    let violations = [];
-    if (rows.length > 0 && rows[0].data) {
-       violations = Array.isArray(rows[0].data) ? rows[0].data : [];
-    }
-    violations.unshift(violation);
-    if (violations.length > 200) violations = violations.slice(0, 200); // limit to 200 latest
-
-    await pool.query(`
-        INSERT INTO system_config (key, data, updated_at) 
-        VALUES ($1, $2, CURRENT_TIMESTAMP)
-        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = CURRENT_TIMESTAMP
-    `, ['ai_violations', JSON.stringify(violations)]);
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Lỗi lưu AI violations:', error);
-    res.status(500).json({ error: 'Lỗi server' });
-  }
-});
-
 // API: Kích hoạt AI Ping đôn đốc công việc
 app.post('/api/ai/ping', authenticateUser, async (req, res) => {
   try {
@@ -987,15 +553,11 @@ app.post('/api/ai/ping', authenticateUser, async (req, res) => {
       Đúng chuẩn mức độ cảnh báo được yêu cầu. Không thêm lời chào thừa thãi như "Chào bạn", đi thẳng vào vấn đề theo cách thấu cảm.
     `;
 
-    const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
-    const aiConfig = configRows.length > 0 ? configRows[0].data : {};
-    const aiModel = aiConfig.model || "google/gemini-2.5-flash";
-
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: aiModel,
+        model: "meta-llama/llama-3-8b-instruct",
         messages: [
           { role: "system", content: systemPrompt }
         ]
@@ -1091,13 +653,7 @@ app.get('/api/reports', authenticateUser, async (req, res) => {
       return res.status(403).json({ error: 'Không đủ quyền xem báo cáo tài chính.' });
     }
     const { rows } = await pool.query('SELECT * FROM daily_financial_reports ORDER BY date DESC');
-    const mappedRows = rows.map(r => ({
-      ...r,
-      totalRevenue: Number(r.total_revenue),
-      createdBy: r.created_by,
-      timestamp: Number(r.timestamp)
-    }));
-    res.json({ success: true, data: mappedRows });
+    res.json({ success: true, data: rows });
   } catch (error) {
     console.error('Lỗi lấy báo cáo doanh thu:', error);
     res.status(500).json({ error: 'Lỗi server khi lấy doanh thu.' });
@@ -1137,105 +693,6 @@ app.post('/api/reports', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error('Lỗi lưu báo cáo doanh thu:', error);
     res.status(500).json({ error: 'Lỗi server khi lưu báo cáo doanh thu.' });
-  }
-});
-
-// ==============================================================================
-// 6. KPI SETTINGS
-// ==============================================================================
-
-app.get('/api/kpi', authenticateUser, async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM kpi_settings ORDER BY updated_at DESC LIMIT 1');
-    if (rows.length > 0) {
-      res.json({ success: true, data: rows[0] });
-    } else {
-      res.json({ success: true, data: null });
-    }
-  } catch (error) {
-    console.error('Lỗi lấy KPI:', error);
-    res.status(500).json({ error: 'Lỗi server khi lấy KPI.' });
-  }
-});
-
-app.post('/api/kpi', authenticateUser, async (req, res) => {
-  try {
-    const { role, name, username } = req.user;
-    if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT'].includes(role)) {
-      return res.status(403).json({ error: 'Không đủ quyền lưu cấu hình KPI.' });
-    }
-    
-    const { apply_month, data } = req.body;
-    
-    // UPSERT by apply_month or just keep adding new rows and fetch latest
-    const query = `
-      INSERT INTO kpi_settings (id, apply_month, data, updated_by, updated_at)
-      VALUES ($1, $2, $3, $4, NOW())
-      ON CONFLICT (id) DO UPDATE 
-      SET apply_month = EXCLUDED.apply_month,
-          data = EXCLUDED.data,
-          updated_by = EXCLUDED.updated_by,
-          updated_at = NOW()
-      RETURNING *
-    `;
-    
-    // We use a constant ID for now or unique month
-    const id = apply_month ? `kpi_${apply_month.replace('/', '_')}` : 'kpi_default';
-    const updatedBy = name || username || role;
-    
-    const { rows } = await pool.query(query, [id, apply_month, JSON.stringify(data), updatedBy]);
-    
-    res.json({ success: true, data: rows[0] });
-  } catch (error) {
-    console.error('Lỗi lưu cấu hình KPI:', error);
-    res.status(500).json({ error: 'Lỗi server khi lưu cấu hình KPI.' });
-  }
-});
-
-// ==============================================================================
-// SYSTEM CONFIG API
-// ==============================================================================
-app.get('/api/config', async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM system_config');
-    const configData = {};
-    rows.forEach(row => { configData[row.key] = row.data; });
-    res.json({ success: true, data: configData });
-  } catch (error) {
-    console.error('Lỗi tải system config:', error);
-    res.status(500).json({ error: 'Lỗi server khi tải cấu hình.' });
-  }
-});
-
-app.post('/api/config', authenticateUser, async (req, res) => {
-  try {
-    const { role } = req.user || {};
-    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
-       return res.status(403).json({ error: 'Không có quyền lưu cấu hình hệ thống.' });
-    }
-    
-    const { ai_config, system_prompts } = req.body;
-    
-    if (ai_config) {
-      await pool.query(`
-        INSERT INTO system_config (key, data, updated_at) 
-        VALUES ($1, $2, NOW()) 
-        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
-      `, ['taskflow_ai_config', JSON.stringify(ai_config)]);
-    }
-    
-    if (system_prompts) {
-      await pool.query(`
-        INSERT INTO system_config (key, data, updated_at) 
-        VALUES ($1, $2, NOW()) 
-        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
-      `, ['taskflow_system_prompts', JSON.stringify(system_prompts)]);
-    }
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Lỗi lưu system config:', error);
-    res.status(500).json({ error: 'Lỗi server khi lưu cấu hình hệ thống.' });
   }
 });
 
