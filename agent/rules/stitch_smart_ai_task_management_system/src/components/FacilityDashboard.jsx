@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import AIAdvisor from './AIAdvisor';
 
 export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacilityFilter }) {
@@ -71,8 +71,8 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                }
                
                if (isDeptHead) {
-                  if (globalFacilityFilter === 'ALL') return true;
                   const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
+                    if (globalFacilityFilter === 'ALL') { return (t?.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase()); }
                   if (globalFacilityFilter && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptId) {
                       const filterLower = String(globalFacilityFilter).toLowerCase();
                       return tFacCode.includes(filterLower);
@@ -454,3 +454,4 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
         </div>
       );
     }
+
