@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { fetchHistory } from '../services/dataService.js';
 
-export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryHandled, isFacilityMode = false, facilityName = '' }) {
+export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryHandled, isFacilityMode = false, facilityName = '', activeSessionId, onSessionUpdate, onSessionCreated }) {
   const [query, setQuery] = useState('');
+  const currentSessionIdRef = React.useRef(activeSessionId);
+  const isInitialMount = React.useRef(true);
 
   const getGreetingText = (userObj) => {
     const hour = new Date().getHours();
@@ -33,10 +35,72 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
     return `${timeGreeting}, ${displayName}! Tôi là Trợ lý Cố vấn AI Cấp cao đây! Dữ liệu vận hành toàn chuỗi đã được đồng bộ. Bạn cần tôi hỗ trợ thông tin gì ạ?`;
   };
 
-  const [chatLog, setChatLog] = useState(user?.role === 'FACILITY_MANAGER' ? [{
+  const defaultLog = user?.role === 'FACILITY_MANAGER' ? [{
     role: 'ai',
     content: "Chào bạn, tôi là Trợ lý AI nội bộ trực thuộc cơ sở. Chức năng của tôi là tối ưu hóa nghiệp vụ: phân tích doanh thu, báo cáo chuyên cần và hỗ trợ công việc tổng thể. Vui lòng nhập yêu cầu của bạn.\n\n⚠️ LƯU Ý HỆ THỐNG: Tài nguyên truy vấn (API) có giới hạn và được giám sát chặt chẽ. AI chỉ cấp quyền truy cập dữ liệu nội bộ của cơ sở bạn đang làm việc. Mọi hành vi cố tình dò hỏi dữ liệu chéo giữa các chi nhánh hoặc không phục vụ công việc sẽ bị từ chối, ghi log (lưu vết) và báo cáo tự động lên Ban Giám đốc."
-  }] : []);
+  }] : [];
+
+  const [chatLog, setChatLog] = useState(defaultLog);
+
+  React.useEffect(() => {
+    currentSessionIdRef.current = activeSessionId;
+    if (activeSessionId) {
+       const sessions = JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]');
+       const session = sessions.find(s => s.id === activeSessionId);
+       if (session) {
+         setChatLog(session.chatLog || []);
+       }
+    } else {
+       setChatLog(defaultLog);
+    }
+  }, [activeSessionId, user?.role]);
+
+  React.useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (chatLog.length === 0) return;
+    if (chatLog.length === 1 && chatLog[0].role === 'ai' && user?.role === 'FACILITY_MANAGER') return;
+
+    let sessions = JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]');
+    let currentId = currentSessionIdRef.current;
+    
+    if (!currentId) {
+      currentId = 'session_' + Date.now();
+      currentSessionIdRef.current = currentId;
+      
+      const title = chatLog.find(m => m.role === 'user')?.content?.substring(0, 30) || 'Phiên AI mới';
+      sessions.unshift({
+        id: currentId,
+        userId: user?.id,
+        title: title,
+        chatLog: chatLog,
+        timestamp: Date.now()
+      });
+      if (onSessionCreated) onSessionCreated(currentId);
+    } else {
+      const idx = sessions.findIndex(s => s.id === currentId);
+      if (idx !== -1) {
+        sessions[idx].chatLog = chatLog;
+        sessions[idx].timestamp = Date.now();
+      } else {
+        const title = chatLog.find(m => m.role === 'user')?.content?.substring(0, 30) || 'Phiên AI mới';
+        sessions.unshift({
+          id: currentId,
+          userId: user?.id,
+          title: title,
+          chatLog: chatLog,
+          timestamp: Date.now()
+        });
+      }
+    }
+    
+    localStorage.setItem('taskflow_ai_sessions', JSON.stringify(sessions));
+    if (onSessionUpdate) {
+      onSessionUpdate(sessions);
+    }
+  }, [chatLog, user?.id, onSessionUpdate]);
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [attachment, setAttachment] = useState(null);

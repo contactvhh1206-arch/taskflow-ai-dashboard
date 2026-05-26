@@ -208,7 +208,15 @@ function MainDashboard() {
   const [cursorPosition, setCursorPosition] = useState(0);
 
   const [aiSessions, setAiSessions] = useState(JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]'));
-  const [activeAiSessionId, setActiveAiSessionId] = useState(null);
+  const [activeAiSessionId, setActiveAiSessionId] = useState(localStorage.getItem('taskflow_active_ai_session_id') || null);
+
+  React.useEffect(() => {
+    if (activeAiSessionId) {
+      localStorage.setItem('taskflow_active_ai_session_id', activeAiSessionId);
+    } else {
+      localStorage.removeItem('taskflow_active_ai_session_id');
+    }
+  }, [activeAiSessionId]);
   const [tasks, setTasks] = useState([]);
   
   // Derived state for filtering tasks
@@ -732,7 +740,7 @@ function MainDashboard() {
              <div className="mt-6 mb-2 px-4">
                 <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-3 flex items-center justify-between tracking-widest uppercase">
                    Lịch sử trò chuyện AI
-                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) { setActiveTab('reports'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
+                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) { setActiveTab('reports'); } else if (['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
                       <span className="material-symbols-outlined text-[16px]">add_circle</span>
                    </button>
                 </div>
@@ -747,6 +755,8 @@ function MainDashboard() {
                                setActiveAiSessionId(session.id); 
                                if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
                                   setActiveTab('reports'); 
+                               } else if (['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) {
+                                  setActiveTab('ai-advisor');
                                } else {
                                   setShowAITaskModal(true);
                                }
@@ -868,7 +878,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <div className="flex flex-col h-full w-full max-w-5xl mx-auto py-2">
                   <div className="bg-white dark:bg-[#1e1e1e] shadow-md rounded-2xl overflow-hidden border border-outline-variant dark:border-gray-700 h-[60vh] flex flex-col shrink-0 mb-6">
-                    <AIAdvisor user={user} />
+                    <AIAdvisor user={user} activeSessionId={activeAiSessionId} onSessionUpdate={setAiSessions} onSessionCreated={setActiveAiSessionId} />
                   </div>
                   <div className="mt-4 mb-12">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
@@ -950,7 +960,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <div className="flex flex-col h-full w-full max-w-5xl mx-auto py-2">
                   <div className="bg-white dark:bg-[#1e1e1e] shadow-md rounded-2xl overflow-hidden border border-outline-variant dark:border-gray-700 h-[calc(100vh-120px)] flex flex-col shrink-0">
-                    <AIAdvisor user={user} />
+                    <AIAdvisor user={user} activeSessionId={activeAiSessionId} onSessionUpdate={setAiSessions} onSessionCreated={setActiveAiSessionId} />
                   </div>
                 </div>
               </ErrorBoundary>
