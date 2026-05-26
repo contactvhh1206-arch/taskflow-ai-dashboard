@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -679,7 +679,7 @@ function MainDashboard() {
                    const picStr = String(t.pic).toLowerCase();
                    const picIdStr = String(t.picId || '').toLowerCase();
                    
-                   if (picIdStr === '@thien' || picStr === 'thiện' || picIdStr === 'marketing' || picStr.includes('marketing')) {
+                   if (picIdStr === '@thien' || picStr === 'thiện' || picIdStr === '@cuong' || picStr === 'cường' || picIdStr === 'marketing' || picStr.includes('marketing')) {
                        return { ...t, facility: 'Phòng Marketing', facilityId: 'MARKETING', department_tag: 'MARKETING' };
                    }
                    if (picIdStr === 'ketoan' || picStr.includes('kế toán')) {
