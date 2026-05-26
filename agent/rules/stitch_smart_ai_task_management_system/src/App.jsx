@@ -671,7 +671,28 @@ function MainDashboard() {
           
           const data = await res.json();
           if (data.success) {
-            setTasks(data.data);
+            let fetchedTasks = data.data || [];
+            
+            // HACK: Auto-correct tasks incorrectly assigned to DUBAI 41 by old backend
+            fetchedTasks = fetchedTasks.map(t => {
+               if (t.facility === 'DUBAI 41' || t.facilityId === 'DUBAI 41' || t.facility === 'HQ' || !t.facility) {
+                   const picStr = String(t.pic).toLowerCase();
+                   const picIdStr = String(t.picId || '').toLowerCase();
+                   
+                   if (picIdStr === '@thien' || picStr === 'thiện' || picIdStr === 'marketing' || picStr.includes('marketing')) {
+                       return { ...t, facility: 'Phòng Marketing', facilityId: 'MARKETING', department_tag: 'MARKETING' };
+                   }
+                   if (picIdStr === 'ketoan' || picStr.includes('kế toán')) {
+                       return { ...t, facility: 'Phòng Finance', facilityId: 'FINANCE', department_tag: 'FINANCE' };
+                   }
+                   if (picStr.includes('phó') || picStr.includes('bgd') || picStr.includes('giám đốc')) {
+                       return { ...t, facility: 'Ban Giám Đốc', facilityId: 'BGD', department_tag: 'BGD' };
+                   }
+               }
+               return t;
+            });
+            
+            setTasks(fetchedTasks);
           } else {
             setTasks([]);
             showToast('Lấy dữ liệu thất bại: ' + (data.error || ''));
