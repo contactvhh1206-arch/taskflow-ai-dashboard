@@ -229,13 +229,15 @@ function MainDashboard() {
       const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
       setFacilitiesList([
         ...facs,
-        { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' }
+        { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+        { id: 'dept2', name: 'Ban Giám Đốc', filterValue: 'BGD' }
       ]);
     } catch {}
   }, []);
   
-  const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
-  const deptIdGlobal = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : 'MARKETING');
+  const isVPGlobal = user?.role === 'VICE_PRESIDENT';
+  const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVPGlobal;
+  const deptIdGlobal = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVPGlobal ? 'BGD' : 'MARKETING'));
   const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== deptIdGlobal;
 
   // Derived state for filtering tasks
@@ -562,8 +564,9 @@ function MainDashboard() {
 
   const handleCreateTask = async (newTask) => {
     try {
-      const isDeptHeadLocal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
-      const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : 'MARKETING');
+      const isVP = user?.role === 'VICE_PRESIDENT';
+      const isDeptHeadLocal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
+      const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
       const taskFacility = user?.role === 'SUPER_ADMIN' ? 'HQ' : (isDeptHeadLocal ? deptId : user?.facility_id);
       
       const taskPayload = {
