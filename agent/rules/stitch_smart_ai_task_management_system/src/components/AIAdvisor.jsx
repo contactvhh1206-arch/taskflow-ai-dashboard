@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { fetchHistory } from '../services/dataService.js';
 
 export default function AIAdvisor(props) {
-  const { user, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
+  const { user, tasks, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
   const isFacilityMode = props.isFacilityMode !== undefined ? props.isFacilityMode : (user && !['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role));
   let facilityName = props.facilityName || (isFacilityMode ? (localStorage.getItem('facility_name') || user?.facilityName || user?.facility_id || '') : '');
   
@@ -314,6 +314,28 @@ export default function AIAdvisor(props) {
       let systemContext = `Dữ liệu hệ thống hiện tại:\n${vectorDataArr.join('\n')}`;
       if (financialContextStr) {
          systemContext += `\n\nDỮ LIỆU DOANH THU (TÀI CHÍNH):\n${financialContextStr}`;
+      }
+      
+      if (tasks && tasks.length > 0) {
+         let taskContextStr = '';
+         if (isFacilityMode) {
+            const uName = (user?.username || '').toLowerCase();
+            const fName = (facilityName || '').toLowerCase();
+            const facTasks = tasks.filter(t => {
+               const title = (t.title || '').toLowerCase();
+               return t.pic === user?.username || t.facility_id === facilityName || t.facility_name === facilityName || t.org_unit === facilityName || (uName && title.includes(uName)) || (fName && title.includes(fName));
+            });
+            facTasks.slice(0, 50).forEach(t => {
+               taskContextStr += `- [${t.status === 'done' ? 'Hoàn thành' : (t.urgent ? 'Khẩn cấp' : 'Đang mở')}] ${t.title} (Hạn: ${t.deadline || 'Không'})\n`;
+            });
+         } else {
+            tasks.slice(0, 50).forEach(t => {
+               taskContextStr += `- [${t.facility_name || t.org_unit || t.pic}] ${t.title} (Trạng thái: ${t.status})\n`;
+            });
+         }
+         if (taskContextStr) {
+            systemContext += `\n\nDANH SÁCH CÔNG VIỆC (TASKS):\n${taskContextStr}`;
+         }
       }
       
       const messages = [
