@@ -285,7 +285,7 @@ export default function AIAdvisor(props) {
          const reports = await fetchReports(token, user?.role, user?.facility_id) || [];
          
          if (reports && reports.length > 0) {
-            const recentReports = reports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 10);
+            const recentReports = reports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 60);
             
             recentReports.forEach(rep => {
                const rData = typeof rep.data === 'string' ? JSON.parse(rep.data) : rep.data;
