@@ -1048,7 +1048,7 @@ app.get('/api/internal/ai-token-stats', authenticateUser, async (req, res) => {
 app.get('/api/reports', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
-    if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(role)) {
+    if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(role)) {
       return res.status(403).json({ error: 'Không đủ quyền xem báo cáo tài chính.' });
     }
     const { rows } = await pool.query('SELECT * FROM daily_financial_reports ORDER BY date DESC');
