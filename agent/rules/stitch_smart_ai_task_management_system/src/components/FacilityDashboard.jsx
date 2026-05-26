@@ -77,6 +77,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                   if (!matchesDept) return false;
                   
                   if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
+                      if (globalFacilityFilter === deptId) return true;
                       const filterLower = globalFacilityFilter.toLowerCase();
                       return tFacCode.includes(filterLower) || (t?.department_tag || '').toLowerCase().includes(filterLower);
                   }

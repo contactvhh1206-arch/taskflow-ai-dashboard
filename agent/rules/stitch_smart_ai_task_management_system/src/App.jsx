@@ -280,6 +280,7 @@ function MainDashboard() {
         if (!matchesDept) return false;
         
         if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
+            if (globalFacilityFilter === deptId) return true;
             const filterLower = globalFacilityFilter.toLowerCase();
             return tFacCode.includes(filterLower) || (t?.department_tag || '').toLowerCase().includes(filterLower);
         }
@@ -556,11 +557,13 @@ function MainDashboard() {
 
   const handleCreateTask = async (newTask) => {
     try {
+      const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : ''));
       const taskPayload = {
         pic: user.name,
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
         facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
+        ...(deptId ? { department_tag: deptId } : {}),
         ...newTask
       };
       
