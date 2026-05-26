@@ -745,10 +745,10 @@ function MainDashboard() {
                    </button>
                 </div>
                 <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
-                   {aiSessions.filter(s => s.userId === user.id).length === 0 ? (
+                   {aiSessions.filter(s => s.userId === (user.username || user.id)).length === 0 ? (
                       <div className="text-xs text-gray-400 dark:text-gray-600 italic px-2">Chưa có lịch sử...</div>
                    ) : (
-                      aiSessions.filter(s => s.userId === user.id).map(session => (
+                      aiSessions.filter(s => s.userId === (user?.username || user?.id)).map(session => (
                          <div 
                             key={session.id} 
                             onClick={() => { 

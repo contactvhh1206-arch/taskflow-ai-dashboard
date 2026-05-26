@@ -86,7 +86,7 @@ export default function AIAdvisor(props) {
       const title = chatLog.find(m => m.role === 'user')?.content?.substring(0, 30) || 'Phiên AI mới';
       sessions.unshift({
         id: currentId,
-        userId: user?.id,
+        userId: user?.username || user?.id,
         title: title,
         chatLog: chatLog,
         timestamp: Date.now()
@@ -101,7 +101,7 @@ export default function AIAdvisor(props) {
         const title = chatLog.find(m => m.role === 'user')?.content?.substring(0, 30) || 'Phiên AI mới';
         sessions.unshift({
           id: currentId,
-          userId: user?.id,
+          userId: user?.username || user?.id,
           title: title,
           chatLog: chatLog,
           timestamp: Date.now()
@@ -244,7 +244,7 @@ export default function AIAdvisor(props) {
              violations.push({
                id: Date.now(),
                timestamp: new Date().toISOString(),
-               userId: user?.id || user?.username || 'Unknown',
+               userId: user?.username || user?.id,
                facility: facilityName,
                query: userQuery,
                status: 'Violation'
