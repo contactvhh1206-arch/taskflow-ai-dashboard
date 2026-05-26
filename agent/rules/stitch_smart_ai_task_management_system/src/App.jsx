@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+﻿import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -885,7 +885,7 @@ function MainDashboard() {
             >
               <span className="material-symbols-outlined">menu</span>
             </button>
-            <div className="relative w-full max-w-sm hidden md:block">
+            <div className="relative w-full max-w-sm">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
               <select 
                 value={globalFacilityFilter} 
