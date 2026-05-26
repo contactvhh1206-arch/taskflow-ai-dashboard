@@ -235,8 +235,8 @@ function MainDashboard() {
   }, []);
   
   const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
-  const deptIdGlobal = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : ''));
-  const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptIdGlobal;
+  const deptIdGlobal = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : 'MARKETING');
+  const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== deptIdGlobal;
 
   // Derived state for filtering tasks
   const now = new Date();
