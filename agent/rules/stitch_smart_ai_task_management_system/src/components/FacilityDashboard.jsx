@@ -73,7 +73,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                   const tFacCode = (t?.facility || t?.facilityId || '').toLowerCase();
                   const uName = (user?.username || '').toLowerCase();
                   const uNameFull = (user?.name || '').toLowerCase();
-                  let matchesDept = tFacCode.includes(uName) || tFacCode.includes(uNameFull) || t.department_tag === deptId;
+                  let matchesDept = !t.department_tag || t.department_tag === deptId || tFacCode.includes(uName) || tFacCode.includes(uNameFull);
                   if (!matchesDept) return false;
                   
                   if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
