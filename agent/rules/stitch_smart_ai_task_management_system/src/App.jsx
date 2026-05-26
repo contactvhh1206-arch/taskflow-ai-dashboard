@@ -227,7 +227,12 @@ function MainDashboard() {
     try {
       const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
       const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
-      setFacilitiesList(facs);
+      setFacilitiesList([
+        ...facs,
+        { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+        { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+        { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
+      ]);
     } catch {}
   }, []);
   
