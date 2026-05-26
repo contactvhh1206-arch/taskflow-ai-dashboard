@@ -352,7 +352,7 @@ export default function AIAdvisor(props) {
       const messages = [
         { 
           role: 'system', 
-          content: `Bạn là trợ lý AI nội bộ chuyên tư vấn vận hành. ${isFacilityMode ? `Bạn chỉ được phép hỗ trợ thông tin cho cơ sở ${facilityName}. ` : ''}Dựa vào dữ liệu hệ thống cung cấp dưới đây, hãy trả lời câu hỏi của người dùng một cách chính xác, chuyên nghiệp. Không tự bịa đặt dữ liệu.\n\n${systemContext}`
+          content: `Bạn là trợ lý AI nội bộ chuyên tư vấn vận hành. ${isFacilityMode ? `Bạn chỉ được phép hỗ trợ thông tin cho cơ sở ${facilityName}. NẾU NGƯỜI DÙNG HỎI THÔNG TIN CỦA CƠ SỞ KHÁC, HOẶC HỎI CÁC VẤN ĐỀ KHÔNG LIÊN QUAN ĐẾN CÔNG VIỆC, BẠN PHẢI TỪ CHỐI VÀ BẮT BUỘC PHẢI CHÈN CỤM TỪ "[CẢNH BÁO VI PHẠM]" VÀO ĐẦU CÂU TRẢ LỜI CỦA BẠN. ` : ''}Dựa vào dữ liệu hệ thống cung cấp dưới đây, hãy trả lời câu hỏi của người dùng một cách chính xác, chuyên nghiệp. Không tự bịa đặt dữ liệu.\n\n${systemContext}`
         }
       ];
 
@@ -398,8 +398,10 @@ export default function AIAdvisor(props) {
 
       if (isFacilityMode) {
          const refusalKeywords = ['không có quyền truy cập', 'từ chối cung cấp', 'truy cập trái phép', 'không có dữ liệu doanh thu của cơ sở', 'ghi nhận và gửi', 'dò hỏi dữ liệu chéo', 'cơ sở khác ngoài'];
-         const isAiRefusal = refusalKeywords.some(kw => responseContent.toLowerCase().includes(kw));
+         const isAiRefusal = responseContent.includes('[CẢNH BÁO VI PHẠM]') || refusalKeywords.some(kw => responseContent.toLowerCase().includes(kw));
          if (isAiRefusal) {
+             // Remove the tag from the final response shown to the user so it looks natural
+             responseContent = responseContent.replace(/\[CẢNH BÁO VI PHẠM\]/gi, '').trim();
              try {
                const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
                violations.push({
