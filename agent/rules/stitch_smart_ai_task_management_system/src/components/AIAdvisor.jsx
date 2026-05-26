@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { fetchHistory } from '../services/dataService.js';
 
-export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryHandled, isFacilityMode = false, facilityName = '', activeSessionId, onSessionUpdate, onSessionCreated }) {
+export default function AIAdvisor(props) {
+  const { user, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
+  const isFacilityMode = props.isFacilityMode !== undefined ? props.isFacilityMode : (user && !['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role));
+  const facilityName = props.facilityName || (isFacilityMode ? (localStorage.getItem('facility_name') || user?.facilityName || user?.facility_id || '') : '');
   const [query, setQuery] = useState('');
   const currentSessionIdRef = React.useRef(activeSessionId);
   const isInitialMount = React.useRef(true);
