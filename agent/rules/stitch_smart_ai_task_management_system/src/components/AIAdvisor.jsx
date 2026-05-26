@@ -414,14 +414,18 @@ export default function AIAdvisor(props) {
                const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
                violations.push(newViolation);
                localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
-               fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/violations', {
+               fetch('https://taskflow-ai-dashboard.onrender.com/api/logs', {
                   method: 'POST',
                   headers: {
-                    'Content-Type': 'application/json',
-                    'x-user-role': user?.role || '',
-                    'x-facility-id': localStorage.getItem('facility_id') || user?.facility_id || 'ALL'
+                    'Content-Type': 'application/json'
                   },
-                  body: JSON.stringify(newViolation)
+                  body: JSON.stringify({
+                    org_unit: 'AI_VIOLATION',
+                    entry_type: 'AI_VIOLATION',
+                    content: newViolation,
+                    date: new Date().toISOString().split('T')[0],
+                    display_time: new Date().toLocaleTimeString('vi-VN')
+                  })
                }).catch(() => {});
              } catch {}
          }

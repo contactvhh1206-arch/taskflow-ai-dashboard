@@ -28,7 +28,7 @@ export default function AIUsageLogs() {
 
         const fetchViolations = async () => {
           try {
-            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/violations', {
+            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/logs', {
               headers: {
                 'x-user-role': 'ADMIN',
                 'x-facility-id': 'ALL'
@@ -37,7 +37,10 @@ export default function AIUsageLogs() {
             if (res.ok) {
               const data = await res.json();
               if (data.success && data.data) {
-                setViolations(data.data.sort((a, b) => b.timestamp < a.timestamp ? -1 : 1));
+                const apiViolations = data.data
+                  .filter(log => log.org_unit === 'AI_VIOLATION')
+                  .map(log => log.content);
+                setViolations(apiViolations.sort((a, b) => b.timestamp < a.timestamp ? -1 : 1));
                 return;
               }
             }
