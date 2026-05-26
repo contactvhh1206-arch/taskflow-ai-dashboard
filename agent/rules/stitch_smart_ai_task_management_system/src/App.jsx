@@ -258,8 +258,44 @@ function MainDashboard() {
     }
   };
 
-  const activeTasks = tasks.filter(t => !isOldDoneTask(t));
-  const historyTasks = tasks.filter(t => isOldDoneTask(t));
+  const filteredTasks = tasks.filter(t => {
+     const isHighLevel = user?.role !== 'DEPARTMENT_HEAD' && (user?.facility_id === 'ALL' || (Array.isArray(user?.facility_id) && user?.facility_id.includes('ALL')) || ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user?.role));
+     const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
+     const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : ''));
+
+     if (isHighLevel && globalFacilityFilter === 'ALL') return true;
+     if (isHighLevel && globalFacilityFilter !== 'ALL') {
+         const tTitle = (t.title || '').toLowerCase();
+         const tFacName = (t?.facilityId || t?.facility || '').toLowerCase();
+         const tDeptTag = (t?.department_tag || '').toLowerCase();
+         const filterLower = globalFacilityFilter.toLowerCase();
+         return tFacName.includes(filterLower) || tTitle.includes(filterLower) || tDeptTag === filterLower;
+     }
+     
+     if (isDeptHead) {
+        const tFacCode = (t?.facility || t?.facilityId || '').toLowerCase();
+        const uName = (user?.username || '').toLowerCase();
+        const uNameFull = (user?.name || '').toLowerCase();
+        let matchesDept = tFacCode.includes(uName) || tFacCode.includes(uNameFull) || t.department_id === deptId;
+        if (!matchesDept) return false;
+        
+        if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
+            const filterLower = globalFacilityFilter.toLowerCase();
+            return tFacCode.includes(filterLower) || (t?.department_id || '').toLowerCase().includes(filterLower);
+        }
+        return true;
+     }
+     
+     if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
+         const tFacCode = (t?.facility || t?.facilityId || '').toLowerCase();
+         return tFacCode.includes(globalFacilityFilter.toLowerCase());
+     }
+
+     return true;
+  });
+
+  const activeTasks = filteredTasks.filter(t => !isOldDoneTask(t));
+  const historyTasks = filteredTasks.filter(t => isOldDoneTask(t));
 
   const [facilityStatuses, setFacilityStatuses] = useState([]);
   const [isCheckinCompleted, setIsCheckinCompleted] = useState(false);
