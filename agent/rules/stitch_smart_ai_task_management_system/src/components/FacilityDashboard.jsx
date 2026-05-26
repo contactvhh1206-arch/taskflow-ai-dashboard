@@ -73,14 +73,15 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                   const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
                   const uName = String(user?.username || '').toLowerCase();
                   const uNameFull = String(user?.name || '').toLowerCase();
+                  
+                  if (globalFacilityFilter && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptId) {
+                      const filterLower = String(globalFacilityFilter).toLowerCase();
+                      return tFacCode.includes(filterLower);
+                  }
+
                   let matchesDept = !t.department_tag || t.department_tag === deptId || tFacCode.includes(uName) || tFacCode.includes(uNameFull);
                   if (!matchesDept) return false;
                   
-                  if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
-                      if (globalFacilityFilter === deptId) return true;
-                      const filterLower = String(globalFacilityFilter).toLowerCase();
-                      return tFacCode.includes(filterLower) || String(t?.department_tag || '').toLowerCase().includes(filterLower);
-                  }
                   return true;
                }
                

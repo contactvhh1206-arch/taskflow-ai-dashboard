@@ -234,6 +234,10 @@ function MainDashboard() {
     } catch {}
   }, []);
   
+  const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
+  const deptIdGlobal = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : ''));
+  const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptIdGlobal;
+
   // Derived state for filtering tasks
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -276,14 +280,15 @@ function MainDashboard() {
         const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
         const uName = String(user?.username || '').toLowerCase();
         const uNameFull = String(user?.name || '').toLowerCase();
+        
+        if (globalFacilityFilter && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptId) {
+            const filterLower = String(globalFacilityFilter).toLowerCase();
+            return tFacCode.includes(filterLower);
+        }
+
         let matchesDept = !t.department_tag || t.department_tag === deptId || tFacCode.includes(uName) || tFacCode.includes(uNameFull);
         if (!matchesDept) return false;
         
-        if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
-            if (globalFacilityFilter === deptId) return true;
-            const filterLower = String(globalFacilityFilter).toLowerCase();
-            return tFacCode.includes(filterLower) || String(t?.department_tag || '').toLowerCase().includes(filterLower);
-        }
         return true;
      }
      
@@ -1107,14 +1112,16 @@ function MainDashboard() {
                         <span className="material-symbols-outlined text-[18px]">view_kanban</span> Bảng
                       </button>
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={() => setShowAITaskModal(true)} className="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-md shadow-secondary/20 transition-all">
-                          <span className="material-symbols-outlined text-[18px]">auto_awesome</span> <span className="hidden sm:inline">Trích xuất Biên bản</span>
-                        </button>
-                        <button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-md shadow-primary/20 transition-all">
-                          <span className="material-symbols-outlined text-[18px]">add</span> Mới
-                        </button>
+                    {!isReadOnlyView && (
+                      <div className="flex gap-2">
+                          <button onClick={() => setShowAITaskModal(true)} className="bg-secondary hover:bg-secondary/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-md shadow-secondary/20 transition-all">
+                            <span className="material-symbols-outlined text-[18px]">auto_awesome</span> <span className="hidden sm:inline">Trích xuất Biên bản</span>
+                          </button>
+                          <button onClick={() => setShowCreateModal(true)} className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-md shadow-primary/20 transition-all">
+                            <span className="material-symbols-outlined text-[18px]">add</span> Mới
+                          </button>
                       </div>
+                    )}
                   </div>
                 </div>
 
@@ -1175,10 +1182,10 @@ function MainDashboard() {
 
                 {viewMode === 'kanban' ? (
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Cần làm" status="todo" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} />
-                    <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} />
-                    <KanbanColumn title="Nghiệm thu" status="review" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} />
-                    <KanbanColumn title="Hoàn thành" status="done" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} />
+                    <KanbanColumn title="Cần làm" status="todo" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Nghiệm thu" status="review" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Hoàn thành" status="done" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} readOnly={isReadOnlyView} />
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden">
@@ -1603,51 +1610,52 @@ function StatusBadge({ status }) {
   return <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}>{labels[status]}</span>;
 }
 
-function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal, onQuickAdd }) {
+function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal, onQuickAdd, readOnly }) {
   const columnTasks = tasks.filter(t => t.status === status);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickTitle, setQuickTitle] = useState('');
   const inputRef = React.useRef(null);
 
-  React.useEffect(() => {
-    if (showQuickAdd && inputRef.current) inputRef.current.focus();
+  useEffect(() => {
+    if (showQuickAdd && inputRef.current) {
+      inputRef.current.focus();
+    }
   }, [showQuickAdd]);
 
   const handleQuickSubmit = () => {
-    if (quickTitle.trim()) {
-      onQuickAdd({ title: quickTitle.trim(), status, desc: '' });
+    if (quickTitle.trim() && !readOnly) {
+      onQuickAdd({ title: quickTitle, desc: '', status });
       setQuickTitle('');
-      setShowQuickAdd(false);
     }
+    setShowQuickAdd(false);
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleQuickSubmit();
-    else if (e.key === 'Escape') { setShowQuickAdd(false); setQuickTitle(''); }
+    if (e.key === 'Escape') setShowQuickAdd(false);
   };
 
   return (
-    <div className="flex flex-col bg-surface-container dark:bg-[#1a1a1a] rounded-xl border border-outline-variant dark:border-gray-800/50 p-4 min-h-[500px]">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-          {title} <span className="bg-white dark:bg-gray-800 border border-outline-variant dark:border-gray-700 text-gray-500 px-2 py-0.5 rounded-full text-xs">{columnTasks.length}</span>
+    <div className="bg-surface-container-low dark:bg-[#1e1e1e] rounded-2xl flex flex-col max-h-full border border-outline-variant dark:border-gray-800 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-outline-variant dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-[#252525]">
+        <h3 className="font-bold text-on-surface dark:text-white flex items-center gap-2">
+          {title}
+          <span className="bg-white dark:bg-gray-800 text-xs py-0.5 px-2 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm text-gray-500">{columnTasks.length}</span>
         </h3>
-        <button className="text-gray-400 hover:text-primary transition-colors"><span className="material-symbols-outlined text-[18px]">more_horiz</span></button>
+        <button className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"><span className="material-symbols-outlined text-[18px]">more_horiz</span></button>
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar bg-gray-50/30 dark:bg-transparent min-h-[150px]">
         {columnTasks.map(task => (
-          <div key={task.id} onClick={() => setSelectedTask(task)} className="bg-white dark:bg-[#252525] p-4 rounded-xl border border-outline-variant dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-primary dark:text-blue-400 bg-primary/10 dark:bg-primary/20 px-2 py-1 rounded-md">{task.facility}</span>
-              <div className="flex items-center gap-1">
-                {task.needsSupport && <span className="px-2 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-md text-[10px] font-bold flex items-center gap-1 border border-red-200 dark:border-red-800/50"><span className="material-symbols-outlined text-[10px]">support_agent</span></span>}
-                {task.urgent && <span className="material-symbols-outlined text-error text-[16px]" title="Khẩn cấp">error</span>}
+          <div key={task.id} onClick={() => setSelectedTask(task)} className="bg-white dark:bg-[#252525] p-4 rounded-xl shadow-sm border border-outline-variant dark:border-gray-700 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group">
+            {task.facility && (
+              <div className="mb-2">
+                <span className="text-[10px] font-bold tracking-wider uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-md">{task.facility}</span>
               </div>
-            </div>
-            <h4 className="text-sm font-semibold text-on-surface dark:text-gray-100 mb-2 leading-snug">{task.title}</h4>
-            <div className="flex items-center justify-between mt-4 border-t border-outline-variant dark:border-gray-700/50 pt-3">
+            )}
+            <h4 className="font-medium text-sm text-on-surface dark:text-white mb-2 leading-snug group-hover:text-primary transition-colors">{task.title}</h4>
+            <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-gray-300" title={task.pic || 'Chưa có PIC'}>
+                <div className="w-6 h-6 rounded-full bg-surface-container-highest dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center text-[10px] font-bold border border-white dark:border-gray-600 shadow-sm">
                   {task.pic ? task.pic.split(' ').map(n => n[0]).join('').slice(0, 2) : '?'}
                 </div>
                 <span className="text-xs text-gray-500 dark:text-gray-400">{task.pic || 'Chưa giao'}</span>
@@ -1662,13 +1670,13 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
 
         {columnTasks.length === 0 && !showQuickAdd && <div className="text-center p-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-gray-400 text-xs">Trống</div>}
         
-        {showQuickAdd && (
+        {showQuickAdd && !readOnly && (
           <div className="bg-white dark:bg-[#252525] p-3 rounded-lg shadow-sm border border-primary dark:border-blue-500">
             <input ref={inputRef} type="text" value={quickTitle} onChange={e => setQuickTitle(e.target.value)} onKeyDown={handleKeyDown} onBlur={() => quickTitle.trim() ? handleQuickSubmit() : setShowQuickAdd(false)} placeholder="Nhập tiêu đề (Enter để lưu)..." className="w-full text-sm outline-none bg-transparent dark:text-white" />
           </div>
         )}
 
-        {!showQuickAdd && (
+        {!showQuickAdd && !readOnly && (
           <div className="flex gap-2 mt-2">
             <button onClick={() => setShowQuickAdd(true)} className="flex-1 py-2 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors border border-dashed border-gray-300 dark:border-gray-700" title="Quick Add">
               <span className="material-symbols-outlined text-[18px]">bolt</span>
