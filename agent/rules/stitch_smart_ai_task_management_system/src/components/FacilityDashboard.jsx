@@ -76,8 +76,8 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                   let matchesDept = tFacCode.includes(uName) || tFacCode.includes(uNameFull) || t.department_id === deptId;
                   if (!matchesDept) return false;
                   
-                  if (localFacFilter && localFacFilter !== 'ALL') {
-                      const filterLower = localFacFilter.toLowerCase();
+                  if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
+                      const filterLower = globalFacilityFilter.toLowerCase();
                       return tFacCode.includes(filterLower) || (t?.department_id || '').toLowerCase().includes(filterLower);
                   }
                   return true;
@@ -243,18 +243,6 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             </div>
 
             <div className="flex items-center gap-3">
-              {['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) && (
-                <div className="relative flex items-center">
-                   <select 
-                     value={localFacFilter} 
-                     onChange={(e) => setLocalFacFilter(e.target.value)}
-                     className="px-3 py-1.5 bg-surface-container-high dark:bg-[#252525] border border-outline-variant dark:border-gray-800 rounded-lg text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white cursor-pointer"
-                   >
-                     <option value="ALL">Tất cả Cơ sở / Phòng ban</option>
-                     {facilitiesList.map(f => <option key={f.id || f.facility_id} value={f.id || f.facility_id}>{f.name || f.facility_id}</option>)}
-                   </select>
-                </div>
-              )}
               {/* Segmented Control: Time Filter */}
               <div className="flex items-center bg-surface-container-high dark:bg-[#252525] rounded-lg p-1 w-fit shadow-inner border border-outline-variant dark:border-gray-800">
               <button

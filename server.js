@@ -919,6 +919,45 @@ const calculateTone = (deadlineDateStr) => {
   }
 };
 
+// API: Lưu và lấy danh sách vi phạm AI
+app.get('/api/ai/violations', authenticateUser, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT data FROM system_config WHERE key = $1', ['ai_violations']);
+    let violations = [];
+    if (rows.length > 0 && rows[0].data) {
+       violations = rows[0].data;
+    }
+    res.json({ success: true, data: violations });
+  } catch (error) {
+    console.error('Lỗi lấy AI violations:', error);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
+app.post('/api/ai/violations', authenticateUser, async (req, res) => {
+  try {
+    const violation = req.body;
+    const { rows } = await pool.query('SELECT data FROM system_config WHERE key = $1', ['ai_violations']);
+    let violations = [];
+    if (rows.length > 0 && rows[0].data) {
+       violations = Array.isArray(rows[0].data) ? rows[0].data : [];
+    }
+    violations.unshift(violation);
+    if (violations.length > 200) violations = violations.slice(0, 200); // limit to 200 latest
+
+    await pool.query(`
+        INSERT INTO system_config (key, data, updated_at) 
+        VALUES ($1, $2, CURRENT_TIMESTAMP)
+        ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = CURRENT_TIMESTAMP
+    `, ['ai_violations', JSON.stringify(violations)]);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Lỗi lưu AI violations:', error);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // API: Kích hoạt AI Ping đôn đốc công việc
 app.post('/api/ai/ping', authenticateUser, async (req, res) => {
   try {
