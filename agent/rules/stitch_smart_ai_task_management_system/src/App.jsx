@@ -9,7 +9,7 @@ import ApiConfigPanel from './components/ApiConfigPanel.jsx';
 import AIUsageLogs from './components/AIUsageLogs.jsx';
 import RAGManagerPanel from './components/RAGManagerPanel.jsx';
 import FacilityDashboard from './components/FacilityDashboard.jsx';
-import PerformanceReport from './components/PerformanceReport.jsx';
+
 import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
 import DailyRevenueReport from './components/DailyRevenueReport.jsx';
 import RevenueLog from './components/RevenueLog.jsx';
@@ -781,7 +781,7 @@ function MainDashboard() {
               <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
-              <NavItem icon="analytics" label="Báo cáo hiệu suất" active={activeTab === 'dept-reports'} onClick={() => setActiveTab('dept-reports')} />
+
             </>
           )}
           {user.role === 'FINANCE_DEPT' && (
@@ -1123,10 +1123,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <RevenueLog user={user} showToast={showToast} />
               </ErrorBoundary>
-            ) : ['dept-reports'].includes(activeTab) ? (
-              <ErrorBoundary>
-                <PerformanceReport user={user} tasks={tasks} globalFacilityFilter={globalFacilityFilter} />
-              </ErrorBoundary>
+
             ) : (
               <>
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
