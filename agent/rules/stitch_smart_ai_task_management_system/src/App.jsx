@@ -282,15 +282,13 @@ function MainDashboard() {
      if (isDeptHead) {
         if (globalFacilityFilter === 'ALL') return true;
         const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
-        const uName = String(user?.username || '').toLowerCase();
-        const uNameFull = String(user?.name || '').toLowerCase();
         
         if (globalFacilityFilter && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptId) {
             const filterLower = String(globalFacilityFilter).toLowerCase();
             return tFacCode.includes(filterLower);
         }
 
-        let matchesDept = !t.department_tag || t.department_tag === deptId || tFacCode.includes(uName) || tFacCode.includes(uNameFull);
+        let matchesDept = (t.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase());
         if (!matchesDept) return false;
         
         return true;
