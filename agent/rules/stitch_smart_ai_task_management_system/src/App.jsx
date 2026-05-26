@@ -698,7 +698,10 @@ function MainDashboard() {
             </>
           )}
           {user.role === 'FACILITY_MANAGER' && (
-            <NavItem icon="fact_check" label="Điểm danh" active={activeTab === 'checkin'} onClick={() => setActiveTab('checkin')} />
+            <>
+              <NavItem icon="fact_check" label="Điểm danh" active={activeTab === 'checkin'} onClick={() => setActiveTab('checkin')} />
+              <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => setActiveTab('ai-advisor')} />
+            </>
           )}
           {['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) && (
             <>
