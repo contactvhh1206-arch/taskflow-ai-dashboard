@@ -774,6 +774,7 @@ function MainDashboard() {
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
               <NavItem icon="analytics" label="Báo cáo hiệu suất" active={activeTab === 'dept-reports'} onClick={() => setActiveTab('dept-reports')} />
+              <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
             </>
           )}
           {user.role === 'FINANCE_DEPT' && (
