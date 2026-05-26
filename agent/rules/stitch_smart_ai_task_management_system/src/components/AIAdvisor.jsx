@@ -321,9 +321,18 @@ export default function AIAdvisor(props) {
          if (isFacilityMode) {
             const uName = (user?.username || '').toLowerCase();
             const fName = (facilityName || '').toLowerCase();
+            const fCode = (user?.facility_code || '').toLowerCase();
             const facTasks = tasks.filter(t => {
                const title = (t.title || '').toLowerCase();
-               return t.pic === user?.username || t.facility_id === facilityName || t.facility_name === facilityName || t.org_unit === facilityName || (uName && title.includes(uName)) || (fName && title.includes(fName));
+               return t.pic === user?.username || 
+                      t.facilityId === user?.facility_code ||
+                      t.facility === facilityName ||
+                      t.facility_id === facilityName || 
+                      t.facility_name === facilityName || 
+                      t.org_unit === facilityName || 
+                      (uName && title.includes(uName)) || 
+                      (fName && title.includes(fName)) ||
+                      (fCode && title.includes(fCode));
             });
             facTasks.slice(0, 50).forEach(t => {
                const todayStr = new Date().toISOString().split('T')[0];
