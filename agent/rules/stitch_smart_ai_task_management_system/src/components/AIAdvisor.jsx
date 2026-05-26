@@ -363,6 +363,25 @@ export default function AIAdvisor(props) {
       const data = await response.json();
       responseContent = data.choices?.[0]?.message?.content || "Không có phản hồi từ AI.";
 
+      if (isFacilityMode) {
+         const refusalKeywords = ['không có quyền truy cập', 'từ chối cung cấp', 'truy cập trái phép', 'không có dữ liệu doanh thu của cơ sở', 'ghi nhận và gửi', 'dò hỏi dữ liệu chéo', 'cơ sở khác ngoài'];
+         const isAiRefusal = refusalKeywords.some(kw => responseContent.toLowerCase().includes(kw));
+         if (isAiRefusal) {
+             try {
+               const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
+               violations.push({
+                 id: Date.now(),
+                 timestamp: new Date().toISOString(),
+                 userId: user?.username || user?.id,
+                 facility: facilityName,
+                 query: userQuery,
+                 status: 'Violation'
+               });
+               localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
+             } catch {}
+         }
+      }
+
       setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
 
     } catch (err) {
