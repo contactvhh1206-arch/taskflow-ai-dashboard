@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+﻿import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -1126,7 +1126,7 @@ function MainDashboard() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                   <div>
                     <h2 className="text-2xl font-bold text-on-surface dark:text-white">
-                      {user.role === 'SUPER_ADMIN' ? 'Tổng quan Toàn chuỗi' : `Dashboard - ${user.facility_id}`}
+                      {user.role === 'SUPER_ADMIN' ? 'Tổng quan Toàn chuỗi' : (user.facility_id === 'ALL' || user.facility_id === 'undefined' || !user.facility_id ? 'Dashboard' : `Dashboard - ${user.facility_id}`)}
                     </h2>
                     <p className="text-sm text-on-surface-variant dark:text-gray-400 mt-1">
                       {user.role === 'SUPER_ADMIN' ? 'Quản lý và điều phối task trên toàn hệ thống.' : 'Quản lý công việc nội bộ cơ sở.'}
