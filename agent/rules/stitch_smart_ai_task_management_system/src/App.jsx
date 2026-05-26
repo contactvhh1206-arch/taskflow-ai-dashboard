@@ -229,8 +229,7 @@ function MainDashboard() {
       const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
       setFacilitiesList([
         ...facs,
-        { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
-        { id: 'dept2', name: 'Phòng Kế toán', filterValue: 'FINANCE' }
+        { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' }
       ]);
     } catch {}
   }, []);
@@ -819,14 +818,13 @@ function MainDashboard() {
                 value={globalFacilityFilter} 
                 onChange={(e) => setGlobalFacilityFilter(e.target.value)} 
                 disabled={user.role === 'FACILITY_MANAGER'}
-                className="w-full bg-surface-container dark:bg-gray-800 border-transparent focus:border-primary focus:ring-1 focus:ring-primary rounded-full pl-10 pr-4 py-2 text-sm outline-none transition-all dark:text-white appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-surface-container dark:bg-gray-800 border-transparent focus:border-primary focus:ring-1 focus:ring-primary rounded-full pl-10 pr-4 py-2 text-sm outline-none transition-all dark:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="ALL">Tất cả cơ sở</option>
                 {facilitiesList.map(f => (
                   <option key={f.id} value={f.filterValue || f.name}>{f.name}</option>
                 ))}
               </select>
-              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">expand_more</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
