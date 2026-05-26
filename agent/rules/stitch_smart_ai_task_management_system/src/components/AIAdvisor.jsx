@@ -332,8 +332,8 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
           </div>
         )}
       </div>
-      <div className={`p-4 ${chatLog.length > (user?.role === 'FACILITY_MANAGER' ? 1 : 0) ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
-        {chatLog.length === (user?.role === 'FACILITY_MANAGER' ? 1 : 0) && (
+      <div className={`p-4 ${chatLog.length > 0 ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
+        {chatLog.length === 0 && (
           <div className="mb-4 flex flex-wrap gap-2 justify-center">
              {(isFacilityMode ? [
                'Tình hình doanh thu hôm nay?',
