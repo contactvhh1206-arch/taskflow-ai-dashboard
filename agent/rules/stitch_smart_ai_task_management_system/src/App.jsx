@@ -728,7 +728,7 @@ function MainDashboard() {
             </>
           )}
 
-          {['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'ADMIN'].includes(user.role) && (
+          {true && (
              <div className="mt-6 mb-2 px-4">
                 <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-3 flex items-center justify-between tracking-widest uppercase">
                    Lịch sử trò chuyện AI
