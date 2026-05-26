@@ -568,14 +568,15 @@ function MainDashboard() {
       const isDeptHeadLocal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
       const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
       const taskFacility = user?.role === 'SUPER_ADMIN' ? 'HQ' : (isDeptHeadLocal ? deptId : user?.facility_id);
+      const safeFacility = Array.isArray(taskFacility) ? taskFacility[0] : taskFacility;
       
       const taskPayload = {
         pic: user.name,
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
+        ...newTask,
         facility: taskFacility,
-        ...(deptId && isDeptHeadLocal ? { department_tag: deptId } : {}),
-        ...newTask
+        ...(deptId && isDeptHeadLocal ? { department_tag: deptId } : {})
       };
       
       const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
@@ -583,7 +584,7 @@ function MainDashboard() {
         headers: {
           'Content-Type': 'application/json',
           'x-user-role': user.role,
-          'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+          'x-facility-id': safeFacility || 'ALL'
         },
         body: JSON.stringify(taskPayload)
       });
