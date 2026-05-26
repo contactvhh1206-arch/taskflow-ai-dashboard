@@ -9,6 +9,7 @@ import ApiConfigPanel from './components/ApiConfigPanel.jsx';
 import AIUsageLogs from './components/AIUsageLogs.jsx';
 import RAGManagerPanel from './components/RAGManagerPanel.jsx';
 import FacilityDashboard from './components/FacilityDashboard.jsx';
+import PerformanceReport from './components/PerformanceReport.jsx';
 import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
 import DailyRevenueReport from './components/DailyRevenueReport.jsx';
 import RevenueLog from './components/RevenueLog.jsx';
@@ -1123,10 +1124,9 @@ function MainDashboard() {
                 <RevenueLog user={user} showToast={showToast} />
               </ErrorBoundary>
             ) : ['dept-reports'].includes(activeTab) ? (
-              <div className="flex items-center justify-center h-[50vh] text-gray-500 flex-col gap-4">
-                <span className="material-symbols-outlined text-4xl text-gray-400">construction</span>
-                <p>Tính năng đang được phát triển và đồng bộ...</p>
-              </div>
+              <ErrorBoundary>
+                <PerformanceReport user={user} tasks={tasks} globalFacilityFilter={globalFacilityFilter} />
+              </ErrorBoundary>
             ) : (
               <>
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
