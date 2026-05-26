@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -750,13 +750,18 @@ function MainDashboard() {
       )}
       
       <aside className={`w-64 bg-surface-container-low dark:bg-[#1e1e1e] border-r border-outline-variant dark:border-gray-800 flex flex-col transition-transform duration-300 fixed inset-y-0 left-0 z-40 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30">
-            <span className="material-symbols-outlined">hub</span>
+        <div className="p-6 pb-4 border-b border-outline-variant dark:border-gray-800 flex items-center gap-3 bg-surface-container-low dark:bg-[#1e1e1e]">
+          <div className="w-12 h-12 flex items-center justify-center">
+            <svg viewBox="0 0 100 100" className="w-full h-full text-[#1A56DB] dark:text-[#3B82F6]" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="10"/>
+              <circle cx="50" cy="50" r="28" stroke="currentColor" strokeWidth="3"/>
+              <rect x="36" y="36" width="28" height="28" fill="currentColor"/>
+              <path d="M50 16 L50 36 M50 64 L50 84 M16 50 L36 50 M64 50 L84 50" stroke="currentColor" strokeWidth="4"/>
+            </svg>
           </div>
           <div>
-            <h1 className="font-display font-bold text-lg leading-tight tracking-tight text-primary dark:text-blue-400">TaskFlow AI</h1>
-            <p className="text-xs text-on-surface-variant dark:text-gray-400">Trung tâm Điều khiển</p>
+            <h1 className="font-display font-black text-xl leading-tight tracking-tight text-[#1A56DB] dark:text-[#3B82F6]">Hub DUBAI AI</h1>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Gắn Kết Cùng Phát Triển</p>
           </div>
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">

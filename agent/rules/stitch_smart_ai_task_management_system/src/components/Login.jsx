@@ -28,7 +28,7 @@ export default function Login() {
           login(data.user, data.token);
           return;
         } else {
-          throw new Error(data.error || 'Lỗi đăng nhập');
+          throw new Error(data.error || 'Lá»—i Ä‘Äƒng nháº­p');
         }
       } else {
         throw new Error('Backend down, fallback to local');
@@ -44,7 +44,7 @@ export default function Login() {
         
         if (foundUser) {
           if (foundUser.isActive === false) {
-            setError('Tài khoản này đã bị khóa!');
+            setError('TÃ i khoáº£n nÃ y Ä‘Ã£ bá»‹ khÃ³a!');
             return;
           }
           let facId = foundUser.facility_id;
@@ -62,15 +62,15 @@ export default function Login() {
       // Hardcoded fallback
       if (trimmedUser === 'admin' && trimmedPass === 'admin123') {
         localStorage.setItem('facility_id', 'ALL');
-        login({ name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }, 'mock-admin');
+        login({ name: 'Sáº¿p Tá»•ng', role: 'SUPER_ADMIN', facility_id: 'ALL' }, 'mock-admin');
       } else if (trimmedUser === 'manager1' && trimmedPass === 'manager123') {
-        localStorage.setItem('facility_id', 'Cơ sở 1');
-        login({ name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' }, 'mock-manager');
+        localStorage.setItem('facility_id', 'CÆ¡ sá»Ÿ 1');
+        login({ name: 'Quáº£n lÃ½ CÆ¡ sá»Ÿ 1', role: 'FACILITY_MANAGER', facility_id: 'CÆ¡ sá»Ÿ 1' }, 'mock-manager');
       } else if (trimmedUser === 'sysadmin' && trimmedPass === 'admin123') {
         localStorage.setItem('facility_id', 'ALL');
-        login({ name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' }, 'mock-sysadmin');
+        login({ name: 'Quáº£n trá»‹ viÃªn Há»‡ thá»‘ng (IT)', role: 'ADMIN', facility_id: 'ALL' }, 'mock-sysadmin');
       } else {
-        setError('Tài khoản hoặc mật khẩu không chính xác.');
+        setError('TÃ i khoáº£n hoáº·c máº­t kháº©u khÃ´ng chÃ­nh xÃ¡c.');
       }
     } finally {
       setLoading(false);
@@ -84,11 +84,16 @@ export default function Login() {
 
       <div className="glass-panel w-full max-w-md p-8 rounded-2xl shadow-2xl relative z-10 dark:bg-[#1e1e1e]/80">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-primary mx-auto flex items-center justify-center text-white shadow-lg shadow-primary/30 mb-4 transform rotate-3 hover:rotate-0 transition-transform">
-            <span className="material-symbols-outlined text-3xl">hub</span>
+          <div className="w-20 h-20 mx-auto flex items-center justify-center mb-2 transform hover:scale-105 transition-transform">
+            <svg viewBox="0 0 100 100" className="w-full h-full text-[#1A56DB] dark:text-[#3B82F6]" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="10"/>
+              <circle cx="50" cy="50" r="28" stroke="currentColor" strokeWidth="3"/>
+              <rect x="36" y="36" width="28" height="28" fill="currentColor"/>
+              <path d="M50 16 L50 36 M50 64 L50 84 M16 50 L36 50 M64 50 L84 50" stroke="currentColor" strokeWidth="4"/>
+            </svg>
           </div>
-          <h1 className="text-2xl font-display font-bold text-on-surface dark:text-white">TaskFlow AI</h1>
-          <p className="text-sm text-on-surface-variant dark:text-gray-400 mt-1">Hệ thống Điều phối Công việc Toàn chuỗi</p>
+          <h1 className="text-3xl font-display font-black text-[#1A56DB] dark:text-[#3B82F6]">Hub DUBAI AI</h1>
+          <p className="text-base font-medium text-gray-500 dark:text-gray-400 mt-1">Gắn Kết Cùng Phát Triển</p>
         </div>
 
         {error && (
@@ -100,7 +105,7 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-on-surface dark:text-gray-300 mb-1.5">Tài khoản</label>
+            <label className="block text-sm font-medium text-on-surface dark:text-gray-300 mb-1.5">TÃ i khoáº£n</label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">person</span>
               <input
@@ -115,7 +120,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-on-surface dark:text-gray-300 mb-1.5">Mật khẩu</label>
+            <label className="block text-sm font-medium text-on-surface dark:text-gray-300 mb-1.5">Máº­t kháº©u</label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">lock</span>
               <input
@@ -124,7 +129,7 @@ export default function Login() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#2a2a2a] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all dark:text-white"
-                placeholder="••••••••"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
               />
             </div>
           </div>
@@ -138,7 +143,7 @@ export default function Login() {
               <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
             ) : (
               <>
-                Đăng nhập
+                ÄÄƒng nháº­p
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </>
             )}
@@ -149,4 +154,5 @@ export default function Login() {
     </div>
   );
 }
+
 
