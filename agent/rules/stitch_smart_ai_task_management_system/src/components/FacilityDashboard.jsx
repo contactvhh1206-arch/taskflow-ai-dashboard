@@ -71,6 +71,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                }
                
                if (isDeptHead) {
+                  if (globalFacilityFilter === 'ALL') return true;
                   const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
                   const uName = String(user?.username || '').toLowerCase();
                   const uNameFull = String(user?.name || '').toLowerCase();
