@@ -218,6 +218,17 @@ function MainDashboard() {
     }
   }, [activeAiSessionId]);
   const [tasks, setTasks] = useState([]);
+  const [globalFacilityFilter, setGlobalFacilityFilter] = useState(() => {
+    return user?.role === 'FACILITY_MANAGER' ? (user?.facility_code || user?.facility_id || '') : 'ALL';
+  });
+  const [facilitiesList, setFacilitiesList] = useState([]);
+  
+  React.useEffect(() => {
+    try {
+      const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
+      setFacilitiesList(localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2'));
+    } catch {}
+  }, []);
   
   // Derived state for filtering tasks
   const now = new Date();
@@ -798,8 +809,19 @@ function MainDashboard() {
               <span className="material-symbols-outlined">menu</span>
             </button>
             <div className="relative w-full max-w-sm hidden md:block">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
-              <input type="text" placeholder="Tìm kiếm task, cơ sở, PIC..." className="w-full bg-surface-container dark:bg-gray-800 border-transparent focus:border-primary focus:ring-1 focus:ring-primary rounded-full pl-10 pr-4 py-2 text-sm outline-none transition-all dark:text-white" />
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
+              <select 
+                value={globalFacilityFilter} 
+                onChange={(e) => setGlobalFacilityFilter(e.target.value)} 
+                disabled={user.role === 'FACILITY_MANAGER'}
+                className="w-full bg-surface-container dark:bg-gray-800 border-transparent focus:border-primary focus:ring-1 focus:ring-primary rounded-full pl-10 pr-4 py-2 text-sm outline-none transition-all dark:text-white appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="ALL">Tất cả cơ sở</option>
+                {facilitiesList.map(f => (
+                  <option key={f.id} value={f.name}>{f.name}</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">expand_more</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -943,7 +965,7 @@ function MainDashboard() {
               </ErrorBoundary>
             ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) ? (
               <ErrorBoundary>
-                <FacilityDashboard user={user} tasks={tasks} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={user.role === 'FACILITY_MANAGER' ? (user.facility_code || user.facility_id || '') : "ALL"} />
+                <FacilityDashboard user={user} tasks={tasks} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={globalFacilityFilter} />
               </ErrorBoundary>
             ) : activeTab === 'revenue-overview' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) ? (
               <ErrorBoundary>
