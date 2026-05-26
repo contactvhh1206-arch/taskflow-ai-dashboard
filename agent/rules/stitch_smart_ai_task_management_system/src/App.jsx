@@ -687,9 +687,6 @@ function MainDashboard() {
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
               <NavItem icon="analytics" label="Báo cáo hiệu suất" active={activeTab === 'dept-reports'} onClick={() => setActiveTab('dept-reports')} />
-              <NavItem icon="history" label="Nhật ký doanh thu" active={activeTab === 'revenue-log'} onClick={() => setActiveTab('revenue-log')} />
-              <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
-              <NavItem icon="archive" label="Dữ liệu Lưu trữ" active={activeTab === 'archives'} onClick={() => setActiveTab('archives')} />
             </>
           )}
           {user.role === 'FINANCE_DEPT' && (
