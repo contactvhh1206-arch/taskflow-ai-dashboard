@@ -326,7 +326,9 @@ export default function AIAdvisor(props) {
                return t.pic === user?.username || t.facility_id === facilityName || t.facility_name === facilityName || t.org_unit === facilityName || (uName && title.includes(uName)) || (fName && title.includes(fName));
             });
             facTasks.slice(0, 50).forEach(t => {
-               taskContextStr += `- [${t.status === 'done' ? 'Hoàn thành' : (t.urgent ? 'Khẩn cấp' : 'Đang mở')}] ${t.title} (Hạn: ${t.deadline || 'Không'})\n`;
+               const todayStr = new Date().toISOString().split('T')[0];
+               const isUrgent = t.urgent || t.pinned || (t.deadline && t.deadline <= todayStr);
+               taskContextStr += `- [${t.status === 'done' ? 'Hoàn thành' : (isUrgent ? 'Khẩn cấp' : 'Đang mở')}] ${t.title} (Hạn: ${t.deadline || 'Không'})\n`;
             });
          } else {
             tasks.slice(0, 50).forEach(t => {
