@@ -276,12 +276,12 @@ function MainDashboard() {
         const tFacCode = (t?.facility || t?.facilityId || '').toLowerCase();
         const uName = (user?.username || '').toLowerCase();
         const uNameFull = (user?.name || '').toLowerCase();
-        let matchesDept = tFacCode.includes(uName) || tFacCode.includes(uNameFull) || t.department_id === deptId;
+        let matchesDept = tFacCode.includes(uName) || tFacCode.includes(uNameFull) || t.department_tag === deptId;
         if (!matchesDept) return false;
         
         if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
             const filterLower = globalFacilityFilter.toLowerCase();
-            return tFacCode.includes(filterLower) || (t?.department_id || '').toLowerCase().includes(filterLower);
+            return tFacCode.includes(filterLower) || (t?.department_tag || '').toLowerCase().includes(filterLower);
         }
         return true;
      }
