@@ -226,7 +226,12 @@ function MainDashboard() {
   React.useEffect(() => {
     try {
       const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
-      setFacilitiesList(localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2'));
+      const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
+      setFacilitiesList([
+        ...facs,
+        { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+        { id: 'dept2', name: 'Phòng Kế toán', filterValue: 'FINANCE' }
+      ]);
     } catch {}
   }, []);
   
@@ -818,7 +823,7 @@ function MainDashboard() {
               >
                 <option value="ALL">Tất cả cơ sở</option>
                 {facilitiesList.map(f => (
-                  <option key={f.id} value={f.name}>{f.name}</option>
+                  <option key={f.id} value={f.filterValue || f.name}>{f.name}</option>
                 ))}
               </select>
               <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">expand_more</span>
