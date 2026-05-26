@@ -33,7 +33,10 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
     return `${timeGreeting}, ${displayName}! Tôi là Trợ lý Cố vấn AI Cấp cao đây! Dữ liệu vận hành toàn chuỗi đã được đồng bộ. Bạn cần tôi hỗ trợ thông tin gì ạ?`;
   };
 
-  const [chatLog, setChatLog] = useState([]);
+  const [chatLog, setChatLog] = useState(user?.role === 'FACILITY_MANAGER' ? [{
+    role: 'ai',
+    content: "Chào bạn, tôi là Trợ lý AI nội bộ trực thuộc cơ sở. Chức năng của tôi là tối ưu hóa nghiệp vụ: phân tích doanh thu, báo cáo chuyên cần và hỗ trợ công việc tổng thể. Vui lòng nhập yêu cầu của bạn.\n\n⚠️ LƯU Ý HỆ THỐNG: Tài nguyên truy vấn (API) có giới hạn và được giám sát chặt chẽ. AI chỉ cấp quyền truy cập dữ liệu nội bộ của cơ sở bạn đang làm việc. Mọi hành vi cố tình dò hỏi dữ liệu chéo giữa các chi nhánh hoặc không phục vụ công việc sẽ bị từ chối, ghi log (lưu vết) và báo cáo tự động lên Ban Giám đốc."
+  }] : []);
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [attachment, setAttachment] = useState(null);
@@ -329,8 +332,8 @@ export default function AIAdvisor({ user, externalQueryTrigger, onExternalQueryH
           </div>
         )}
       </div>
-      <div className={`p-4 ${chatLog.length > 0 ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
-        {chatLog.length === 0 && (
+      <div className={`p-4 ${chatLog.length > (user?.role === 'FACILITY_MANAGER' ? 1 : 0) ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
+        {chatLog.length === (user?.role === 'FACILITY_MANAGER' ? 1 : 0) && (
           <div className="mb-4 flex flex-wrap gap-2 justify-center">
              {(isFacilityMode ? [
                'Tình hình doanh thu hôm nay?',
