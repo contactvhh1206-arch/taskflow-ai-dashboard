@@ -74,7 +74,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
     onSave({
       id: Date.now(),
       ...formData,
-      facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id
+      facility: user.role === 'SUPER_ADMIN' ? 'HQ' : (Array.isArray(user.facility_id) ? 'ALL' : user.facility_id)
     });
     onClose();
   };
@@ -265,31 +265,31 @@ function MainDashboard() {
 
      if (isHighLevel && globalFacilityFilter === 'ALL') return true;
      if (isHighLevel && globalFacilityFilter !== 'ALL') {
-         const tTitle = (t.title || '').toLowerCase();
-         const tFacName = (t?.facilityId || t?.facility || '').toLowerCase();
-         const tDeptTag = (t?.department_tag || '').toLowerCase();
-         const filterLower = globalFacilityFilter.toLowerCase();
+         const tTitle = String(t.title || '').toLowerCase();
+         const tFacName = String(t?.facilityId || t?.facility || '').toLowerCase();
+         const tDeptTag = String(t?.department_tag || '').toLowerCase();
+         const filterLower = String(globalFacilityFilter).toLowerCase();
          return tFacName.includes(filterLower) || tTitle.includes(filterLower) || tDeptTag === filterLower;
      }
      
      if (isDeptHead) {
-        const tFacCode = (t?.facility || t?.facilityId || '').toLowerCase();
-        const uName = (user?.username || '').toLowerCase();
-        const uNameFull = (user?.name || '').toLowerCase();
+        const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
+        const uName = String(user?.username || '').toLowerCase();
+        const uNameFull = String(user?.name || '').toLowerCase();
         let matchesDept = !t.department_tag || t.department_tag === deptId || tFacCode.includes(uName) || tFacCode.includes(uNameFull);
         if (!matchesDept) return false;
         
         if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
             if (globalFacilityFilter === deptId) return true;
-            const filterLower = globalFacilityFilter.toLowerCase();
-            return tFacCode.includes(filterLower) || (t?.department_tag || '').toLowerCase().includes(filterLower);
+            const filterLower = String(globalFacilityFilter).toLowerCase();
+            return tFacCode.includes(filterLower) || String(t?.department_tag || '').toLowerCase().includes(filterLower);
         }
         return true;
      }
      
      if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
-         const tFacCode = (t?.facility || t?.facilityId || '').toLowerCase();
-         return tFacCode.includes(globalFacilityFilter.toLowerCase());
+         const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
+         return tFacCode.includes(String(globalFacilityFilter).toLowerCase());
      }
 
      return true;
