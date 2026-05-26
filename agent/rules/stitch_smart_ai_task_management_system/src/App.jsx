@@ -348,6 +348,7 @@ function MainDashboard() {
           is_active: fac.is_active !== false
         }));
         setFacilityList(mappedFacs);
+        setFacilitiesList(mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2'));
         localStorage.setItem('taskflow_facilities', JSON.stringify(mappedFacs));
         return;
       }
@@ -368,6 +369,7 @@ function MainDashboard() {
       localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
     }
     setFacilityList(localFacs);
+    setFacilitiesList(localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2'));
   };
 
   const fetchKPIs = async () => {
