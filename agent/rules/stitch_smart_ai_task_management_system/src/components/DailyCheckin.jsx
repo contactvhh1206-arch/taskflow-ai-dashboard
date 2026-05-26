@@ -621,7 +621,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
           <div className="mt-4 p-4 border border-outline-variant dark:border-gray-700 bg-surface-container-highest dark:bg-[#1a1a1a] rounded-xl flex flex-col md:flex-row gap-4">
             <div className="flex-1 flex flex-col gap-2 bg-white dark:bg-[#252525] p-3 rounded-lg border border-gray-200 dark:border-gray-600">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-error flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-error"></span> Số lượng Nghỉ không phép</span>
+                <span className="text-sm font-bold text-error flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-error"></span> Nghỉ không phép</span>
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => setVal('manual_unauth', Math.max(0, (formData.manual_unauth || 0) - 1))} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none" disabled={isSubmitted}>-</button>
                   <input 
@@ -652,7 +652,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
             </div>
             <div className="flex-1 flex flex-col gap-2 bg-white dark:bg-[#252525] p-3 rounded-lg border border-gray-200 dark:border-gray-600">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-orange-500 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Số lượng Nghỉ có phép</span>
+                <span className="text-sm font-bold text-orange-500 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500"></span> Nghỉ có phép</span>
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={() => setVal('manual_auth', Math.max(0, (formData.manual_auth || 0) - 1))} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 text-gray-700 dark:text-gray-300 transition-colors font-bold select-none">-</button>
                   <input 
@@ -717,7 +717,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         <div className="p-6 border-t border-outline-variant dark:border-gray-800 bg-surface-container-low dark:bg-[#1a1a1a] flex flex-col items-end gap-3 shrink-0 rounded-b-2xl">
           {!isFormValid && ((formData.manual_unauth > 0 && (!formData.manual_unauth_note || !formData.manual_unauth_note.trim())) || (formData.manual_auth > 0 && (!formData.manual_auth_note || !formData.manual_auth_note.trim()))) && !isSubmitted && (
             <div className="w-full text-right text-xs text-error font-medium">
-              Bạn đã nhập Số lượng nghỉ, hệ thống bắt buộc phải ghi chú phương án/lý do cho nhân sự tương ứng.
+              Bạn đã nhập nhân sự nghỉ, hệ thống bắt buộc phải ghi chú phương án/lý do cho nhân sự tương ứng.
             </div>
           )}
           {!isFormValid && ['eq_camera', 'eq_maytinh', 'eq_den', 'eq_maylanh'].some(field => formData[field] === 'su_co' && (!formData[field + '_note'] || !formData[field + '_note'].trim())) && !isSubmitted && (
