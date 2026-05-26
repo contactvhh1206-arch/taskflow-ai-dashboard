@@ -4,7 +4,17 @@ import { fetchHistory } from '../services/dataService.js';
 export default function AIAdvisor(props) {
   const { user, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
   const isFacilityMode = props.isFacilityMode !== undefined ? props.isFacilityMode : (user && !['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role));
-  const facilityName = props.facilityName || (isFacilityMode ? (localStorage.getItem('facility_name') || user?.facilityName || user?.facility_id || '') : '');
+  let facilityName = props.facilityName || (isFacilityMode ? (localStorage.getItem('facility_name') || user?.facilityName || user?.facility_id || '') : '');
+  
+  try {
+     if (typeof facilityName === 'string' && facilityName.startsWith('[')) {
+        const parsed = JSON.parse(facilityName);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+           facilityName = parsed[0];
+        }
+     }
+  } catch(e) {}
+  
   const [query, setQuery] = useState('');
   const currentSessionIdRef = React.useRef(activeSessionId);
   const isInitialMount = React.useRef(true);
@@ -279,10 +289,13 @@ export default function AIAdvisor(props) {
             
             recentReports.forEach(rep => {
                const rData = typeof rep.data === 'string' ? JSON.parse(rep.data) : rep.data;
-               if (isFacilityMode && facilityName) {
-                  const facData = rData?.find(d => d.facility_id === facilityName || d.facility_name === facilityName || d.name === facilityName);
-                  if (facData) {
-                     financialContextStr += `Doanh thu cơ sở ${facilityName} ngày ${rep.date}: ${Number(facData.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
+               const cleanFacilityName = facilityName?.trim();
+               if (isFacilityMode) {
+                  if (cleanFacilityName) {
+                     const facData = Array.isArray(rData) ? rData?.find(d => d.facility_id === cleanFacilityName || d.facility_name === cleanFacilityName || d.name === cleanFacilityName) : null;
+                     if (facData) {
+                        financialContextStr += `Doanh thu cơ sở ${cleanFacilityName} ngày ${rep.date}: ${Number(facData.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
+                     }
                   }
                } else {
                   financialContextStr += `Báo cáo doanh thu ngày ${rep.date} (Tổng: ${Number(rep.total_revenue || rep.totalRevenue || 0).toLocaleString('vi-VN')} VNĐ):\n`;
