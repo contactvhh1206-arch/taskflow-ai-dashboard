@@ -750,8 +750,8 @@ function MainDashboard() {
       )}
       
       <aside className={`w-64 bg-surface-container-low dark:bg-[#1e1e1e] border-r border-outline-variant dark:border-gray-800 flex flex-col transition-transform duration-300 fixed inset-y-0 left-0 z-40 md:relative transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-        <div className="p-6 pb-4 border-b border-outline-variant dark:border-gray-800 flex items-center gap-3 bg-surface-container-low dark:bg-[#1e1e1e]">
-          <div className="w-12 h-12 flex items-center justify-center">
+        <div className="p-5 pb-4 border-b border-outline-variant dark:border-gray-800 flex items-center gap-2.5 bg-surface-container-low dark:bg-[#1e1e1e]">
+          <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center">
             <svg viewBox="0 0 100 100" className="w-full h-full text-[#1A56DB] dark:text-[#3B82F6]" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="10"/>
               <circle cx="50" cy="50" r="28" stroke="currentColor" strokeWidth="3"/>
@@ -759,9 +759,9 @@ function MainDashboard() {
               <path d="M50 16 L50 36 M50 64 L50 84 M16 50 L36 50 M64 50 L84 50" stroke="currentColor" strokeWidth="4"/>
             </svg>
           </div>
-          <div>
-            <h1 className="font-display font-black text-xl leading-tight tracking-tight text-[#1A56DB] dark:text-[#3B82F6]">Hub DUBAI AI</h1>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Gắn Kết Cùng Phát Triển</p>
+          <div className="min-w-0">
+            <h1 className="font-display font-black text-lg leading-tight tracking-tight text-[#1A56DB] dark:text-[#3B82F6] truncate">Hub DUBAI AI</h1>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Gắn Kết Cùng Phát Triển</p>
           </div>
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
