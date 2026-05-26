@@ -33,12 +33,17 @@ export default function DailyRevenueReport({ user, facilityList, showToast }) {
   // Lấy danh sách cơ sở
   const getActiveFacilities = useCallback(() => {
     if (facilityList && facilityList.length > 0) {
-      return facilityList.filter(f => f.is_active !== false && !f.isExecutive);
+      return facilityList.filter(f => 
+        f.is_active !== false && 
+        !f.isExecutive && 
+        !['MARKETING', 'FINANCE', 'BGD'].includes(f.filterValue || f.id) &&
+        !f.id.startsWith('dept')
+      );
     }
     // Fallback if no list provided
     return Array.from({length: 6}, (_, i) => ({
       id: `f${i+1}`,
-      name: `Cơ sở ${i+1}`
+      name: `DUBAI ${i+1}`
     }));
   }, [facilityList]);
 

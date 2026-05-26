@@ -26,7 +26,11 @@ export default function RevenueLog({ user, showToast }) {
   const handleEditClick = (report) => {
     setEditingReport(report);
     // Deep copy data for editing
-    setEditFormData(JSON.parse(JSON.stringify(report.data || [])));
+    const cleanData = (report.data || []).filter(d => {
+      const fname = String(d.name || d.facility_id || '').toUpperCase();
+      return !fname.includes('MARKETING') && !fname.includes('MAKETING') && !fname.includes('FINANCE') && !fname.includes('BGD');
+    });
+    setEditFormData(JSON.parse(JSON.stringify(cleanData)));
     setEditReason('');
   };
 

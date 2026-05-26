@@ -246,6 +246,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                 const rData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
                 if (rData && Array.isArray(rData)) {
                    rData.forEach(facData => {
+                      const fname = String(facData.name || '').toUpperCase();
+                      if (fname.includes('MARKETING') || fname.includes('MAKETING') || fname.includes('FINANCE') || fname.includes('BGD')) return;
                       if (aggregated[facData.name]) {
                          aggregated[facData.name].revenue += Number(facData.revenue || 0);
                       }

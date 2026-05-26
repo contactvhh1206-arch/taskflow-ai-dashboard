@@ -300,7 +300,9 @@ export default function AIAdvisor(props) {
                } else {
                   financialContextStr += `Báo cáo doanh thu ngày ${rep.date} (Tổng: ${Number(rep.total_revenue || rep.totalRevenue || 0).toLocaleString('vi-VN')} VNĐ):\n`;
                   rData?.forEach(d => {
-                     financialContextStr += `- ${d.facility_id || d.facility_name || d.name}: ${Number(d.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
+                     const fname = String(d.facility_id || d.facility_name || d.name || '').toUpperCase();
+                     if (fname.includes('MARKETING') || fname.includes('MAKETING') || fname.includes('FINANCE') || fname.includes('BGD')) return;
+                     financialContextStr += `- ${d.facility_id || d.facility_name || d.name}: ${Number(d.revenue || 0).toLocaleString('vi-VN')} VND\n`;
                   });
                }
             });
