@@ -357,28 +357,34 @@ function MainDashboard() {
   // Audio Notification Logic (5 seconds loud siren)
   const playNotificationSound = () => {
     try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-      const ctx = new AudioContext();
-      const playBeep = (startTime, duration, freq1, freq2) => {
-        const osc = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(freq1, startTime);
-        osc.frequency.linearRampToValueAtTime(freq2, startTime + duration);
-        gainNode.gain.setValueAtTime(0.3, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-        osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        osc.start(startTime);
-        osc.stop(startTime + duration);
-      };
-      
-      let now = ctx.currentTime;
-      // Play 10 beeps over 5 seconds (0.5s each)
-      for (let i = 0; i < 10; i++) {
-        playBeep(now + i * 0.5, 0.4, 880, 1100);
-      }
+      // 1. Dùng âm thanh audio file có sẵn để tránh lỗi Web Audio API trên một số trình duyệt
+      const audio = new Audio('https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg');
+      audio.volume = 1.0;
+      audio.play().catch(e => {
+        console.log('Audio fallback failed, trying Web Audio API...', e);
+        // Fallback: Web Audio API
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        if (ctx.state === 'suspended') ctx.resume();
+        const playBeep = (startTime, duration, freq1, freq2) => {
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq1, startTime);
+          osc.frequency.linearRampToValueAtTime(freq2, startTime + duration);
+          gainNode.gain.setValueAtTime(1.0, startTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        };
+        let now = ctx.currentTime;
+        for (let i = 0; i < 10; i++) {
+          playBeep(now + i * 0.5, 0.4, 880, 1100);
+        }
+      });
     } catch(e) {
       console.log('Audio playback prevented', e);
     }
