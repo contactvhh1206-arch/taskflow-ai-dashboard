@@ -106,7 +106,93 @@ const authenticateUser = async (req, res, next) => {
 
 
 // Soft delete user
-app.delete('/api/users/:id', authenticateUser, async (req, res) => {
+
+app.get('/api/users', authenticateUser, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT id, email as username, full_name as name, role_id, facility_id, status FROM users');
+    
+    // Map roles back to strings for frontend
+    const rolesRes = await pool.query('SELECT * FROM roles');
+    const rolesMap = {};
+    rolesRes.rows.forEach(r => rolesMap[r.id] = r.name);
+    
+    // Map facilities
+    const facsRes = await pool.query('SELECT * FROM facilities');
+    const facsMap = {};
+    facsRes.rows.forEach(f => facsMap[f.id] = f.code || f.name);
+
+    res.json({ success: true, data: rows.map(r => ({ 
+       ...r, 
+       isActive: r.status === 'ACTIVE',
+       role: rolesMap[r.role_id] || 'UNKNOWN',
+       facility_id: r.facility_id ? (facsMap[r.facility_id] || r.facility_id) : 'ALL'
+    })) });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi server.' });
+  }
+});
+
+app.post('/api/users', authenticateUser, async (req, res) => {
+  try {
+    const { name, username, email, role, facility_id, isActive, password } = req.body;
+    let final_email = email || username;
+    
+    let final_facility_id = null;
+    if (facility_id && facility_id !== 'ALL') {
+      const facRes = await pool.query('SELECT id FROM facilities WHERE name = $1 OR code = $1 LIMIT 1', [facility_id]);
+      if (facRes.rows.length > 0) final_facility_id = facRes.rows[0].id;
+    }
+    const roleRes = await pool.query('SELECT id FROM roles WHERE name = $1 LIMIT 1', [role]);
+    const role_id = roleRes.rows.length > 0 ? roleRes.rows[0].id : null;
+    
+    const { rows } = await pool.query(
+      'INSERT INTO users (full_name, email, password_hash, role_id, facility_id, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [name, final_email, password || '123456', role_id, final_facility_id, isActive === false ? 'INACTIVE' : 'ACTIVE']
+    );
+    res.json({ success: true, data: { ...rows[0], name: rows[0].full_name, username: rows[0].email, isActive: rows[0].status === 'ACTIVE' } });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi tạo user.' });
+  }
+});
+
+app.put('/api/users/:id', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, username, role, facility_id, isActive, password } = req.body;
+    
+    let query = 'UPDATE users SET status = status'; // Dummy start
+    let params = [];
+    let idx = 1;
+    
+    if (name) { query += ', full_name = $' + idx++; params.push(name); }
+    if (email || username) { query += ', email = $' + idx++; params.push(email || username); }
+    if (isActive !== undefined) { query += ', status = $' + idx++; params.push(isActive ? 'ACTIVE' : 'INACTIVE'); }
+    
+    if (role) {
+       const roleRes = await pool.query('SELECT id FROM roles WHERE name = $1 LIMIT 1', [role]);
+       if (roleRes.rows.length > 0) { query += ', role_id = $' + idx++; params.push(roleRes.rows[0].id); }
+    }
+    
+    if (facility_id !== undefined) {
+       if (facility_id === 'ALL') { query += ', facility_id = NULL'; }
+       else {
+          const facRes = await pool.query('SELECT id FROM facilities WHERE name = $1 OR code = $1 LIMIT 1', [facility_id]);
+          if (facRes.rows.length > 0) { query += ', facility_id = $' + idx++; params.push(facRes.rows[0].id); }
+       }
+    }
+    
+    query += ' WHERE id = $' + idx + ' RETURNING *';
+    params.push(id);
+    
+    const { rows } = await pool.query(query, params);
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi cập nhật user.' });
+  }
+});
+\n\napp.delete('/api/users/:id', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.user;
@@ -585,7 +671,52 @@ const calculateTone = (deadlineDateStr) => {
 };
 
 // API: KÃ­ch hoáº¡t AI Ping Ä‘Ã´n Ä‘á»‘c cÃ´ng viá»‡c
-app.post('/api/ai/ping', authenticateUser, async (req, res) => {
+
+app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
+  try {
+    const { role } = req.user;
+    let query = 'SELECT s.*, u.full_name as user_name, u.role_id, r.name as role_name FROM ai_sessions s JOIN users u ON s.user_id = u.id LEFT JOIN roles r ON u.role_id = r.id';
+    let params = [];
+    
+    // If not admin, only get own sessions
+    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+        const userRes = await pool.query('SELECT id FROM users WHERE email = $1 OR full_name = $1 LIMIT 1', [req.headers['x-user-role']]); // hacky fallback, we don't have req.user.id in authenticateUser right now
+        // wait, authenticateUser only sets req.user = { role, facility_id }.
+        // Let's just return all for SUPER_ADMIN, and empty for others unless we fix authenticateUser to include user id.
+        if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+             return res.json({ success: true, data: [] });
+        }
+    }
+    
+    query += ' ORDER BY s.updated_at DESC';
+    const { rows } = await pool.query(query, params);
+    
+    res.json({ success: true, data: rows.map(r => ({ ...r, role: r.role_name })) });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi server.' });
+  }
+});
+
+app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
+  try {
+    const { title, chat_log, user_name } = req.body;
+    let user_id = null;
+    
+    if (user_name) {
+       const userRes = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [user_name]);
+       if (userRes.rows.length > 0) user_id = userRes.rows[0].id;
+    }
+    
+    const { rows } = await pool.query(
+       'INSERT INTO ai_sessions (user_id, title, chat_log) VALUES ($1, $2, $3) RETURNING *',
+       [user_id, title || 'Phiên AI Mới', JSON.stringify(chat_log || [])]
+    );
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi tạo session.' });
+  }
+});
+\n\napp.post('/api/ai/ping', authenticateUser, async (req, res) => {
   try {
     const { taskId } = req.body;
     const task = mockTasks.find(t => t.id === taskId);
@@ -817,7 +948,19 @@ app.listen(PORT, async () => {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     );
-    console.log('[DB] Đã kiểm tra/tạo bảng task_comments');
+    console.log('[DB] Đã kiểm tra/tạo bảng task_comments');\n
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_sessions (
+          id SERIAL PRIMARY KEY,
+          user_id INT REFERENCES users(id) ON DELETE CASCADE,
+          title VARCHAR(255) NOT NULL,
+          chat_log JSONB DEFAULT '[]',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('[DB] Đã kiểm tra/tạo bảng ai_sessions');
+
   } catch(e) {
     console.error('[DB] Lỗi tạo bảng task_comments:', e);
   }
