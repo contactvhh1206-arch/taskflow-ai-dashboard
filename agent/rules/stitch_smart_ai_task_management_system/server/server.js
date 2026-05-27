@@ -306,7 +306,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     let pic_id = null;
     let pic_facility_id = null;
     if (pic) {
-        const picUser = await pool.query('SELECT id, facility_id FROM users WHERE username = $1 OR full_name = $1 OR email = $1 LIMIT 1', [pic]);
+        const picUser = await pool.query('SELECT id, facility_id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
         if (picUser.rows.length > 0) {
             pic_id = picUser.rows[0].id;
             pic_facility_id = picUser.rows[0].facility_id;
@@ -892,13 +892,13 @@ app.post('/api/reports', authenticateUser, async (req, res) => {
 app.get('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
-    const query = 
-      SELECT c.*, u.full_name as author_name, u.role_id, u.email, u.username
+    const query = `
+      SELECT c.*, u.full_name as author_name, u.role_id, u.email
       FROM task_comments c
       JOIN users u ON c.user_id = u.id
-      WHERE c.task_id = 
+      WHERE c.task_id = $1
       ORDER BY c.created_at ASC
-    ;
+    `;
     const { rows } = await pool.query(query, [id]);
     res.json({ success: true, data: rows });
   } catch (error) {
