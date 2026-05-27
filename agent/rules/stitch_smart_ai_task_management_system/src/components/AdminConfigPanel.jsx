@@ -296,12 +296,12 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
 
       return (
         <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border border-outline-variant dark:border-gray-800 animate-fade-in flex flex-col h-[75vh]">
-          <div className="p-4 border-b border-outline-variant dark:border-gray-800 bg-gradient-to-r from-primary/10 to-transparent flex gap-4">
-            <button onClick={() => setActiveTab('facilities')} className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'facilities' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Cơ sở</button>
-            <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'users' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Tài khoản</button>
-            <button onClick={() => setActiveTab('ai_logs')} className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'ai_logs' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Hội thoại AI</button>
+          <div className="p-4 border-b border-outline-variant dark:border-gray-800 bg-gradient-to-r from-primary/10 to-transparent flex gap-4 overflow-x-auto custom-scrollbar">
+            <button onClick={() => setActiveTab('facilities')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'facilities' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Cơ sở</button>
+            <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Tài khoản</button>
+            <button onClick={() => setActiveTab('ai_logs')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'ai_logs' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Hội thoại AI</button>
             {user.role === 'ADMIN' && (
-               <button onClick={() => setActiveTab('maintenance')} className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'maintenance' ? 'bg-error text-white shadow-md' : 'text-error hover:bg-error/10 border border-transparent dark:hover:bg-red-900/20'}`}>Cấu hình Nâng cao / Bảo trì</button>
+               <button onClick={() => setActiveTab('maintenance')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'maintenance' ? 'bg-error text-white shadow-md' : 'text-error hover:bg-error/10 border border-transparent dark:hover:bg-red-900/20'}`}>Cấu hình Nâng cao / Bảo trì</button>
             )}
           </div>
           <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
