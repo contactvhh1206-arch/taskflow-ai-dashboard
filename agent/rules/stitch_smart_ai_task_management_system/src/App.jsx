@@ -793,8 +793,10 @@ function MainDashboard() {
           }
         };
         fetchTasks();
-      }, 10000);
-      return () => clearInterval(pollInterval);
+        const pollInterval = setInterval(() => {
+          fetchTasks();
+        }, 10000);
+        return () => clearInterval(pollInterval);
     }
   }, [user]);
 
