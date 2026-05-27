@@ -93,7 +93,14 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users');
+        const token = localStorage.getItem('taskflow_token');
+        const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
+          headers: {
+            'Authorization': token ? \\Bearer \\ : '',
+            'x-user-role': user?.role || '',
+            'x-facility-id': user?.facility_id || 'ALL'
+          }
+        });
         const data = await res.json();
         let allUsers = data.success ? data.data : JSON.parse(localStorage.getItem('taskflow_users') || '[]');
         

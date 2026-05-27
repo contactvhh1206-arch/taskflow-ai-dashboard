@@ -117,7 +117,14 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
 
       const fetchUsers = async () => {
         try {
-          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users');
+          const token = localStorage.getItem('taskflow_token');
+          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
+            headers: {
+              'Authorization': token ? \\Bearer \\ : '',
+              'x-user-role': user?.role || '',
+              'x-facility-id': user?.facility_id || 'ALL'
+            }
+          });
           const data = await res.json();
           if (data.success) {
             setUsers(data.data);
@@ -127,7 +134,14 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
 
       const fetchFacilities = async () => {
         try {
-          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities');
+          const token = localStorage.getItem('taskflow_token');
+          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities', {
+            headers: {
+              'Authorization': token ? \\Bearer \\ : '',
+              'x-user-role': user?.role || '',
+              'x-facility-id': user?.facility_id || 'ALL'
+            }
+          });
           const data = await res.json();
           if (data.success) setFacilities(data.data);
         } catch (e) { console.error(e); }
@@ -149,8 +163,14 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         if (!newFacName) return;
         setIsAddingFac(true);
         try {
+           const token = localStorage.getItem('taskflow_token');
            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities', {
-               method: 'POST', headers: { 'Content-Type': 'application/json' },
+               method: 'POST', headers: { 
+                 'Content-Type': 'application/json',
+                 'Authorization': token ? \\Bearer \\ : '',
+                 'x-user-role': user?.role || '',
+                 'x-facility-id': user?.facility_id || 'ALL'
+               },
                body: JSON.stringify({ name: newFacName, address: newFacAddress })
            });
            if (res.ok) {
@@ -170,8 +190,14 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         let finalName = newName;
         
         try {
+            const token = localStorage.getItem('taskflow_token');
             const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': token ? \\Bearer \\ : '',
+                  'x-user-role': user?.role || '',
+                  'x-facility-id': user?.facility_id || 'ALL'
+                },
                 body: JSON.stringify({
                     username: newUsername.trim(),
                     password: newPassword.trim(),
@@ -205,7 +231,12 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         try {
             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${editingFac.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': localStorage.getItem('taskflow_token') ? \\Bearer \\ : '',
+                  'x-user-role': user?.role || '',
+                  'x-facility-id': user?.facility_id || 'ALL'
+                },
                 body: JSON.stringify({
                     name: editFacName,
                     address: editFacAddress,
