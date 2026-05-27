@@ -1,0 +1,17 @@
+{
+  "short_name": "Hub DUBAI",
+  "name": "Hub DUBAI - Taskflow AI Dashboard",
+  "description": "Hệ thống Quản lý Công việc thông minh ứng dụng AI",
+  "icons": [
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#2563eb",
+  "background_color": "#ffffff"
+}
