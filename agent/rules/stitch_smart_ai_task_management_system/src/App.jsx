@@ -9,7 +9,7 @@ import ApiConfigPanel from './components/ApiConfigPanel.jsx';
 import AIUsageLogs from './components/AIUsageLogs.jsx';
 import RAGManagerPanel from './components/RAGManagerPanel.jsx';
 import FacilityDashboard from './components/FacilityDashboard.jsx';
-import PerformanceReport from './components/PerformanceReport.jsx';
+
 import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
 import DailyRevenueReport from './components/DailyRevenueReport.jsx';
 import RevenueLog from './components/RevenueLog.jsx';
@@ -55,19 +55,37 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   const [picOptions, setPicOptions] = useState([]);
 
   useEffect(() => {
-    try {
-      const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
-      let filtered = [];
-      if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
-        filtered = allUsers;
-      } else {
-        filtered = allUsers.filter(u => 
-          (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
-          (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
-        );
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users');
+        const data = await res.json();
+        let allUsers = data.success ? data.data : JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+        
+        let filtered = [];
+        if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+          filtered = allUsers;
+        } else {
+          filtered = allUsers.filter(u => 
+            (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
+            (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
+          );
+        }
+        setPicOptions(filtered);
+      } catch(e) {
+        const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+        let filtered = [];
+        if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+          filtered = allUsers;
+        } else {
+          filtered = allUsers.filter(u => 
+            (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
+            (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
+          );
+        }
+        setPicOptions(filtered);
       }
-      setPicOptions(filtered);
-    } catch(e) {}
+    };
+    fetchUsers();
   }, [user]);
 
   const handleSubmit = (e) => {
@@ -198,9 +216,10 @@ function MainDashboard() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     if (!user) return 'tasks';
-    if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) return 'reports';
+    
     if (user.role === 'ADMIN') return 'admin';
-    if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(user.role)) return 'dashboard';
+    if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD'].includes(user.role)) return 'ai-advisor';
+    if (['FINANCE_DEPT', 'FACILITY_MANAGER'].includes(user.role)) return 'dashboard';
     return 'tasks';
   });
   const [chatInput, setChatInput] = useState('');
@@ -227,7 +246,7 @@ function MainDashboard() {
   React.useEffect(() => {
     try {
       const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
-      const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
+      const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
       setFacilitiesList([
         ...facs,
         { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
@@ -238,7 +257,7 @@ function MainDashboard() {
   }, []);
   
   const isVPGlobal = user?.role === 'VICE_PRESIDENT';
-  const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVPGlobal;
+  const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
   const deptIdGlobal = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVPGlobal ? 'BGD' : 'MARKETING'));
   const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== deptIdGlobal;
 
@@ -353,6 +372,13 @@ function MainDashboard() {
           is_active: fac.is_active !== false
         }));
         setFacilityList(mappedFacs);
+        const filteredFacs = mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
+        setFacilitiesList([
+          ...filteredFacs,
+          { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+          { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+          { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
+        ]);
         localStorage.setItem('taskflow_facilities', JSON.stringify(mappedFacs));
         return;
       }
@@ -373,6 +399,13 @@ function MainDashboard() {
       localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
     }
     setFacilityList(localFacs);
+    const filteredLocalFacs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
+    setFacilitiesList([
+      ...filteredLocalFacs,
+      { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+      { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+      { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
+    ]);
   };
 
   const fetchKPIs = async () => {
@@ -536,7 +569,8 @@ function MainDashboard() {
             deadline: new Date().toISOString().split('T')[0],
             urgent: false,
             facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
-            ...draft
+            creator_role: user.role,
+          ...draft, desc: (draft.desc || "") + " <!--cr:" + user.role + "-->",
           };
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
             method: 'POST',
@@ -576,8 +610,9 @@ function MainDashboard() {
         pic: user.name,
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
-        ...newTask,
-        facility: taskFacility,
+        creator_role: user.role,
+          ...newTask, desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
+        facility: newTask.facility || taskFacility,
         ...(deptId && isDeptHeadLocal ? { department_tag: deptId } : {})
       };
       
@@ -610,6 +645,8 @@ function MainDashboard() {
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
         facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
+        creator_role: user.role,
+          desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
         status: 'todo',
         ...newTask
       };
@@ -657,44 +694,44 @@ function MainDashboard() {
   useEffect(() => {
     if (user) {
       const fetchTasks = async () => {
-        try {
-          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
-            headers: {
-              'x-user-role': user.role,
-              'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
-            }
-          });
-          
-          if (res.status === 500 || !res.ok) {
-             setTasks([]);
-             showToast('Lỗi máy chủ khi tải dữ liệu, vui lòng thử lại');
-             return;
-          }
-          
-          const data = await res.json();
-          if (data.success) {
-            let fetchedTasks = data.data || [];
-            
-            // HACK: Auto-correct tasks incorrectly assigned to DUBAI 41 by old backend
-            fetchedTasks = fetchedTasks.map(t => {
-               if (t.facility === 'DUBAI 41' || t.facilityId === 'DUBAI 41' || t.facility === 'HQ' || !t.facility) {
-                   const picStr = String(t.pic).toLowerCase();
-                   const picIdStr = String(t.picId || '').toLowerCase();
-                   
-                   if (picIdStr === '@thien' || picStr === 'thiện' || picIdStr === '@cuong' || picStr === 'cường' || picIdStr === 'marketing' || picStr.includes('marketing')) {
-                       return { ...t, facility: 'Phòng Marketing', facilityId: 'MARKETING', department_tag: 'MARKETING' };
-                   }
-                   if (picIdStr === 'ketoan' || picStr.includes('kế toán')) {
-                       return { ...t, facility: 'Phòng Finance', facilityId: 'FINANCE', department_tag: 'FINANCE' };
-                   }
-                   if (picStr.includes('phó') || picStr.includes('bgd') || picStr.includes('giám đốc')) {
-                       return { ...t, facility: 'Ban Giám Đốc', facilityId: 'BGD', department_tag: 'BGD' };
-                   }
-               }
-               return t;
+          try {
+            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
+              headers: {
+                'x-user-role': user.role,
+                'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+              }
             });
             
-            setTasks(fetchedTasks);
+            if (res.status === 500 || !res.ok) {
+               setTasks([]);
+               showToast('Lỗi máy chủ khi tải dữ liệu, vui lòng thử lại');
+               return;
+            }
+            
+            const data = await res.json();
+            if (data.success) {
+              let fetchedTasks = data.data || [];
+              
+              // HACK: Auto-correct tasks incorrectly assigned to DUBAI 41 by old backend
+              fetchedTasks = fetchedTasks.map(t => {
+                 if (t.facility === 'DUBAI 41' || t.facilityId === 'DUBAI 41' || t.facility === 'HQ' || !t.facility) {
+                     const picStr = String(t.pic).toLowerCase();
+                     const picIdStr = String(t.picId || '').toLowerCase();
+                     
+                     if (picIdStr === '@thien' || picStr === 'thiện' || picIdStr === '@cuong' || picStr === 'cường' || picIdStr === 'marketing' || picStr.includes('marketing')) {
+                         return { ...t, facility: 'Phòng Marketing', facilityId: 'MARKETING', department_tag: 'MARKETING' };
+                     }
+                     if (picIdStr === 'ketoan' || picStr.includes('kế toán')) {
+                         return { ...t, facility: 'Phòng Finance', facilityId: 'FINANCE', department_tag: 'FINANCE' };
+                     }
+                     if (picStr.includes('phó') || picStr.includes('bgd') || picStr.includes('giám đốc')) {
+                         return { ...t, facility: 'Ban Giám Đốc', facilityId: 'BGD', department_tag: 'BGD' };
+                     }
+                 }
+                 return t;
+              });
+              
+              setTasks(fetchedTasks);
               
               // Notification polling logic
               const currentIds = new Set(fetchedTasks.map(t => t.id));
@@ -709,31 +746,30 @@ function MainDashboard() {
                       if (!prevIds.has(task.id) && task.status === 'todo') {
                           const myNames = [String(user.name).toLowerCase(), String(user.username).toLowerCase(), '@' + String(user.username).toLowerCase()];
                           let isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
-                            
-                            if (!isAssignedToMe) {
-                                const isVP = user?.role === 'VICE_PRESIDENT';
-                                const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
-                                const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
-                                const rawFac = user?.facility_code || user?.facility_id || '';
-                                const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
-                                const tFacCode = String(task?.facility || task?.facilityId || '').toLowerCase();
-                                
-                                if (isDeptHead) {
-                                    if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase())) {
-                                        isAssignedToMe = true;
-                                    }
-                                } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user.role)) {
-                                    if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
-                                        isAssignedToMe = true;
-                                    }
-                                }
-                            }
                           
-                          // Check if I am the PIC (e.g. PIC contains "Thiện" and user.name is "Thiện")
+                          if (!isAssignedToMe) {
+                              const isVP = user?.role === 'VICE_PRESIDENT';
+                              const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
+                              const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
+                              const rawFac = user?.facility_code || user?.facility_id || '';
+                              const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
+                              const tFacCode = String(task?.facility || task?.facilityId || '').toLowerCase();
+                              
+                              if (isDeptHead) {
+                                  if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase())) {
+                                      isAssignedToMe = true;
+                                  }
+                              } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user.role)) {
+                                  if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
+                                      isAssignedToMe = true;
+                                  }
+                              }
+                          }
+                          
                           if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
                               const newNotif = {
                                   title: 'Công việc mới',
-                                  message: Bạn được giao công việc: ,
+                                  message: 'Bạn được giao công việc: ' + task.title,
                                   time: new Date().toLocaleTimeString('vi-VN')
                               };
                               const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
@@ -746,17 +782,21 @@ function MainDashboard() {
               try {
                   sessionStorage.setItem('taskflow_prev_ids', JSON.stringify(Array.from(currentIds)));
               } catch (e) {}
-          } else {
-            setTasks([]);
-            showToast('Lấy dữ liệu thất bại: ' + (data.error || ''));
+              
+            } else {
+              setTasks([]);
+              showToast('Lấy dữ liệu thất bại: ' + (data.error || ''));
+            }
+          } catch (e) {
+            console.error(e);
+            showToast('Lỗi kết nối khi lấy dữ liệu');
           }
-        } catch (e) {
-          console.error(e);
-          showToast('Lỗi kết nối khi lấy dữ liệu');
-        }
-      };
-      fetchTasks();
-      fetchFacilityStatuses();
+        };
+        fetchTasks();
+        const pollInterval = setInterval(() => {
+          fetchTasks();
+        }, 10000);
+        return () => clearInterval(pollInterval);
     }
   }, [user]);
 
@@ -825,14 +865,14 @@ function MainDashboard() {
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
             </>
           )}
-          {user.role === 'DEPARTMENT_HEAD' && (
+          {['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) && (
             <>
-              <NavItem icon="dashboard" label="Tổng quan phòng ban" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+              <NavItem icon="dashboard" label={['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) ? 'Tổng quan BĐH' : 'Tổng quan phòng ban'} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
               <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
               <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
-              <NavItem icon="analytics" label="Báo cáo hiệu suất" active={activeTab === 'dept-reports'} onClick={() => setActiveTab('dept-reports')} />
+
             </>
           )}
           {user.role === 'FINANCE_DEPT' && (
@@ -854,19 +894,9 @@ function MainDashboard() {
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
             </>
           )}
-          {['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) && (
-            <>
-              {user.role === 'VICE_PRESIDENT' && (
-                <>
-                  <NavItem icon="content_paste" label="Công việc" active={activeTab === 'internal-tasks'} onClick={() => { setActiveTab('internal-tasks'); }} />
-                  <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
-                </>
-              )}
-              <NavItem icon="space_dashboard" label="Executive Dashboard" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
-              <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
-              <NavItem icon="corporate_fare" label="Đa cơ sở" active={activeTab === 'facilities'} onClick={() => setActiveTab('facilities')} />
-              <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
-              <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
+          {user.role === 'SUPER_ADMIN' && (
+              <>
+                <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
             </>
           )}
           {user.role === 'ADMIN' && (
@@ -883,7 +913,7 @@ function MainDashboard() {
              <div className="mt-6 mb-2 px-4">
                 <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-3 flex items-center justify-between tracking-widest uppercase">
                    Lịch sử trò chuyện AI
-                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) { setActiveTab('reports'); } else if (['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
+                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
                       <span className="material-symbols-outlined text-[16px]">add_circle</span>
                    </button>
                 </div>
@@ -896,10 +926,7 @@ function MainDashboard() {
                             key={session.id} 
                             onClick={() => { 
                                setActiveAiSessionId(session.id); 
-                               if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
-                                  setActiveTab('reports'); 
-                               } else if (['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) {
-                                  setActiveTab('ai-advisor');
+                               if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor');
                                } else {
                                   setShowAITaskModal(true);
                                }
@@ -1097,7 +1124,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <RAGManagerPanel showToast={showToast} />
               </ErrorBoundary>
-            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) ? (
+            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
               <ErrorBoundary>
                 <FacilityDashboard user={user} tasks={tasks} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={globalFacilityFilter} />
               </ErrorBoundary>
@@ -1174,10 +1201,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <RevenueLog user={user} showToast={showToast} />
               </ErrorBoundary>
-            ) : ['dept-reports'].includes(activeTab) ? (
-              <ErrorBoundary>
-                <PerformanceReport user={user} tasks={tasks} globalFacilityFilter={globalFacilityFilter} />
-              </ErrorBoundary>
+
             ) : (
               <>
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
@@ -1274,17 +1298,7 @@ function MainDashboard() {
                     <KanbanColumn title="Hoàn thành" status="done" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} readOnly={isReadOnlyView} />
                   </div>
                 ) : (
-                  <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
-                        <tr>
-                          <th className="px-6 py-4">Task</th>
-                          <th className="px-6 py-4">PIC</th>
-                          <th className="px-6 py-4">Deadline</th>
-                          <th className="px-6 py-4">Trạng thái</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                  <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden"><div className="overflow-x-auto custom-scrollbar"><table className="w-full text-sm text-left"><thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400"><tr><th className="px-6 py-4">Task</th><th className="px-6 py-4">PIC</th><th className="px-6 py-4">Deadline</th><th className="px-6 py-4">Trạng thái</th></tr></thead><tbody>
                         {activeTasks.map(task => (
                           <tr key={task.id} onClick={() => setSelectedTask(task)} className="cursor-pointer border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                             <td className="px-6 py-4">
@@ -1304,9 +1318,7 @@ function MainDashboard() {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                  </div>
-                )}
+                    </table></div></div>)}
               </>
             )}
           </div>
@@ -1496,8 +1508,8 @@ function MainDashboard() {
         )}
       </main>
 
-      {/* Right Sidebar (SUPER_ADMIN Only) */}
-      {user.role === 'SUPER_ADMIN' && (
+      {/* Right Sidebar Disabled */}
+      {false && (
         <aside className="w-80 bg-white dark:bg-[#1e1e1e] border-l border-outline-variant dark:border-gray-800 flex flex-col shadow-xl z-20 transition-colors">
           <div className="p-6 border-b border-outline-variant dark:border-gray-800 bg-gradient-to-r from-secondary/5 to-transparent">
             <div className="flex items-center justify-between mb-1">
@@ -1693,7 +1705,7 @@ function NavItem({ icon, label, active, onClick }) {
 function StatusBadge({ status }) {
   const styles = { todo: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700', in_progress: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800', review: 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800', done: 'bg-success-container text-success dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800' };
   const labels = { todo: 'Cần làm', in_progress: 'Đang tiến hành', review: 'Nghiệm thu', done: 'Hoàn thành' };
-  return <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}>{labels[status]}</span>;
+  return <span className={`whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium border ${styles[status]}`}>{labels[status]}</span>;
 }
 
 function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal, onQuickAdd, readOnly }) {
@@ -1733,11 +1745,26 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
       <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar bg-gray-50/30 dark:bg-transparent min-h-[150px]">
         {columnTasks.map(task => (
           <div key={task.id} onClick={() => setSelectedTask(task)} className="bg-white dark:bg-[#252525] p-4 rounded-xl shadow-sm border border-outline-variant dark:border-gray-700 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group">
-            {task.facility && (
-              <div className="mb-2">
+            <div className="mb-2 flex items-center justify-between">
+              {task.facility ? (
                 <span className="text-[10px] font-bold tracking-wider uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-md">{task.facility}</span>
+              ) : <div />}
+              <div className="flex">
+                {((task.creator_role === 'SUPER_ADMIN' || (task.desc && task.desc.includes('<!--cr:SUPER_ADMIN-->'))) || (!task.creator_role && task.facility === 'HQ')) && (
+                  <>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  </>
+                )}
+                {((task.creator_role === 'VICE_PRESIDENT' || (task.desc && task.desc.includes('<!--cr:VICE_PRESIDENT-->'))) || (!task.creator_role && (task.facility === 'Ban Giám Đốc' || task.facility === 'BGD' || task.facilityId === 'BGD' || task.department_tag === 'BGD'))) && (
+                  <>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  </>
+                )}
               </div>
-            )}
+            </div>
             <h4 className="font-medium text-sm text-on-surface dark:text-white mb-2 leading-snug group-hover:text-primary transition-colors">{task.title}</h4>
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
@@ -1776,4 +1803,13 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
 
