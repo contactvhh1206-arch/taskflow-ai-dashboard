@@ -570,8 +570,7 @@ function MainDashboard() {
             urgent: false,
             facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
             creator_role: user.role,
-          desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
-            ...draft
+          ...draft, desc: (draft.desc || "") + " <!--cr:" + user.role + "-->",
           };
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
             method: 'POST',
@@ -612,8 +611,7 @@ function MainDashboard() {
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
         creator_role: user.role,
-          desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
-        ...newTask,
+          ...newTask, desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
         facility: newTask.facility || taskFacility,
         ...(deptId && isDeptHeadLocal ? { department_tag: deptId } : {})
       };
