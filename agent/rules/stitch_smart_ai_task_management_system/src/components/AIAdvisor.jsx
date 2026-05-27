@@ -515,22 +515,22 @@ export default function AIAdvisor(props) {
         {chatLog.length === 0 && !isFacilityMode && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
             <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 pointer-events-auto">
-              <div onClick={() => handleAsk('Trích xuất báo cáo chi tiết tổng quan hoạt động của 6 cơ sở: db41, dbace, dbpq, db pa, dbpav, dppak')} className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-8 rounded-3xl border border-blue-100 dark:border-blue-800/50 cursor-pointer hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1.5 transition-all duration-300 group relative overflow-hidden">
+              <div onClick={() => handleAsk('Trích xuất báo cáo chi tiết tổng quan hoạt động của 6 cơ sở: DB41, DBACE, DBPQ, DB PA, DBPAV, DPPAK')} className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-8 rounded-3xl border border-blue-100 dark:border-blue-800/50 cursor-pointer hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1.5 transition-all duration-300 group relative overflow-hidden">
                 <div className="absolute -right-6 -top-6 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all"></div>
                 <div className="relative w-16 h-16 bg-white dark:bg-[#2a2a2a] shadow-sm rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 border border-blue-100/50 dark:border-gray-700">
                   <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>monitoring</span>
                 </div>
                 <h3 className="relative text-2xl font-bold text-gray-800 dark:text-white mb-3 leading-tight">Tổng quan 6 cơ sở</h3>
-                <p className="relative text-base text-gray-600 dark:text-gray-400 leading-relaxed">Báo cáo chi tiết hoạt động của db41, dbace, dbpq, db pa, dbpav, dppak.</p>
+                <p className="relative text-base text-gray-600 dark:text-gray-400 leading-relaxed">Báo cáo chi tiết hoạt động của DB41, DBACE, DBPQ, DB PA, DBPAV, DPPAK.</p>
               </div>
 
-              <div onClick={() => handleAsk('Báo cáo tiến độ công việc và KPI của Thiện, Cường, Tùng, Martin, Hoàng, Anh Phương')} className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-8 rounded-3xl border border-purple-100 dark:border-purple-800/50 cursor-pointer hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1.5 transition-all duration-300 group relative overflow-hidden">
+              <div onClick={() => handleAsk('Cập nhật tiến độ phòng ban (Thiện, Cường, Tùng, Martin, Hoàng, Anh Phương)')} className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-8 rounded-3xl border border-purple-100 dark:border-purple-800/50 cursor-pointer hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1.5 transition-all duration-300 group relative overflow-hidden">
                 <div className="absolute -right-6 -top-6 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all"></div>
                 <div className="relative w-16 h-16 bg-white dark:bg-[#2a2a2a] shadow-sm rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 border border-purple-100/50 dark:border-gray-700">
                   <span className="material-symbols-outlined text-purple-600 dark:text-purple-400 text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>engineering</span>
                 </div>
-                <h3 className="relative text-2xl font-bold text-gray-800 dark:text-white mb-3 leading-tight">Tiến độ nhân sự</h3>
-                <p className="relative text-base text-gray-600 dark:text-gray-400 leading-relaxed">Cập nhật tiến độ của Thiện, Cường, Tùng, Martin, Hoàng, Anh Phương.</p>
+                <h3 className="relative text-2xl font-bold text-gray-800 dark:text-white mb-3 leading-tight">Tiến độ phòng ban</h3>
+                <p className="relative text-base text-gray-600 dark:text-gray-400 leading-relaxed">Cập nhật tiến độ phòng ban.</p>
               </div>
             </div>
           </div>
