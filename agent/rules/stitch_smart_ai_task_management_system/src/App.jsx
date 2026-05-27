@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -871,7 +871,8 @@ function MainDashboard() {
                               let isBgd = deptId === 'BGD' && (tFacCode.includes('bgd') || tFacName.includes('giám đốc') || tFacName.includes('phó'));
                               if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase()) || isMkt || isFin || isBgd) {
                                   isAssignedToMe = true;
-                              } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+                              }
+                          } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
                               if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
                                   isAssignedToMe = true;
                               }
