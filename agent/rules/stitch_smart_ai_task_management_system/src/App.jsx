@@ -570,6 +570,7 @@ function MainDashboard() {
             urgent: false,
             facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
             creator_role: user.role,
+          desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
             ...draft
           };
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
@@ -611,6 +612,7 @@ function MainDashboard() {
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
         creator_role: user.role,
+          desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
         ...newTask,
         facility: newTask.facility || taskFacility,
         ...(deptId && isDeptHeadLocal ? { department_tag: deptId } : {})
@@ -646,6 +648,7 @@ function MainDashboard() {
         urgent: false,
         facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
         creator_role: user.role,
+          desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
         status: 'todo',
         ...newTask
       };
@@ -713,6 +716,13 @@ function MainDashboard() {
             
             // HACK: Auto-correct tasks incorrectly assigned to DUBAI 41 by old backend
             fetchedTasks = fetchedTasks.map(t => {
+                 if (t.desc && t.desc.includes("<!--cr:")) {
+                     const match = t.desc.match(/<!--cr:(.*?)-->/);
+                     if (match) {
+                         t.creator_role = match[1];
+                         t.desc = t.desc.replace(match[0], "");
+                     }
+                 }
                if (t.facility === 'DUBAI 41' || t.facilityId === 'DUBAI 41' || t.facility === 'HQ' || !t.facility) {
                    const picStr = String(t.pic).toLowerCase();
                    const picIdStr = String(t.picId || '').toLowerCase();
