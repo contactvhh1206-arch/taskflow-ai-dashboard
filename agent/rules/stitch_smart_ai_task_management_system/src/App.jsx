@@ -748,9 +748,27 @@ function MainDashboard() {
                   fetchedTasks.forEach(task => {
                       if (!prevIds.has(task.id) && task.status === 'todo') {
                           const myNames = [String(user.name).toLowerCase(), String(user.username).toLowerCase(), '@' + String(user.username).toLowerCase()];
-                          const isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
+                          let isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
                           
-                          // Check if I am the PIC (e.g. PIC contains "Thiện" and user.name is "Thiện")
+                          if (!isAssignedToMe) {
+                              const isVP = user?.role === 'VICE_PRESIDENT';
+                              const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
+                              const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
+                              const rawFac = user?.facility_code || user?.facility_id || '';
+                              const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
+                              const tFacCode = String(task?.facility || task?.facilityId || '').toLowerCase();
+                              
+                              if (isDeptHead) {
+                                  if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase())) {
+                                      isAssignedToMe = true;
+                                  }
+                              } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user.role)) {
+                                  if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
+                                      isAssignedToMe = true;
+                                  }
+                              }
+                          }
+                          
                           if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
                               const newNotif = {
                                   title: 'Công việc mới',
