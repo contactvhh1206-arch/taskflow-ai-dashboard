@@ -42,7 +42,8 @@ const AI_INSIGHTS = [
   { id: 2, title: 'Tối ưu Nguồn lực', desc: 'Cơ sở 1 đang quá tải 20% so với định mức. Có thể điều phối nhân sự từ Cơ sở 2 sang hỗ trợ.', type: 'info' },
 ];
 
-function TaskCreationModal({ onClose, onSave, defaultStatus, user, activeFacilities }) {
+function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
+  const activeFacilities = JSON.parse(localStorage.getItem("taskflow_facilities") || "[]").filter(f => f.is_active !== false);
   const [formData, setFormData] = useState({
     title: '',
     desc: '',
