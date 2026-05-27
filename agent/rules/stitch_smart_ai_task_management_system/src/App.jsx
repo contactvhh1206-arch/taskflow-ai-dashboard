@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+﻿import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -1234,17 +1234,7 @@ function MainDashboard() {
                     <KanbanColumn title="Hoàn thành" status="done" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} readOnly={isReadOnlyView} />
                   </div>
                 ) : (
-                  <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
-                        <tr>
-                          <th className="px-6 py-4">Task</th>
-                          <th className="px-6 py-4">PIC</th>
-                          <th className="px-6 py-4">Deadline</th>
-                          <th className="px-6 py-4">Trạng thái</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                  <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden"><div className="overflow-x-auto custom-scrollbar"><table className="w-full text-sm text-left"><thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400"><tr><th className="px-6 py-4">Task</th><th className="px-6 py-4">PIC</th><th className="px-6 py-4">Deadline</th><th className="px-6 py-4">Trạng thái</th></tr></thead><tbody>
                         {activeTasks.map(task => (
                           <tr key={task.id} onClick={() => setSelectedTask(task)} className="cursor-pointer border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                             <td className="px-6 py-4">
@@ -1264,9 +1254,7 @@ function MainDashboard() {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                  </div>
-                )}
+                    </table></div></div>)}
               </>
             )}
           </div>
@@ -1736,4 +1724,6 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
     </div>
   );
 }
+
+
 
