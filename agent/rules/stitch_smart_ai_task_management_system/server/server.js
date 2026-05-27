@@ -124,7 +124,10 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
              TO_CHAR(t.deadline, 'YYYY-MM-DD') as deadline, 
              t.created_at as "createdAt", t.updated_at as "completedAt", t.created_by_role as "creator_role",
              u.full_name as pic, u.email as "picId",
-             f.name as facility, f.code as "facilityId"
+             f.name as facility, f.code as "facilityId",
+             (SELECT COUNT(*) FROM task_comments WHERE task_id = t.id) as comments_count,
+             (SELECT content FROM task_comments WHERE task_id = t.id ORDER BY created_at DESC LIMIT 1) as latest_comment,
+             (SELECT user_id FROM task_comments WHERE task_id = t.id ORDER BY created_at DESC LIMIT 1) as latest_comment_user_id
       FROM tasks t
       LEFT JOIN users u ON t.pic_id = u.id
       LEFT JOIN facilities f ON t.facility_id = f.id
