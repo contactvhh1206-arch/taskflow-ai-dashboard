@@ -1532,11 +1532,11 @@ function MainDashboard() {
                 </div>
                 <div id="comments-scroll-container" className="flex-1 p-4 overflow-y-auto space-y-4">
                     {selectedTaskComments.map(c => (
-                      <div key={c.id} className={lex gap-3 }>
+                      <div key={c.id} className={`flex gap-3 ${c.user_id === user.id ? 'flex-row-reverse' : ''}`}>
                         <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shrink-0">
                           {c.author_name ? c.author_name.substring(0, 2).toUpperCase() : 'U'}
                         </div>
-                        <div className={g-surface-container dark:bg-[#2a2a2a] p-3 rounded-2xl text-sm dark:text-gray-200 }>
+                        <div className={`bg-surface-container dark:bg-[#2a2a2a] p-3 rounded-2xl text-sm dark:text-gray-200 ${c.user_id === user.id ? 'rounded-tr-none bg-primary/10 border border-primary/20' : 'rounded-tl-none border border-outline-variant dark:border-gray-800'}`}>
                           <span className="text-primary font-bold text-[11px] block mb-1">{c.author_name}</span> 
                           {c.content}
                           <span className="text-[9px] text-gray-500 block mt-1">{new Date(c.created_at).toLocaleString('vi-VN')}</span>
