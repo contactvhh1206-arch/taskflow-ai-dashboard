@@ -569,6 +569,7 @@ function MainDashboard() {
             deadline: new Date().toISOString().split('T')[0],
             urgent: false,
             facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
+            creator_role: user.role,
             ...draft
           };
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
@@ -609,6 +610,7 @@ function MainDashboard() {
         pic: user.name,
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
+        creator_role: user.role,
         ...newTask,
         facility: taskFacility,
         ...(deptId && isDeptHeadLocal ? { department_tag: deptId } : {})
@@ -643,6 +645,7 @@ function MainDashboard() {
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
         facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
+        creator_role: user.role,
         status: 'todo',
         ...newTask
       };
@@ -1687,11 +1690,26 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
       <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar bg-gray-50/30 dark:bg-transparent min-h-[150px]">
         {columnTasks.map(task => (
           <div key={task.id} onClick={() => setSelectedTask(task)} className="bg-white dark:bg-[#252525] p-4 rounded-xl shadow-sm border border-outline-variant dark:border-gray-700 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group">
-            {task.facility && (
-              <div className="mb-2">
+            <div className="mb-2 flex items-center justify-between">
+              {task.facility ? (
                 <span className="text-[10px] font-bold tracking-wider uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-md">{task.facility}</span>
+              ) : <div />}
+              <div className="flex">
+                {(task.creator_role === 'SUPER_ADMIN' || (!task.creator_role && task.facility === 'HQ')) && (
+                  <>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  </>
+                )}
+                {(task.creator_role === 'VICE_PRESIDENT' || (!task.creator_role && (task.facility === 'Ban Giám Đốc' || task.facility === 'BGD' || task.facilityId === 'BGD' || task.department_tag === 'BGD'))) && (
+                  <>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  </>
+                )}
               </div>
-            )}
+            </div>
             <h4 className="font-medium text-sm text-on-surface dark:text-white mb-2 leading-snug group-hover:text-primary transition-colors">{task.title}</h4>
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
