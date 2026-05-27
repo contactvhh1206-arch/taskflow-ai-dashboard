@@ -114,9 +114,16 @@ app.delete('/api/users/:id', authenticateUser, async (req, res) => {
         return res.status(403).json({ error: 'KhÃ´ng Ä‘á»§ quyá» n' });
     }
     
-    // Soft delete to avoid foreign key violations
-    const updateQuery = 'UPDATE users SET is_deleted = TRUE WHERE id = $1 RETURNING *';
-    const { rows } = await pool.query(updateQuery, [id]);
+    // Hard delete - delete all associated records first to avoid foreign key constraints
+    await pool.query('DELETE FROM task_comments WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM ai_ping_logs WHERE pic_id = $1', [id]);
+    await pool.query('DELETE FROM daily_checkins WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM ai_token_usage_logs WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM tasks WHERE pic_id = $1 OR created_by = $1', [id]);
+    
+    // Finally delete the user
+    const deleteQuery = 'DELETE FROM users WHERE id = $1 RETURNING *';
+    const { rows } = await pool.query(deleteQuery, [id]);
     
     if (rows.length === 0) {
       return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n.' });
