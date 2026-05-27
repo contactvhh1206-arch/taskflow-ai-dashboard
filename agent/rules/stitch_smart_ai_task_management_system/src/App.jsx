@@ -42,11 +42,12 @@ const AI_INSIGHTS = [
   { id: 2, title: 'Tối ưu Nguồn lực', desc: 'Cơ sở 1 đang quá tải 20% so với định mức. Có thể điều phối nhân sự từ Cơ sở 2 sang hỗ trợ.', type: 'info' },
 ];
 
-function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
+function TaskCreationModal({ onClose, onSave, defaultStatus, user, activeFacilities }) {
   const [formData, setFormData] = useState({
     title: '',
     desc: '',
     pic: user.name,
+    facility: '',
     deadline: new Date().toISOString().slice(0, 16),
     status: defaultStatus || 'todo',
     urgent: false
@@ -93,7 +94,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
     onSave({
       id: Date.now(),
       ...formData,
-      facility: user.role === 'SUPER_ADMIN' ? 'HQ' : (Array.isArray(user.facility_id) ? 'ALL' : user.facility_id)
+      facility: formData.facility || (user.role === 'SUPER_ADMIN' ? 'HQ' : (Array.isArray(user.facility_id) ? 'ALL' : user.facility_id))
     });
     onClose();
   };
@@ -127,7 +128,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
             <textarea name="desc" value={formData.desc} onChange={handleChange} className="w-full h-24 px-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white resize-none" placeholder="Ghi chú thêm (không bắt buộc)..." />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.5fr] gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 text-truncate truncate">Người phụ trách (PIC)</label>
               <div className="relative">
@@ -141,6 +142,21 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
                   {!picOptions.find(u => u.name === user.name) && (
                     <option value={user.name}>{user.name} (Bạn)</option>
                   )}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 text-truncate truncate">Cơ sở / Phòng ban</label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
+                <select name="facility" value={formData.facility} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
+                  <option value="">-- Tự động --</option>
+                  {(activeFacilities || []).map(f => (
+                    <option key={f.id || f.name} value={f.name}>{f.name}</option>
+                  ))}
+                  <option value="HQ">Ban Giám Đốc (HQ)</option>
+                  <option value="MARKETING">Phòng Marketing</option>
+                  <option value="FINANCE">Phòng Kế toán</option>
                 </select>
               </div>
             </div>
