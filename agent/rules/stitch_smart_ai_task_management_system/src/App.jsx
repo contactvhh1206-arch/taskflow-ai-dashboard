@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+﻿import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -819,13 +819,8 @@ function MainDashboard() {
             </>
           )}
           {user.role === 'SUPER_ADMIN' && (
-            <>
-              
-              <NavItem icon="space_dashboard" label="Executive Dashboard" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
-              <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
-              <NavItem icon="corporate_fare" label="Đa cơ sở" active={activeTab === 'facilities'} onClick={() => setActiveTab('facilities')} />
-              <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
-              <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
+              <>
+                <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
             </>
           )}
           {user.role === 'ADMIN' && (
@@ -1717,6 +1712,7 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
     </div>
   );
 }
+
 
 
 
