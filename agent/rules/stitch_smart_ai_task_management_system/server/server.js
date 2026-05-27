@@ -119,7 +119,7 @@ app.delete('/api/users/:id', authenticateUser, async (req, res) => {
     await pool.query('DELETE FROM ai_ping_logs WHERE pic_id = $1', [id]);
     await pool.query('DELETE FROM daily_checkins WHERE user_id = $1', [id]);
     await pool.query('DELETE FROM ai_token_usage_logs WHERE user_id = $1', [id]);
-    await pool.query('DELETE FROM tasks WHERE pic_id = $1 OR created_by = $1', [id]);
+    await pool.query('DELETE FROM tasks WHERE pic_id = $1', [id]);
     
     // Finally delete the user
     const deleteQuery = 'DELETE FROM users WHERE id = $1 RETURNING *';
