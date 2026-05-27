@@ -237,6 +237,9 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
              const defaultFacs = activeFacs.length > 0 ? activeFacs : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
              
              defaultFacs.forEach(f => {
+                const fname = String(f.name || '').toUpperCase();
+                if (['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].some(k => fname.includes(k))) return;
+
                 if (isAllowedAll || hasAll || allowedFacs.includes(f.id) || allowedFacs.includes(f.name)) {
                    aggregated[f.name] = { id: f.id, name: f.name, revenue: 0, is_active: f.is_active !== false };
                 }
