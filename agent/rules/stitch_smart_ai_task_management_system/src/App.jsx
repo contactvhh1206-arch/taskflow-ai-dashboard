@@ -788,9 +788,9 @@ function MainDashboard() {
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
             </>
           )}
-          {user.role === 'DEPARTMENT_HEAD' && (
+          {['DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) && (
             <>
-              <NavItem icon="dashboard" label="Tổng quan phòng ban" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+              <NavItem icon="dashboard" label={user.role === 'VICE_PRESIDENT' ? 'Tổng quan BĐH' : 'Tổng quan phòng ban'} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
               <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
               <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
@@ -817,14 +817,9 @@ function MainDashboard() {
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
             </>
           )}
-          {['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) && (
+          {user.role === 'SUPER_ADMIN' && (
             <>
-              {user.role === 'VICE_PRESIDENT' && (
-                <>
-                  <NavItem icon="content_paste" label="Công việc" active={activeTab === 'internal-tasks'} onClick={() => { setActiveTab('internal-tasks'); }} />
-                  <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
-                </>
-              )}
+              
               <NavItem icon="space_dashboard" label="Executive Dashboard" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
               <NavItem icon="corporate_fare" label="Đa cơ sở" active={activeTab === 'facilities'} onClick={() => setActiveTab('facilities')} />
@@ -1060,7 +1055,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <RAGManagerPanel showToast={showToast} />
               </ErrorBoundary>
-            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) ? (
+            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
               <ErrorBoundary>
                 <FacilityDashboard user={user} tasks={tasks} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={globalFacilityFilter} />
               </ErrorBoundary>
@@ -1724,6 +1719,8 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
     </div>
   );
 }
+
+
 
 
 
