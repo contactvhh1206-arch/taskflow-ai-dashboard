@@ -216,6 +216,24 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
 
     // FALLBACK: If insert_facility_id is still null (due to 'ALL', 'HQ', or unmapped facility name like 'DB41')
     if (!insert_facility_id || insert_facility_id === 'ALL') {
+          const userRole = req.user.role;
+          let deptFacCode = null;
+          if (userRole === 'DEPARTMENT_HEAD') deptFacCode = 'MARKETING';
+          else if (userRole === 'FINANCE_DEPT') deptFacCode = 'FINANCE';
+          else if (userRole === 'VICE_PRESIDENT') deptFacCode = 'BGD';
+
+          if (deptFacCode) {
+              const facRecord = await pool.query('SELECT id FROM facilities WHERE code =  OR name =  LIMIT 1', [deptFacCode]);
+              if (facRecord.rows.length > 0) {
+                  insert_facility_id = facRecord.rows[0].id;
+              } else {
+                  const newFac = await pool.query("INSERT INTO facilities (name, code) VALUES (, ) RETURNING id", [deptFacCode]);
+                  insert_facility_id = newFac.rows[0].id;
+              }
+          }
+      }
+
+      if (!insert_facility_id || insert_facility_id === 'ALL') {
         const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
         if (hqFac.rows.length > 0) {
             insert_facility_id = hqFac.rows[0].id;
