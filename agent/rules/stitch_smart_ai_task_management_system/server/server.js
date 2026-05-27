@@ -345,11 +345,11 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
 
 
           if (deptFacCode) {
-              const facRecord = await pool.query('SELECT id FROM facilities WHERE code =  OR name =  LIMIT 1', [deptFacCode]);
+              const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [deptFacCode]);
               if (facRecord.rows.length > 0) {
                   insert_facility_id = facRecord.rows[0].id;
               } else {
-                  const newFac = await pool.query("INSERT INTO facilities (name, code) VALUES (, ) RETURNING id", [deptFacCode]);
+                  const newFac = await pool.query("INSERT INTO facilities (name, code) VALUES ($1, $1) RETURNING id", [deptFacCode]);
                   insert_facility_id = newFac.rows[0].id;
               }
           }
@@ -924,7 +924,7 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     const { rows } = await pool.query(query, [id, user_id, content]);
     
     // Also update task updated_at to trigger polling refresh
-    await pool.query('UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = ', [id]);
+    await pool.query('UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
     
     res.json({ success: true, data: rows[0] });
   } catch (error) {

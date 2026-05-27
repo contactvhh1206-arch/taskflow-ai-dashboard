@@ -366,7 +366,7 @@ function MainDashboard() {
      
      if (isDeptHead) {
         // // if (globalFacilityFilter === 'ALL') return true;
-        const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
+        const tFacCode = String(t?.facilityId || t?.facility || '').toLowerCase();
         
         if (globalFacilityFilter && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptId) {
             const filterLower = String(globalFacilityFilter).toLowerCase();
@@ -380,7 +380,7 @@ function MainDashboard() {
      }
      
      if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
-         const tFacCode = String(t?.facility || t?.facilityId || '').toLowerCase();
+         const tFacCode = String(t?.facilityId || t?.facility || '').toLowerCase();
          return tFacCode.includes(String(globalFacilityFilter).toLowerCase());
      }
 
