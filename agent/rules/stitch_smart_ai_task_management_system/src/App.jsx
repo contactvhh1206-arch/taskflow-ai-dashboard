@@ -190,7 +190,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
                     <option key={f.id || f.name} value={f.name}>{f.name}</option>
                   ))}
                   {availableDepts.includes('HQ') && <option value="HQ">Ban Giám đốc (HQ)</option>}
-                  {availableDepts.includes('MARKETING') && <option value="MARKETING">Phòng Marketing</option>}
+                  {availableDepts.includes('MARKETING') && <option value="MARKETING">Phòng Truyền thông</option>}
                   {availableDepts.includes('FINANCE') && <option value="FINANCE">Phòng Kế toán</option>}
                   {availableDepts.includes('SALES') && <option value="SALES">Phòng Kinh doanh</option>}
                 </select>
@@ -302,7 +302,7 @@ function MainDashboard() {
       const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'SALES', 'BGD'].includes(String(f.name || '').toUpperCase()));
       setFacilitiesList([
         ...facs,
-        { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+        { id: 'dept1', name: 'Phòng Truyền thông', filterValue: 'MARKETING' },
         { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
           { id: 'dept3', name: 'Phòng Kinh doanh', filterValue: 'SALES' },
         { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
@@ -467,7 +467,7 @@ function MainDashboard() {
         const filteredFacs = mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'SALES', 'BGD'].includes(String(f.name || '').toUpperCase()));
         setFacilitiesList([
           ...filteredFacs,
-          { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+          { id: 'dept1', name: 'Phòng Truyền thông', filterValue: 'MARKETING' },
           { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
           { id: 'dept3', name: 'Phòng Kinh doanh', filterValue: 'SALES' },
           { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
@@ -495,7 +495,7 @@ function MainDashboard() {
     const filteredLocalFacs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'SALES', 'BGD'].includes(String(f.name || '').toUpperCase()));
     setFacilitiesList([
       ...filteredLocalFacs,
-      { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+      { id: 'dept1', name: 'Phòng Truyền thông', filterValue: 'MARKETING' },
       { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
           { id: 'dept3', name: 'Phòng Kinh doanh', filterValue: 'SALES' },
       { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
@@ -813,7 +813,7 @@ function MainDashboard() {
                      const picIdStr = String(t.picId || '').toLowerCase();
                      
                      if (picIdStr === '@thien' || picStr === 'thiện' || picIdStr === '@cuong' || picStr === 'cường' || picIdStr === 'marketing' || picStr.includes('marketing')) {
-                         return { ...t, facility: 'Phòng Marketing', facilityId: 'MARKETING', department_tag: 'MARKETING' };
+                         return { ...t, facility: 'Phòng Truyền thông', facilityId: 'MARKETING', department_tag: 'MARKETING' };
                      }
                      if (picIdStr === 'ketoan' || picStr.includes('kế toán')) {
                          return { ...t, facility: 'Phòng Finance', facilityId: 'FINANCE', department_tag: 'FINANCE' };
@@ -1199,7 +1199,7 @@ function MainDashboard() {
                            return { name: facName, count: pendingTasks.length, icon: 'work', type: 'executive' };
                         });
                         const depts = [
-                           { name: 'Phòng Marketing', id: 'MARKETING', icon: 'campaign' },
+                           { name: 'Phòng Truyền thông', id: 'MARKETING', icon: 'campaign' },
                            { name: 'Phòng Kế Toán', id: 'FINANCE', icon: 'account_balance' },
                             { name: 'Phòng Kinh Doanh', id: 'SALES', icon: 'trending_up' }
                         ].map(d => {
@@ -1563,7 +1563,7 @@ function MainDashboard() {
                           { user_id: 'hq', full_name: 'Sếp Tổng', email: 'Ban Giám Đốc' },
                           { user_id: 'vp', full_name: 'Sếp Phó', email: 'Ban Giám Đốc' },
                           { user_id: 'acc', full_name: 'Phòng Kế toán', email: 'Bộ phận tài chính' },
-                          { user_id: 'mkt', full_name: 'Phòng Marketing', email: 'Bộ phận truyền thông' },
+                          { user_id: 'mkt', full_name: 'Phòng Truyền thông', email: 'Bộ phận truyền thông' },
                           { user_id: 'sales', full_name: 'Phòng Kinh doanh', email: 'Bộ phận kinh doanh' }
                         ];
                         const allOptions = [...specialMentions, ...dbUsers];

@@ -6,7 +6,7 @@ const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'A
 
 const SYSTEM_ROLES = [
   { value: 'FACILITY_MANAGER', label: 'Quản lý cơ sở' },
-  { value: 'DEPARTMENT_HEAD', label: 'Bộ phận Marketing' },
+  { value: 'DEPARTMENT_HEAD', label: 'Bộ phận Truyền thông' },
   { value: 'FINANCE_DEPT', label: 'Bộ phận Tài chính - Kế toán' },
   { value: 'SALES_DEPT', label: 'Bộ phận Kinh doanh' },
   { value: 'GENERAL_MANAGER', label: 'Tổng quản lý chuỗi' },
