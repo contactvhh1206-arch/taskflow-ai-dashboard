@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch'; 
 import dotenv from 'dotenv';
@@ -515,7 +515,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
                 insert_facility_id = parsedFac;
             } else {
                 const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
-                if (facRecord.rows.length > 0) { insert_facility_id = facRecord.rows[0].id; } else if (['MARKETING', 'BGD', 'FINANCE'].includes(facility)) { const newFac = await pool.query("INSERT INTO facilities (name, code) VALUES ($1, $1) RETURNING id", [facility]); insert_facility_id = newFac.rows[0].id; }
+                if (facRecord.rows.length > 0) { insert_facility_id = facRecord.rows[0].id; }
             }
         }
     }
