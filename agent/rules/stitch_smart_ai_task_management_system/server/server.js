@@ -132,7 +132,7 @@ app.delete('/api/users/:id', authenticateUser, async (req, res) => {
     res.json({ success: true, message: 'Ä Ã£ xÃ³a tÃ i khoáº£n thÃ nh cÃ´ng.' });
   } catch (error) {
     console.error('Lỗi xóa tài khoản:', error);
-    res.status(500).json({ error: error.message || 'Lỗi server khi xóa tài khoản.' });
+    res.status(500).json({ error: 'DEBUG_MARKER: ' + (error.message || 'Lỗi server khi xóa tài khoản.') });
   }
 });
 
