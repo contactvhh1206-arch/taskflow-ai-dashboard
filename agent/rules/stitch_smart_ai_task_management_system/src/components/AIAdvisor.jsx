@@ -311,11 +311,26 @@ export default function AIAdvisor(props) {
          console.error('Error loading financial reports for AI', e);
       }
       
+      // Fetch RAG knowledge base
+      let ragContextStr = '';
+      try {
+         const ragDocs = JSON.parse(localStorage.getItem('taskflow_rag_docs') || '[]');
+         const ragContents = JSON.parse(localStorage.getItem('taskflow_rag_contents') || '{}');
+         ragDocs.forEach(doc => {
+            if (ragContents[doc.id]) {
+               ragContextStr += `\n--- TÀI LIỆU: ${doc.name} ---\n${ragContents[doc.id]}\n`;
+            }
+         });
+      } catch (e) {}
+
       // Build Vector context from contextData
       const vectorDataArr = contextData.map(d => d.aiVectorData || JSON.stringify(d)).filter(Boolean).slice(0, 10);
       let systemContext = `Dữ liệu hệ thống hiện tại:\n${vectorDataArr.join('\n')}`;
       if (financialContextStr) {
          systemContext += `\n\nDỮ LIỆU DOANH THU (TÀI CHÍNH):\n${financialContextStr}`;
+      }
+      if (ragContextStr) {
+         systemContext += `\n\nCƠ SỞ TRI THỨC (KIẾN THỨC BỔ SUNG TỪ TÀI LIỆU):\n${ragContextStr}`;
       }
       
       if (tasks && tasks.length > 0) {

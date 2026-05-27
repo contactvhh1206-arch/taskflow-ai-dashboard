@@ -119,6 +119,16 @@ export default function RAGManagerPanel({ showToast }) {
              ...d, 
              status: 'Đã mã hóa'
           } : d));
+          
+          // LƯU NỘI DUNG RAG VÀO LOCAL STORAGE
+          try {
+             const existingContents = JSON.parse(localStorage.getItem('taskflow_rag_contents') || '{}');
+             existingContents[docId] = fileText;
+             localStorage.setItem('taskflow_rag_contents', JSON.stringify(existingContents));
+          } catch(e) {
+             console.error('Không thể lưu nội dung RAG:', e);
+          }
+
           if (typeof showToast !== 'undefined') showToast('Tải lên và nhúng vector thành công!');
           
         } catch (error) {
@@ -134,6 +144,14 @@ export default function RAGManagerPanel({ showToast }) {
       const handleDelete = (id) => {
         if(window.confirm('Bạn có chắc muốn xóa tài liệu này khỏi Vector DB?')) {
           setDocuments(prev => prev.filter(d => d.id !== id));
+          
+          // XÓA NỘI DUNG RAG KHỎI LOCAL STORAGE
+          try {
+             const existingContents = JSON.parse(localStorage.getItem('taskflow_rag_contents') || '{}');
+             delete existingContents[id];
+             localStorage.setItem('taskflow_rag_contents', JSON.stringify(existingContents));
+          } catch(e) {}
+          
           showToast && showToast('Đã xóa tài liệu');
         }
       };
