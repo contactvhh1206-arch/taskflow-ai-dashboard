@@ -55,6 +55,34 @@ export const fetchHistory = async (filters = {}) => {
   return [];
 };
 
+export const fetchAiSessions = async (token) => {
+  try {
+    const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/sessions', {
+       headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const result = await response.json();
+    if (result.success) return result.data;
+  } catch (error) {
+    console.error('Lỗi fetch ai sessions:', error);
+  }
+  return [];
+};
+
+export const saveAiSession = async (sessionData, token) => {
+  try {
+    await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/sessions', {
+       method: 'POST',
+       headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+       },
+       body: JSON.stringify(sessionData)
+    });
+  } catch (error) {
+    console.error('Lỗi save ai session:', error);
+  }
+};
+
 const REPORTS_API_URL = 'https://taskflow-ai-dashboard.onrender.com/api/reports';
 
 export const fetchReports = async (token, role, facility_id) => {

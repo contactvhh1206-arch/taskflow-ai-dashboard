@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ErrorBoundary } from '../App.jsx';
+import { fetchAiSessions } from '../services/dataService.js';
 
 const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'];
 
@@ -16,6 +17,7 @@ const SYSTEM_ROLES = [
 export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskComments, user }) {
       const [users, setUsers] = useState([]);
       const [facilities, setFacilities] = useState([]);
+      const [aiSessions, setAiSessions] = useState([]);
       const [activeTab, setActiveTab] = useState('facilities');
 
       const [editingUser, setEditingUser] = useState(null);
@@ -133,6 +135,12 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       useEffect(() => {
         fetchUsers();
         fetchFacilities();
+        const loadAiSessions = async () => {
+           const token = localStorage.getItem('taskflow_token');
+           const sessions = await fetchAiSessions(token) || [];
+           setAiSessions(sessions);
+        };
+        loadAiSessions();
       }, []);
 
       const handleAddFacility = async (e) => {
@@ -291,6 +299,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
           <div className="p-4 border-b border-outline-variant dark:border-gray-800 bg-gradient-to-r from-primary/10 to-transparent flex gap-4">
             <button onClick={() => setActiveTab('facilities')} className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'facilities' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Cơ sở</button>
             <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'users' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Tài khoản</button>
+            <button onClick={() => setActiveTab('ai_logs')} className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'ai_logs' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Hội thoại AI</button>
             {user.role === 'ADMIN' && (
                <button onClick={() => setActiveTab('maintenance')} className={`px-4 py-2 rounded-lg font-bold transition-all ${activeTab === 'maintenance' ? 'bg-error text-white shadow-md' : 'text-error hover:bg-error/10 border border-transparent dark:hover:bg-red-900/20'}`}>Cấu hình Nâng cao / Bảo trì</button>
             )}
@@ -490,6 +499,43 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                     )}
                   </div>
                 </div>
+              </div>
+            ) : activeTab === 'ai_logs' ? (
+              <div className="space-y-6">
+                 <div className="bg-surface-container-low dark:bg-[#252525] p-5 rounded-xl border border-outline-variant dark:border-gray-700">
+                   <h3 className="font-bold mb-4 dark:text-white flex items-center gap-2">
+                     <span className="material-symbols-outlined text-primary">memory</span>
+                     Bộ nhớ Hội thoại AI Toàn cầu
+                   </h3>
+                   <p className="text-sm text-gray-500 mb-6">Đây là nơi hệ thống lưu trữ tất cả các phiên chat của các cơ sở. AI Master sẽ đọc được kho dữ liệu này để ghi nhớ các ngữ cảnh giao tiếp (Global Memory) từ các phiên làm việc trước.</p>
+                   
+                   <div className="grid grid-cols-1 gap-4">
+                     {aiSessions.length === 0 ? (
+                       <div className="text-center text-gray-500 py-8 border border-dashed rounded-xl">Chưa có dữ liệu hội thoại AI nào.</div>
+                     ) : (
+                       aiSessions.map(session => (
+                         <div key={session.id} className="p-4 rounded-xl border border-outline-variant dark:border-gray-700 bg-white dark:bg-[#1a1a1a] shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                               <h4 className="font-bold text-primary dark:text-blue-400">{session.title || 'Không có tiêu đề'}</h4>
+                               <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-500">{new Date(session.timestamp).toLocaleString('vi-VN')}</span>
+                            </div>
+                            <div className="flex gap-2 text-xs text-gray-500 font-medium mb-4">
+                               <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">store</span> {session.facility || 'HQ'}</span>
+                               <span className="bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">person</span> {session.user_id}</span>
+                            </div>
+                            <div className="bg-surface-container dark:bg-[#252525] p-3 rounded-lg max-h-40 overflow-y-auto text-sm space-y-3 custom-scrollbar">
+                               {(typeof session.chat_log === 'string' ? JSON.parse(session.chat_log) : (session.chat_log || [])).map((msg, idx) => (
+                                 <div key={idx} className={`flex flex-col ${msg.role === 'ai' ? 'text-gray-700 dark:text-gray-300' : 'text-primary dark:text-blue-400 font-medium'}`}>
+                                    <span className="text-[10px] uppercase opacity-70 mb-0.5">{msg.role === 'ai' ? 'AI Advisor' : 'User'}</span>
+                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                                 </div>
+                               ))}
+                            </div>
+                         </div>
+                       ))
+                     )}
+                   </div>
+                 </div>
               </div>
             ) : null}
           </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { fetchHistory } from '../services/dataService.js';
+import { fetchHistory, fetchAiSessions, saveAiSession } from '../services/dataService.js';
 
 export default function AIAdvisor(props) {
   const { user, tasks, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
@@ -113,6 +113,20 @@ export default function AIAdvisor(props) {
     if (onSessionUpdate) {
       onSessionUpdate(sessions);
     }
+    
+    // Đồng bộ lên backend (Global Memory)
+    try {
+      const currentSessionData = sessions.find(s => s.id === currentId);
+      if (currentSessionData) {
+         const token = localStorage.getItem('taskflow_token');
+         if (token) {
+            saveAiSession({
+               ...currentSessionData,
+               facility: user?.facilityName || user?.facility_id || 'HQ'
+            }, token);
+         }
+      }
+    } catch (e) {}
   }, [chatLog, user?.id, onSessionUpdate]);
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -331,6 +345,36 @@ export default function AIAdvisor(props) {
       }
       if (ragContextStr) {
          systemContext += `\n\nCƠ SỞ TRI THỨC (KIẾN THỨC BỔ SUNG TỪ TÀI LIỆU):\n${ragContextStr}`;
+      }
+
+      // Load Global AI Memory (Conversations)
+      let aiMemoryContextStr = '';
+      try {
+         const token = localStorage.getItem('taskflow_token');
+         const globalSessions = await fetchAiSessions(token) || [];
+         if (globalSessions.length > 0) {
+            let filteredSessions = globalSessions;
+            if (isFacilityMode && facilityName) {
+               filteredSessions = globalSessions.filter(s => s.facility === facilityName || s.facility === user?.facility_id);
+            }
+            
+            // Only take the last 3-5 relevant sessions to save tokens
+            filteredSessions.slice(0, 3).forEach(s => {
+               if (s.id !== currentSessionIdRef.current) {
+                  aiMemoryContextStr += `\n[Phiên Chat Cũ: ${s.title || 'Không tên'} - Cơ sở: ${s.facility || 'Chung'}]\n`;
+                  const logs = typeof s.chat_log === 'string' ? JSON.parse(s.chat_log) : (s.chat_log || []);
+                  logs.slice(-4).forEach(msg => { // only take last 4 messages of each past session
+                     aiMemoryContextStr += `${msg.role === 'user' ? 'User' : 'AI'}: ${msg.content?.substring(0, 300)}...\n`;
+                  });
+               }
+            });
+         }
+      } catch (e) {
+         console.error('Error loading AI memory', e);
+      }
+      
+      if (aiMemoryContextStr) {
+         systemContext += `\n\nKÝ ỨC HỘI THOẠI TRƯỚC ĐÓ (LỊCH SỬ GIAO TIẾP):\nDưới đây là tóm tắt các cuộc trò chuyện gần đây, hãy sử dụng chúng để nhớ lại ngữ cảnh nếu người dùng nhắc đến sự việc cũ:\n${aiMemoryContextStr}`;
       }
       
       if (tasks && tasks.length > 0) {
