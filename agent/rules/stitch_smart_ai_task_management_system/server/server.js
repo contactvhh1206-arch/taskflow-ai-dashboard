@@ -131,8 +131,8 @@ app.delete('/api/users/:id', authenticateUser, async (req, res) => {
     
     res.json({ success: true, message: 'Ä Ã£ xÃ³a tÃ i khoáº£n thÃ nh cÃ´ng.' });
   } catch (error) {
-    console.error('Lá»—i xÃ³a tÃ i khoáº£n:', error);
-    res.status(500).json({ error: 'Lá»—i server khi xÃ³a tÃ i khoáº£n.' });
+    console.error('Lỗi xóa tài khoản:', error);
+    res.status(500).json({ error: error.message || 'Lỗi server khi xóa tài khoản.' });
   }
 });
 
