@@ -104,6 +104,31 @@ const authenticateUser = async (req, res, next) => {
     }
 };
 
+
+// Soft delete user
+app.delete('/api/users/:id', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.user;
+    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+        return res.status(403).json({ error: 'KhÃ´ng Ä‘á»§ quyá» n' });
+    }
+    
+    // Soft delete to avoid foreign key violations
+    const updateQuery = 'UPDATE users SET is_deleted = TRUE WHERE id = $1 RETURNING *';
+    const { rows } = await pool.query(updateQuery, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n.' });
+    }
+    
+    res.json({ success: true, message: 'Ä Ã£ xÃ³a tÃ i khoáº£n thÃ nh cÃ´ng.' });
+  } catch (error) {
+    console.error('Lá»—i xÃ³a tÃ i khoáº£n:', error);
+    res.status(500).json({ error: 'Lá»—i server khi xÃ³a tÃ i khoáº£n.' });
+  }
+});
+
 app.get('/api/users/directory', authenticateUser, async (req, res) => {
   try {
     const { rows: users } = await pool.query('SELECT id AS user_id, email, full_name, role_id, facility_id FROM users');
