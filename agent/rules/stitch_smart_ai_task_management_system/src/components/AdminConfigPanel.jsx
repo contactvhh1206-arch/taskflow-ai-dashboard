@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { ErrorBoundary } from '../App.jsx';
 import { fetchAiSessions } from '../services/dataService.js';
 
-const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'];
+const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'];
 
 const SYSTEM_ROLES = [
   { value: 'FACILITY_MANAGER', label: 'Quản lý cơ sở' },
   { value: 'DEPARTMENT_HEAD', label: 'Bộ phận Truyền thông' },
   { value: 'FINANCE_DEPT', label: 'Bộ phận Tài chính - Kế toán' },
-  { value: 'SALES_DEPT', label: 'Bộ phận Kinh doanh' },
-  { value: 'GENERAL_MANAGER', label: 'Tổng quản lý chuỗi' },
   { value: 'VICE_PRESIDENT', label: 'Vice' },
   { value: 'SUPER_ADMIN', label: 'Sếp tổng' },
   { value: 'ADMIN', label: 'Admin Hệ thống' }
@@ -122,19 +120,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users');
           const data = await res.json();
           if (data.success) {
-            const parsedUsers = data.data.map(u => {
-              let updated = { ...u };
-              if (updated.role_id === 'DEPARTMENT_HEAD' && updated.full_name && updated.full_name.includes('(Kinh doanh)')) {
-                updated.role_id = 'SALES_DEPT';
-                updated.full_name = updated.full_name.replace(' (Kinh doanh)', '');
-              }
-              if (updated.role === 'DEPARTMENT_HEAD' && updated.name && updated.name.includes('(Kinh doanh)')) {
-                updated.role = 'SALES_DEPT';
-                updated.name = updated.name.replace(' (Kinh doanh)', '');
-              }
-              return updated;
-            });
-            setUsers(parsedUsers);
+            setUsers(data.data);
           }
         } catch (e) { console.error(e); }
       };
@@ -152,7 +138,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         fetchFacilities();
         const loadAiSessions = async () => {
            const token = localStorage.getItem('taskflow_token');
-           const sessions = await fetchAiSessions(token) || [];
+           const sessions = await fetchAiSessions(token, user?.role, user?.facility_id) || [];
            setAiSessions(sessions);
         };
         loadAiSessions();
@@ -182,10 +168,6 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         
         let finalRole = newRole;
         let finalName = newName;
-        if (newRole === 'SALES_DEPT') {
-            finalRole = 'DEPARTMENT_HEAD';
-            finalName = newName + ' (Kinh doanh)';
-        }
         
         try {
             const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
@@ -195,7 +177,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                     password: newPassword.trim(),
                     name: finalName,
                     role: finalRole,
-                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(newRole) ? newFinanceFacilities : HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId
+                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(newRole) ? newFinanceFacilities : HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId
                 })
             });
             if (res.ok) {
@@ -284,15 +266,6 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         
         let finalRole = editUserRole;
         let finalName = editUserName;
-        if (editUserRole === 'SALES_DEPT') {
-            finalRole = 'DEPARTMENT_HEAD';
-            if (!editUserName.includes('(Kinh doanh)')) {
-                finalName = editUserName + ' (Kinh doanh)';
-            }
-        } else if (editUserName.includes('(Kinh doanh)')) {
-            // Remove the suffix if they change away from Sales Dept
-            finalName = editUserName.replace(' (Kinh doanh)', '');
-        }
         
         try {
             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${editingUser.id}`, {
@@ -300,7 +273,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                 body: JSON.stringify({
                     name: finalName,
                     role: finalRole,
-                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(editUserRole) ? editFinanceFacilities : HIGH_LEVEL_ROLES.includes(editUserRole) ? 'ALL' : editUserFacility,
+                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(editUserRole) ? editFinanceFacilities : HIGH_LEVEL_ROLES.includes(editUserRole) ? 'ALL' : editUserFacility,
                     password: editUserPassword ? editUserPassword.trim() : null
                 })
             });
@@ -420,7 +393,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                         ))}
                       </select>
                     </div>
-                    {['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(newRole) ? (
+                    {['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(newRole) ? (
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Phân quyền cơ sở (RLS)</label>
                         <div className="flex flex-wrap gap-x-4 gap-y-2 border border-gray-300 dark:border-gray-600 rounded-lg p-2 max-h-[80px] overflow-y-auto custom-scrollbar">
@@ -719,7 +692,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                         ))}
                       </select>
                     </div>
-                    {['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(editUserRole) ? (
+                    {['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(editUserRole) ? (
                       <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phân quyền cơ sở (RLS)</label>
                         <div className="flex flex-wrap gap-x-4 gap-y-2 border border-gray-300 dark:border-gray-600 rounded-lg p-3 max-h-[100px] overflow-y-auto custom-scrollbar">

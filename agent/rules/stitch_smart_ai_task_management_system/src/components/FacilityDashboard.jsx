@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import AIAdvisor from './AIAdvisor';
 
 export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacilityFilter }) {
@@ -53,7 +53,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
           try {
             // Safe array fallback and Row-level security
             const safeTasks = Array.isArray(tasks) ? tasks : [];
-            const isHighLevel = user?.role !== 'DEPARTMENT_HEAD' && (user?.facility_id === 'ALL' || (Array.isArray(user?.facility_id) && user?.facility_id.includes('ALL')) || ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user?.role));
+            const isHighLevel = user?.role !== 'DEPARTMENT_HEAD' && (user?.facility_id === 'ALL' || (Array.isArray(user?.facility_id) && user?.facility_id.includes('ALL')) || ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user?.role));
             const rawFac = user?.facility_code || user?.facility_id || '';
             const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
             const isVP = user?.role === 'VICE_PRESIDENT';
@@ -233,7 +233,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             <div>
               <h2 className="text-2xl font-bold text-on-surface dark:text-white">
                 {['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)
-                  ? `Bảng tin công việc - ${user?.department || (user?.role === 'FINANCE_DEPT' ? 'Phòng Kế Toán' : 'Phòng ban')}` 
+                  ? `Bảng tin công việc - ${user?.department || (user?.role === 'FINANCE_DEPT' ? 'Phòng Kế Toán' : 'Phòng Truyền Thông')}` 
                   : ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user?.role)
                     ? `Tổng quan - ${globalFacilityFilter === 'ALL' ? 'Tất cả cơ sở & Phòng ban' : (globalFacilityFilter || 'Tất cả cơ sở & Phòng ban')}`
                     : `Tổng quan - ${user?.facility_name || user?.facility_code || user?.facility_id || 'Tất cả cơ sở'}`}
@@ -445,8 +445,8 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
               <div className="mt-6 h-[600px] flex flex-col">
                  <AIAdvisor 
                    user={user} 
-                   isFacilityMode={!['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)} 
-                   facilityName={['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) ? '' : (localStorage.getItem('facility_name') || user?.facilityName || 'bạn')} 
+                   isFacilityMode={!['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)} 
+                   facilityName={['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) ? '' : (localStorage.getItem('facility_name') || user?.facilityName || 'bạn')} 
                  />
               </div>
             </>

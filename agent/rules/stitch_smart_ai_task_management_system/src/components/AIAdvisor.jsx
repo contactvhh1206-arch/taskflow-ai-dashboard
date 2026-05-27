@@ -3,7 +3,7 @@ import { fetchHistory, fetchAiSessions, saveAiSession } from '../services/dataSe
 
 export default function AIAdvisor(props) {
   const { user, tasks, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
-  const isFacilityMode = props.isFacilityMode !== undefined ? props.isFacilityMode : (user && !['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role));
+  const isFacilityMode = props.isFacilityMode !== undefined ? props.isFacilityMode : (user && !['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role));
   let facilityName = props.facilityName || (isFacilityMode ? (localStorage.getItem('facility_name') || user?.facilityName || user?.facility_id || '') : '');
   
   try {
@@ -35,7 +35,7 @@ export default function AIAdvisor(props) {
     }
 
     const isMarketing = userObj.role === 'DEPARTMENT_HEAD';
-    const isBoss = userObj.role === 'SUPER_ADMIN' || userObj.role === 'GENERAL_MANAGER' || userObj.role === 'VICE_PRESIDENT';
+    const isBoss = userObj.role === 'SUPER_ADMIN' || userObj.role === 'VICE_PRESIDENT';
     
     if (!displayName) {
        if (isMarketing) displayName = 'Trưởng phòng Marketing';
@@ -123,7 +123,7 @@ export default function AIAdvisor(props) {
             saveAiSession({
                ...currentSessionData,
                facility: user?.facilityName || user?.facility_id || 'HQ'
-            }, token);
+            }, token, user?.role, user?.facility_id);
          }
       }
     } catch (e) {}
@@ -351,7 +351,7 @@ export default function AIAdvisor(props) {
       let aiMemoryContextStr = '';
       try {
          const token = localStorage.getItem('taskflow_token');
-         const globalSessions = await fetchAiSessions(token) || [];
+         const globalSessions = await fetchAiSessions(token, user?.role, user?.facility_id) || [];
          if (globalSessions.length > 0) {
             let filteredSessions = globalSessions;
             if (isFacilityMode && facilityName) {

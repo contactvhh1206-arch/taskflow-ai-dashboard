@@ -55,10 +55,15 @@ export const fetchHistory = async (filters = {}) => {
   return [];
 };
 
-export const fetchAiSessions = async (token) => {
+export const fetchAiSessions = async (token, role, facility_id) => {
   try {
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (role) headers['x-user-role'] = role;
+    if (facility_id) headers['x-facility-id'] = facility_id;
+
     const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/sessions', {
-       headers: { 'Authorization': `Bearer ${token}` }
+       headers
     });
     const result = await response.json();
     if (result.success) return result.data;
@@ -68,14 +73,16 @@ export const fetchAiSessions = async (token) => {
   return [];
 };
 
-export const saveAiSession = async (sessionData, token) => {
+export const saveAiSession = async (sessionData, token, role, facility_id) => {
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (role) headers['x-user-role'] = role;
+    if (facility_id) headers['x-facility-id'] = facility_id;
+
     await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/sessions', {
        method: 'POST',
-       headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-       },
+       headers,
        body: JSON.stringify(sessionData)
     });
   } catch (error) {
