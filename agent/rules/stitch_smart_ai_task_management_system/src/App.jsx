@@ -59,7 +59,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   // Compute available facilities and departments based on selected PIC
   const { filteredFacilities, availableDepts } = React.useMemo(() => {
     let facs = activeFacilities;
-    let depts = ['HQ', 'MARKETING', 'FINANCE'];
+    let depts = ['HQ', 'MARKETING', 'FINANCE', 'SALES'];
     
     if (formData.pic) {
       const selectedPic = picOptions.find(u => u.name === formData.pic);
@@ -192,6 +192,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
                   {availableDepts.includes('HQ') && <option value="HQ">Ban Giám đốc (HQ)</option>}
                   {availableDepts.includes('MARKETING') && <option value="MARKETING">Phòng Marketing</option>}
                   {availableDepts.includes('FINANCE') && <option value="FINANCE">Phòng Kế toán</option>}
+                  {availableDepts.includes('SALES') && <option value="SALES">Phòng Kinh doanh</option>}
                 </select>
               </div>
             </div>
@@ -298,19 +299,20 @@ function MainDashboard() {
   React.useEffect(() => {
     try {
       const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
-      const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
+      const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'SALES', 'BGD'].includes(String(f.name || '').toUpperCase()));
       setFacilitiesList([
         ...facs,
         { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
         { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+          { id: 'dept3', name: 'Phòng Kinh doanh', filterValue: 'SALES' },
         { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
       ]);
     } catch {}
   }, []);
   
   const isVPGlobal = user?.role === 'VICE_PRESIDENT';
-  const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
-  const deptIdGlobal = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVPGlobal ? 'BGD' : 'MARKETING'));
+  const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SALES_DEPT'].includes(user?.role);
+  const deptIdGlobal = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (user?.role === 'SALES_DEPT' ? 'SALES' : (isVPGlobal ? 'BGD' : 'MARKETING')));
   const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== deptIdGlobal;
 
   // Derived state for filtering tasks
@@ -340,8 +342,8 @@ function MainDashboard() {
   const filteredTasks = tasks.filter(t => {
      const isHighLevel = user?.role !== 'DEPARTMENT_HEAD' && (user?.facility_id === 'ALL' || (Array.isArray(user?.facility_id) && user?.facility_id.includes('ALL')) || ['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user?.role));
      const isVP = user?.role === 'VICE_PRESIDENT';
-     const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
-     const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING')));
+     const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SALES_DEPT'].includes(user?.role) || isVP;
+     const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (user?.role === 'SALES_DEPT' ? 'SALES' : (isVP ? 'BGD' : 'MARKETING'))));
 
      if (isHighLevel && globalFacilityFilter === 'ALL') return true;
      if (isHighLevel && globalFacilityFilter !== 'ALL') {
@@ -462,11 +464,12 @@ function MainDashboard() {
           is_active: fac.is_active !== false
         }));
         setFacilityList(mappedFacs);
-        const filteredFacs = mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
+        const filteredFacs = mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'SALES', 'BGD'].includes(String(f.name || '').toUpperCase()));
         setFacilitiesList([
           ...filteredFacs,
           { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
           { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+          { id: 'dept3', name: 'Phòng Kinh doanh', filterValue: 'SALES' },
           { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
         ]);
         localStorage.setItem('taskflow_facilities', JSON.stringify(mappedFacs));
@@ -489,11 +492,12 @@ function MainDashboard() {
       localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
     }
     setFacilityList(localFacs);
-    const filteredLocalFacs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
+    const filteredLocalFacs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'SALES', 'BGD'].includes(String(f.name || '').toUpperCase()));
     setFacilitiesList([
       ...filteredLocalFacs,
       { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
       { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+          { id: 'dept3', name: 'Phòng Kinh doanh', filterValue: 'SALES' },
       { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
     ]);
   };
@@ -691,8 +695,8 @@ function MainDashboard() {
   const handleCreateTask = async (newTask) => {
     try {
       const isVP = user?.role === 'VICE_PRESIDENT';
-      const isDeptHeadLocal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
-      const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
+      const isDeptHeadLocal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SALES_DEPT'].includes(user?.role) || isVP;
+      const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (user?.role === 'SALES_DEPT' ? 'SALES' : (isVP ? 'BGD' : 'MARKETING')));
       const taskFacility = user?.role === 'SUPER_ADMIN' ? 'HQ' : (isDeptHeadLocal ? deptId : user?.facility_id);
       const safeFacility = Array.isArray(taskFacility) ? taskFacility[0] : taskFacility;
       
@@ -842,8 +846,8 @@ function MainDashboard() {
                       
                       if (!isAssignedToMe) {
                           const isVP = user?.role === 'VICE_PRESIDENT';
-                          const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
-                          const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
+                          const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SALES_DEPT'].includes(user?.role) || isVP;
+                          const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (user?.role === 'SALES_DEPT' ? 'SALES' : (isVP ? 'BGD' : 'MARKETING')));
                           const rawFac = user?.facility_code || user?.facility_id || '';
                           const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
                           const tFacCode = String(task?.facility || task?.facilityId || '').toLowerCase();
@@ -1026,7 +1030,7 @@ function MainDashboard() {
              <div className="mt-6 mb-2 px-4">
                 <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-3 flex items-center justify-between tracking-widest uppercase">
                    Lịch sử trò chuyện AI
-                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
+                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SALES_DEPT'].includes(user.role)) { setActiveTab('ai-advisor'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
                       <span className="material-symbols-outlined text-[16px]">add_circle</span>
                    </button>
                 </div>
@@ -1039,7 +1043,7 @@ function MainDashboard() {
                             key={session.id} 
                             onClick={() => { 
                                setActiveAiSessionId(session.id); 
-                               if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor');
+                               if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SALES_DEPT'].includes(user.role)) { setActiveTab('ai-advisor');
                                } else {
                                   setShowAITaskModal(true);
                                }
@@ -1196,7 +1200,8 @@ function MainDashboard() {
                         });
                         const depts = [
                            { name: 'Phòng Marketing', id: 'MARKETING', icon: 'campaign' },
-                           { name: 'Phòng Kế Toán', id: 'FINANCE', icon: 'account_balance' }
+                           { name: 'Phòng Kế Toán', id: 'FINANCE', icon: 'account_balance' },
+                            { name: 'Phòng Kinh Doanh', id: 'SALES', icon: 'trending_up' }
                         ].map(d => {
                            const pendingTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'revoked' && t.department_tag === d.id);
                            return { name: d.name, count: pendingTasks.length, icon: d.icon, type: 'dept' };
@@ -1237,11 +1242,11 @@ function MainDashboard() {
               <ErrorBoundary>
                 <RAGManagerPanel showToast={showToast} />
               </ErrorBoundary>
-            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
+            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'SALES_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
               <ErrorBoundary>
                 <FacilityDashboard user={user} tasks={tasks} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={globalFacilityFilter} />
               </ErrorBoundary>
-            ) : activeTab === 'revenue-overview' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) ? (
+            ) : activeTab === 'revenue-overview' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT', 'VICE_PRESIDENT'].includes(user.role) ? (
               <ErrorBoundary>
                 <RevenueOverviewDashboard user={user} facilityList={facilityList} />
               </ErrorBoundary>
@@ -1558,7 +1563,8 @@ function MainDashboard() {
                           { user_id: 'hq', full_name: 'Sếp Tổng', email: 'Ban Giám Đốc' },
                           { user_id: 'vp', full_name: 'Sếp Phó', email: 'Ban Giám Đốc' },
                           { user_id: 'acc', full_name: 'Phòng Kế toán', email: 'Bộ phận tài chính' },
-                          { user_id: 'mkt', full_name: 'Phòng Marketing', email: 'Bộ phận truyền thông' }
+                          { user_id: 'mkt', full_name: 'Phòng Marketing', email: 'Bộ phận truyền thông' },
+                          { user_id: 'sales', full_name: 'Phòng Kinh doanh', email: 'Bộ phận kinh doanh' }
                         ];
                         const allOptions = [...specialMentions, ...dbUsers];
                         return allOptions

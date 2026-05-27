@@ -8,6 +8,7 @@ const SYSTEM_ROLES = [
   { value: 'FACILITY_MANAGER', label: 'Quản lý cơ sở' },
   { value: 'DEPARTMENT_HEAD', label: 'Bộ phận Marketing' },
   { value: 'FINANCE_DEPT', label: 'Bộ phận Tài chính - Kế toán' },
+  { value: 'SALES_DEPT', label: 'Bộ phận Kinh doanh' },
   { value: 'GENERAL_MANAGER', label: 'Tổng quản lý chuỗi' },
   { value: 'VICE_PRESIDENT', label: 'Vice' },
   { value: 'SUPER_ADMIN', label: 'Sếp tổng' },
@@ -172,7 +173,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                     password: newPassword.trim(),
                     name: newName,
                     role: newRole,
-                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(newRole) ? newFinanceFacilities : HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId
+                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(newRole) ? newFinanceFacilities : HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId
                 })
             });
             if (res.ok) {
@@ -264,7 +265,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                 body: JSON.stringify({
                     name: editUserName,
                     role: editUserRole,
-                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(editUserRole) ? editFinanceFacilities : HIGH_LEVEL_ROLES.includes(editUserRole) ? 'ALL' : editUserFacility,
+                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(editUserRole) ? editFinanceFacilities : HIGH_LEVEL_ROLES.includes(editUserRole) ? 'ALL' : editUserFacility,
                     password: editUserPassword ? editUserPassword.trim() : null
                 })
             });
@@ -384,7 +385,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                         ))}
                       </select>
                     </div>
-                    {['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(newRole) ? (
+                    {['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(newRole) ? (
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Phân quyền cơ sở (RLS)</label>
                         <div className="flex flex-wrap gap-x-4 gap-y-2 border border-gray-300 dark:border-gray-600 rounded-lg p-2 max-h-[80px] overflow-y-auto custom-scrollbar">
@@ -683,7 +684,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                         ))}
                       </select>
                     </div>
-                    {['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(editUserRole) ? (
+                    {['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(editUserRole) ? (
                       <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phân quyền cơ sở (RLS)</label>
                         <div className="flex flex-wrap gap-x-4 gap-y-2 border border-gray-300 dark:border-gray-600 rounded-lg p-3 max-h-[100px] overflow-y-auto custom-scrollbar">
