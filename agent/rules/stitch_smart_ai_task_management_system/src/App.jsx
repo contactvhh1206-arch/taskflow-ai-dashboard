@@ -1607,7 +1607,7 @@ function MainDashboard() {
                     <button id="send-comment-btn" onClick={async () => {
                       if (!chatInput.trim()) return;
                       try {
-                        const res = await fetch(https://taskflow-ai-dashboard.onrender.com/api/tasks//comments, {
+                        const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${selectedTask.id}/comments`, {
                           method: 'POST',
                           headers: {
                             'Content-Type': 'application/json',
@@ -1619,7 +1619,7 @@ function MainDashboard() {
                         const data = await res.json();
                         if (data.success) {
                           setChatInput('');
-                          const fetchRes = await fetch(https://taskflow-ai-dashboard.onrender.com/api/tasks//comments, {
+                          const fetchRes = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${selectedTask.id}/comments`, {
                             headers: { 'x-user-role': user.role, 'x-facility-id': user.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user.facility_id) ? user.facility_id.join(',') : user.facility_id) }
                           });
                           const fetchJson = await fetchRes.json();
