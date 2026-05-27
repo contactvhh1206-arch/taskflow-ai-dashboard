@@ -56,6 +56,40 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   
   const [picOptions, setPicOptions] = useState([]);
 
+  // Compute available facilities and departments based on selected PIC
+  const { filteredFacilities, availableDepts } = React.useMemo(() => {
+    let facs = activeFacilities;
+    let depts = ['HQ', 'MARKETING', 'FINANCE'];
+    
+    if (formData.pic) {
+      const selectedPic = picOptions.find(u => u.name === formData.pic);
+      if (selectedPic && !['SUPER_ADMIN', 'ADMIN', 'VICE_PRESIDENT'].includes(selectedPic.role)) {
+        const rawFac = selectedPic.facility_code || selectedPic.facility_id || selectedPic.facility_name || '';
+        const facCodes = Array.isArray(rawFac) ? rawFac.map(s => String(s).toLowerCase()) : String(rawFac).toLowerCase().split(',').map(s => s.trim());
+        
+        facs = activeFacilities.filter(f => 
+          facCodes.some(code => code === String(f.code).toLowerCase() || code === String(f.name).toLowerCase() || String(f.name).toLowerCase().includes(code))
+        );
+        
+        depts = [];
+        if (selectedPic.department_id === 'BGD' || selectedPic.role === 'VICE_PRESIDENT') depts.push('HQ');
+        if (selectedPic.department_id === 'MARKETING') depts.push('MARKETING');
+        if (selectedPic.department_id === 'FINANCE' || selectedPic.role === 'FINANCE_DEPT') depts.push('FINANCE');
+      }
+    }
+    return { filteredFacilities: facs, availableDepts: depts };
+  }, [formData.pic, picOptions]);
+  
+  // Auto-select if there is only 1 option
+  React.useEffect(() => {
+    if (formData.pic) {
+      const allOptions = [...filteredFacilities.map(f => f.name), ...availableDepts];
+      if (allOptions.length === 1 && formData.facility !== allOptions[0]) {
+         setFormData(prev => ({...prev, facility: allOptions[0]}));
+      }
+    }
+  }, [formData.pic, filteredFacilities, availableDepts]);
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -152,12 +186,12 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
                 <select name="facility" value={formData.facility} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
                   <option value="">-- Tự động --</option>
-                  {(activeFacilities || []).map(f => (
+                  {(filteredFacilities || []).map(f => (
                     <option key={f.id || f.name} value={f.name}>{f.name}</option>
                   ))}
-                  <option value="HQ">Ban Giám Đốc (HQ)</option>
-                  <option value="MARKETING">Phòng Marketing</option>
-                  <option value="FINANCE">Phòng Kế toán</option>
+                  {availableDepts.includes('HQ') && <option value="HQ">Ban Giám đốc (HQ)</option>}
+                  {availableDepts.includes('MARKETING') && <option value="MARKETING">Phòng Marketing</option>}
+                  {availableDepts.includes('FINANCE') && <option value="FINANCE">Phòng Kế toán</option>}
                 </select>
               </div>
             </div>
