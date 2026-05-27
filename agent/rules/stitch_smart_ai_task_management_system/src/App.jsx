@@ -784,38 +784,42 @@ function MainDashboard() {
               
               // Notification polling logic
               const currentIds = new Set(fetchedTasks.map(t => t.id));
+              const currentComments = fetchedTasks.reduce((acc, t) => ({...acc, [t.id]: parseInt(t.comments_count || 0)}), {});
               let prevIds = new Set();
+              let prevComments = {};
               try {
                   const storedIds = sessionStorage.getItem('taskflow_prev_ids');
                   if (storedIds) prevIds = new Set(JSON.parse(storedIds));
+                  const storedComments = sessionStorage.getItem('taskflow_prev_comments');
+                  if (storedComments) prevComments = JSON.parse(storedComments);
               } catch (e) {}
               
-              if (prevIds.size > 0 && user) {
+              if ((prevIds.size > 0 || Object.keys(prevComments).length > 0) && user) {
                   fetchedTasks.forEach(task => {
-                      if (!prevIds.has(task.id) && task.status === 'todo') {
-                          const myNames = [String(user.name).toLowerCase(), String(user.username).toLowerCase(), '@' + String(user.username).toLowerCase()];
-                          let isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
+                      const myNames = [String(user.name).toLowerCase(), String(user.username).toLowerCase(), '@' + String(user.username).toLowerCase()];
+                      let isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
+                      
+                      if (!isAssignedToMe) {
+                          const isVP = user?.role === 'VICE_PRESIDENT';
+                          const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
+                          const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
+                          const rawFac = user?.facility_code || user?.facility_id || '';
+                          const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
+                          const tFacCode = String(task?.facility || task?.facilityId || '').toLowerCase();
                           
-                          if (!isAssignedToMe) {
-                              const isVP = user?.role === 'VICE_PRESIDENT';
-                              const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
-                              const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
-                              const rawFac = user?.facility_code || user?.facility_id || '';
-                              const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
-                              const tFacCode = String(task?.facility || task?.facilityId || '').toLowerCase();
-                              
-                              if (isDeptHead) {
-                                  if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase())) {
-                                      isAssignedToMe = true;
-                                  }
-                              } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user.role)) {
-                                  if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
-                                      isAssignedToMe = true;
-                                  }
+                          if (isDeptHead) {
+                              if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase())) {
+                                  isAssignedToMe = true;
+                              }
+                          } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'GENERAL_MANAGER', 'ADMIN'].includes(user.role)) {
+                              if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
+                                  isAssignedToMe = true;
                               }
                           }
-                          
-                          if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
+                      }
+                      
+                      if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
+                          if (!prevIds.has(task.id) && task.status === 'todo') {
                               const newNotif = {
                                   title: 'Công việc mới',
                                   message: 'Bạn được giao công việc: ' + task.title,
@@ -824,12 +828,31 @@ function MainDashboard() {
                               const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
                               localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
                               window.dispatchEvent(new Event('taskflow_notify'));
+                              setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
+                          }
+                      }
+                      
+                      const prevC = prevComments[task.id] || 0;
+                      const currC = parseInt(task.comments_count || 0);
+                      if (currC > prevC && task.latest_comment) {
+                          const lc = task.latest_comment.toLowerCase();
+                          const isMentioned = myNames.some(n => lc.includes(n)) || lc.includes('@all') || lc.includes('@tất cả') || (lc.includes('@ban giám đốc') && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role));
+                          if (isMentioned && String(task.latest_comment_user_id) !== String(user.id)) {
+                              const newNotif = {
+                                  title: 'Nhắc tên (@)',
+                                  message: 'Bạn được nhắc đến trong bình luận của công việc: ' + task.title,
+                                  time: new Date().toLocaleTimeString('vi-VN')
+                              };
+                              const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+                              localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
+                              window.dispatchEvent(new Event('taskflow_notify'));
+                              setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
                           }
                       }
                   });
               }
-              try {
-                  sessionStorage.setItem('taskflow_prev_ids', JSON.stringify(Array.from(currentIds)));
+              sessionStorage.setItem('taskflow_prev_ids', JSON.stringify(Array.from(currentIds)));
+              sessionStorage.setItem('taskflow_prev_comments', JSON.stringify(currentComments));
               } catch (e) {}
               
             } else {
@@ -1467,11 +1490,23 @@ function MainDashboard() {
                   <h3 className="font-bold text-sm flex items-center gap-2 dark:text-white"><span className="material-symbols-outlined text-primary">forum</span> Thảo luận Task (@)</h3>
                   <button onClick={() => setSelectedTask(null)} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hidden md:block"><span className="material-symbols-outlined">close</span></button>
                 </div>
-                <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shrink-0">AD</div>
-                    <div className="bg-surface-container dark:bg-[#2a2a2a] p-3 rounded-2xl rounded-tl-none text-sm dark:text-gray-200"><span className="text-primary font-bold text-[11px] block mb-1">Admin Tổng</span> Nhớ kiểm tra kỹ task này nhé, Sếp đang hối.</div>
-                  </div>
+                <div id="comments-scroll-container" className="flex-1 p-4 overflow-y-auto space-y-4">
+                    {selectedTaskComments.map(c => (
+                      <div key={c.id} className={lex gap-3 }>
+                        <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shrink-0">
+                          {c.author_name ? c.author_name.substring(0, 2).toUpperCase() : 'U'}
+                        </div>
+                        <div className={g-surface-container dark:bg-[#2a2a2a] p-3 rounded-2xl text-sm dark:text-gray-200 }>
+                          <span className="text-primary font-bold text-[11px] block mb-1">{c.author_name}</span> 
+                          {c.content}
+                          <span className="text-[9px] text-gray-500 block mt-1">{new Date(c.created_at).toLocaleString('vi-VN')}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {selectedTaskComments.length === 0 && (
+                      <div className="text-center text-gray-400 text-sm italic mt-4">Chưa có bình luận nào.</div>
+                    )}
+                  </div></div>
                 </div>
                 <div className="p-4 border-t border-outline-variant dark:border-gray-800 bg-white dark:bg-[#1e1e1e] relative">
                   {showMentionMenu && (
@@ -1509,7 +1544,13 @@ function MainDashboard() {
                     </div>
                   )}
                   <div className="relative">
-                    <input id="task-chat-input" type="text" value={chatInput} onChange={(e) => {
+                    <input id="task-chat-input" type="text" value={chatInput} 
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter') {
+                          document.getElementById('send-comment-btn').click();
+                        }
+                      }}
+                      onChange={(e) => {
                       const val = e.target.value;
                       setChatInput(val);
                       const pos = e.target.selectionStart;
@@ -1523,7 +1564,34 @@ function MainDashboard() {
                           setShowMentionMenu(false);
                       }
                     }} placeholder="Gõ @ để tag tên..." className="w-full pl-4 pr-10 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none dark:text-white" />
-                    <button className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80 p-1 flex items-center justify-center">
+                    <button id="send-comment-btn" onClick={async () => {
+                      if (!chatInput.trim()) return;
+                      try {
+                        const res = await fetch(https://taskflow-ai-dashboard.onrender.com/api/tasks//comments, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'x-user-role': user.role,
+                            'x-facility-id': user.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user.facility_id) ? user.facility_id.join(',') : user.facility_id)
+                          },
+                          body: JSON.stringify({ content: chatInput })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          setChatInput('');
+                          const fetchRes = await fetch(https://taskflow-ai-dashboard.onrender.com/api/tasks//comments, {
+                            headers: { 'x-user-role': user.role, 'x-facility-id': user.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user.facility_id) ? user.facility_id.join(',') : user.facility_id) }
+                          });
+                          const fetchJson = await fetchRes.json();
+                          if (fetchJson.success) setSelectedTaskComments(fetchJson.data);
+                          setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, comments_count: parseInt(t.comments_count || 0) + 1, latest_comment: chatInput, latest_comment_user_id: user.id } : t));
+                          setTimeout(() => {
+                            const el = document.getElementById('comments-scroll-container');
+                            if (el) el.scrollTop = el.scrollHeight;
+                          }, 100);
+                        }
+                      } catch(e) { console.error('Error posting comment', e); }
+                    }} className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:text-primary/80 p-1 flex items-center justify-center">
                       <span className="material-symbols-outlined text-[20px]">send</span>
                     </button>
                   </div>
