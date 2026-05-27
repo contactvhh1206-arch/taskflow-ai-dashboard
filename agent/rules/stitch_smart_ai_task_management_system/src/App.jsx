@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -742,7 +742,11 @@ function MainDashboard() {
               
               // Notification polling logic
               const currentIds = new Set(fetchedTasks.map(t => t.id));
-              const prevIds = window.prevTaskIdsRef || new Set();
+              let prevIds = new Set();
+              try {
+                  const storedIds = sessionStorage.getItem('taskflow_prev_ids');
+                  if (storedIds) prevIds = new Set(JSON.parse(storedIds));
+              } catch (e) {}
               
               if (prevIds.size > 0 && user) {
                   fetchedTasks.forEach(task => {
@@ -782,7 +786,9 @@ function MainDashboard() {
                       }
                   });
               }
-              window.prevTaskIdsRef = currentIds;
+              try {
+                  sessionStorage.setItem('taskflow_prev_ids', JSON.stringify(Array.from(currentIds)));
+              } catch (e) {}
           } else {
             setTasks([]);
             showToast('Láº¥y dá»¯ liá»‡u tháº¥t báº¡i: ' + (data.error || ''));
