@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch'; 
 import dotenv from 'dotenv';
@@ -183,9 +183,13 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     const { title, desc, pic, deadline, status, urgent, facility, creator_role } = req.body;
     
     let pic_id = null;
+    let pic_facility_id = null;
     if (pic) {
-        const picUser = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
-        if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
+        const picUser = await pool.query('SELECT id, facility_id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
+        if (picUser.rows.length > 0) {
+            pic_id = picUser.rows[0].id;
+            pic_facility_id = picUser.rows[0].facility_id;
+        }
     }
   
     let insert_facility_id = null;
@@ -205,6 +209,8 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
                     insert_facility_id = newFac.rows[0].id;
                 }
             }
+        } else if (pic_facility_id) {
+            insert_facility_id = pic_facility_id;
         }
     }
 
