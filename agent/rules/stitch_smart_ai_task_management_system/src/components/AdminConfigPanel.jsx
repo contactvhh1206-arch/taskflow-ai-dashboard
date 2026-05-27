@@ -121,7 +121,21 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         try {
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users');
           const data = await res.json();
-          if (data.success) setUsers(data.data);
+          if (data.success) {
+            const parsedUsers = data.data.map(u => {
+              let updated = { ...u };
+              if (updated.role_id === 'DEPARTMENT_HEAD' && updated.full_name && updated.full_name.includes('(Kinh doanh)')) {
+                updated.role_id = 'SALES_DEPT';
+                updated.full_name = updated.full_name.replace(' (Kinh doanh)', '');
+              }
+              if (updated.role === 'DEPARTMENT_HEAD' && updated.name && updated.name.includes('(Kinh doanh)')) {
+                updated.role = 'SALES_DEPT';
+                updated.name = updated.name.replace(' (Kinh doanh)', '');
+              }
+              return updated;
+            });
+            setUsers(parsedUsers);
+          }
         } catch (e) { console.error(e); }
       };
 
@@ -165,14 +179,22 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const handleAddUser = async (e) => {
         e.preventDefault();
         if (!newUsername || !newPassword || !newName) return;
+        
+        let finalRole = newRole;
+        let finalName = newName;
+        if (newRole === 'SALES_DEPT') {
+            finalRole = 'DEPARTMENT_HEAD';
+            finalName = newName + ' (Kinh doanh)';
+        }
+        
         try {
             const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     username: newUsername.trim(),
                     password: newPassword.trim(),
-                    name: newName,
-                    role: newRole,
+                    name: finalName,
+                    role: finalRole,
                     facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(newRole) ? newFinanceFacilities : HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId
                 })
             });
@@ -259,12 +281,25 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const handleUpdateUser = async (e) => {
         e.preventDefault();
         if (!editingUser) return;
+        
+        let finalRole = editUserRole;
+        let finalName = editUserName;
+        if (editUserRole === 'SALES_DEPT') {
+            finalRole = 'DEPARTMENT_HEAD';
+            if (!editUserName.includes('(Kinh doanh)')) {
+                finalName = editUserName + ' (Kinh doanh)';
+            }
+        } else if (editUserName.includes('(Kinh doanh)')) {
+            // Remove the suffix if they change away from Sales Dept
+            finalName = editUserName.replace(' (Kinh doanh)', '');
+        }
+        
         try {
             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${editingUser.id}`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: editUserName,
-                    role: editUserRole,
+                    name: finalName,
+                    role: finalRole,
                     facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SALES_DEPT'].includes(editUserRole) ? editFinanceFacilities : HIGH_LEVEL_ROLES.includes(editUserRole) ? 'ALL' : editUserFacility,
                     password: editUserPassword ? editUserPassword.trim() : null
                 })

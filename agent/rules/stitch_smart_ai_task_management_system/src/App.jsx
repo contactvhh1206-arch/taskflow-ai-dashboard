@@ -97,6 +97,22 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
         const data = await res.json();
         let allUsers = data.success ? data.data : JSON.parse(localStorage.getItem('taskflow_users') || '[]');
         
+        allUsers = allUsers.map(u => {
+          let updated = { ...u };
+          if (updated.role_id === 'DEPARTMENT_HEAD' && updated.full_name && updated.full_name.includes('(Kinh doanh)')) {
+            updated.role_id = 'SALES_DEPT';
+            updated.full_name = updated.full_name.replace(' (Kinh doanh)', '');
+          }
+          if (updated.role === 'DEPARTMENT_HEAD' && updated.name && updated.name.includes('(Kinh doanh)')) {
+            updated.role = 'SALES_DEPT';
+            updated.name = updated.name.replace(' (Kinh doanh)', '');
+          }
+          if (updated.username && updated.username.includes('(Kinh doanh)')) {
+             updated.username = updated.username.replace(' (Kinh doanh)', '');
+          }
+          return updated;
+        });
+        
         let filtered = [];
         if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
           filtered = allUsers;
@@ -1823,6 +1839,10 @@ export default function AppContainer() {
           if (parsed.user.role) {
             parsed.user.role = parsed.user.role.trim().toUpperCase();
           }
+          if (parsed.user.role === 'DEPARTMENT_HEAD' && parsed.user.full_name && parsed.user.full_name.includes('(Kinh doanh)')) {
+            parsed.user.role = 'SALES_DEPT';
+            parsed.user.full_name = parsed.user.full_name.replace(' (Kinh doanh)', '');
+          }
           setUser(parsed.user);
         }
       } catch (e) { }
@@ -1833,6 +1853,10 @@ export default function AppContainer() {
   const login = (userData, token) => {
     if (userData && userData.role) {
       userData.role = userData.role.trim().toUpperCase();
+    }
+    if (userData && userData.role === 'DEPARTMENT_HEAD' && userData.full_name && userData.full_name.includes('(Kinh doanh)')) {
+      userData.role = 'SALES_DEPT';
+      userData.full_name = userData.full_name.replace(' (Kinh doanh)', '');
     }
     localStorage.setItem('taskflow_auth', JSON.stringify({ token, user: userData }));
     setUser(userData);
