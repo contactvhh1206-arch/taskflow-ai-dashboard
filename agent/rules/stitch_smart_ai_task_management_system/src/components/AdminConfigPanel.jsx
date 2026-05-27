@@ -295,8 +295,8 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       };
 
       return (
-        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border border-outline-variant dark:border-gray-800 animate-fade-in flex flex-col h-[75vh]">
-          <div className="p-4 border-b border-outline-variant dark:border-gray-800 bg-gradient-to-r from-primary/10 to-transparent flex gap-4 overflow-x-auto custom-scrollbar">
+        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border border-outline-variant dark:border-gray-800 animate-fade-in flex flex-col h-[calc(100vh-8rem)] lg:h-[80vh]">
+          <div className="p-3 md:p-4 border-b border-outline-variant dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 flex gap-2 md:gap-4 overflow-x-auto custom-scrollbar rounded-t-2xl">
             <button onClick={() => setActiveTab('facilities')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'facilities' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Cơ sở</button>
             <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Tài khoản</button>
             <button onClick={() => setActiveTab('ai_logs')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'ai_logs' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Hội thoại AI</button>
@@ -304,7 +304,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                <button onClick={() => setActiveTab('maintenance')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'maintenance' ? 'bg-error text-white shadow-md' : 'text-error hover:bg-error/10 border border-transparent dark:hover:bg-red-900/20'}`}>Cấu hình Nâng cao / Bảo trì</button>
             )}
           </div>
-          <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+          <div className="p-4 md:p-6 flex-1 overflow-y-auto custom-scrollbar">
             {activeTab === 'facilities' ? (
               <div className="space-y-6">
                 <div className="bg-surface-container-low dark:bg-[#252525] p-5 rounded-xl border border-outline-variant dark:border-gray-700">
