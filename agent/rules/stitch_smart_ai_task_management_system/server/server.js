@@ -180,7 +180,7 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
 app.post('/api/tasks', authenticateUser, async (req, res) => {
   try {
     console.log("Payload táº¡o task:", req.body);
-    const { title, desc, pic, deadline, status, urgent, facility } = req.body;
+    const { title, desc, pic, deadline, status, urgent, facility, creator_role } = req.body;
     
     let pic_id = null;
     if (pic) {
