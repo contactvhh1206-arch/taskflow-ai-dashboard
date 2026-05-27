@@ -299,104 +299,83 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
 });
 
 app.post('/api/tasks', authenticateUser, async (req, res) => {
-  try {
-    console.log("Payload táº¡o task:", req.body);
-    const { title, desc, pic, deadline, status, urgent, facility, creator_role } = req.body;
-    
-    let pic_id = null;
-    let pic_facility_id = null;
-    if (pic) {
-        const picUser = await pool.query('SELECT id, facility_id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
-        if (picUser.rows.length > 0) {
-            pic_id = picUser.rows[0].id;
-            pic_facility_id = picUser.rows[0].facility_id;
+    try {
+        const { title, desc, pic, deadline, status, urgent, facility, creator_role } = req.body;
+        const { role, id: userId, facility_id } = req.user;
+
+        // 1. Xác định department_code CỦA USER ĐANG TẠO TASK (Nguồn)
+        let userDeptCode = null;
+        if (role === 'FINANCE_DEPT') userDeptCode = 'FINANCE';
+        else if (facility_id && facility_id !== 'ALL') {
+            const userFacRecord = await pool.query('SELECT code, name FROM facilities WHERE id = $1 LIMIT 1', [facility_id]);
+            if (userFacRecord.rows.length > 0) {
+                userDeptCode = normalizeDeptCode(userFacRecord.rows[0].code, userFacRecord.rows[0].name);
+            }
         }
-    }
-  
-    let insert_facility_id = null;
-    if (req.user.role === 'FACILITY_MANAGER') {
-        insert_facility_id = req.user.facility_id;
-    } else {
+
+        // 2. Xác định đích đến (Cơ sở)
+        let target_facility_id = null;
+        let target_dept_code = null;
+        
         if (facility && facility !== 'HQ' && facility !== 'ALL') {
             let parsedFac = parseInt(facility, 10);
+            let facRecord;
             if (!isNaN(parsedFac)) {
-                insert_facility_id = parsedFac;
+                facRecord = await pool.query('SELECT id, code, name FROM facilities WHERE id = $1 LIMIT 1', [parsedFac]);
             } else {
-                const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
-                if (facRecord.rows.length > 0) {
-                    insert_facility_id = facRecord.rows[0].id;
-                } else if (['MARKETING', 'BGD', 'FINANCE'].includes(facility)) {
-                    const newFac = await pool.query("INSERT INTO facilities (name, code) VALUES ($1, $1) RETURNING id", [facility]);
-                    insert_facility_id = newFac.rows[0].id;
-                }
+                facRecord = await pool.query('SELECT id, code, name FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
             }
-        } else if (pic_facility_id) {
-            insert_facility_id = pic_facility_id;
+            
+            // XÓA BỎ LOGIC TỰ ĐỘNG INSERT FACILITIES (Tránh rác DB)
+            if (facRecord && facRecord.rows.length > 0) {
+                target_facility_id = facRecord.rows[0].id;
+                target_dept_code = normalizeDeptCode(facRecord.rows[0].code, facRecord.rows[0].name);
+            } else {
+                return res.status(400).json({ success: false, error: `Cơ sở/Phòng ban "${facility}" không tồn tại trong hệ thống.` });
+            }
         }
-    }
 
-    // FALLBACK: If insert_facility_id is still null (due to 'ALL', 'HQ', or unmapped facility name like 'DB41')
-    if (!insert_facility_id || insert_facility_id === 'ALL') {
-          const userRole = req.user.role;
-          let deptFacCode = null;
-          if (userRole === 'DEPARTMENT_HEAD') deptFacCode = 'MARKETING';
-          else if (userRole === 'FINANCE_DEPT') deptFacCode = 'FINANCE';
-          else if (userRole === 'VICE_PRESIDENT') deptFacCode = 'BGD';
+        if (!target_dept_code) target_dept_code = userDeptCode || 'ALL'; 
 
-
-          if (deptFacCode) {
-              const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [deptFacCode]);
-              if (facRecord.rows.length > 0) {
-                  insert_facility_id = facRecord.rows[0].id;
-              } else {
-                  const newFac = await pool.query("INSERT INTO facilities (name, code) VALUES ($1, $1) RETURNING id", [deptFacCode]);
-                  insert_facility_id = newFac.rows[0].id;
-              }
-          }
-      }
-
-      if (!insert_facility_id || insert_facility_id === 'ALL') {
-        const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
-        if (hqFac.rows.length > 0) {
-            insert_facility_id = hqFac.rows[0].id;
-        } else {
-            const anyFac = await pool.query("SELECT id FROM facilities LIMIT 1");
-            if (anyFac.rows.length > 0) insert_facility_id = anyFac.rows[0].id;
+        // 3. Áp dụng MA TRẬN QUYỀN HẠN
+        const isAllAccess = ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(role);
+        
+        if (!isAllAccess) {
+             if (userDeptCode && target_dept_code !== userDeptCode) {
+                 return res.status(403).json({ 
+                     success: false, 
+                     error: `403 Forbidden: Bạn thuộc (${userDeptCode}), không có quyền giao việc sang bộ phận khác (${target_dept_code}).` 
+                 });
+             }
+             target_dept_code = userDeptCode; // Ghi đè để an toàn tuyệt đối
+             target_facility_id = facility_id; // Ép về cơ sở của chính họ
         }
-    }
 
-    const insertQuery = `
-      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, created_by_role, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD') as deadline, created_at as "createdAt"
-    `;
-      const { rows } = await pool.query(insertQuery, [
-        title, 
-        desc || '', 
-        status || 'todo', 
-        urgent || false, 
-        deadline, 
-        pic_id, 
-        insert_facility_id, 
-        urgent ? 'URGENT' : 'PRIORITY',
-          req.user.role
+        // 4. Tìm ID của người được giao (PIC)
+        let pic_id = null;
+        if (pic) {
+             const picUser = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
+             if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
+        }
+
+        // 5. Lưu task vào DB
+        const insertQuery = `
+            INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, department_code, created_by, created_by_role)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING *
+        `;
+        
+        const { rows } = await pool.query(insertQuery, [
+            title, desc, status || 'todo', urgent || false, deadline ? new Date(deadline) : null, 
+            pic_id, target_facility_id, target_dept_code, userId, creator_role || role
         ]);
-    
-    const newTask = {
-      ...rows[0],
-      pic: pic || 'ChÆ°a gÃ¡n',
-      picId: pic || 'unassigned',
-      facility: facility || 'HQ',
-      facilityId: facility || 'HQ'
-    };
-
-    res.json({ success: true, data: newTask });
-  } catch (error) {
-    console.error("Lá»—i chi tiáº¿t tá»« DB:", error.message, error.stack);
-    res.status(500).json({ error: 'Lá»—i server khi lÆ°u cÃ´ng viá»‡c.' });
-  }
+        res.status(201).json({ success: true, data: rows[0] });
+    } catch (err) {
+        console.error("POST /api/tasks Error:", err);
+        res.status(500).json({ success: false, error: "Lỗi máy chủ" });
+    }
 });
 
-// API ÄÄƒng nháº­p giáº£ láº­p
 app.delete('/api/tasks/all', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
