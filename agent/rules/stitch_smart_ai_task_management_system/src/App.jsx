@@ -612,7 +612,7 @@ function MainDashboard() {
         urgent: false,
         creator_role: user.role,
         ...newTask,
-        facility: taskFacility,
+        facility: newTask.facility || taskFacility,
         ...(deptId && isDeptHeadLocal ? { department_tag: deptId } : {})
       };
       
