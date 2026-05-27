@@ -56,6 +56,42 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   
   const [picOptions, setPicOptions] = useState([]);
 
+  // Compute available facilities and departments based on selected PIC
+  const { filteredFacilities, availableDepts } = React.useMemo(() => {
+    let facs = activeFacilities;
+    let depts = ['HQ', 'MARKETING', 'FINANCE'];
+    
+    if (formData.pic) {
+      const selectedPic = picOptions.find(u => u.name === formData.pic);
+      if (selectedPic && !['SUPER_ADMIN', 'ADMIN', 'VICE_PRESIDENT'].includes(selectedPic.role)) {
+        // Filter facilities
+        const rawFac = selectedPic.facility_code || selectedPic.facility_id || selectedPic.facility_name || '';
+        const facCodes = Array.isArray(rawFac) ? rawFac.map(s => String(s).toLowerCase()) : String(rawFac).toLowerCase().split(',').map(s => s.trim());
+        
+        facs = activeFacilities.filter(f => 
+          facCodes.some(code => code === String(f.code).toLowerCase() || code === String(f.name).toLowerCase() || String(f.name).toLowerCase().includes(code))
+        );
+        
+        // Filter departments
+        depts = [];
+        if (selectedPic.department_id === 'BGD' || selectedPic.role === 'VICE_PRESIDENT') depts.push('HQ');
+        if (selectedPic.department_id === 'MARKETING') depts.push('MARKETING');
+        if (selectedPic.department_id === 'FINANCE' || selectedPic.role === 'FINANCE_DEPT') depts.push('FINANCE');
+      }
+    }
+    return { filteredFacilities: facs, availableDepts: depts };
+  }, [formData.pic, picOptions]);
+  
+  // Auto-select if there is only 1 option
+  React.useEffect(() => {
+    if (formData.pic) {
+      const allOptions = [...filteredFacilities.map(f => f.name), ...availableDepts];
+      if (allOptions.length === 1 && formData.facility !== allOptions[0]) {
+         setFormData(prev => ({...prev, facility: allOptions[0]}));
+      }
+    }
+  }, [formData.pic, filteredFacilities, availableDepts]);
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -135,29 +171,13 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">person</span>
                 <select required name="pic" value={formData.pic} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
-                  <option value="">-- Chọn PIC --</option>
-                  {picOptions.map(u => (
-                    <option key={u.username} value={u.name}>{u.name} {u.role === 'FACILITY_MANAGER' ? '(QL)' : ''}</option>
-                  ))}
-                  {/* Fallback option if user's own name is not in the list but they want to assign to themselves */}
-                  {!picOptions.find(u => u.name === user.name) && (
-                    <option value={user.name}>{user.name} (Bạn)</option>
-                  )}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 text-truncate truncate">Cơ sở / Phòng ban</label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
-                <select name="facility" value={formData.facility} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
-                  <option value="">-- Tự động --</option>
-                  {(activeFacilities || []).map(f => (
+                                    <option value="">-- Tự động --</option>
+                  {(filteredFacilities || []).map(f => (
                     <option key={f.id || f.name} value={f.name}>{f.name}</option>
                   ))}
-                  <option value="HQ">Ban Giám Đốc (HQ)</option>
-                  <option value="MARKETING">Phòng Marketing</option>
-                  <option value="FINANCE">Phòng Kế toán</option>
+                  {availableDepts.includes('HQ') && <option value="HQ">Ban Giám đốc (HQ)</option>}
+                  {availableDepts.includes('MARKETING') && <option value="MARKETING">Phòng Marketing</option>}
+                  {availableDepts.includes('FINANCE') && <option value="FINANCE">Phòng Kế toán</option>}
                 </select>
               </div>
             </div>
