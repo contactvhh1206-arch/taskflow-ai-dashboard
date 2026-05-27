@@ -739,6 +739,32 @@ function MainDashboard() {
             });
             
             setTasks(fetchedTasks);
+              
+              // Notification polling logic
+              const currentIds = new Set(fetchedTasks.map(t => t.id));
+              const prevIds = window.prevTaskIdsRef || new Set();
+              
+              if (prevIds.size > 0 && user) {
+                  fetchedTasks.forEach(task => {
+                      if (!prevIds.has(task.id) && task.status === 'todo') {
+                          const myNames = [String(user.name).toLowerCase(), String(user.username).toLowerCase(), '@' + String(user.username).toLowerCase()];
+                          const isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
+                          
+                          // Check if I am the PIC (e.g. PIC contains "Thiện" and user.name is "Thiện")
+                          if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
+                              const newNotif = {
+                                  title: 'Công việc mới',
+                                  message: Bạn được giao công việc: ,
+                                  time: new Date().toLocaleTimeString('vi-VN')
+                              };
+                              const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+                              localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
+                              window.dispatchEvent(new Event('taskflow_notify'));
+                          }
+                      }
+                  });
+              }
+              window.prevTaskIdsRef = currentIds;
           } else {
             setTasks([]);
             showToast('Lấy dữ liệu thất bại: ' + (data.error || ''));
@@ -750,6 +776,11 @@ function MainDashboard() {
       };
       fetchTasks();
       fetchFacilityStatuses();
+      
+      const pollInterval = setInterval(() => {
+        fetchTasks();
+      }, 10000);
+      return () => clearInterval(pollInterval);
     }
   }, [user]);
 
