@@ -272,6 +272,30 @@ export class ErrorBoundary extends React.Component {
   }
 }
 
+
+const DEPT_MAPPING = {
+  'MARKETING': ['phòng truyền thông', 'marketing', 'truyền thông', 'mkt'],
+  'FINANCE': ['kế toán', 'tài chính', 'finance', 'ketoan'],
+  'BGD': ['giám đốc', 'ban giám đốc', 'bgd', 'phó'],
+};
+
+const filterTaskForDeptHead = (t, currentUser, deptId) => {
+  const isOwner = t.createdBy === currentUser?.username || t.creator_role === currentUser?.role; 
+  const isAssignee = t.pic === currentUser?.username || t.picId === currentUser?.email || t.picId === '@' + currentUser?.username;
+  if (isOwner || isAssignee) return true;
+
+  const tFacCode = String(t?.facilityId || t?.facility || '').toLowerCase();
+  const tDeptTag = String(t?.department_tag || '').toUpperCase();
+  const currentDept = String(deptId).toUpperCase();
+
+  if (tDeptTag === currentDept) return true;
+
+  const validKeywords = DEPT_MAPPING[currentDept] || [currentDept.toLowerCase()];
+  const matchesDept = validKeywords.some(keyword => tFacCode.includes(keyword) || String(t?.facility || '').toLowerCase().includes(keyword));
+
+  return matchesDept;
+};
+
 function MainDashboard() {
   const { user, logout } = useContext(AuthContext);
   const [viewMode, setViewMode] = useState('kanban');
@@ -366,21 +390,13 @@ function MainDashboard() {
      
      if (isDeptHead) {
         // // if (globalFacilityFilter === 'ALL') return true;
-        const tFacCode = String(t?.facilityId || t?.facility || '').toLowerCase();
-        const tFacName = String(t?.facility || '').toLowerCase();
-        
         if (globalFacilityFilter && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptId) {
             const filterLower = String(globalFacilityFilter).toLowerCase();
+            const tFacCode = String(t?.facilityId || t?.facility || '').toLowerCase();
+            const tFacName = String(t?.facility || '').toLowerCase();
             return tFacCode.includes(filterLower) || tFacName.includes(filterLower);
         }
-
-        let isMkt = deptId === 'MARKETING' && (tFacCode.includes('marketing') || tFacName.includes('truyền thông') || tFacName.includes('mkt'));
-        let isFin = deptId === 'FINANCE' && (tFacCode.includes('finance') || tFacName.includes('kế toán') || tFacName.includes('ketoan'));
-        let isBgd = deptId === 'BGD' && (tFacCode.includes('bgd') || tFacName.includes('giám đốc') || tFacName.includes('phó'));
-        let matchesDept = (t.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase()) || isMkt || isFin || isBgd;
-        if (!matchesDept) return false;
-        
-        return true;
+        return filterTaskForDeptHead(t, user, deptId);
      }
      
      if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
@@ -866,10 +882,7 @@ function MainDashboard() {
                           const tFacName = String(task?.facility || '').toLowerCase();
                           
                           if (isDeptHead) {
-                              let isMkt = deptId === 'MARKETING' && (tFacCode.includes('marketing') || tFacName.includes('truyền thông') || tFacName.includes('mkt'));
-                              let isFin = deptId === 'FINANCE' && (tFacCode.includes('finance') || tFacName.includes('kế toán') || tFacName.includes('ketoan'));
-                              let isBgd = deptId === 'BGD' && (tFacCode.includes('bgd') || tFacName.includes('giám đốc') || tFacName.includes('phó'));
-                              if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase()) || isMkt || isFin || isBgd) {
+                              if (filterTaskForDeptHead(task, user, deptId)) {
                                   isAssignedToMe = true;
                               }
                           } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
