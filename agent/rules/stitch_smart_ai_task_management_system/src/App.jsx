@@ -1843,6 +1843,9 @@ export default function AppContainer() {
             parsed.user.role = 'SALES_DEPT';
             parsed.user.full_name = parsed.user.full_name.replace(' (Kinh doanh)', '');
           }
+          if (parsed.token) {
+            localStorage.setItem('taskflow_token', parsed.token);
+          }
           setUser(parsed.user);
         }
       } catch (e) { }
@@ -1859,6 +1862,7 @@ export default function AppContainer() {
       userData.full_name = userData.full_name.replace(' (Kinh doanh)', '');
     }
     localStorage.setItem('taskflow_auth', JSON.stringify({ token, user: userData }));
+    if (token) localStorage.setItem('taskflow_token', token);
     setUser(userData);
     fetchSystemConfig();
     fetchKPIs();
@@ -1866,6 +1870,7 @@ export default function AppContainer() {
 
   const logout = () => {
     localStorage.removeItem('taskflow_auth');
+    localStorage.removeItem('taskflow_token');
     setUser(null);
   };
 
