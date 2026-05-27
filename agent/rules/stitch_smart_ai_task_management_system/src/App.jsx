@@ -367,13 +367,17 @@ function MainDashboard() {
      if (isDeptHead) {
         // // if (globalFacilityFilter === 'ALL') return true;
         const tFacCode = String(t?.facilityId || t?.facility || '').toLowerCase();
+        const tFacName = String(t?.facility || '').toLowerCase();
         
         if (globalFacilityFilter && globalFacilityFilter !== 'ALL' && globalFacilityFilter !== deptId) {
             const filterLower = String(globalFacilityFilter).toLowerCase();
-            return tFacCode.includes(filterLower);
+            return tFacCode.includes(filterLower) || tFacName.includes(filterLower);
         }
 
-        let matchesDept = (t.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase());
+        let isMkt = deptId === 'MARKETING' && (tFacCode.includes('marketing') || tFacName.includes('truyền thông') || tFacName.includes('mkt'));
+        let isFin = deptId === 'FINANCE' && (tFacCode.includes('finance') || tFacName.includes('kế toán') || tFacName.includes('ketoan'));
+        let isBgd = deptId === 'BGD' && (tFacCode.includes('bgd') || tFacName.includes('giám đốc') || tFacName.includes('phó'));
+        let matchesDept = (t.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase()) || isMkt || isFin || isBgd;
         if (!matchesDept) return false;
         
         return true;
@@ -858,13 +862,16 @@ function MainDashboard() {
                           const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
                           const rawFac = user?.facility_code || user?.facility_id || '';
                           const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
-                          const tFacCode = String(task?.facility || task?.facilityId || '').toLowerCase();
+                          const tFacCode = String(task?.facilityId || task?.facility || '').toLowerCase();
+                          const tFacName = String(task?.facility || '').toLowerCase();
                           
                           if (isDeptHead) {
-                              if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase())) {
+                              let isMkt = deptId === 'MARKETING' && (tFacCode.includes('marketing') || tFacName.includes('truyền thông') || tFacName.includes('mkt'));
+                              let isFin = deptId === 'FINANCE' && (tFacCode.includes('finance') || tFacName.includes('kế toán') || tFacName.includes('ketoan'));
+                              let isBgd = deptId === 'BGD' && (tFacCode.includes('bgd') || tFacName.includes('giám đốc') || tFacName.includes('phó'));
+                              if ((task.department_tag === deptId) || tFacCode.includes(String(deptId).toLowerCase()) || isMkt || isFin || isBgd) {
                                   isAssignedToMe = true;
-                              }
-                          } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+                              } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
                               if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
                                   isAssignedToMe = true;
                               }
