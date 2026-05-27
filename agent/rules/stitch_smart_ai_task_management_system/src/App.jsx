@@ -228,7 +228,12 @@ function MainDashboard() {
     try {
       const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
       const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
-      setFacilitiesList(facs);
+      setFacilitiesList([
+        ...facs,
+        { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+        { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+        { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
+      ]);
     } catch {}
   }, []);
   
@@ -348,7 +353,13 @@ function MainDashboard() {
           is_active: fac.is_active !== false
         }));
         setFacilityList(mappedFacs);
-        setFacilitiesList(mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2'));
+        const filteredFacs = mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
+        setFacilitiesList([
+          ...filteredFacs,
+          { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+          { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+          { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
+        ]);
         localStorage.setItem('taskflow_facilities', JSON.stringify(mappedFacs));
         return;
       }
@@ -369,7 +380,13 @@ function MainDashboard() {
       localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
     }
     setFacilityList(localFacs);
-    setFacilitiesList(localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2'));
+    const filteredLocalFacs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
+    setFacilitiesList([
+      ...filteredLocalFacs,
+      { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
+      { id: 'dept2', name: 'Phòng Tài chính', filterValue: 'FINANCE' },
+      { id: 'dept3', name: 'Ban Giám Đốc', filterValue: 'BGD' }
+    ]);
   };
 
   const fetchKPIs = async () => {
