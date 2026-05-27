@@ -45,6 +45,15 @@ const initDB = async () => {
       date VARCHAR(50),
       display_time VARCHAR(50)
     )`);
+    
+    await pool.query(`CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+      id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255),
+      facility VARCHAR(255),
+      title VARCHAR(255),
+      chat_log JSONB,
+      timestamp BIGINT
+    )`);
     await pool.query(`CREATE TABLE IF NOT EXISTS daily_financial_reports (
       id VARCHAR(255) PRIMARY KEY,
       date VARCHAR(50) UNIQUE,
@@ -918,6 +927,34 @@ const calculateTone = (deadlineDateStr) => {
     };
   }
 };
+
+  // API: Lịch sử hội thoại AI toàn cầu (Global Memory)
+  app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
+    try {
+      const { rows } = await pool.query('SELECT * FROM ai_chat_sessions ORDER BY timestamp DESC LIMIT 50');
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
+    try {
+      const { id, user_id, facility, title, chat_log, timestamp } = req.body;
+      await pool.query(
+        `INSERT INTO ai_chat_sessions (id, user_id, facility, title, chat_log, timestamp)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE SET 
+         chat_log = EXCLUDED.chat_log, 
+         timestamp = EXCLUDED.timestamp,
+         title = EXCLUDED.title`,
+        [id, user_id, facility, title, JSON.stringify(chat_log || []), timestamp]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
 // API: Lưu và lấy danh sách vi phạm AI
 app.get('/api/ai/violations', authenticateUser, async (req, res) => {
