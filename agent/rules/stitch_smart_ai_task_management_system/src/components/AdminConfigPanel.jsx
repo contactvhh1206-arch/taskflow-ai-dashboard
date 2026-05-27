@@ -9,7 +9,7 @@ const SYSTEM_ROLES = [
   { value: 'DEPARTMENT_HEAD', label: 'Bộ phận Marketing' },
   { value: 'FINANCE_DEPT', label: 'Bộ phận Tài chính - Kế toán' },
   { value: 'GENERAL_MANAGER', label: 'Tổng quản lý chuỗi' },
-  { value: 'VICE_PRESIDENT', label: 'Phó tổng' },
+  { value: 'VICE_PRESIDENT', label: 'Vice' },
   { value: 'SUPER_ADMIN', label: 'Sếp tổng' },
   { value: 'ADMIN', label: 'Admin Hệ thống' }
 ];
