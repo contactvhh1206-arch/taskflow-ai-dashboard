@@ -720,9 +720,71 @@ app.post('/api/reports', authenticateUser, async (req, res) => {
   }
 });
 
+
+// GET comments for a task
+app.get('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = 
+      SELECT c.*, u.full_name as author_name, u.role_id, u.email, u.username
+      FROM task_comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.task_id = 
+      ORDER BY c.created_at ASC
+    ;
+    const { rows } = await pool.query(query, [id]);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Lỗi lấy bình luận:', error);
+    res.status(500).json({ error: 'Lỗi server khi lấy bình luận.' });
+  }
+});
+
+// POST a new comment
+app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    const user_id = req.user.id;
+    
+    if (!content) return res.status(400).json({ error: 'Nội dung bình luận không được trống.' });
+    
+    const query = 
+      INSERT INTO task_comments (task_id, user_id, content)
+      VALUES (, , )
+      RETURNING *
+    ;
+    const { rows } = await pool.query(query, [id, user_id, content]);
+    
+    // Also update task updated_at to trigger polling refresh
+    await pool.query('UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = ', [id]);
+    
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Lỗi tạo bình luận:', error);
+    res.status(500).json({ error: 'Lỗi server khi tạo bình luận.' });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+
+app.listen(PORT, async () => {
+  try {
+    await pool.query(
+      CREATE TABLE IF NOT EXISTS task_comments (
+          id SERIAL PRIMARY KEY,
+          task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
+          user_id INT REFERENCES users(id) ON DELETE CASCADE,
+          content TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    );
+    console.log('[DB] Đã kiểm tra/tạo bảng task_comments');
+  } catch(e) {
+    console.error('[DB] Lỗi tạo bảng task_comments:', e);
+  }
+
   console.log(`ðŸš€ TaskFlow AI Server Ä‘ang cháº¡y táº¡i http://localhost:${PORT}`);
   console.log(`[DB] DATABASE_URL: ${process.env.DATABASE_URL ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_HOST: ${process.env.DB_HOST ? 'OK' : 'UNDEFINED'}`);
