@@ -120,7 +120,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
           const token = localStorage.getItem('taskflow_token');
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
             headers: {
-              'Authorization': token ? \\Bearer \\ : '',
+              'Authorization': token ? `Bearer ${token}` : '',
               'x-user-role': user?.role || '',
               'x-facility-id': user?.facility_id || 'ALL'
             }
@@ -137,7 +137,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
           const token = localStorage.getItem('taskflow_token');
           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities', {
             headers: {
-              'Authorization': token ? \\Bearer \\ : '',
+              'Authorization': token ? `Bearer ${token}` : '',
               'x-user-role': user?.role || '',
               'x-facility-id': user?.facility_id || 'ALL'
             }
@@ -167,7 +167,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities', {
                method: 'POST', headers: { 
                  'Content-Type': 'application/json',
-                 'Authorization': token ? \\Bearer \\ : '',
+                 'Authorization': token ? `Bearer ${token}` : '',
                  'x-user-role': user?.role || '',
                  'x-facility-id': user?.facility_id || 'ALL'
                },
@@ -194,7 +194,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
             const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
                 method: 'POST', headers: { 
                   'Content-Type': 'application/json',
-                  'Authorization': token ? \\Bearer \\ : '',
+                  'Authorization': token ? `Bearer ${token}` : '',
                   'x-user-role': user?.role || '',
                   'x-facility-id': user?.facility_id || 'ALL'
                 },
@@ -233,7 +233,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                 method: 'PUT',
                 headers: { 
                   'Content-Type': 'application/json',
-                  'Authorization': localStorage.getItem('taskflow_token') ? \\Bearer \\ : '',
+                  'Authorization': localStorage.getItem('taskflow_token') ? `Bearer ${localStorage.getItem('taskflow_token')}` : '',
                   'x-user-role': user?.role || '',
                   'x-facility-id': user?.facility_id || 'ALL'
                 },

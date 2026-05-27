@@ -96,7 +96,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
         const token = localStorage.getItem('taskflow_token');
         const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
           headers: {
-            'Authorization': token ? \\Bearer \\ : '',
+            'Authorization': token ? `Bearer ${token}` : '',
             'x-user-role': user?.role || '',
             'x-facility-id': user?.facility_id || 'ALL'
           }
