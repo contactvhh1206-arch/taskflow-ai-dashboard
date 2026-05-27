@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -55,19 +55,37 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   const [picOptions, setPicOptions] = useState([]);
 
   useEffect(() => {
-    try {
-      const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
-      let filtered = [];
-      if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
-        filtered = allUsers;
-      } else {
-        filtered = allUsers.filter(u => 
-          (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
-          (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
-        );
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users');
+        const data = await res.json();
+        let allUsers = data.success ? data.data : JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+        
+        let filtered = [];
+        if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+          filtered = allUsers;
+        } else {
+          filtered = allUsers.filter(u => 
+            (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
+            (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
+          );
+        }
+        setPicOptions(filtered);
+      } catch(e) {
+        const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+        let filtered = [];
+        if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+          filtered = allUsers;
+        } else {
+          filtered = allUsers.filter(u => 
+            (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
+            (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
+          );
+        }
+        setPicOptions(filtered);
       }
-      setPicOptions(filtered);
-    } catch(e) {}
+    };
+    fetchUsers();
   }, [user]);
 
   const handleSubmit = (e) => {
@@ -1712,6 +1730,7 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
     </div>
   );
 }
+
 
 
 
