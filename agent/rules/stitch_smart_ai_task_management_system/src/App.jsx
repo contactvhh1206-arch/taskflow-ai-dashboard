@@ -1546,8 +1546,7 @@ function MainDashboard() {
                     {selectedTaskComments.length === 0 && (
                       <div className="text-center text-gray-400 text-sm italic mt-4">Chưa có bình luận nào.</div>
                     )}
-                  </div></div>
-                </div>
+                  </div>
                 <div className="p-4 border-t border-outline-variant dark:border-gray-800 bg-white dark:bg-[#1e1e1e] relative">
                   {showMentionMenu && (
                     <div className="absolute bottom-full left-0 w-full mb-2 bg-white dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl shadow-lg max-h-48 overflow-y-auto z-10 p-2">
