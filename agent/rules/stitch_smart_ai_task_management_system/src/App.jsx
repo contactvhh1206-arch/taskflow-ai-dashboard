@@ -227,7 +227,7 @@ function MainDashboard() {
   React.useEffect(() => {
     try {
       const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
-      const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
+      const facs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
       setFacilitiesList([
         ...facs,
         { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
@@ -353,7 +353,7 @@ function MainDashboard() {
           is_active: fac.is_active !== false
         }));
         setFacilityList(mappedFacs);
-        const filteredFacs = mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
+        const filteredFacs = mappedFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
         setFacilitiesList([
           ...filteredFacs,
           { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
@@ -380,7 +380,7 @@ function MainDashboard() {
       localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
     }
     setFacilityList(localFacs);
-    const filteredLocalFacs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2');
+    const filteredLocalFacs = localFacs.filter(f => !f.isExecutive && f.id !== 'vp1' && f.id !== 'vp2' && !['MARKETING', 'MAKETING', 'FINANCE', 'BGD'].includes(String(f.name || '').toUpperCase()));
     setFacilitiesList([
       ...filteredLocalFacs,
       { id: 'dept1', name: 'Phòng Marketing', filterValue: 'MARKETING' },
