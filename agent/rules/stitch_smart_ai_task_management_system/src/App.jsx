@@ -859,7 +859,7 @@ function MainDashboard() {
               }
               sessionStorage.setItem('taskflow_prev_ids', JSON.stringify(Array.from(currentIds)));
               sessionStorage.setItem('taskflow_prev_comments', JSON.stringify(currentComments));
-              } catch (e) {}
+
               
             } else {
               setTasks([]);
