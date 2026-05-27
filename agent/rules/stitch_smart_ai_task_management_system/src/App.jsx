@@ -198,9 +198,9 @@ function MainDashboard() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     if (!user) return 'tasks';
-    if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) return 'reports';
+    
     if (user.role === 'ADMIN') return 'admin';
-    if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(user.role)) return 'dashboard';
+    if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(user.role)) return 'dashboard';
     return 'tasks';
   });
   const [chatInput, setChatInput] = useState('');
@@ -788,9 +788,9 @@ function MainDashboard() {
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
             </>
           )}
-          {['DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) && (
+          {['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) && (
             <>
-              <NavItem icon="dashboard" label={user.role === 'VICE_PRESIDENT' ? 'Tổng quan BĐH' : 'Tổng quan phòng ban'} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+              <NavItem icon="dashboard" label={['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) ? 'Tổng quan BĐH' : 'Tổng quan phòng ban'} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
               <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
               <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
@@ -841,7 +841,7 @@ function MainDashboard() {
              <div className="mt-6 mb-2 px-4">
                 <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-3 flex items-center justify-between tracking-widest uppercase">
                    Lịch sử trò chuyện AI
-                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) { setActiveTab('reports'); } else if (['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
+                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
                       <span className="material-symbols-outlined text-[16px]">add_circle</span>
                    </button>
                 </div>
@@ -854,10 +854,7 @@ function MainDashboard() {
                             key={session.id} 
                             onClick={() => { 
                                setActiveAiSessionId(session.id); 
-                               if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
-                                  setActiveTab('reports'); 
-                               } else if (['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) {
-                                  setActiveTab('ai-advisor');
+                               if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor');
                                } else {
                                   setShowAITaskModal(true);
                                }
@@ -1055,7 +1052,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <RAGManagerPanel showToast={showToast} />
               </ErrorBoundary>
-            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
+            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
               <ErrorBoundary>
                 <FacilityDashboard user={user} tasks={tasks} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={globalFacilityFilter} />
               </ErrorBoundary>
@@ -1439,8 +1436,8 @@ function MainDashboard() {
         )}
       </main>
 
-      {/* Right Sidebar (SUPER_ADMIN Only) */}
-      {user.role === 'SUPER_ADMIN' && (
+      {/* Right Sidebar Disabled */}
+      {false && (
         <aside className="w-80 bg-white dark:bg-[#1e1e1e] border-l border-outline-variant dark:border-gray-800 flex flex-col shadow-xl z-20 transition-colors">
           <div className="p-6 border-b border-outline-variant dark:border-gray-800 bg-gradient-to-r from-secondary/5 to-transparent">
             <div className="flex items-center justify-between mb-1">
@@ -1719,6 +1716,8 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
     </div>
   );
 }
+
+
 
 
 
