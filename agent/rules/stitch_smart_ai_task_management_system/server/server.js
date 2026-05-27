@@ -257,6 +257,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           else if (userRole === 'FINANCE_DEPT') deptFacCode = 'FINANCE';
           else if (userRole === 'VICE_PRESIDENT') deptFacCode = 'BGD';
 
+
           if (deptFacCode) {
               const facRecord = await pool.query('SELECT id FROM facilities WHERE code =  OR name =  LIMIT 1', [deptFacCode]);
               if (facRecord.rows.length > 0) {
@@ -708,7 +709,7 @@ app.get('/api/internal/ai-token-stats', authenticateUser, async (req, res) => {
 app.get('/api/reports', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
-    if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(role)) {
+    if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(role)) {
       return res.status(403).json({ error: 'KhÃ´ng Ä‘á»§ quyá»n xem bÃ¡o cÃ¡o tÃ i chÃ­nh.' });
     }
     const { rows } = await pool.query('SELECT * FROM daily_financial_reports ORDER BY date DESC');
@@ -806,6 +807,7 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, async () => {
   try {
+
     await pool.query(
       CREATE TABLE IF NOT EXISTS task_comments (
           id SERIAL PRIMARY KEY,

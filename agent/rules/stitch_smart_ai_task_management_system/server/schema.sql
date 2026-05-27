@@ -14,7 +14,7 @@ CREATE TABLE facilities (
 -- 2. Bảng Vai trò (Roles)
 CREATE TABLE roles (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) UNIQUE NOT NULL, -- SUPER_ADMIN, GENERAL_MANAGER, FACILITY_MANAGER, DEPT_HEAD
+    name VARCHAR(50) UNIQUE NOT NULL, -- SUPER_ADMIN, FACILITY_MANAGER, DEPT_HEAD
     description TEXT
 );
 
@@ -83,7 +83,7 @@ CREATE POLICY super_admin_all_tasks ON tasks
             SELECT 1 FROM users u 
             JOIN roles r ON u.role_id = r.id 
             WHERE u.id = current_user_id() 
-            AND r.name IN ('SUPER_ADMIN', 'GENERAL_MANAGER')
+            AND r.name IN ('SUPER_ADMIN')
         )
     );
 
@@ -120,7 +120,7 @@ CREATE TABLE daily_checkins (
 ALTER TABLE daily_checkins ENABLE ROW LEVEL SECURITY;
 CREATE POLICY super_admin_all_checkins ON daily_checkins
     FOR ALL USING (
-        EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN', 'GENERAL_MANAGER'))
+        EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN'))
     );
 CREATE POLICY facility_manager_own_checkins ON daily_checkins
     FOR ALL USING (
@@ -161,7 +161,7 @@ CREATE TABLE daily_financial_reports (
 ALTER TABLE daily_financial_reports ENABLE ROW LEVEL SECURITY;
 CREATE POLICY finance_all_reports ON daily_financial_reports
     FOR ALL USING (
-        EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'))
+        EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'))
     );
 
 
