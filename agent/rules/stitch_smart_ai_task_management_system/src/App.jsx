@@ -90,10 +90,19 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    let finalFacility = user.role === 'SUPER_ADMIN' ? 'HQ' : (Array.isArray(user.facility_id) ? 'ALL' : user.facility_id);
+    
+    if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
+      const selectedPic = picOptions.find(u => u.name === formData.pic);
+      if (selectedPic) {
+        finalFacility = Array.isArray(selectedPic.facility_id) ? selectedPic.facility_id[0] : (selectedPic.facility_id || selectedPic.facility_name || finalFacility);
+      }
+    }
+
     onSave({
       id: Date.now(),
       ...formData,
-      facility: user.role === 'SUPER_ADMIN' ? 'HQ' : (Array.isArray(user.facility_id) ? 'ALL' : user.facility_id)
+      facility: finalFacility
     });
     onClose();
   };
