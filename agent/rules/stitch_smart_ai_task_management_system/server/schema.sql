@@ -164,3 +164,12 @@ CREATE POLICY finance_all_reports ON daily_financial_reports
         EXISTS (SELECT 1 FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = current_user_id() AND r.name IN ('SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'))
     );
 
+
+-- 8. Bảng Bình luận (Task Comments)
+CREATE TABLE IF NOT EXISTS task_comments (
+    id SERIAL PRIMARY KEY,
+    task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
