@@ -118,7 +118,7 @@ const initDB = async () => {
         id SERIAL PRIMARY KEY,
         task_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
         user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        comment TEXT NOT NULL,
+        content TEXT NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`);
 
@@ -612,14 +612,14 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
 
     // 2. THỰC THI INSERT (Lúc này realUserId đã được đảm bảo 100% là an toàn)
     const { rows } = await pool.query(`
-      INSERT INTO task_comments (task_id, user_id, comment)
+      INSERT INTO task_comments (task_id, user_id, content)
       VALUES ($1, $2, $3) RETURNING *
     `, [id, realUserId, comment]);
     
 
 
     // 4. KHỞI TẠO BIẾN TRẢ VỀ (Giữ lại logic bọc lót của Cố vấn để phòng thủ tầng 2)
-    const newComment = (rows && rows.length > 0) ? rows[0] : { task_id: id, user_id: realUserId, comment: comment };
+    const newComment = (rows && rows.length > 0) ? rows[0] : { task_id: id, user_id: realUserId, content: comment };
     
     try {
         const nameRes = await pool.query('SELECT full_name FROM users WHERE id = $1', [realUserId]);
