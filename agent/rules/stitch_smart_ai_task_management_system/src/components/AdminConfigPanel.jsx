@@ -53,6 +53,51 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const [isResetting, setIsResetting] = useState(false);
       const isProduction = false;
 
+      const handleLearnFromChat = async (chatLogData) => {
+          if (!chatLogData) return;
+
+          // Xử lý làm sạch: Chỉ bóc tách phần Text Content, vứt bỏ vỏ bọc JSON
+          let cleanContent = "";
+          try {
+              const logs = typeof chatLogData === 'string' ? JSON.parse(chatLogData) : chatLogData;
+              if (Array.isArray(logs)) {
+                  // Gom nội dung chat thành văn bản thuần
+                  cleanContent = logs.map(msg => `${msg.role === 'assistant' ? 'AI' : 'User'}: ${msg.content}`).join('\n\n');
+              } else {
+                  cleanContent = String(chatLogData);
+              }
+          } catch (e) {
+              cleanContent = String(chatLogData);
+          }
+
+          if (!cleanContent.trim()) return;
+
+          try {
+              if (showToast) showToast('Đang nạp vào Quy chuẩn (RAG)... Vui lòng đợi.');
+              const token = localStorage.getItem('taskflow_token');
+              
+              // SỬA LỖI: Bắt buộc dùng biến môi trường Vite
+              const res = await fetch(`${import.meta.env.VITE_API_URL}/api/rag/learn-from-chat`, {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': token ? `Bearer ${token}` : ''
+                  },
+                  body: JSON.stringify({ content: cleanContent })
+              });
+              
+              const data = await res.json();
+              if (res.ok) {
+                  if (showToast) showToast(`Thành công! ${data.message}`);
+              } else {
+                  if (showToast) showToast(`Thất bại: ${data.error || 'Lỗi hệ thống'}`);
+              }
+          } catch (error) {
+              console.error(error);
+              if (showToast) showToast('Thất bại: Không thể kết nối tới Server');
+          }
+      };
+
       const handleResetSystem = () => {
          if (isProduction) return;
          if (resetConfirmText !== 'CONFIRM RESET SYSTEM') return;
@@ -559,7 +604,17 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                          <div key={session.id} className="p-4 rounded-xl border border-outline-variant dark:border-gray-700 bg-white dark:bg-[#1a1a1a] shadow-sm">
                             <div className="flex justify-between items-start mb-2">
                                <h4 className="font-bold text-primary dark:text-blue-400">{session.title || 'Không có tiêu đề'}</h4>
-                               <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-500">{new Date(session.timestamp).toLocaleString('vi-VN')}</span>
+                               <div className="flex items-center gap-2">
+                                  {HIGH_LEVEL_ROLES.includes(user?.role) && (
+                                     <button 
+                                        onClick={() => handleLearnFromChat(session.chat_log)} 
+                                        className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded border border-green-300 hover:bg-green-200 font-bold flex items-center gap-1 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                                     >
+                                        <span className="material-symbols-outlined text-[14px]">school</span> Nạp vào Quy chuẩn (RAG)
+                                     </button>
+                                  )}
+                                  <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-500">{new Date(session.timestamp).toLocaleString('vi-VN')}</span>
+                               </div>
                             </div>
                             <div className="flex gap-2 text-xs text-gray-500 font-medium mb-4">
                                <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">store</span> {session.facility || 'HQ'}</span>
