@@ -138,6 +138,15 @@ const initDB = async () => {
             ADD COLUMN prompt_tokens INT DEFAULT 0,
             ADD COLUMN completion_tokens INT DEFAULT 0
         `);
+    try {
+        await pool.query(`
+            ALTER TABLE ai_ping_logs 
+            ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id),
+            ADD COLUMN IF NOT EXISTS facility_id INT REFERENCES facilities(id),
+            ADD COLUMN IF NOT EXISTS total_tokens INT DEFAULT 0
+        `);
+    } catch (e) {}
+
     } catch (e) {
         // Ignore if columns already exist
     }
@@ -1903,42 +1912,65 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         
         if (!userMessage) return res.status(400).json({ error: "Message is required" });
 
-        // Nhịp 1: Lưu ngay câu hỏi của User TRƯỚC KHI gọi LLM API (Chống mất mát dữ liệu)
+        // ==========================================
+        // NHỊP 1: LƯU CÂU HỎI & CHỐNG MẤT DỮ LIỆU
+        // ==========================================
         if (session_id) {
-            // Xác thực lại session_id trước khi insert
             const checkSession = await pool.query("SELECT id FROM ai_chat_sessions WHERE id = $1 AND user_id = $2", [session_id, req.user.id]);
             if (checkSession.rowCount === 0) return res.status(403).json({ error: "Lỗi phiên làm việc." });
             
-            const saveUserMsgSql = `
-                INSERT INTO ai_chat_messages (session_id, role, content) 
-                VALUES ($1, 'user', $2)
-            `;
+            const saveUserMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'user', $2)`;
             await pool.query(saveUserMsgSql, [session_id, userMessage]);
         }
 
-        // 1. KÍCH HOẠT MÀNG LỌC TIỀM THỨC
+        // ==========================================
+        // NHỊP 2: RAG & MÀNG LỌC TIỀM THỨC
+        // ==========================================
         let learnedRule = await detectAndLearnRule(userMessage, req.user.role, req.user.id);
         let systemPromptAddition = "";
         
-        // FIX LOGIC: Chỉ thêm prompt báo cáo nếu thực sự có luật mới được nạp
         if (learnedRule) {
-            systemPromptAddition = `\n[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngầu, điện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
+            systemPromptAddition = `
+[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngầu, điện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
         }
 
+        // Phục dựng lại mảng messages (RAG + Context Window)
+        const ragContextRows = await searchKnowledgeBase(userMessage, req.user, 3);
+        const ragContextText = ragContextRows.map(row => row.content).join("
+");
+        const finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow.
+" + 
+                                  (ragContextText ? "Dữ liệu tham khảo:
+" + ragContextText : "") + 
+                                  systemPromptAddition;
+
+        let chatHistory = [];
+        if (session_id) {
+            chatHistory = await getConversationContext(session_id, req.user.id);
+        }
+
+        const messages = [
+            { role: "system", content: finalSystemPrompt },
+            ...chatHistory,
+            { role: "user", content: userMessage }
+        ];
+
+        // ==========================================
+        // NHỊP 3: SSE STREAMING
+        // ==========================================
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
-        // Flush headers
         res.flushHeaders();
 
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: { 
-                "Authorization": `Bearer ${OPENROUTER_API_KEY}`, 
+                "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY || OPENROUTER_API_KEY}`, 
                 "Content-Type": "application/json" 
             },
             body: JSON.stringify({
-                model: aiModel,
+                model: "openai/gpt-4o-mini", // Tuỳ chỉnh model theo config của bạn
                 messages: messages,
                 stream: true,
                 stream_options: { include_usage: true }
@@ -1946,18 +1978,16 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         });
 
         if (!response.ok) {
-            const errBody = await response.text();
-            console.error("OpenRouter Stream Error:", errBody);
-            // FIX SSE: Dùng \n\n thay vì Enter xuống dòng
-            res.write(`data: ${JSON.stringify({ error: "Lỗi kết nối AI API" })}\n\n`);
+            console.error("OpenRouter Stream Error:", await response.text());
+            res.write(`data: ${JSON.stringify({ error: "Lỗi kết nối AI API" })}
+
+`);
             return res.end();
         }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let aiReplyContent = "";
-        
-        // Khai báo sẵn biến để hứng Token Usage ở bước sau
         let promptTokens = 0; 
         let completionTokens = 0;
 
@@ -1966,76 +1996,61 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             if (done) break;
             
             const chunk = decoder.decode(value, { stream: true });
-            // FIX SYNTAX ERROR: Chuyển dấu enter thành \n
-            const lines = chunk.split("\n");
+            const lines = chunk.split("
+");
             
             for (const line of lines) {
                 if (line.startsWith("data: ") && line !== "data: [DONE]") {
                     try {
                         const parsed = JSON.parse(line.substring(6));
                         
-                        // Xử lý content chunk
+                        // Hứng Token Usage (OpenAI trả về ở chunk cuối cùng)
+                        if (parsed.usage) {
+                            promptTokens = parsed.usage.prompt_tokens || 0;
+                            completionTokens = parsed.usage.completion_tokens || 0;
+                        }
+
+                        // Hứng Content Chunk
                         if (parsed.choices && parsed.choices.length > 0) {
                             const contentChunk = parsed.choices[0].delta?.content || "";
                             if (contentChunk) {
                                 aiReplyContent += contentChunk;
-                                // FIX SSE: Dùng \n\n chuẩn
-                                res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
+                                res.write(`data: ${JSON.stringify({ content: contentChunk })}
+
+`);
                             }
                         }
                     } catch (e) {
-                        // Bỏ qua lỗi parse JSON cho các chunk không hoàn chỉnh
                         console.error("Lỗi parse JSON stream chunk:", e);
                     }
                 }
             }
         }
-                            promptTokens = parsed.usage.prompt_tokens || 0;
-                            completionTokens = parsed.usage.completion_tokens || 0;
-                        }
-                    } catch (err) {
-                        console.error("Error parsing stream line:", line, err);
-                    }
-                }
-            }
-        }
 
-        // Kết thúc luồng stream
         res.write("data: [DONE]
 
 ");
         res.end();
 
-        // Nhịp 2: Lưu câu trả lời của AI
+        // ==========================================
+        // NHỊP 4: LƯU DB & GHI LOG BẢO MẬT
+        // ==========================================
         if (session_id && aiReplyContent) {
-            const saveAiMsgSql = `
-                INSERT INTO ai_chat_messages (session_id, role, content) 
-                VALUES ($1, 'assistant', $2)
-            `;
+            const saveAiMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)`;
             await pool.query(saveAiMsgSql, [session_id, aiReplyContent]);
         }
 
-        // Nhịp 3: Ghi nhận Token Usage
+        // Ghi log chính xác 100% vào bảng ai_ping_logs chuẩn
         if (promptTokens > 0 || completionTokens > 0) {
-            // Log for statistics
             const totalTokens = promptTokens + completionTokens;
             await pool.query(`
-                INSERT INTO ai_token_usage_logs (user_id, prompt_tokens, completion_tokens, total_tokens)
-                VALUES ($1, $2, $3, $4)
-            `, [req.user.id, promptTokens, completionTokens, totalTokens]);
-        } else {
-            // Fallback token estimation
-            const estPrompt = Math.ceil(JSON.stringify(messages).length / 4);
-            const estComp = Math.ceil(aiReplyContent.length / 4);
-            await pool.query(`
-                INSERT INTO ai_token_usage_logs (user_id, prompt_tokens, completion_tokens, total_tokens)
-                VALUES ($1, $2, $3, $4)
-            `, [req.user.id, estPrompt, estComp, estPrompt + estComp]);
+                INSERT INTO ai_ping_logs (user_id, facility_id, prompt_tokens, completion_tokens, total_tokens)
+                VALUES ($1, $2, $3, $4, $5)
+            `, [req.user.id, req.user.facility_id || null, promptTokens, completionTokens, totalTokens]);
         }
 
     } catch (error) {
         console.error("AI Chat Stream error:", error);
-        // If stream hasn't started sending data, return 500
         if (!res.headersSent) {
             res.status(500).json({ error: "Lỗi hệ thống AI Chat." });
         } else {
