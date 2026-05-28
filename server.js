@@ -174,6 +174,10 @@ const initDB = async () => {
         ON company_knowledge_base USING gin (metadata)
     `);
     
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_department_code ON tasks USING btree (department_code);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks USING btree (created_by);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_pic_id ON tasks USING btree (pic_id);`);
+    
     await pool.query(`CREATE TABLE IF NOT EXISTS daily_financial_reports (
       id VARCHAR(255) PRIMARY KEY,
       date VARCHAR(50) UNIQUE,
@@ -602,7 +606,7 @@ app.delete('/api/users/:id', authenticateUser, checkAdmin, async (req, res) => {
 
 app.get('/api/tasks', authenticateUser, async (req, res) => {
   try {
-    const { role, facility_id } = req.user;
+    const { role, facility_id, department_code, department_id, id } = req.user;
     
     let query = `
       SELECT t.id, t.title, t.description as desc, t.status, t.urgency as urgent, 
@@ -614,25 +618,26 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
              COUNT(tc.id) AS comment_count
       FROM tasks t
       LEFT JOIN users u ON t.pic_id = u.id
-      LEFT JOIN facilities f ON t.facility_id = f.id
+      LEFT JOIN facilities f ON t.facility_id = f.id AND f.is_deleted = false
       LEFT JOIN task_comments tc ON t.id = tc.task_id
       WHERE 1=1
     `;
-      const params = [];
-      if (role === 'SUPER_ADMIN' || role === 'VICE_PRESIDENT') {
-          // Không nối thêm AND. Đặc quyền xem toàn bộ hệ thống.
-      } else if (role === 'FACILITY_MANAGER') {
-          // Lọc theo cơ sở
-          params.push(req.user.facility_id);
-          query += ` AND t.facility_id = $${params.length}`;
-      } else {
-          // Lọc theo phòng ban (Dành cho DEPARTMENT_HEAD và LOCAL)
-          const userDept = normalizeDept(req.user.department_code || req.user.department_id);
-          params.push(userDept);
-          query += ` AND t.department_code = $${params.length}`;
-      }
+    const params = [];
+    const userDept = normalizeDept(department_code || department_id);
+
+    if (
+        role === 'SUPER_ADMIN' || 
+        role === 'VICE_PRESIDENT' || 
+        (role === 'DEPARTMENT_HEAD' && userDept === 'MARKETING')
+    ) {
+        // Nhóm All-Access: Không áp dụng điều kiện lọc bổ sung
+    } else {
+        // Nhóm Local: Áp dụng chung cho FACILITY_MANAGER, FINANCE_DEPT...
+        params.push(userDept, id, id);
+        query += ` AND (t.department_code = $${params.length - 2} OR t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
+    }
       
-      query += ` GROUP BY t.id, u.full_name, u.email, f.name, f.code ORDER BY t.created_at DESC`;
+    query += ` GROUP BY t.id, u.full_name, u.email, f.name, f.code ORDER BY t.created_at DESC`;
 
     const { rows } = await pool.query(query, params);
     res.json({ success: true, data: rows });
