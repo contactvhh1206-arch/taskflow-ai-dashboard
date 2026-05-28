@@ -45,23 +45,44 @@ setInterval(() => {
     });
 }, 15000);
 
-async function sendRealtimeNotification(userId, type, message, taskId = null, actorId = null) {
-    if (!userId) return;
+// HÀM PHÂN QUYỀN SSE BROADCAST
+async function sendRealtimeNotification(taskId, type, message, actorId = null) {
+    if (!taskId) return;
     try {
-        const notifRes = await pool.query(`
-            INSERT INTO notifications (user_id, task_id, type, message, actor_id)
-            VALUES ($1, $2, $3, $4, $5) RETURNING *
-        `, [userId, taskId, type, message, actorId]);
+        const taskCheck = await pool.query('SELECT facility_id, department_code FROM tasks WHERE id = $1', [taskId]);
+        if (taskCheck.rows.length === 0) return;
+        const task = taskCheck.rows[0];
+
+        // Lấy danh sách User hợp lệ (Sếp tổng/phó HOẶC trùng facility_id/department_code)
+        const usersRes = await pool.query(`
+            SELECT u.id 
+            FROM users u
+            JOIN roles r ON u.role_id = r.id
+            WHERE r.name IN ('SUPER_ADMIN', 'VICE_PRESIDENT')
+               OR (u.facility_id = $1 AND $1 IS NOT NULL)
+               OR (u.department_code = $2 AND $2 IS NOT NULL)
+               OR (u.department_id = $2 AND $2 IS NOT NULL)
+        `, [task.facility_id, task.department_code]);
         
-        const newNotif = notifRes.rows[0];
+        const allowedUserIds = usersRes.rows.map(r => r.id);
         
-        if (sseClients.has(parseInt(userId))) {
-            sseClients.get(parseInt(userId)).write(`data: ${JSON.stringify(newNotif)}\n\n`);
-        } else if (sseClients.has(String(userId))) {
-            sseClients.get(String(userId)).write(`data: ${JSON.stringify(newNotif)}\n\n`);
+        for (const uid of allowedUserIds) {
+            // Lưu DB Notifications
+            const notifRes = await pool.query(`
+                INSERT INTO notifications (user_id, task_id, type, message, actor_id)
+                VALUES ($1, $2, $3, $4, $5) RETURNING *
+            `, [uid, taskId, type, message, actorId]);
+            const newNotif = notifRes.rows[0];
+
+            // Bắn SSE an toàn đúng kênh
+            if (sseClients.has(parseInt(uid))) {
+                sseClients.get(parseInt(uid)).write(`data: ${JSON.stringify(newNotif)}\n\n`);
+            } else if (sseClients.has(String(uid))) {
+                sseClients.get(String(uid)).write(`data: ${JSON.stringify(newNotif)}\n\n`);
+            }
         }
     } catch (e) {
-        console.error("Error saving/sending notification:", e);
+        console.error("Error saving/sending secure notification:", e);
     }
 }
 
@@ -565,6 +586,22 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, evidence } = req.body;
+
+    // Tường lửa chống IDOR
+    const taskCheck = await pool.query('SELECT facility_id, department_code FROM tasks WHERE id = $1', [id]);
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    const task = taskCheck.rows[0];
+    
+    if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
+        return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của cơ sở khác!' });
+    }
+    if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
+        const userDept = normalizeDept(req.user.department_code || req.user.department_id);
+        if (task.department_code !== userDept) {
+            return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của phòng ban khác!' });
+        }
+    }
+
     
     const updateQuery = `
       UPDATE tasks 
@@ -589,6 +626,22 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
 app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Tường lửa chống IDOR
+    const taskCheck = await pool.query('SELECT facility_id, department_code FROM tasks WHERE id = $1', [id]);
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    const task = taskCheck.rows[0];
+    
+    if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
+        return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của cơ sở khác!' });
+    }
+    if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
+        const userDept = normalizeDept(req.user.department_code || req.user.department_id);
+        if (task.department_code !== userDept) {
+            return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của phòng ban khác!' });
+        }
+    }
+
     const updateQuery = `
       UPDATE tasks 
       SET needs_support = true, 
@@ -632,6 +685,22 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const comment = req.body.comment || req.body.content;
+
+    // Tường lửa chống IDOR
+    const taskCheck = await pool.query('SELECT facility_id, department_code FROM tasks WHERE id = $1', [id]);
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    const task = taskCheck.rows[0];
+    
+    if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
+        return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của cơ sở khác!' });
+    }
+    if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
+        const userDept = normalizeDept(req.user.department_code || req.user.department_id);
+        if (task.department_code !== userDept) {
+            return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của phòng ban khác!' });
+        }
+    }
+
     if (!comment) return res.status(400).json({ error: 'Nội dung bình luận trống' });
 
     // 1. LẤY USER_ID AN TOÀN VÀ CHẶN NGAY NẾU RỖNG (Nguyên nhân gốc gây sập)
@@ -747,53 +816,70 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     try {
       const { title, desc, pic, deadline, status, urgent, facility, department_code } = req.body;
       
-      const normalizedDept = normalizeDept(department_code || facility);
-      const userDept = req.user.department_code || req.user.department_id;
-      
-      if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'VICE_PRESIDENT') {
-          if (normalizeDept(userDept) !== normalizedDept) {
-              return res.status(403).json({message: "Cấm gán chéo phòng ban!"});
+      let insert_dept_code = normalizeDept(department_code || facility);
+      let insert_facility_id = null;
+
+      // 1. CHỐNG PAYLOAD SPOOFING: ÉP CỨNG ĐỊNH DANH THEO ROLE
+      if (req.user.role === 'FACILITY_MANAGER') {
+          insert_facility_id = req.user.facility_id;
+      } else if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT' || req.user.role === 'LOCAL') {
+          insert_dept_code = normalizeDept(req.user.department_code || req.user.department_id);
+          
+          if (facility && facility !== 'HQ' && facility !== 'ALL') {
+              let parsedFac = parseInt(facility, 10);
+              if (!isNaN(parsedFac)) insert_facility_id = parsedFac;
+              else {
+                  const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
+                  if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
+              }
+          }
+      } else {
+          // ADMIN hoặc VICE_PRESIDENT
+          if (facility && facility !== 'HQ' && facility !== 'ALL') {
+              let parsedFac = parseInt(facility, 10);
+              if (!isNaN(parsedFac)) insert_facility_id = parsedFac;
+              else {
+                  const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
+                  if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
+              }
           }
       }
-      
+
       let priorityStars = 0;
       if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
       else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
 
-      
+      // 2. KIỂM TRA CHÉO PIC (Người phụ trách)
       let pic_id = null;
       if (pic) {
-          const picUser = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
-          if (picUser.rows.length > 0) pic_id = picUser.rows[0].id;
-      }
-    
-      let insert_facility_id = null;
-      if (req.user.role === 'FACILITY_MANAGER') {
-          insert_facility_id = req.user.facility_id;
-      } else if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
-          // FORCE OVERRIDE cho phòng ban
-          let targetDept = req.user.department_id || facility;
-          if (targetDept && targetDept !== 'HQ' && targetDept !== 'ALL') {
-              const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [targetDept]);
-              if (facRecord.rows.length > 0) {
-                  insert_facility_id = facRecord.rows[0].id;
-              }
+          let picQuery = 'SELECT id, facility_id, department_code FROM users WHERE (full_name = $1 OR email = $1)';
+          let picParams = [pic];
+          
+          if (req.user.role === 'FACILITY_MANAGER') {
+              picQuery += ' AND facility_id = $2';
+              picParams.push(req.user.facility_id);
+          } else if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
+              // Department Head can only assign to people in their own department
+              picQuery += ' AND (department_code = $2 OR department_id = $2)';
+              picParams.push(insert_dept_code);
           }
-      } else {
-          // Admin hoặc các role khác
-          if (facility && facility !== 'HQ' && facility !== 'ALL') {
-              let parsedFac = parseInt(facility, 10);
-              if (!isNaN(parsedFac)) {
-                  insert_facility_id = parsedFac;
+          
+          picQuery += ' LIMIT 1';
+          const picUser = await pool.query(picQuery, picParams);
+          
+          if (picUser.rows.length === 0) {
+              if (req.user.role === 'FACILITY_MANAGER' || req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
+                  return res.status(403).json({message: "Lỗi 403: Không được gán chéo nhân sự ngoài thẩm quyền!"});
               } else {
-                  const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
-                  if (facRecord.rows.length > 0) { insert_facility_id = facRecord.rows[0].id; }
-                }
-            }
-        }
+                   const checkExist = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
+                   if (checkExist.rows.length > 0) pic_id = checkExist.rows[0].id;
+              }
+          } else {
+              pic_id = picUser.rows[0].id;
+          }
+      }
 
-      // FALLBACK: If insert_facility_id is still null (due to 'ALL', 'HQ', or unmapped facility name like 'DB41')
-    if (!insert_facility_id || insert_facility_id === 'ALL') {
+      if (!insert_facility_id || insert_facility_id === 'ALL') {
         const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
         if (hqFac.rows.length > 0) {
             insert_facility_id = hqFac.rows[0].id;
@@ -1397,7 +1483,17 @@ app.get('/api/reports', authenticateUser, async (req, res) => {
     if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(role)) {
       return res.status(403).json({ error: 'Không đủ quyền xem báo cáo tài chính.' });
     }
-    const { rows } = await pool.query('SELECT * FROM daily_financial_reports ORDER BY date DESC');
+    
+    let query = 'SELECT * FROM daily_financial_reports WHERE 1=1';
+    const params = [];
+    
+    if (role === 'FACILITY_MANAGER') {
+        params.push(req.user.facility_id);
+        query += ` AND facility_id = $${params.length}`;
+    }
+    
+    query += ' ORDER BY date DESC';
+    const { rows } = await pool.query(query, params);
     const mappedRows = rows.map(r => ({
       ...r,
       totalRevenue: Number(r.total_revenue),
