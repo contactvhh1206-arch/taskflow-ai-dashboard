@@ -1573,7 +1573,7 @@ app.get('/api/dev/migrate-departments', async (req, res) => {
         res.json({ success: true, message: 'Dọn rác Database thành công!' });
     } catch (error) {
         console.error("Migration Error:", error);
-        res.status(500).json({ success: false, error: 'Lỗi khi chạy Migration' });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
