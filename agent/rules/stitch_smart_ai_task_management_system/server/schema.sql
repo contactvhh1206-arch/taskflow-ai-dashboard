@@ -211,3 +211,34 @@ ON company_knowledge_base USING hnsw (embedding vector_cosine_ops);
 -- GIN Index cho Metadata để phục vụ Filter RBAC siêu tốc
 CREATE INDEX IF NOT EXISTS company_knowledge_metadata_gin_idx 
 ON company_knowledge_base USING gin (metadata);
+
+
+
+    // Bảng quản lý phiên chat của AI Advisor
+    
+        CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id INT REFERENCES users(id) ON DELETE CASCADE,
+            facility_id INT REFERENCES facilities(id) ON DELETE CASCADE,
+            department_code VARCHAR(50) NOT NULL,
+            title VARCHAR(255) DEFAULT 'Cuộc hội thoại mới',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    ;
+
+    // Bảng lưu chi tiết các câu chat
+    
+        CREATE TABLE IF NOT EXISTS ai_chat_messages (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            session_id UUID REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+            role VARCHAR(20) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    ;
+
+    
+        CREATE INDEX IF NOT EXISTS ai_chat_messages_session_idx 
+        ON ai_chat_messages(session_id, created_at ASC)
+    ;
