@@ -485,10 +485,12 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
              t.created_at as "createdAt", t.updated_at as "completedAt",
              t.needs_support as "needsSupport",
              u.full_name as pic, u.email as "picId",
-             f.name as facility, f.code as "facilityId"
+             f.name as facility, f.code as "facilityId",
+             COUNT(tc.id) AS comment_count
       FROM tasks t
       LEFT JOIN users u ON t.pic_id = u.id
       LEFT JOIN facilities f ON t.facility_id = f.id
+      LEFT JOIN task_comments tc ON t.id = tc.task_id
       WHERE 1=1
     `;
       const params = [];
@@ -503,7 +505,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
         query += ` AND t.facility_id = $${params.length}`;
       }
       
-      query += ` ORDER BY t.created_at DESC`;
+      query += ` GROUP BY t.id, u.full_name, u.email, f.name, f.code ORDER BY t.created_at DESC`;
 
     const { rows } = await pool.query(query, params);
     res.json({ success: true, data: rows });
