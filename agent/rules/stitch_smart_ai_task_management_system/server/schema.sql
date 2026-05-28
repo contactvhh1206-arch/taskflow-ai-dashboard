@@ -43,6 +43,8 @@ CREATE TABLE tasks (
     created_by INT REFERENCES users(id),
     created_by_role VARCHAR(50), -- 'CEO', 'VCEO', 'MANAGER', etc.
     priority_level VARCHAR(50) DEFAULT 'PRIORITY', -- 'URGENT', 'PRIORITY'
+    department_code VARCHAR(50),
+    priority_stars INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -51,10 +53,8 @@ CREATE TABLE tasks (
 CREATE TABLE ai_ping_logs (
     id SERIAL PRIMARY KEY,
     task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
-    pic_id INT REFERENCES users(id),
-    message TEXT NOT NULL,
-    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_read BOOLEAN DEFAULT FALSE
+    message TEXT,
+    pinged_at TIMESTAMP DEFAULT NOW()
 );
 
 -- 6. Bảng Chat trong Task (Contextual Task-Chat)
@@ -183,3 +183,8 @@ CREATE TABLE ai_sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+-- Performance Indexes
+CREATE INDEX idx_tasks_dept ON tasks(department_code);
+CREATE INDEX idx_reports_date ON daily_financial_reports(created_at);
