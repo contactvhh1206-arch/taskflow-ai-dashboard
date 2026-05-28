@@ -2045,14 +2045,14 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
                 <span className="text-[10px] font-bold tracking-wider uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-md">{task.facility}</span>
               ) : <div />}
               <div className="flex">
-                {((task.creator_role === 'SUPER_ADMIN' || (task.desc && task.desc.includes('<!--cr:SUPER_ADMIN-->'))) || (!task.creator_role && task.facility === 'HQ')) && (
+                {task.priority_stars === 3 && (
                   <>
                     <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
                     <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
                     <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
                   </>
                 )}
-                {((task.creator_role === 'VICE_PRESIDENT' || (task.desc && task.desc.includes('<!--cr:VICE_PRESIDENT-->'))) || (!task.creator_role && (task.facility === 'Ban Giám Đốc' || task.facility === 'BGD' || task.facilityId === 'BGD' || task.department_tag === 'BGD'))) && (
+                {task.priority_stars === 2 && (
                   <>
                     <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
                     <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>

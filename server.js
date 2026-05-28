@@ -537,15 +537,10 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
       WHERE 1=1
     `;
       const params = [];
-      if (role === 'FACILITY_MANAGER') {
-        if (!facility_id || facility_id === 'ALL') {
-            return res.status(403).json({ error: "Lỗi phân quyền: Không xác định được cơ sở hợp lệ." });
-        }
-        params.push(facility_id);
-        query += ` AND t.facility_id = $${params.length}`;
-      } else if (facility_id && facility_id !== 'ALL') {
-        params.push(facility_id);
-        query += ` AND t.facility_id = $${params.length}`;
+      if (role !== 'SUPER_ADMIN' && role !== 'VICE_PRESIDENT') {
+          const userDept = normalizeDept(req.user.department_code || req.user.department_id);
+          params.push(userDept);
+          query += ` AND t.department_code = $${params.length}`;
       }
       
       query += ` GROUP BY t.id, u.full_name, u.email, f.name, f.code ORDER BY t.created_at DESC`;
