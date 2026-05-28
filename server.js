@@ -178,6 +178,9 @@ const initDB = async () => {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks USING btree (created_by);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_pic_id ON tasks USING btree (pic_id);`);
     
+    // Yêu cầu bắt buộc: Bổ sung is_deleted cho facilities
+    await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;`);
+    
     await pool.query(`CREATE TABLE IF NOT EXISTS daily_financial_reports (
       id VARCHAR(255) PRIMARY KEY,
       date VARCHAR(50) UNIQUE,
