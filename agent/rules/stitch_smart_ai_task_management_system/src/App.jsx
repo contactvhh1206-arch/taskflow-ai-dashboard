@@ -430,6 +430,7 @@ function MainDashboard() {
           try {
             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/comments`, {
               headers: { 
+                'x-user-id': user?.id,
                 'x-user-role': user?.role, 
                 'x-facility-id': user?.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user?.facility_id) ? user.facility_id.join(',') : user?.facility_id) 
               }
@@ -1601,7 +1602,7 @@ function MainDashboard() {
                         </div>
                         <div className={`p-3 rounded-2xl text-sm dark:text-gray-200 max-w-[85%] ${c.user_id === user.id ? 'bg-orange-100 text-orange-900 dark:bg-orange-900/30 dark:text-orange-100 rounded-tr-none border border-orange-200 dark:border-orange-800/50' : 'bg-gray-100 text-gray-800 dark:bg-[#2a2a2a] rounded-tl-none border border-outline-variant dark:border-gray-800'}`}>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-bold text-[11px]">{c.user_name || 'Người dùng ẩn danh'}</span>
+                            <span className="font-bold text-[11px]">{c.user_name ? c.user_name : 'Người dùng hệ thống'}</span>
                             {c.user_role && <span className="text-[9px] bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded-full text-gray-700 dark:text-gray-300">{c.user_role}</span>}
                           </div>
                           <div className="break-words leading-relaxed text-[13px]">{c.content}</div>
@@ -1686,6 +1687,7 @@ function MainDashboard() {
                           method: 'POST',
                           headers: {
                             'Content-Type': 'application/json',
+                            'x-user-id': user.id,
                             'x-user-role': user.role,
                             'x-facility-id': user.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user.facility_id) ? user.facility_id.join(',') : user.facility_id)
                           },

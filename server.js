@@ -277,6 +277,7 @@ const authenticateUser = async (req, res, next) => {
         const departmentId = req.headers['x-department-id'];
         
         let facilityId = parseInt(facilityRaw, 10);
+        const userId = req.headers['x-user-id'];
         
         if (!userRole) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -291,7 +292,7 @@ const authenticateUser = async (req, res, next) => {
             facilityId = 'ALL';
         }
       
-        req.user = { role: userRole, facility_id: facilityId, department_id: departmentId };
+        req.user = { id: userId ? parseInt(userId, 10) : null, role: userRole, facility_id: facilityId, department_id: departmentId };
         next();
     } catch (err) {
         console.error("Auth middleware error:", err);
