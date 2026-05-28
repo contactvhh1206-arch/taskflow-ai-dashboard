@@ -1792,21 +1792,25 @@ async function searchKnowledgeBase(queryText, user, limit = 3) {
         // 4. Tách nhánh Truy vấn sử dụng toán tử JSONB tối ưu (@>)
         if (isAllAccess) {
             sql = `
-                SELECT id, content, source_type, metadata, 
+                SELECT id, content, source_type, metadata, created_at,
                        1 - (embedding <=> $1::vector) AS similarity 
                 FROM company_knowledge_base 
-                ORDER BY embedding <=> $1::vector 
+                ORDER BY 
+                    (embedding <=> $1::vector) ASC, 
+                    created_at DESC
                 LIMIT $2
             `;
             params = [formatEmbedding, limit];
         } else {
             // Sử dụng toán tử @> để kích hoạt GIN Index, ép kiểu tường minh $3::text
             sql = `
-                SELECT id, content, source_type, metadata, 
+                SELECT id, content, source_type, metadata, created_at,
                        1 - (embedding <=> $1::vector) AS similarity 
                 FROM company_knowledge_base 
                 WHERE metadata @> jsonb_build_object('department_code', $3::text)
-                ORDER BY embedding <=> $1::vector 
+                ORDER BY 
+                    (embedding <=> $1::vector) ASC, 
+                    created_at DESC
                 LIMIT $2
             `;
             params = [formatEmbedding, limit, department_code];
@@ -2033,7 +2037,9 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 
         // Phục dựng lại mảng messages (RAG + Context Window)
         const ragContextRows = await searchKnowledgeBase(userMessage, req.user, 3);
-        const ragContextText = ragContextRows.map(row => row.content).join(String.fromCharCode(10));
+        const rawRagText = ragContextRows.map(row => row.content).join("\n\n");
+        // Giới hạn max 4000 ký tự (Khoảng 1000 tokens) để chống vỡ Context Window
+        const ragContextText = rawRagText.length > 4000 ? rawRagText.substring(0, 4000) + "\n... [Đã cắt bớt do giới hạn bộ nhớ]" : rawRagText;
         const finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow." + String.fromCharCode(10) + 
                                   (ragContextText ? "Dữ liệu tham khảo:" + String.fromCharCode(10) + ragContextText : "") + 
                                   systemPromptAddition;
