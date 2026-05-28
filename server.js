@@ -477,7 +477,6 @@ app.delete('/api/users/:id', async (req, res) => {
 
 app.get('/api/tasks', authenticateUser, async (req, res) => {
   try {
-    console.log("Header nhận được:", req.headers);
     const { role, facility_id } = req.user;
     
     let query = `
@@ -692,7 +691,6 @@ app.put('/api/notifications/:id/read', authenticateUser, async (req, res) => {
 
 app.post('/api/tasks', authenticateUser, async (req, res) => {
     try {
-      console.log("Payload tạo task:", req.body);
       const { title, desc, pic, deadline, status, urgent, facility } = req.body;
       
       let pic_id = null;
