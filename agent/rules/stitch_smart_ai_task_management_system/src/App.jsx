@@ -1640,8 +1640,16 @@ function MainDashboard() {
                     }} placeholder="Gõ @ để tag tên..." className="w-full pl-4 pr-10 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none dark:text-white" />
                     <button id="send-comment-btn" onClick={async () => {
                       if (!chatInput.trim()) return;
+                      // Lấy ID an toàn
+                      const taskId = selectedTask?.id || selectedTask?.task_id;
+                      console.log("DEBUG taskId trước khi gửi comment:", taskId);
+                      if (!taskId || taskId === 'undefined') {
+                          console.error("Lỗi: Không tìm thấy ID của task đang mở!");
+                          return;
+                      }
+                      
                       try {
-                        const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${selectedTask.id}/comments`, {
+                        const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/comments`, {
                           method: 'POST',
                           headers: {
                             'Content-Type': 'application/json',
@@ -1653,7 +1661,7 @@ function MainDashboard() {
                         const data = await res.json();
                         if (data.success) {
                           setChatInput('');
-                          const fetchRes = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${selectedTask.id}/comments`, {
+                          const fetchRes = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/comments`, {
                             headers: { 'x-user-role': user.role, 'x-facility-id': user.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user.facility_id) ? user.facility_id.join(',') : user.facility_id) }
                           });
                           const fetchJson = await fetchRes.json();
