@@ -1541,6 +1541,7 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
       // Nhóm All-Access (Toàn quyền)
       if (
         role === 'SUPER_ADMIN' || 
+        role === 'ADMIN' || // BỔ SUNG ROLE NÀY NGAY LẬP TỨC
         role === 'VICE_PRESIDENT' || 
         (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING')
       ) {
@@ -1555,7 +1556,8 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
           ORDER BY s.timestamp DESC
           LIMIT 100
         `;
-        queryParams = [department_code];
+        // BỌC LÓT LỖI UNDEFINED TRÁNH CRASH DB
+        queryParams = [department_code || 'UNKNOWN'];
       }
 
       const { rows } = await pool.query(query, queryParams);
