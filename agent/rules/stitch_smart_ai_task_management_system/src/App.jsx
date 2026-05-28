@@ -25,18 +25,33 @@ window.fetch = async (...args) => {
     config = config || {};
     config.headers = config.headers || {};
     
-    const token = localStorage.getItem('token');
-    if (token) {
+    let token = localStorage.getItem('token') || localStorage.getItem('taskflow_token');
+    if (!token || token === 'undefined' || token === 'null') {
+      try {
+        const authData = JSON.parse(localStorage.getItem('taskflow_auth') || '{}');
+        if (authData.token) token = authData.token;
+      } catch(e) {}
+    }
+    
+    console.log("Token gửi đi:", token);
+    
+    if (token && token !== 'undefined' && token !== 'null') {
       if (config.headers instanceof Headers) {
-        if (!config.headers.has('Authorization') && !config.headers.has('authorization')) {
-            config.headers.set('Authorization', `Bearer ${token}`);
-        }
+        config.headers.set('Authorization', `Bearer ${token}`);
       } else {
-        // Plain object
-        const hasAuth = Object.keys(config.headers).some(k => k.toLowerCase() === 'authorization');
-        if (!hasAuth) {
-            config.headers['Authorization'] = `Bearer ${token}`;
-        }
+        // Force overwrite the garbage Authorization header passed by callers
+        Object.keys(config.headers).forEach(k => {
+          if (k.toLowerCase() === 'authorization') delete config.headers[k];
+        });
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    } else {
+      if (config.headers instanceof Headers) {
+        config.headers.delete('Authorization');
+      } else {
+        Object.keys(config.headers).forEach(k => {
+          if (k.toLowerCase() === 'authorization') delete config.headers[k];
+        });
       }
     }
     args[1] = config;
