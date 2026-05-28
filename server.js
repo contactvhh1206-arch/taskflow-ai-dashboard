@@ -122,6 +122,28 @@ const initDB = async () => {
       chat_log JSONB,
       timestamp BIGINT
     )`);
+    
+    // =========================================
+    // KÍCH HOẠT VECTOR VÀ BẢNG RAG (KNOWLEDGE BASE)
+    // =========================================
+    await pool.query(`CREATE EXTENSION IF NOT EXISTS vector`);
+    
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS company_knowledge_base (
+            id SERIAL PRIMARY KEY,
+            content TEXT NOT NULL,
+            embedding vector(1536),
+            source_type VARCHAR(50),
+            metadata JSONB,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    `);
+    
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS company_knowledge_base_embedding_idx 
+        ON company_knowledge_base USING hnsw (embedding vector_cosine_ops)
+    `);
+    
     await pool.query(`CREATE TABLE IF NOT EXISTS daily_financial_reports (
       id VARCHAR(255) PRIMARY KEY,
       date VARCHAR(50) UNIQUE,

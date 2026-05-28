@@ -188,3 +188,22 @@ CREATE TABLE ai_sessions (
 -- Performance Indexes
 CREATE INDEX idx_tasks_dept ON tasks(department_code);
 CREATE INDEX idx_reports_date ON daily_financial_reports(created_at);
+
+
+-- ==========================================================
+-- AI KNOWLEDGE BASE (RAG)
+-- ==========================================================
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS company_knowledge_base (
+    id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL, -- Nội dung text đã băm nhỏ (Chunk)
+    embedding vector(1536), -- Vector nhúng chuẩn OpenAI
+    source_type VARCHAR(50), -- Phân loại: 'DOCUMENT', 'BOSS_INSTRUCTION', 'STAFF_CHAT'
+    metadata JSONB, -- Lưu thêm thông tin: file_name, user_id, role...
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Tạo Index để search tốc độ cao (HNSW)
+CREATE INDEX IF NOT EXISTS company_knowledge_base_embedding_idx 
+ON company_knowledge_base USING hnsw (embedding vector_cosine_ops);
