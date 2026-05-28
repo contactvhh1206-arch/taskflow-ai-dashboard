@@ -44,10 +44,11 @@ window.fetch = async (...args) => {
   
   return originalFetch(...args).then(res => {
     if (res.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('taskflow_token');
-      localStorage.removeItem('taskflow_auth');
-      window.location.reload();
+      // localStorage.removeItem('token');
+      // localStorage.removeItem('taskflow_token');
+      // localStorage.removeItem('taskflow_auth');
+      // window.location.reload();
+      console.error('[Interceptor] API bị 401:', res.url);
     }
     return res;
   });
@@ -1946,6 +1947,7 @@ export default function AppContainer() {
     if (userData && userData.role) {
       userData.role = userData.role.trim().toUpperCase();
     }
+    console.log('Token đã lưu:', token);
     localStorage.setItem('taskflow_auth', JSON.stringify({ token, user: userData }));
     if (token) {
         localStorage.setItem('taskflow_token', token);
