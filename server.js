@@ -622,18 +622,22 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     
 
 
-    // 4. KHỞI TẠO BIẾN TRẢ VỀ (Giữ lại logic bọc lót của Cố vấn để phòng thủ tầng 2)
-    const newComment = (rows && rows.length > 0) ? rows[0] : { task_id: id, user_id: realUserId, content: comment };
+        // 4. KHỞI TẠO BIẾN TRẢ VỀ TỪ CƠ SỞ DỮ LIỆU
+    const newCommentId = (rows && rows.length > 0) ? rows[0].id : null;
     
-    try {
-        const nameRes = await pool.query('SELECT full_name FROM users WHERE id = $1', [realUserId]);
-        newComment.user_name = (nameRes.rows && nameRes.rows.length > 0) ? nameRes.rows[0].full_name : 'Unknown';
-    } catch (nameErr) {
-        console.error("Lỗi lấy tên user:", nameErr);
-        newComment.user_name = 'Unknown';
+    if (newCommentId) {
+        const getCommentSql = `
+           SELECT c.*, u.full_name as user_name, r.name as user_role 
+           FROM task_comments c 
+           LEFT JOIN users u ON c.user_id = u.id 
+           LEFT JOIN roles r ON u.role_id = r.id 
+           WHERE c.id = $1
+        `;
+        const fullComment = await pool.query(getCommentSql, [newCommentId]);
+        return res.json({ success: true, data: fullComment.rows[0] });
+    } else {
+        return res.status(500).json({ success: false, error: 'Không thể tạo bình luận' });
     }
-
-    res.json({ success: true, data: newComment });
   } catch (error) {
     if (error.code === '23503') {
         console.warn(`[API Comment] Cố gắng bình luận vào Task không tồn tại: task_id=${req.params.id}`);
