@@ -376,6 +376,14 @@ app.get('/api/roles', async (req, res) => {
   }
 });
 
+
+const checkAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+        return res.status(403).json({ error: "403 Forbidden: Quyền lực này chỉ dành cho Kẻ Gác Đền (ADMIN)!" });
+    }
+    next();
+};
+
 app.get('/api/users/directory', authenticateUser, async (req, res) => {
   try {
     const { rows: users } = await pool.query('SELECT id AS user_id, email, full_name, role_id, facility_id FROM users');
@@ -406,7 +414,7 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', authenticateUser, checkAdmin, async (req, res) => {
   try {
     const { username, password, name, role, facility_id } = req.body;
     
@@ -491,7 +499,7 @@ app.put('/api/users/change-password', authenticateUser, async (req, res) => {
   }
 });
 
-app.put('/api/users/:id', async (req, res) => {
+app.put('/api/users/:id', authenticateUser, checkAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, role, facility_id, password, isActive } = req.body;
@@ -530,7 +538,7 @@ app.put('/api/users/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', authenticateUser, checkAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
@@ -1065,6 +1073,11 @@ app.get('/api/checkin/status', authenticateUser, async (req, res) => {
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-xxxxxxxxxxxx'; 
 
+
+app.post('/api/rag/upload', authenticateUser, checkAdmin, (req, res) => {
+    return res.json({ message: "Hệ thống RAG Backend đang được CTO thiết kế kiến trúc. Vui lòng quay lại sau!" });
+});
+
 app.post('/api/ai/auto-tasking', authenticateUser, async (req, res) => {
   try {
     const { meetingTranscript, facilityId } = req.body;
@@ -1288,7 +1301,7 @@ const calculateTone = (deadlineDateStr) => {
 };
 
   // API: Lịch sử hội thoại AI toàn cầu (Global Memory)
-  app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
+  app.get('/api/ai/sessions', authenticateUser, checkAdmin, async (req, res) => {
     try {
       const { rows } = await pool.query('SELECT * FROM ai_chat_sessions ORDER BY timestamp DESC LIMIT 50');
       res.json({ success: true, data: rows });
@@ -1297,7 +1310,7 @@ const calculateTone = (deadlineDateStr) => {
     }
   });
 
-  app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
+  app.post('/api/ai/sessions', authenticateUser, checkAdmin, async (req, res) => {
     try {
       const { id, user_id, facility, title, chat_log, timestamp } = req.body;
       await pool.query(
@@ -1316,7 +1329,7 @@ const calculateTone = (deadlineDateStr) => {
   });
 
 // API: Lưu và lấy danh sách vi phạm AI
-app.get('/api/ai/violations', authenticateUser, async (req, res) => {
+app.get('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT data FROM system_config WHERE key = $1', ['ai_violations']);
     let violations = [];
@@ -1330,7 +1343,7 @@ app.get('/api/ai/violations', authenticateUser, async (req, res) => {
   }
 });
 
-app.post('/api/ai/violations', authenticateUser, async (req, res) => {
+app.post('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) => {
   try {
     const violation = req.body;
     const { rows } = await pool.query('SELECT data FROM system_config WHERE key = $1', ['ai_violations']);
@@ -1598,7 +1611,7 @@ app.post('/api/kpi', authenticateUser, async (req, res) => {
 // ==============================================================================
 // SYSTEM CONFIG API
 // ==============================================================================
-app.get('/api/config', async (req, res) => {
+app.get('/api/config', authenticateUser, checkAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM system_config');
     const configData = {};
