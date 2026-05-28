@@ -1459,7 +1459,79 @@ const calculateTone = (deadlineDateStr) => {
 };
 
   // API: Lịch sử hội thoại AI toàn cầu (Global Memory)
-  app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
+  
+// API: AI Tự Học Từ Chat (Admin One-Click)
+app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
+    try {
+        const { role, department_code } = req.user;
+        
+        // Bảo mật (RBAC): Chỉ các cấp cao được phép "dạy" AI
+        if (role !== 'SUPER_ADMIN' && role !== 'VICE_PRESIDENT' && role !== 'ADMIN') {
+            return res.status(403).json({ error: "Chỉ Admin/Sếp mới có quyền nạp dữ liệu Chat vào RAG." });
+        }
+
+        const { content } = req.body;
+        if (!content || !content.trim()) {
+            return res.status(400).json({ error: "Nội dung đoạn chat không được để trống." });
+        }
+
+        const textContent = content.trim();
+
+        // Thuật toán Chunking (Ngữ nghĩa)
+        const chunks = [];
+        const sentences = textContent.split(/(?<=[.!?\n])\s+/);
+        
+        let currentChunk = "";
+        for (const sentence of sentences) {
+            if (currentChunk.length + sentence.length > 1000) {
+                if (currentChunk.trim()) {
+                    chunks.push(currentChunk.trim());
+                }
+                currentChunk = sentence;
+            } else {
+                currentChunk += (currentChunk ? " " : "") + sentence;
+            }
+        }
+        if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
+        }
+
+        const departmentCode = department_code || 'GLOBAL'; 
+        let successCount = 0;
+
+        for (const chunk of chunks) {
+            const embedding = await generateEmbedding(chunk);
+            
+            const formatEmbedding = `[${embedding.join(',')}]`;
+            
+            const insertSql = `
+                INSERT INTO company_knowledge_base (content, embedding, source_type, metadata)
+                VALUES ($1, $2::vector, $3, $4)
+            `;
+            await pool.query(insertSql, [
+                chunk, 
+                formatEmbedding, 
+                'CHAT_LEARNING', 
+                JSON.stringify({ 
+                    department_code: departmentCode, 
+                    source: 'Admin_One_Click' 
+                })
+            ]);
+            successCount++;
+        }
+
+        res.json({ 
+            success: true, 
+            chunks_processed: successCount, 
+            message: `Đã nạp thành công ${successCount} khối kiến thức vào não AI.` 
+        });
+
+    } catch (error) {
+        console.error("Lỗi learn-from-chat:", error);
+        res.status(500).json({ error: "Lỗi máy chủ khi nhúng dữ liệu chat." });
+    }
+});
+\n  app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
       const { role, department_code } = req.user;
       
@@ -2149,7 +2221,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         if (!userMessage) return res.status(400).json({ error: "Message is required" });
 
         // ==========================================
-        // NHỊP 1: LƯU CÂU HỎI & CHỐNG MẤT DỮ LIỆU
+        // NHẬP 1: LƯU CÂU HỎI & CHỐNG MẤT DỮ LIỆU
         // ==========================================
         if (session_id) {
             const checkSession = await pool.query("SELECT id FROM ai_chat_sessions WHERE id = $1 AND user_id = $2", [session_id, req.user.id]);
@@ -2160,23 +2232,28 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
 
         // ==========================================
-        // NHỊP 2: RAG & MÀNG LỌC TIỀM THỨC
+        // NHẬP 2: RAG & MẠNG LỌC TIỀM THỨC
         // ==========================================
         let learnedRule = await detectAndLearnRule(userMessage, req.user.role, req.user.id);
         let systemPromptAddition = "";
         
         if (learnedRule) {
-            systemPromptAddition = String.fromCharCode(10) + `[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngầu, điện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
+            systemPromptAddition = String.fromCharCode(10) + `[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngắn gọn, diện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
         }
 
-        // Phục dựng lại mảng messages (RAG + Context Window)
         const ragContextRows = await searchKnowledgeBase(userMessage, req.user, 3);
         const rawRagText = ragContextRows.map(row => row.content).join("\n\n");
-        // Giới hạn max 4000 ký tự (Khoảng 1000 tokens) để chống vỡ Context Window
         const ragContextText = rawRagText.length > 4000 ? rawRagText.substring(0, 4000) + "\n... [Đã cắt bớt do giới hạn bộ nhớ]" : rawRagText;
-        const finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow." + String.fromCharCode(10) + 
+        
+        const isLocalUser = req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'VICE_PRESIDENT' && req.user.role !== 'ADMIN';
+        
+        let finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow." + String.fromCharCode(10) + 
                                   (ragContextText ? "Dữ liệu tham khảo:" + String.fromCharCode(10) + ragContextText : "") + 
                                   systemPromptAddition;
+
+        if (isLocalUser) {
+            finalSystemPrompt += String.fromCharCode(10) + "LƯU Ý BẢO MẬT: Bạn chỉ được trả lời các câu hỏi liên quan sát sườn đến nghiệp vụ phòng ban của người dùng. Nếu người dùng hỏi đùa, hỏi xàm, tán tỉnh hoặc hỏi các kiến thức ngoài công việc, bạn BẮT BUỘC phải trả về đúng từ khóa: [BLOCK_MISCONDUCT]";
+        }
 
         let chatHistory = [];
         if (session_id) {
@@ -2189,9 +2266,8 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             { role: "user", content: userMessage }
         ];
 
-        
         // ==========================================
-        // NHỊP 3: SSE STREAMING VỚI TOOL CALL
+        // NHẬP 3: SSE STREAMING VỚI TOOL CALL
         // ==========================================
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -2225,11 +2301,11 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 "Content-Type": "application/json" 
             },
             body: JSON.stringify({
-                model: "openai/gpt-4o-mini", // Tuỳ chỉnh model theo config của bạn
+                model: "openai/gpt-4o-mini",
                 messages: messages,
-                stream: true,
+                stream: !isLocalUser,
                 tools: tools,
-                stream_options: { include_usage: true }
+                stream_options: !isLocalUser ? { include_usage: true } : undefined
             })
         });
 
@@ -2239,71 +2315,96 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             return res.end();
         }
 
-        let reader = response.body.getReader();
-        let decoder = new TextDecoder("utf-8");
         let aiReplyContent = "";
         let promptTokens = 0; 
         let completionTokens = 0;
-
         let toolCallId = null;
         let toolCallName = null;
         let toolCallArguments = "";
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+        if (isLocalUser) {
+            const data = await response.json();
+            if (data.usage) {
+                promptTokens = data.usage.prompt_tokens || 0;
+                completionTokens = data.usage.completion_tokens || 0;
+            }
+            if (data.choices && data.choices.length > 0) {
+                const msg = data.choices[0].message;
+                if (msg.tool_calls && msg.tool_calls.length > 0) {
+                    const tc = msg.tool_calls[0];
+                    if (tc.id) toolCallId = tc.id;
+                    if (tc.function && tc.function.name) toolCallName = tc.function.name;
+                    if (tc.function && tc.function.arguments) toolCallArguments = tc.function.arguments;
+                }
+                if (msg.content) {
+                    aiReplyContent = msg.content;
+                }
+            }
             
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split(String.fromCharCode(10));
+            // XỬ LÝ BLOCK MISCONDUCT NGAY LẬP TỨC
+            if (aiReplyContent.includes('[BLOCK_MISCONDUCT]')) {
+                await pool.query(`
+                    INSERT INTO daily_logs (entry_type, user_id, action_details, created_at)
+                    VALUES ($1, $2, $3, NOW())
+                `, ['SECURITY_ALERT', req.user.id, `Nhân viên hỏi xàm hệ thống AI. Nội dung: "${userMessage}"`]);
+                res.write(`data: ${JSON.stringify({ error: "HỆ THỐNG CẢNH BÁO: Câu hỏi của bạn vi phạm tiêu chuẩn nghiệp vụ nội bộ. Hành vi này đã được ghi nhận và gửi về tài khoản Admin để tiến hành truy vết kỷ luật!" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                return res.end();
+            }
             
-            for (const line of lines) {
-                if (line.startsWith("data: ") && line !== "data: [DONE]") {
-                    try {
-                        const parsed = JSON.parse(line.substring(6));
-                        
-                        if (parsed.usage) {
-                            promptTokens += parsed.usage.prompt_tokens || 0;
-                            completionTokens += parsed.usage.completion_tokens || 0;
-                        }
-
-                        if (parsed.choices && parsed.choices.length > 0) {
-                            const delta = parsed.choices[0].delta;
-                            
-                            // 1. Hứng Tool Call
-                            if (delta && delta.tool_calls) {
-                                const tc = delta.tool_calls[0];
-                                if (tc.id) toolCallId = tc.id;
-                                if (tc.function && tc.function.name) toolCallName = tc.function.name;
-                                if (tc.function && tc.function.arguments) toolCallArguments += tc.function.arguments;
+            // NẾU SẠCH SẼ, ĐẨY DỮ LIỆU XUỐNG SSE
+            if (aiReplyContent) {
+                res.write(`data: ${JSON.stringify({ content: aiReplyContent })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+            }
+        } else {
+            // ADMIN STREAMING (Giữ nguyên)
+            let reader = response.body.getReader();
+            let decoder = new TextDecoder("utf-8");
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split(String.fromCharCode(10));
+                
+                for (const line of lines) {
+                    if (line.startsWith("data: ") && line !== "data: [DONE]") {
+                        try {
+                            const parsed = JSON.parse(line.substring(6));
+                            if (parsed.usage) {
+                                promptTokens += parsed.usage.prompt_tokens || 0;
+                                completionTokens += parsed.usage.completion_tokens || 0;
                             }
-                            
-                            // 2. Hứng Text bình thường
-                            if (delta && delta.content) {
-                                aiReplyContent += delta.content;
-                                res.write(`data: ${JSON.stringify({ content: delta.content })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                            if (parsed.choices && parsed.choices.length > 0) {
+                                const delta = parsed.choices[0].delta;
+                                if (delta && delta.tool_calls) {
+                                    const tc = delta.tool_calls[0];
+                                    if (tc.id) toolCallId = tc.id;
+                                    if (tc.function && tc.function.name) toolCallName = tc.function.name;
+                                    if (tc.function && tc.function.arguments) toolCallArguments += tc.function.arguments;
+                                }
+                                if (delta && delta.content) {
+                                    aiReplyContent += delta.content;
+                                    res.write(`data: ${JSON.stringify({ content: delta.content })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                                }
                             }
+                        } catch (e) {
+                            console.error("Lỗi parse JSON stream chunk:", e);
                         }
-                    } catch (e) {
-                        console.error("Lỗi parse JSON stream chunk:", e);
                     }
                 }
             }
         }
 
-        
         // ==========================================
-        // NHỊP 3.5: THỰC THI TOOL VÀ FAIL-FAST
+        // NHẬP 3.5: THỰC THI TOOL VÀ FAIL-FAST
         // ==========================================
         if (toolCallName === "create_system_task" && toolCallArguments) {
             try {
-                // Parse chuỗi arguments đã được nối hoàn chỉnh
                 const args = JSON.parse(toolCallArguments);
-                
-                // Thực thi hàm chuẩn bảo mật
                 const result = await executeCreateTaskTool(args, req.user);
                 const toolResultStr = JSON.stringify(result);
                 
-                // NẾU THÀNH CÔNG: Mới ép kết quả vào mảng và gọi AI lần 2
                 messages.push({
                     role: "assistant",
                     content: null,
@@ -2320,9 +2421,6 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                     content: toolResultStr
                 });
 
-                // ==========================================
-                // GỌI AI LẦN 2 (CHỈ KHI THÀNH CÔNG)
-                // ==========================================
                 const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                     method: "POST",
                     headers: { 
@@ -2332,21 +2430,45 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                     body: JSON.stringify({
                         model: "openai/gpt-4o-mini",
                         messages: messages,
-                        stream: true,
-                        stream_options: { include_usage: true }
+                        stream: !isLocalUser,
+                        tools: tools,
+                        stream_options: !isLocalUser ? { include_usage: true } : undefined
                     })
                 });
 
-                if (response2.ok) {
-                    reader = response2.body.getReader();
-                    decoder = new TextDecoder("utf-8");
+                if (isLocalUser) {
+                    const data2 = await response2.json();
+                    if (data2.usage) {
+                        promptTokens += data2.usage.prompt_tokens || 0;
+                        completionTokens += data2.usage.completion_tokens || 0;
+                    }
+                    if (data2.choices && data2.choices.length > 0) {
+                        const msg2 = data2.choices[0].message;
+                        if (msg2.content) {
+                            aiReplyContent += msg2.content;
+                            
+                            // XỬ LÝ BLOCK LẦN 2
+                            if (aiReplyContent.includes('[BLOCK_MISCONDUCT]')) {
+                                await pool.query(`
+                                    INSERT INTO daily_logs (entry_type, user_id, action_details, created_at)
+                                    VALUES ($1, $2, $3, NOW())
+                                `, ['SECURITY_ALERT', req.user.id, `Nhân viên hỏi xàm hệ thống AI. Nội dung: "${userMessage}"`]);
+                                res.write(`data: ${JSON.stringify({ error: "HỆ THỐNG CẢNH BÁO: Câu hỏi của bạn vi phạm tiêu chuẩn nghiệp vụ nội bộ. Hành vi này đã được ghi nhận và gửi về tài khoản Admin để tiến hành truy vết kỷ luật!" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                                res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                                return res.end();
+                            }
+
+                            res.write(`data: ${JSON.stringify({ content: msg2.content })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                        }
+                    }
+                } else {
+                    let reader2 = response2.body.getReader();
+                    let decoder2 = new TextDecoder("utf-8");
                     while (true) {
-                        const { done, value } = await reader.read();
+                        const { done, value } = await reader2.read();
                         if (done) break;
-                        
-                        const chunk = decoder.decode(value, { stream: true });
+                        const chunk = decoder2.decode(value, { stream: true });
                         const lines = chunk.split(String.fromCharCode(10));
-                        
                         for (const line of lines) {
                             if (line.startsWith("data: ") && line !== "data: [DONE]") {
                                 try {
@@ -2367,13 +2489,11 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                         }
                     }
                 }
-
             } catch (err) {
-                // [FAIL-FAST LỆNH PO]: Dính RBAC hoặc Lỗi Data -> Báo thẳng về UI và NGẮT STREAM
                 console.error("Tool Execution Error:", err.message);
                 res.write(`data: ${JSON.stringify({ error: err.message })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
                 res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
-                return res.end(); // Kết thúc hàm tại đây, không gọi LLM lần 2!
+                return res.end();
             }
         }
 
@@ -2384,15 +2504,13 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
 
         // ==========================================
-        // NHỊP 4: LƯU DB & GHI LOG BẢO MẬT
-
+        // NHẬP 4: LƯU DB & GHI LOG BẢO MẬT
         // ==========================================
         if (session_id && aiReplyContent) {
             const saveAiMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)`;
             await pool.query(saveAiMsgSql, [session_id, aiReplyContent]);
         }
 
-        // Ghi log chính xác 100% vào bảng ai_ping_logs chuẩn
         if (promptTokens > 0 || completionTokens > 0) {
             const totalTokens = promptTokens + completionTokens;
             await pool.query(`
@@ -2410,8 +2528,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
     }
 });
-
-// Start server
+\n// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 TaskFlow AI Server đang chạy tại http://localhost:${PORT}`);
