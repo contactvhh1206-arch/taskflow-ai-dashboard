@@ -566,15 +566,17 @@ app.get('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { rows } = await pool.query(`
-      SELECT c.*, u.name as user_name, u.role as user_role 
+      SELECT c.*, u.full_name as user_name, r.name as user_role 
       FROM task_comments c 
-      JOIN users u ON c.user_id = u.id 
+      LEFT JOIN users u ON c.user_id = u.id 
+      LEFT JOIN roles r ON u.role_id = r.id
       WHERE c.task_id = $1 
       ORDER BY c.created_at ASC
     `, [id]);
     res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ error: 'Lỗi tải bình luận.' });
+    console.error("[API GET Comment] Lỗi 500:", err);
+    res.status(500).json({ success: false, error: 'Lỗi tải bình luận: ' + err.message });
   }
 });
 
