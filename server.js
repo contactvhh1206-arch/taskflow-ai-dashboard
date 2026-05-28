@@ -273,6 +273,14 @@ app.delete('/api/facilities/:id', async (req, res) => {
   }
 });
 
+const normalizeDept = (code) => {
+    if (!code) return '';
+    let normalized = code.toString().trim().toUpperCase();
+    normalized = normalized.replace(/^PHÒNG\s+/i, '').replace(/^PHONG\s+/i, '');
+    if (normalized === 'MKT') return 'MARKETING';
+    return normalized;
+};
+
 const authenticateUser = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
@@ -734,7 +742,21 @@ app.put('/api/notifications/:id/read', authenticateUser, async (req, res) => {
 
 app.post('/api/tasks', authenticateUser, async (req, res) => {
     try {
-      const { title, desc, pic, deadline, status, urgent, facility } = req.body;
+      const { title, desc, pic, deadline, status, urgent, facility, department_code } = req.body;
+      
+      const normalizedDept = normalizeDept(department_code || facility);
+      const userDept = req.user.department_code || req.user.department_id;
+      
+      if (req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'VICE_PRESIDENT') {
+          if (normalizeDept(userDept) !== normalizedDept) {
+              return res.status(403).json({message: "Cấm gán chéo phòng ban!"});
+          }
+      }
+      
+      let priorityStars = 0;
+      if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
+      else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
+
       
       let pic_id = null;
       if (pic) {
@@ -779,8 +801,8 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     }
 
     const insertQuery = `
-      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, department_code, priority_stars, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
       RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
     `;
       const { rows } = await pool.query(insertQuery, [
@@ -791,7 +813,9 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
         deadline, 
         pic_id, 
         insert_facility_id, 
-        urgent ? 'URGENT' : 'PRIORITY'
+        urgent ? 'URGENT' : 'PRIORITY',
+        normalizedDept,
+        priorityStars
       ]);
     
     const newTask = {
@@ -1293,15 +1317,12 @@ app.post('/api/ai/ping', authenticateUser, async (req, res) => {
     }
 
     // 3. Ghi vào "Bảng Log Nhắc việc AI" công khai
+    await pool.query('INSERT INTO ai_ping_logs (task_id, message) VALUES ($1, $2)', [task.id, pingMessage]);
     const logEntry = {
-      id: mockAiPingLogs.length + 1,
       task_id: task.id,
-      pic_name: task.pic_name,
-      tone_level: toneEscalation.level,
       message: pingMessage,
       created_at: new Date().toISOString()
     };
-    mockAiPingLogs.push(logEntry);
 
     res.json({
       success: true,
