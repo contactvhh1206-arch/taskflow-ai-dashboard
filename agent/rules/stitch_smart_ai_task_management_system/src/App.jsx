@@ -420,6 +420,34 @@ function MainDashboard() {
   const [createModalStatus, setCreateModalStatus] = useState('todo');
   const [toastMessage, setToastMessage] = useState('');
   const [selectedTaskComments, setSelectedTaskComments] = useState([]);
+
+  useEffect(() => {
+    if (selectedTask) {
+      const taskId = selectedTask.id || selectedTask.task_id;
+      if (taskId) {
+        setSelectedTaskComments([]); // Chống rò rỉ State
+        const fetchComments = async () => {
+          try {
+            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/comments`, {
+              headers: { 
+                'x-user-role': user?.role, 
+                'x-facility-id': user?.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user?.facility_id) ? user.facility_id.join(',') : user?.facility_id) 
+              }
+            });
+            const data = await res.json();
+            if (data.success) {
+              setSelectedTaskComments(data.data);
+            }
+          } catch (err) {
+            console.error("Error fetching comments:", err);
+          }
+        };
+        fetchComments();
+      }
+    } else {
+      setSelectedTaskComments([]);
+    }
+  }, [selectedTask?.id, selectedTask?.task_id, user]);
   
   // Audio Notification Logic (5 seconds loud siren)
   const playNotificationSound = () => {
@@ -1661,11 +1689,9 @@ function MainDashboard() {
                         const data = await res.json();
                         if (data.success) {
                           setChatInput('');
-                          const fetchRes = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/comments`, {
-                            headers: { 'x-user-role': user.role, 'x-facility-id': user.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user.facility_id) ? user.facility_id.join(',') : user.facility_id) }
-                          });
-                          const fetchJson = await fetchRes.json();
-                          if (fetchJson.success) setSelectedTaskComments(fetchJson.data);
+                          // CẬP NHẬT GIAO DIỆN KHI BACKEND ĐÃ TRẢ VỀ DATA THÀNH CÔNG
+                          setSelectedTaskComments(prev => [...prev, data.data]);
+                          
                           setTasks(tasks.map(t => t.id === selectedTask.id ? { ...t, comments_count: parseInt(t.comments_count || 0) + 1, latest_comment: chatInput, latest_comment_user_id: user.id } : t));
                           setTimeout(() => {
                             const el = document.getElementById('comments-scroll-container');
