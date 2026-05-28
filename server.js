@@ -617,18 +617,7 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
       VALUES ($1, $2, $3) RETURNING *
     `, [id, realUserId, comment]);
     
-    // 3. [NOTIFICATIONS TRIGGER] (An toàn tuyệt đối)
-    try {
-        if (typeof sendRealtimeNotification === 'function') {
-            const taskInfo = await pool.query('SELECT pic_id, title FROM tasks WHERE id = $1', [id]);
-            if (taskInfo.rows.length > 0) {
-                const tInfo = taskInfo.rows[0];
-                if (tInfo.pic_id && parseInt(tInfo.pic_id) !== parseInt(realUserId)) {
-                    sendRealtimeNotification(tInfo.pic_id, 'NEW_COMMENT', `Có bình luận mới trong công việc: "${tInfo.title}"`, id, realUserId);
-                }
-            }
-        }
-    } catch (err) { console.error("Notification comment err:", err); }
+
 
     // 4. KHỞI TẠO BIẾN TRẢ VỀ (Giữ lại logic bọc lót của Cố vấn để phòng thủ tầng 2)
     const newComment = (rows && rows.length > 0) ? rows[0] : { task_id: id, user_id: realUserId, comment: comment };
@@ -761,10 +750,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       facilityId: facility || 'HQ'
     };
 
-    
-      if (pic_id && pic_id !== req.user.id) {
-          sendRealtimeNotification(pic_id, 'NEW_TASK', `Bạn vừa được giao một công việc mới: "${title}"`, newTask.id, req.user.id);
-      }
+
       res.json({ success: true, data: newTask });
   } catch (error) {
     console.error("Lỗi chi tiết từ DB:", error.message, error.stack);
