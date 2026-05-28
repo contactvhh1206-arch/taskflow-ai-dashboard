@@ -10,6 +10,14 @@ import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
+const normalizeDept = (code) => {
+    if (!code) return '';
+    let normalized = code.toString().trim().toUpperCase();
+    normalized = normalized.replace(/^PHÒNG\s+/i, '').replace(/^PHONG\s+/i, '');
+    if (normalized === 'MKT') return 'MARKETING';
+    return normalized;
+};
+
 const { Pool } = pg;
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -273,13 +281,6 @@ app.delete('/api/facilities/:id', async (req, res) => {
   }
 });
 
-const normalizeDept = (code) => {
-    if (!code) return '';
-    let normalized = code.toString().trim().toUpperCase();
-    normalized = normalized.replace(/^PHÒNG\s+/i, '').replace(/^PHONG\s+/i, '');
-    if (normalized === 'MKT') return 'MARKETING';
-    return normalized;
-};
 
 const authenticateUser = async (req, res, next) => {
     try {
@@ -537,7 +538,14 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
       WHERE 1=1
     `;
       const params = [];
-      if (role !== 'SUPER_ADMIN' && role !== 'VICE_PRESIDENT') {
+      if (role === 'SUPER_ADMIN' || role === 'VICE_PRESIDENT') {
+          // Không nối thêm AND. Đặc quyền xem toàn bộ hệ thống.
+      } else if (role === 'FACILITY_MANAGER') {
+          // Lọc theo cơ sở
+          params.push(req.user.facility_id);
+          query += ` AND t.facility_id = $${params.length}`;
+      } else {
+          // Lọc theo phòng ban (Dành cho DEPARTMENT_HEAD và LOCAL)
           const userDept = normalizeDept(req.user.department_code || req.user.department_id);
           params.push(userDept);
           query += ` AND t.department_code = $${params.length}`;
