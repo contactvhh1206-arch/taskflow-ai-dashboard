@@ -430,6 +430,7 @@ function MainDashboard() {
           try {
             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/comments`, {
               headers: { 
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
                 'x-user-id': user?.id,
                 'x-user-role': user?.role, 
                 'x-facility-id': user?.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user?.facility_id) ? user.facility_id.join(',') : user?.facility_id) 
@@ -1687,6 +1688,7 @@ function MainDashboard() {
                           method: 'POST',
                           headers: {
                             'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
                             'x-user-id': user.id,
                             'x-user-role': user.role,
                             'x-facility-id': user.role === 'SUPER_ADMIN' ? 'ALL' : (Array.isArray(user.facility_id) ? user.facility_id.join(',') : user.facility_id)
@@ -1694,7 +1696,7 @@ function MainDashboard() {
                           body: JSON.stringify({ content: chatInput })
                         });
                         const data = await res.json();
-                        if (data.success) {
+                        if ((res.status === 200 || res.status === 201) && data.success) {
                           setChatInput('');
                           // CẬP NHẬT GIAO DIỆN KHI BACKEND ĐÃ TRẢ VỀ DATA THÀNH CÔNG
                           setSelectedTaskComments(prev => [...prev, data.data]);
