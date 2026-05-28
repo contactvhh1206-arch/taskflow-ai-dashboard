@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ErrorBoundary } from '../App.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
 import { fetchAiSessions } from '../services/dataService.js';
 
 const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'];
