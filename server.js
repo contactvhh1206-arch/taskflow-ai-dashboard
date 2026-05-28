@@ -1531,7 +1531,7 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
         res.status(500).json({ error: "Lỗi máy chủ khi nhúng dữ liệu chat." });
     }
 });
-\n  app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
+  app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
       const { role, department_code } = req.user;
       
