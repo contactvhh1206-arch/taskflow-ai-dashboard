@@ -12,6 +12,7 @@ import FacilityDashboard from './components/FacilityDashboard.jsx';
 
 import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
 import DailyRevenueReport from './components/DailyRevenueReport.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import RevenueLog from './components/RevenueLog.jsx';
 import KPISettings from './components/KPISettings.jsx';
 import ArchivedFacilitiesDashboard from './components/ArchivedFacilitiesDashboard.jsx';
@@ -300,29 +301,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
 }
 
 // --- ERROR BOUNDARY ---
-export class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-6 text-error bg-error-container/20 rounded-xl border border-error/30 m-6">
-          <h3 className="font-bold mb-2 flex items-center gap-2"><span className="material-symbols-outlined">warning</span>Đã xảy ra lỗi khi tải Component.</h3>
-          <p className="text-sm opacity-80 font-mono">{this.state.error?.toString()}</p>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+
 
 
 const DEPT_MAPPING = {
@@ -914,27 +893,7 @@ function MainDashboard() {
             
             const data = await res.json();
             if (data.success) {
-              let fetchedTasks = data.data || [];
-              
-              // HACK: Auto-correct tasks incorrectly assigned to DUBAI 41 by old backend
-              fetchedTasks = fetchedTasks.map(t => {
-                 if (t.facility === 'DUBAI 41' || t.facilityId === 'DUBAI 41' || t.facility === 'HQ' || !t.facility) {
-                     const picStr = String(t.pic).toLowerCase();
-                     const picIdStr = String(t.picId || '').toLowerCase();
-                     
-                     if (picIdStr === '@thien' || picStr === 'thiện' || picIdStr === '@cuong' || picStr === 'cường' || picIdStr === 'marketing' || picStr.includes('marketing')) {
-                         return { ...t, facility: 'Phòng Truyền thông', facilityId: 'MARKETING', department_tag: 'MARKETING' };
-                     }
-                     if (picIdStr === 'ketoan' || picStr.includes('kế toán')) {
-                         return { ...t, facility: 'Phòng Finance', facilityId: 'FINANCE', department_tag: 'FINANCE' };
-                     }
-                     if (picStr.includes('phó') || picStr.includes('bgd') || picStr.includes('giám đốc')) {
-                         return { ...t, facility: 'Ban Giám Đốc', facilityId: 'BGD', department_tag: 'BGD' };
-                     }
-                 }
-                 return t;
-              });
-              
+              const fetchedTasks = data.data || [];
               setTasks(fetchedTasks);
               
               // Notification polling logic
