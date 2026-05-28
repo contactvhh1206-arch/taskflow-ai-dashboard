@@ -70,6 +70,8 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                localStorage.removeItem('taskflow_checkins');
                localStorage.removeItem('taskflow_daily_financial_reports');
                localStorage.removeItem('taskflow_facility_kpis');
+               localStorage.removeItem('taskflow_rag_docs');
+               localStorage.removeItem('taskflow_rag_contents');
                
                // 2. GỌI API ĐỂ XÓA SẠCH DỮ LIỆU TRONG POSTGRESQL (Backend)
                try {
