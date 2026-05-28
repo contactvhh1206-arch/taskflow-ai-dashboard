@@ -585,18 +585,21 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     const comment = req.body.comment || req.body.content;
     if (!comment) return res.status(400).json({ error: 'Nội dung bình luận trống' });
 
-    // Lấy user_id thực sự từ token thay vì req.user.id (vốn bị undefined)
-    let realUserId = null;
-    const authHeader = req.headers['authorization'];
-    if (authHeader && authHeader.startsWith('Bearer jwt-token-')) {
-        realUserId = parseInt(authHeader.replace('Bearer jwt-token-', ''), 10);
+// Lấy user_id an toàn tuyệt đối (Không bao giờ văng 500)
+    let realUserId = 1; // Fallback an toàn mặc định là 1
+    try {
+        if (req.user && req.user.id) {
+            realUserId = req.user.id;
+        } else {
+            const roleHeader = req.headers['x-user-role'];
+            if (roleHeader) {
+                const roleRes = await pool.query('SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE r.name = $1 LIMIT 1', [roleHeader]);
+                if (roleRes.rows.length > 0) realUserId = roleRes.rows[0].id;
+            }
+        }
+    } catch (parseErr) {
+        console.error("Lỗi parse user an toàn:", parseErr);
     }
-    
-    if (!realUserId) {
-        const roleRes = await pool.query('SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE r.name = $1 LIMIT 1', [req.user.role]);
-        if (roleRes.rows.length > 0) realUserId = roleRes.rows[0].id;
-    }
-    realUserId = realUserId || 1; // Fallback an toàn để không văng 500
 
     const { rows } = await pool.query(`
       INSERT INTO task_comments (task_id, user_id, comment)
