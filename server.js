@@ -7,6 +7,7 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 
 dotenv.config();
 
@@ -1126,7 +1127,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-xxxxxxxxx
 
 
 
-const multer = require('multer');
+
 const upload = multer({ 
     storage: multer.memoryStorage(),
     limits: { fileSize: 500 * 1024 }, // Giới hạn 500KB cho file text
