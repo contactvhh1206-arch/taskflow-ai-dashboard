@@ -16,6 +16,36 @@ import RevenueLog from './components/RevenueLog.jsx';
 import KPISettings from './components/KPISettings.jsx';
 import ArchivedFacilitiesDashboard from './components/ArchivedFacilitiesDashboard.jsx';
 
+// --- GLOBAL FETCH INTERCEPTOR ---
+const originalFetch = window.fetch;
+window.fetch = async (...args) => {
+  let [resource, config] = args;
+  
+  if (typeof resource === 'string' && resource.includes('/api/')) {
+    config = config || {};
+    config.headers = config.headers || {};
+    
+    const token = localStorage.getItem('token');
+    if (token) {
+      if (config.headers instanceof Headers) {
+        if (!config.headers.has('Authorization') && !config.headers.has('authorization')) {
+            config.headers.set('Authorization', `Bearer ${token}`);
+        }
+      } else {
+        // Plain object
+        const hasAuth = Object.keys(config.headers).some(k => k.toLowerCase() === 'authorization');
+        if (!hasAuth) {
+            config.headers['Authorization'] = `Bearer ${token}`;
+        }
+      }
+    }
+    args[1] = config;
+  }
+  
+  return originalFetch(...args);
+};
+// ---------------------------------
+
 const getStatusConfig = (status) => {
     switch (status) {
       case 'todo': return { label: 'Cần làm', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: 'radio_button_unchecked' };
