@@ -316,18 +316,17 @@ export default function AIAdvisor(props) {
               setIsTyping(false);
           },
           (errorMsg) => {
-              // onError
+              // onError: Xử lý hiển thị thông báo lỗi ngay trong luồng chat
               console.error("Lỗi AI stream:", errorMsg);
               setChatLog(prev => {
                   const newLog = [...prev];
                   const lastIndex = newLog.length - 1;
-                  const lastMsg = newLog[lastIndex];
-                  if (lastMsg && lastMsg.role === 'ai') {
-                      newLog[lastIndex] = {
-                          ...lastMsg,
-                          content: `Xin lỗi, đã xảy ra lỗi: ${errorMsg}`
-                      };
-                  }
+                  // Ghi đè tin nhắn đang stream dở bằng thông báo lỗi màu đỏ
+                  newLog[lastIndex] = { 
+                      role: 'ai', 
+                      content: `[HỆ THỐNG TỪ CHỐI]: ${errorMsg}`,
+                      isError: true 
+                  };
                   return newLog;
               });
               setIsTyping(false);
@@ -375,7 +374,7 @@ export default function AIAdvisor(props) {
         )}
         {chatLog.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'ai' ? 'justify-start' : 'justify-end'}`}>
-            <div key={idx} className={`max-w-[80%] p-4 rounded-2xl text-sm ${msg.role === 'ai' ? 'bg-surface-container dark:bg-[#2a2a2a] dark:text-white rounded-tl-none border border-outline-variant dark:border-gray-700' : 'bg-primary text-white rounded-tr-none shadow-md'}`}>
+            <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${msg.role === 'ai' ? (msg.isError ? 'bg-red-50 text-red-600 border border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400 rounded-tl-none' : 'bg-surface-container dark:bg-[#2a2a2a] dark:text-white rounded-tl-none border border-outline-variant dark:border-gray-700') : 'bg-primary text-white rounded-tr-none shadow-md'}`}>
               {msg.attachment && (
                  <div className="mb-3 max-w-[200px]">
                    {msg.attachment.type.startsWith('image/') ? (
