@@ -42,7 +42,15 @@ window.fetch = async (...args) => {
     args[1] = config;
   }
   
-  return originalFetch(...args);
+  return originalFetch(...args).then(res => {
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('taskflow_token');
+      localStorage.removeItem('taskflow_auth');
+      window.location.reload();
+    }
+    return res;
+  });
 };
 // ---------------------------------
 
@@ -1939,7 +1947,10 @@ export default function AppContainer() {
       userData.role = userData.role.trim().toUpperCase();
     }
     localStorage.setItem('taskflow_auth', JSON.stringify({ token, user: userData }));
-    if (token) localStorage.setItem('taskflow_token', token);
+    if (token) {
+        localStorage.setItem('taskflow_token', token);
+        localStorage.setItem('token', token);
+    }
     setUser(userData);
     fetchSystemConfig();
     fetchKPIs();
@@ -1948,6 +1959,7 @@ export default function AppContainer() {
   const logout = () => {
     localStorage.removeItem('taskflow_auth');
     localStorage.removeItem('taskflow_token');
+    localStorage.removeItem('token');
     setUser(null);
   };
 
