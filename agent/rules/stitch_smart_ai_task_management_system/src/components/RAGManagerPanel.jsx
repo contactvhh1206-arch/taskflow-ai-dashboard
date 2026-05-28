@@ -26,118 +26,61 @@ export default function RAGManagerPanel({ showToast }) {
         e.preventDefault();
         setIsDragging(false);
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          handleFiles(e.dataTransfer.files);
+          handleFileUpload(e.dataTransfer.files[0]);
         }
       };
 
       const handleFileInput = (e) => {
         if (e.target.files && e.target.files.length > 0) {
-          handleFiles(e.target.files);
+          handleFileUpload(e.target.files[0]);
         }
       };
 
-      const handleFiles = async (files) => {
-        const file = files[0];
-        if (!file) return;
+      const handleFileUpload = async (file) => {
+        if (!file.name.endsWith('.txt')) {
+            alert("Hệ thống từ chối: Chỉ chấp nhận file .txt!");
+            return;
+        }
+        if (file.size > 500 * 1024) {
+            alert("File quá lớn! Vui lòng giới hạn file txt dưới 500KB.");
+            return;
+        }
 
-        const docId = Date.now().toString();
-        const initialDoc = {
-          id: docId,
-          name: file.name,
-          type: file.type || 'text/plain',
-          size: (file.size / 1024).toFixed(1) + ' KB',
-          chunks: 0,
-          status: 'Chờ mã hóa',
-          uploadDate: new Date().toISOString()
-        };
+        const formData = new FormData();
+        formData.append('file', file);
         
-        setDocuments(prev => [initialDoc, ...prev]);
         setIsUploading(true);
-        setUploadProgress(0);
 
         try {
-          setDocuments(prev => prev.map(d => d.id === docId ? {...d, status: 'Đang xử lý (10%)'} : d));
-          
-          const fileText = await new Promise((resolve, reject) => {
-             const reader = new FileReader();
-             reader.onload = (e) => {
-                let content = e.target.result;
-                if (file.type.includes('pdf') || file.name.endsWith('.docx')) {
-                   content = `Nội dung mô phỏng trích xuất từ tài liệu ${file.name}. \n` + "Đây là dữ liệu Text được bóc tách từ file PDF/DOCX để đưa vào pipeline RAG.\n".repeat(80);
-                }
-                resolve(content);
-             };
-             reader.onerror = () => reject(new Error('Failed to read file'));
-             reader.readAsText(file);
-          });
-
-          setUploadProgress(30);
-          setDocuments(prev => prev.map(d => d.id === docId ? {...d, status: 'Đang xử lý (30%)'} : d));
-
-          const CHUNK_SIZE = 1000;
-          const chunks = [];
-          for (let i = 0; i < fileText.length; i += CHUNK_SIZE) {
-             chunks.push(fileText.substring(i, i + CHUNK_SIZE));
-          }
-          const numChunks = chunks.length || 1;
-
-          setUploadProgress(60);
-          setDocuments(prev => prev.map(d => d.id === docId ? {...d, status: 'Đang xử lý (60%)', chunks: numChunks} : d));
-
-          const aiConfig = JSON.parse(localStorage.getItem('taskflow_ai_config') || '{}');
-          if (!aiConfig.apiKey || !aiConfig.aiModel) {
-             throw new Error('Chưa cấu hình API Key/Model cho RAG');
-          }
-
-          setUploadProgress(80);
-          setDocuments(prev => prev.map(d => d.id === docId ? {...d, status: 'Đang xử lý (80%)'} : d));
-
-          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${aiConfig.apiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: aiConfig.aiModel,
-              messages: [
-                { role: 'system', content: 'You are an embedding API simulator. Reply with JSON indicating success.' },
-                { role: 'user', content: 'Embed chunk: ' + chunks[0].substring(0, 500) }
-              ],
-              response_format: { type: 'json_object' }
-            })
-          });
-
-          if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || 'API OpenRouter Failed');
-          }
-
-          setUploadProgress(100);
-          
-          setDocuments(prev => prev.map(d => d.id === docId ? {
-             ...d, 
-             status: 'Đã mã hóa'
-          } : d));
-          
-          // LƯU NỘI DUNG RAG VÀO LOCAL STORAGE
-          try {
-             const existingContents = JSON.parse(localStorage.getItem('taskflow_rag_contents') || '{}');
-             existingContents[docId] = fileText;
-             localStorage.setItem('taskflow_rag_contents', JSON.stringify(existingContents));
-          } catch(e) {
-             console.error('Không thể lưu nội dung RAG:', e);
-          }
-
-          if (typeof showToast !== 'undefined') showToast('Tải lên và nhúng vector thành công!');
-          
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/rag/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('taskflow_token')}`
+                    // Lưu ý: Tuyệt đối KHÔNG set 'Content-Type': 'multipart/form-data'. Browser sẽ tự sinh boundary.
+                },
+                body: formData
+            });
+            
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error);
+            
+            alert("Thành công: " + data.message);
+            
+            // Cập nhật danh sách UI
+            const newDoc = {
+                id: Date.now().toString(),
+                name: file.name,
+                type: file.type || 'text/plain',
+                size: (file.size / 1024).toFixed(1) + ' KB',
+                chunks: data.chunks_processed || '-',
+                status: 'Đã mã hóa',
+                uploadDate: new Date().toISOString()
+            };
+            setDocuments(prev => [newDoc, ...prev]);
         } catch (error) {
-          console.error('RAG Error:', error);
-          if (typeof showToast !== 'undefined') showToast('Lỗi khi mã hóa vector: ' + error.message, 'error');
-          setDocuments(prev => prev.map(d => d.id === docId ? {...d, status: 'Lỗi'} : d));
+            alert("Lỗi tải lên: " + error.message);
         } finally {
-          setIsUploading(false);
-          setUploadProgress(0);
+            setIsUploading(false);
         }
       };
 
@@ -191,10 +134,10 @@ export default function RAGManagerPanel({ showToast }) {
               <>
                 <span className="material-symbols-outlined text-4xl text-gray-400 dark:text-gray-500 mb-3">cloud_upload</span>
                 <h3 className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-1">Kéo thả tài liệu vào đây</h3>
-                <p className="text-sm text-gray-500 mb-4">Hỗ trợ: PDF, DOCX, TXT, CSV (Tối đa 10MB)</p>
+                <p className="text-sm text-gray-500 mb-4">Chỉ hỗ trợ: TXT (Tối đa 500KB - Khuyên dùng NotebookLM để trích xuất trước khi nạp)</p>
                 <label className="px-6 py-2 bg-surface text-primary font-bold rounded-lg border border-primary/20 hover:bg-primary hover:text-white transition-colors cursor-pointer">
                   Chọn tệp từ máy tính
-                  <input type="file" className="hidden" accept=".pdf,.docx,.txt,.csv" onChange={handleFileInput} />
+                  <input type="file" className="hidden" accept=".txt, text/plain" onChange={handleFileInput} />
                 </label>
               </>
             )}
