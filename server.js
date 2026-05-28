@@ -18,6 +18,42 @@ const pool = new Pool({
 });
 
 const app = express();
+
+// ==========================================
+// NOTIFICATIONS SSE STATE
+// ==========================================
+const sseClients = new Map();
+
+setInterval(() => {
+    sseClients.forEach((res, userId) => {
+        try {
+            res.write(':\n\n'); // Ping
+        } catch (err) {
+            sseClients.delete(userId);
+        }
+    });
+}, 15000);
+
+async function sendRealtimeNotification(userId, type, message, taskId = null, actorId = null) {
+    if (!userId) return;
+    try {
+        const notifRes = await pool.query(`
+            INSERT INTO notifications (user_id, task_id, type, message, actor_id)
+            VALUES ($1, $2, $3, $4, $5) RETURNING *
+        `, [userId, taskId, type, message, actorId]);
+        
+        const newNotif = notifRes.rows[0];
+        
+        if (sseClients.has(parseInt(userId))) {
+            sseClients.get(parseInt(userId)).write(`data: ${JSON.stringify(newNotif)}\n\n`);
+        } else if (sseClients.has(String(userId))) {
+            sseClients.get(String(userId)).write(`data: ${JSON.stringify(newNotif)}\n\n`);
+        }
+    } catch (e) {
+        console.error("Error saving/sending notification:", e);
+    }
+}
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -75,6 +111,18 @@ const initDB = async () => {
       key VARCHAR(255) PRIMARY KEY,
       data JSONB,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Notifications table
+    await pool.query(`CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        actor_id INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )`);
     // Seed roles
     const roles = ['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'FACILITY_MANAGER', 'ADMIN'];
@@ -576,7 +624,11 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       facilityId: facility || 'HQ'
     };
 
-    res.json({ success: true, data: newTask });
+    
+      if (pic_id && pic_id !== req.user.id) {
+          sendRealtimeNotification(pic_id, 'NEW_TASK', `Bạn vừa được giao một công việc mới: "${title}"`, newTask.id, req.user.id);
+      }
+      res.json({ success: true, data: newTask });
   } catch (error) {
     console.error("Lỗi chi tiết từ DB:", error.message, error.stack);
     res.status(500).json({ error: 'Lỗi server khi lưu công việc.' });
