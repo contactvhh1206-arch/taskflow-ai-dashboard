@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { fetchHistory, fetchAiSessions, saveAiSession } from '../services/dataService.js';
+import { fetchHistory, fetchAiSessions, saveAiSession, streamAIChat } from '../services/dataService.js';
 
 export default function AIAdvisor(props) {
   const { user, tasks, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
@@ -18,6 +18,17 @@ export default function AIAdvisor(props) {
   const [query, setQuery] = useState('');
   const currentSessionIdRef = React.useRef(activeSessionId);
   const isInitialMount = React.useRef(true);
+
+  const messagesEndRef = React.useRef(null);
+
+  const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  React.useEffect(() => {
+      scrollToBottom();
+  }, [chatLog]);
+
 
   const getGreetingText = (userObj) => {
     const hour = new Date().getHours();
@@ -229,6 +240,7 @@ export default function AIAdvisor(props) {
     }
   }, [externalQueryTrigger]);
 
+  
   const handleAsk = async (overrideQuery) => {
     let actualQuery = query;
     if (typeof overrideQuery === 'string') {
@@ -237,267 +249,93 @@ export default function AIAdvisor(props) {
         overrideQuery.preventDefault();
     }
     if (!actualQuery.trim() && !attachment) return;
+    
+    // Ghi nhận câu hỏi của user
     const userQuery = actualQuery.trim() || 'Vui lòng phân tích tệp đính kèm này.';
     setChatLog(prev => [...prev, { role: 'user', content: userQuery, attachment: attachment }]);
     setQuery('');
     setIsTyping(true);
     setAttachment(null);
 
-    try {
-      let responseContent = '';
-      
-      if (isFacilityMode) {
-         // Restriction logic for Facility Mode
-         const forbiddenKeywords = ['cơ sở khác', 'phòng ban', 'chuỗi', 'tất cả cơ sở', 'cơ sở 1', 'cơ sở 2', 'toàn hệ thống'];
-         const isForbidden = forbiddenKeywords.some(kw => userQuery.toLowerCase().includes(kw));
-         
-         if (isForbidden) {
-           responseContent = `Xin lỗi, tôi là Cố vấn AI riêng của cơ sở ${facilityName || 'này'}. Tôi bị hạn chế quyền truy cập và KHÔNG ĐƯỢC PHÉP cung cấp thông tin của các cơ sở khác hay phòng ban khác. Yêu cầu truy cập trái phép này đã được ghi nhận và gửi về Ban Giám Đốc.`;
-           try {
-             const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
-             violations.push({
-               id: Date.now(),
-               timestamp: new Date().toISOString(),
-               userId: user?.username || user?.id,
-               facility: facilityName,
-               query: userQuery,
-               status: 'Violation'
-             });
-             localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
-           } catch {
-             // Ignore localStorage errors
-           }
-           
-           setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
-           setIsTyping(false);
-           return;
-         }
-      }
-      
-      // Real AI Call Logic
-      const aiConfigStr = localStorage.getItem('taskflow_ai_config');
-      const aiConfig = aiConfigStr ? JSON.parse(aiConfigStr) : null;
-      
-      if (!aiConfig || !aiConfig.apiKey) {
-         responseContent = "Hệ thống yêu cầu cấu hình API Key tại phần Cài đặt Hệ thống để tôi có thể phân tích và trả lời câu hỏi của bạn.";
-         setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
-         setIsTyping(false);
-         return;
-      }
-
-      const allData = await fetchHistory();
-      let contextData = allData;
-      if (isFacilityMode && facilityName) {
-         contextData = allData.filter(d => d.org_unit === facilityName);
-      }
-      
-      // Load financial reports
-      let financialContextStr = '';
-      try {
-         const token = localStorage.getItem('taskflow_token');
-         const { fetchReports } = await import('../services/dataService.js');
-         const reports = await fetchReports(token, user?.role, user?.facility_id) || [];
-         
-         if (reports && reports.length > 0) {
-            const recentReports = reports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            
-            recentReports.forEach(rep => {
-               const rData = typeof rep.data === 'string' ? JSON.parse(rep.data) : rep.data;
-               const cleanFacilityName = facilityName?.trim();
-               if (isFacilityMode) {
-                  if (cleanFacilityName) {
-                     const facData = Array.isArray(rData) ? rData?.find(d => d.facility_id === cleanFacilityName || d.facility_name === cleanFacilityName || d.name === cleanFacilityName) : null;
-                     if (facData) {
-                        financialContextStr += `Doanh thu cơ sở ${cleanFacilityName} ngày ${rep.date}: ${Number(facData.revenue || 0).toLocaleString('vi-VN')} VNĐ\n`;
-                     }
-                  }
-               } else {
-                  financialContextStr += `Báo cáo doanh thu ngày ${rep.date} (Tổng: ${Number(rep.total_revenue || rep.totalRevenue || 0).toLocaleString('vi-VN')} VNĐ):\n`;
-                  rData?.forEach(d => {
-                     const fname = String(d.facility_id || d.facility_name || d.name || '').toUpperCase();
-                     if (fname.includes('MARKETING') || fname.includes('MAKETING') || fname.includes('FINANCE') || fname.includes('BGD')) return;
-                     financialContextStr += `- ${d.facility_id || d.facility_name || d.name}: ${Number(d.revenue || 0).toLocaleString('vi-VN')} VND\n`;
-                  });
-               }
+    // Chặn nhanh các từ khóa vi phạm ở Frontend (Facility Mode)
+    if (isFacilityMode) {
+        const forbiddenKeywords = ['cơ sở khác', 'phòng ban', 'chuỗi', 'tất cả cơ sở', 'cơ sở 1', 'cơ sở 2', 'toàn hệ thống'];
+        const isForbidden = forbiddenKeywords.some(kw => userQuery.toLowerCase().includes(kw));
+        
+        if (isForbidden) {
+          const responseContent = `Xin lỗi, tôi là Cố vấn AI riêng của cơ sở ${facilityName || 'này'}. Tôi bị hạn chế quyền truy cập và KHÔNG ĐƯỢC PHÉP cung cấp thông tin của các cơ sở khác hay phòng ban khác. Yêu cầu truy cập trái phép này đã được ghi nhận và gửi về Ban Giám Đốc.`;
+          try {
+            const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
+            violations.push({
+              id: Date.now(),
+              timestamp: new Date().toISOString(),
+              userId: user?.username || user?.id,
+              facility: facilityName,
+              query: userQuery,
+              status: 'Violation'
             });
-         }
-      } catch (e) {
-         console.error('Error loading financial reports for AI', e);
-      }
-      
-      // Fetch RAG knowledge base
-      let ragContextStr = '';
-      try {
-         const ragDocs = JSON.parse(localStorage.getItem('taskflow_rag_docs') || '[]');
-         const ragContents = JSON.parse(localStorage.getItem('taskflow_rag_contents') || '{}');
-         ragDocs.forEach(doc => {
-            if (ragContents[doc.id]) {
-               ragContextStr += `\n--- TÀI LIỆU: ${doc.name} ---\n${ragContents[doc.id]}\n`;
-            }
-         });
-      } catch (e) {}
-
-      // Build Vector context from contextData
-      const vectorDataArr = contextData.map(d => d.aiVectorData || JSON.stringify(d)).filter(Boolean).slice(0, 10);
-      let systemContext = `Dữ liệu hệ thống hiện tại:\n${vectorDataArr.join('\n')}`;
-      if (financialContextStr) {
-         systemContext += `\n\nDỮ LIỆU DOANH THU (TÀI CHÍNH):\n${financialContextStr}`;
-      }
-      if (ragContextStr) {
-         systemContext += `\n\nCƠ SỞ TRI THỨC (KIẾN THỨC BỔ SUNG TỪ TÀI LIỆU):\n${ragContextStr}`;
-      }
-
-      // Load Global AI Memory (Conversations)
-      let aiMemoryContextStr = '';
-      try {
-         const token = localStorage.getItem('taskflow_token');
-         const globalSessions = await fetchAiSessions(token, user?.role, user?.facility_id) || [];
-         if (globalSessions.length > 0) {
-            let filteredSessions = globalSessions;
-            if (isFacilityMode && facilityName) {
-               filteredSessions = globalSessions.filter(s => s.facility === facilityName || s.facility === user?.facility_id);
-            }
-            
-            // Only take the last 3-5 relevant sessions to save tokens
-            filteredSessions.slice(0, 3).forEach(s => {
-               if (s.id !== currentSessionIdRef.current) {
-                  aiMemoryContextStr += `\n[Phiên Chat Cũ: ${s.title || 'Không tên'} - Cơ sở: ${s.facility || 'Chung'}]\n`;
-                  const logs = typeof s.chat_log === 'string' ? JSON.parse(s.chat_log) : (s.chat_log || []);
-                  logs.slice(-4).forEach(msg => { // only take last 4 messages of each past session
-                     aiMemoryContextStr += `${msg.role === 'user' ? 'User' : 'AI'}: ${msg.content?.substring(0, 300)}...\n`;
-                  });
-               }
-            });
-         }
-      } catch (e) {
-         console.error('Error loading AI memory', e);
-      }
-      
-      if (aiMemoryContextStr) {
-         systemContext += `\n\nKÝ ỨC HỘI THOẠI TRƯỚC ĐÓ (LỊCH SỬ GIAO TIẾP):\nDưới đây là tóm tắt các cuộc trò chuyện gần đây, hãy sử dụng chúng để nhớ lại ngữ cảnh nếu người dùng nhắc đến sự việc cũ:\n${aiMemoryContextStr}`;
-      }
-      
-      if (tasks && tasks.length > 0) {
-         let taskContextStr = '';
-         if (isFacilityMode) {
-            const uName = (user?.username || '').toLowerCase();
-            const fName = (facilityName || '').toLowerCase();
-            const fCode = (user?.facility_code || '').toLowerCase();
-            const facTasks = tasks.filter(t => {
-               const title = (t.title || '').toLowerCase();
-               return t.pic === user?.username || 
-                      t.facilityId === user?.facility_code ||
-                      t.facility === facilityName ||
-                      t.facility_id === facilityName || 
-                      t.facility_name === facilityName || 
-                      t.org_unit === facilityName || 
-                      (uName && title.includes(uName)) || 
-                      (fName && title.includes(fName)) ||
-                      (fCode && title.includes(fCode));
-            });
-            facTasks.slice(0, 50).forEach(t => {
-               const todayStr = new Date().toISOString().split('T')[0];
-               const isUrgent = t.urgent || t.pinned || (t.deadline && t.deadline <= todayStr);
-               taskContextStr += `- [${t.status === 'done' ? 'Hoàn thành' : (isUrgent ? 'Khẩn cấp' : 'Đang mở')}] ${t.title} (Hạn: ${t.deadline || 'Không'})\n`;
-            });
-         } else {
-            tasks.slice(0, 50).forEach(t => {
-               taskContextStr += `- [${t.facility_name || t.org_unit || t.pic}] ${t.title} (Trạng thái: ${t.status})\n`;
-            });
-         }
-         if (taskContextStr) {
-            systemContext += `\n\nDANH SÁCH CÔNG VIỆC (TASKS):\n${taskContextStr}`;
-         }
-      }
-      
-      const messages = [
-        { 
-          role: 'system', 
-          content: `Bạn là trợ lý AI nội bộ chuyên tư vấn vận hành. ${isFacilityMode ? `Bạn chỉ được phép hỗ trợ thông tin cho cơ sở ${facilityName}. NẾU NGƯỜI DÙNG HỎI THÔNG TIN CỦA CƠ SỞ KHÁC, HOẶC HỎI CÁC VẤN ĐỀ KHÔNG LIÊN QUAN ĐẾN CÔNG VIỆC, BẠN PHẢI TỪ CHỐI VÀ BẮT BUỘC PHẢI CHÈN CỤM TỪ "[CẢNH BÁO VI PHẠM]" VÀO ĐẦU CÂU TRẢ LỜI CỦA BẠN. ` : ''}Dựa vào dữ liệu hệ thống cung cấp dưới đây, hãy trả lời câu hỏi của người dùng một cách chính xác, chuyên nghiệp. Không tự bịa đặt dữ liệu.\n\n${systemContext}`
+            localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
+          } catch {}
+          setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
+          setIsTyping(false);
+          return;
         }
-      ];
+    }
 
-      if (attachment) {
-         if (attachment.extractedText) {
-             messages.push({ role: 'user', content: `[Nội dung tệp đính kèm: ${attachment.name}]\n${attachment.extractedText}\n\nCâu hỏi: ${userQuery}` });
-         } else if (attachment.url) {
-             messages.push({
-                role: 'user',
-                content: [
-                  { type: 'text', text: userQuery },
-                  { type: 'image_url', image_url: { url: attachment.url } }
-                ]
-             });
-         } else {
-             messages.push({ role: 'user', content: userQuery });
-         }
-      } else {
-         messages.push({ role: 'user', content: userQuery });
-      }
+    try {
+      const token = localStorage.getItem('taskflow_token');
+      const sessionId = currentSessionIdRef.current;
+      
+      // Tạo trước một tin nhắn AI trống trong State để hứng luồng Stream
+      setChatLog(prev => [...prev, { role: 'ai', content: '' }]);
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-         method: 'POST',
-         headers: {
-            'Authorization': `Bearer ${aiConfig.apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': window.location.href,
-            'X-Title': 'TaskFlow AI Dashboard'
-         },
-         body: JSON.stringify({
-            model: aiConfig.aiModel || "google/gemini-1.5-pro",
-            messages: messages
-         })
-      });
-
-      if (!response.ok) {
-         const errData = await response.json().catch(() => ({}));
-         throw new Error(errData.error?.message || `API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      responseContent = data.choices?.[0]?.message?.content || "Không có phản hồi từ AI.";
-
-      if (isFacilityMode) {
-         const refusalKeywords = ['không có quyền truy cập', 'từ chối cung cấp', 'truy cập trái phép', 'không có dữ liệu doanh thu của cơ sở', 'ghi nhận và gửi', 'dò hỏi dữ liệu chéo', 'cơ sở khác ngoài'];
-         const isAiRefusal = responseContent.includes('[CẢNH BÁO VI PHẠM]') || refusalKeywords.some(kw => responseContent.toLowerCase().includes(kw));
-         if (isAiRefusal) {
-             // Remove the tag from the final response shown to the user so it looks natural
-             responseContent = responseContent.replace(/\[CẢNH BÁO VI PHẠM\]/gi, '').trim();
-             try {
-               const newViolation = {
-                 id: Date.now(),
-                 timestamp: new Date().toISOString(),
-                 userId: user?.username || user?.id,
-                 facility: facilityName,
-                 query: userQuery,
-                 status: 'Violation'
-               };
-               const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
-               violations.push(newViolation);
-               localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
-               fetch('https://taskflow-ai-dashboard.onrender.com/api/logs', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    org_unit: 'AI_VIOLATION',
-                    entry_type: 'AI_VIOLATION',
-                    content: newViolation,
-                    date: new Date().toISOString().split('T')[0],
-                    display_time: new Date().toLocaleTimeString('vi-VN')
-                  })
-               }).catch(() => {});
-             } catch {}
-         }
-      }
-
-      setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
-
+      // Đẩy việc xử lý AI cho Backend thông qua hàm streamAIChat
+      await streamAIChat(
+          userQuery,
+          sessionId,
+          token,
+          (chunkText) => {
+              // onChunk chuẩn kiến trúc React Immutability
+              setChatLog(prev => {
+                  const newLog = [...prev];
+                  const lastIndex = newLog.length - 1;
+                  const lastMsg = newLog[lastIndex];
+                  
+                  if (lastMsg && lastMsg.role === 'ai') {
+                      // Tạo hẳn một Object mới, copy các thuộc tính cũ và cộng dồn content
+                      newLog[lastIndex] = { 
+                          ...lastMsg, 
+                          content: lastMsg.content + chunkText 
+                      };
+                  }
+                  return newLog;
+              });
+          },
+          () => {
+              // onDone
+              setIsTyping(false);
+          },
+          (errorMsg) => {
+              // onError
+              console.error("Lỗi AI stream:", errorMsg);
+              setChatLog(prev => {
+                  const newLog = [...prev];
+                  const lastIndex = newLog.length - 1;
+                  const lastMsg = newLog[lastIndex];
+                  if (lastMsg && lastMsg.role === 'ai') {
+                      newLog[lastIndex] = {
+                          ...lastMsg,
+                          content: `Xin lỗi, đã xảy ra lỗi: ${errorMsg}`
+                      };
+                  }
+                  return newLog;
+              });
+              setIsTyping(false);
+          }
+      );
     } catch (err) {
       console.error("AI Error:", err);
-      setChatLog(prev => [...prev, { role: 'ai', content: `Xin lỗi, đã xảy ra lỗi khi kết nối với AI (${err.message}). Vui lòng kiểm tra lại cấu hình API.` }]);
-    } finally {
+      setChatLog(prev => [...prev, { role: 'ai', content: `Xin lỗi, đã xảy ra lỗi khi kết nối (${err.message}).` }]);
       setIsTyping(false);
     }
   };
@@ -563,6 +401,7 @@ export default function AIAdvisor(props) {
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </div>
       <div className={`p-4 ${chatLog.length > 0 ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
         {chatLog.length === 0 && (
