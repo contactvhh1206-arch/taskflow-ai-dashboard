@@ -127,6 +127,21 @@ const initDB = async () => {
     // KÍCH HOẠT VECTOR VÀ BẢNG RAG (KNOWLEDGE BASE)
     // =========================================
     await pool.query(`CREATE EXTENSION IF NOT EXISTS vector`);
+
+    // Dọn dẹp DB theo lệnh CTO
+    try {
+        await pool.query(`DROP TABLE IF EXISTS ai_token_usage_logs CASCADE`);
+    } catch (e) { console.error(e); }
+    try {
+        await pool.query(`
+            ALTER TABLE ai_ping_logs 
+            ADD COLUMN prompt_tokens INT DEFAULT 0,
+            ADD COLUMN completion_tokens INT DEFAULT 0
+        `);
+    } catch (e) {
+        // Ignore if columns already exist
+    }
+
     
     await pool.query(`
         CREATE TABLE IF NOT EXISTS company_knowledge_base (
