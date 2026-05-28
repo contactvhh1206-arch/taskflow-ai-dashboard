@@ -1459,11 +1459,37 @@ const calculateTone = (deadlineDateStr) => {
 };
 
   // API: Lịch sử hội thoại AI toàn cầu (Global Memory)
-  app.get('/api/ai/sessions', authenticateUser, checkAdmin, async (req, res) => {
+  app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
-      const { rows } = await pool.query('SELECT * FROM ai_chat_sessions ORDER BY timestamp DESC LIMIT 50');
+      const { role, department_code } = req.user;
+      
+      let query = '';
+      let queryParams = [];
+
+      // Nhóm All-Access (Toàn quyền)
+      if (
+        role === 'SUPER_ADMIN' || 
+        role === 'VICE_PRESIDENT' || 
+        (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING')
+      ) {
+        query = 'SELECT * FROM ai_chat_sessions ORDER BY timestamp DESC LIMIT 100';
+      } else {
+        // Nhóm Local (Theo phòng ban/cơ sở)
+        query = `
+          SELECT s.* 
+          FROM ai_chat_sessions s
+          INNER JOIN users u ON s.user_id = u.id::varchar
+          WHERE u.department_code = $1
+          ORDER BY s.timestamp DESC
+          LIMIT 100
+        `;
+        queryParams = [department_code];
+      }
+
+      const { rows } = await pool.query(query, queryParams);
       res.json({ success: true, data: rows });
     } catch (error) {
+      console.error("Lỗi get AI sessions:", error);
       res.status(500).json({ error: error.message });
     }
   });
