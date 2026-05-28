@@ -1,5 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+
+const SECRET_KEY = process.env.JWT_SECRET || 'HubDB_Global_Temp_Secret_2026_!!!';
 import cors from 'cors';
 import fetch from 'node-fetch'; 
 import dotenv from 'dotenv';
@@ -286,7 +288,7 @@ const authenticateUser = async (req, res, next) => {
         let departmentId = null;
 
         try {
-            const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key_taskflow');
+            const payload = jwt.verify(token, SECRET_KEY);
             userId = payload.id;
             userRole = payload.role;
             facilityRaw = payload.facility_id;
@@ -304,7 +306,8 @@ const authenticateUser = async (req, res, next) => {
                 facilityRaw = req.headers['x-facility-id'];
                 departmentId = req.headers['x-department-id'];
             } else {
-                return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+                console.error('[Auth Middleware] Lỗi giải mã Token:', jwtErr.message);
+                return res.status(401).json({ success: false, message: 'Invalid or Expired Token' });
             }
         }
         
@@ -880,7 +883,7 @@ app.post('/api/login', async (req, res) => {
                 };
                 return res.json({
                     success: true,
-                    token: jwt.sign(tokenPayload, process.env.JWT_SECRET || 'fallback_secret_key_taskflow', { expiresIn: '7d' }),
+                    token: jwt.sign(tokenPayload, SECRET_KEY, { expiresIn: '7d' }),
                     user: { 
                         name: user.full_name, 
                         role: user.role_name, 
