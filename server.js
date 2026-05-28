@@ -1552,6 +1552,11 @@ app.post('/api/config', authenticateUser, async (req, res) => {
 // ==========================================
 app.get('/api/dev/migrate-departments', async (req, res) => {
     try {
+        // Fix for "column does not exist" error
+        await pool.query(`
+            ALTER TABLE tasks ADD COLUMN IF NOT EXISTS department_code VARCHAR(50);
+        `);
+        
         await pool.query(`
             UPDATE tasks 
             SET department_code = 'MARKETING' 
