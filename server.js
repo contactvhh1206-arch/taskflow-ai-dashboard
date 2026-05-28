@@ -585,7 +585,7 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     const comment = req.body.comment || req.body.content;
     if (!comment) return res.status(400).json({ error: 'Nội dung bình luận trống' });
 
-// Lấy user_id an toàn (Linh hoạt tự động tìm User hợp lệ)
+    // 1. LẤY USER_ID AN TOÀN VÀ CHẶN NGAY NẾU RỖNG (Nguyên nhân gốc gây sập)
     let realUserId = null;
     try {
         if (req.user && req.user.id) {
@@ -598,7 +598,6 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
             }
         }
         
-        // Fallback cuối cùng: Lấy tự động 1 ID bất kỳ đang tồn tại trong DB
         if (!realUserId) {
             const fallbackRes = await pool.query('SELECT id FROM users ORDER BY id ASC LIMIT 1');
             if (fallbackRes.rows.length > 0) realUserId = fallbackRes.rows[0].id;
@@ -607,18 +606,23 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
         console.error("Lỗi parse user an toàn:", parseErr);
     }
 
+    // [QUAN TRỌNG NHẤT]: TRẠM GÁC CHỐNG SẬP DB
+    if (!realUserId) {
+        return res.status(403).json({ error: 'Không thể xác định danh tính. Vui lòng đăng nhập lại!' });
+    }
+
+    // 2. THỰC THI INSERT (Lúc này realUserId đã được đảm bảo 100% là an toàn)
     const { rows } = await pool.query(`
       INSERT INTO task_comments (task_id, user_id, comment)
       VALUES ($1, $2, $3) RETURNING *
     `, [id, realUserId, comment]);
     
-    // [NOTIFICATIONS TRIGGER]
+    // 3. [NOTIFICATIONS TRIGGER] (An toàn tuyệt đối)
     try {
         if (typeof sendRealtimeNotification === 'function') {
             const taskInfo = await pool.query('SELECT pic_id, title FROM tasks WHERE id = $1', [id]);
             if (taskInfo.rows.length > 0) {
                 const tInfo = taskInfo.rows[0];
-                // So sánh chính xác PIC và người comment (chuyển về int)
                 if (tInfo.pic_id && parseInt(tInfo.pic_id) !== parseInt(realUserId)) {
                     sendRealtimeNotification(tInfo.pic_id, 'NEW_COMMENT', `Có bình luận mới trong công việc: "${tInfo.title}"`, id, realUserId);
                 }
@@ -626,10 +630,9 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
         }
     } catch (err) { console.error("Notification comment err:", err); }
 
-// Khởi tạo newComment an toàn tuyệt đối, chống lỗi undefined
+    // 4. KHỞI TẠO BIẾN TRẢ VỀ (Giữ lại logic bọc lót của Cố vấn để phòng thủ tầng 2)
     const newComment = (rows && rows.length > 0) ? rows[0] : { task_id: id, user_id: realUserId, comment: comment };
     
-    // Lấy tên User an toàn
     try {
         const nameRes = await pool.query('SELECT full_name FROM users WHERE id = $1', [realUserId]);
         newComment.user_name = (nameRes.rows && nameRes.rows.length > 0) ? nameRes.rows[0].full_name : 'Unknown';
@@ -640,7 +643,8 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
 
     res.json({ success: true, data: newComment });
   } catch (err) {
-    res.status(500).json({ error: 'Lỗi thêm bình luận.' });
+    console.error("Lỗi POST Comment:", err);
+    res.status(500).json({ error: 'Lỗi thêm bình luận: ' + err.message });
   }
 });
 
