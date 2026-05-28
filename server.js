@@ -582,7 +582,7 @@ app.get('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
 app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
-    const { comment } = req.body;
+    const comment = req.body.comment || req.body.content;
     if (!comment) return res.status(400).json({ error: 'Nội dung bình luận trống' });
 
     const { rows } = await pool.query(`
