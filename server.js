@@ -1903,51 +1903,9 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 
         // 1. KÍCH HOẠT MÀNG LỌC TIỀM THỨC
         let learnedRule = await detectAndLearnRule(userMessage, req.user.role, req.user.id);
-        let systemPromptAddition = "";
-        
-        if (learnedRule) {
-            systemPromptAddition = `
+        let systemPromptAddition = `
 
 [HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngầu, điện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
-        }
-
-        // 2. LỤC LỌI TRÍ NHỚ RAG TỪ DATABASE
-        let ragContext = "";
-        try {
-            const memoryResults = await searchKnowledgeBase(userMessage, req.user, 3);
-            if (memoryResults && memoryResults.length > 0) {
-                ragContext = "
-
-[KIẾN THỨC NỀN TỪ DATABASE]:
-" + memoryResults.map(r => `- ${r.content}`).join("
-");
-            }
-        } catch (e) {
-            console.error("Lỗi tìm kiếm RAG:", e);
-        }
-
-        let finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow." + ragContext + systemPromptAddition;
-
-        // 3. BỘ NHỚ NGẮN HẠN
-        let chatHistory = [];
-        if (session_id) {
-            chatHistory = await getConversationContext(session_id, req.user.id);
-            // Loại bỏ câu hỏi hiện tại khỏi history vì đã insert ở nhịp 1
-            if (chatHistory.length > 0 && chatHistory[chatHistory.length - 1].role === 'user' && chatHistory[chatHistory.length - 1].content === userMessage) {
-                chatHistory.pop();
-            }
-        }
-
-        const messages = [
-            { role: "system", content: finalSystemPrompt },
-            ...chatHistory,
-            { role: "user", content: userMessage }
-        ];
-
-        // 4. GỌI OPENAI VỚI STREAMING (SSE)
-        const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
-        const aiConfig = configRows.length > 0 ? configRows[0].data : {};
-        const aiModel = aiConfig.model || "google/gemini-2.5-flash";
 
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
