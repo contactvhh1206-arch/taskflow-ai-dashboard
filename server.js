@@ -2528,7 +2528,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
     }
 });
-\n// Start server
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 TaskFlow AI Server đang chạy tại http://localhost:${PORT}`);
