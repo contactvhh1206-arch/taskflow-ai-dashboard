@@ -1930,18 +1930,14 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         let systemPromptAddition = "";
         
         if (learnedRule) {
-            systemPromptAddition = `
-[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngầu, điện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
+            systemPromptAddition = String.fromCharCode(10) + `[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngầu, điện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
         }
 
         // Phục dựng lại mảng messages (RAG + Context Window)
         const ragContextRows = await searchKnowledgeBase(userMessage, req.user, 3);
-        const ragContextText = ragContextRows.map(row => row.content).join("
-");
-        const finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow.
-" + 
-                                  (ragContextText ? "Dữ liệu tham khảo:
-" + ragContextText : "") + 
+        const ragContextText = ragContextRows.map(row => row.content).join(String.fromCharCode(10));
+        const finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow." + String.fromCharCode(10) + 
+                                  (ragContextText ? "Dữ liệu tham khảo:" + String.fromCharCode(10) + ragContextText : "") + 
                                   systemPromptAddition;
 
         let chatHistory = [];
@@ -1979,9 +1975,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 
         if (!response.ok) {
             console.error("OpenRouter Stream Error:", await response.text());
-            res.write(`data: ${JSON.stringify({ error: "Lỗi kết nối AI API" })}
-
-`);
+            res.write(`data: ${JSON.stringify({ error: "Lỗi kết nối AI API" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
             return res.end();
         }
 
@@ -1996,8 +1990,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             if (done) break;
             
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("
-");
+            const lines = chunk.split(String.fromCharCode(10));
             
             for (const line of lines) {
                 if (line.startsWith("data: ") && line !== "data: [DONE]") {
@@ -2015,9 +2008,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                             const contentChunk = parsed.choices[0].delta?.content || "";
                             if (contentChunk) {
                                 aiReplyContent += contentChunk;
-                                res.write(`data: ${JSON.stringify({ content: contentChunk })}
-
-`);
+                                res.write(`data: ${JSON.stringify({ content: contentChunk })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
                             }
                         }
                     } catch (e) {
@@ -2027,9 +2018,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             }
         }
 
-        res.write("data: [DONE]
-
-");
+        res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
         res.end();
 
         // ==========================================
