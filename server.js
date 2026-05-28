@@ -1903,9 +1903,12 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 
         // 1. KÍCH HOẠT MÀNG LỌC TIỀM THỨC
         let learnedRule = await detectAndLearnRule(userMessage, req.user.role, req.user.id);
-        let systemPromptAddition = `
-
-[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngầu, điện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
+        let systemPromptAddition = "";
+        
+        // FIX LOGIC: Chỉ thêm prompt báo cáo nếu thực sự có luật mới được nạp
+        if (learnedRule) {
+            systemPromptAddition = `\n[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngầu, điện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
+        }
 
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -1930,25 +1933,26 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         if (!response.ok) {
             const errBody = await response.text();
             console.error("OpenRouter Stream Error:", errBody);
-            res.write(`data: ${JSON.stringify({ error: "Lỗi kết nối AI API" })}
-
-`);
+            // FIX SSE: Dùng \n\n thay vì Enter xuống dòng
+            res.write(`data: ${JSON.stringify({ error: "Lỗi kết nối AI API" })}\n\n`);
             return res.end();
         }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let aiReplyContent = "";
-        let promptTokens = 0;
+        
+        // Khai báo sẵn biến để hứng Token Usage ở bước sau
+        let promptTokens = 0; 
         let completionTokens = 0;
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
+            
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("
-");
+            // FIX SYNTAX ERROR: Chuyển dấu enter thành \n
+            const lines = chunk.split("\n");
             
             for (const line of lines) {
                 if (line.startsWith("data: ") && line !== "data: [DONE]") {
@@ -1960,14 +1964,17 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                             const contentChunk = parsed.choices[0].delta?.content || "";
                             if (contentChunk) {
                                 aiReplyContent += contentChunk;
-                                res.write(`data: ${JSON.stringify({ content: contentChunk })}
-
-`);
+                                // FIX SSE: Dùng \n\n chuẩn
+                                res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
                             }
                         }
-                        
-                        // Lấy token usage nếu có
-                        if (parsed.usage) {
+                    } catch (e) {
+                        // Bỏ qua lỗi parse JSON cho các chunk không hoàn chỉnh
+                        console.error("Lỗi parse JSON stream chunk:", e);
+                    }
+                }
+            }
+        }
                             promptTokens = parsed.usage.prompt_tokens || 0;
                             completionTokens = parsed.usage.completion_tokens || 0;
                         }
