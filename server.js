@@ -140,8 +140,13 @@ const initDB = async () => {
     `);
     
     await pool.query(`
-        CREATE INDEX IF NOT EXISTS company_knowledge_base_embedding_idx 
+        CREATE INDEX IF NOT EXISTS company_knowledge_vector_idx 
         ON company_knowledge_base USING hnsw (embedding vector_cosine_ops)
+    `);
+    
+    await pool.query(`
+        CREATE INDEX IF NOT EXISTS company_knowledge_metadata_gin_idx 
+        ON company_knowledge_base USING gin (metadata)
     `);
     
     await pool.query(`CREATE TABLE IF NOT EXISTS daily_financial_reports (
@@ -1729,23 +1734,61 @@ async function saveToKnowledgeBase(content, sourceType, metadata = {}) {
     }
 }
 
-async function searchKnowledgeBase(queryText, limit = 3) {
+// ==============================================================================
+// TẦNG RAG SEARCH KẾT HỢP RBAC FILTERING (VERSION 2 - CHUẨN KIẾN TRÚC)
+// ==============================================================================
+async function searchKnowledgeBase(queryText, user, limit = 3) {
     try {
+        // 1. Validate dữ liệu đầu vào chặt chẽ
+        if (!user || !user.role) {
+            throw new Error("Thông tin người dùng không hợp lệ để phân quyền.");
+        }
+
         const queryEmbedding = await generateEmbedding(queryText);
         if (!queryEmbedding) throw new Error("Không thể tạo vector cho câu truy vấn.");
         
         const formatEmbedding = `[${queryEmbedding.join(',')}]`;
+        const { role, department_code } = user;
         
-        // Toán tử <=> là Cosine Distance, nên similarity = 1 - distance
-        const sql = `
-            SELECT id, content, source_type, metadata, 
-                   1 - (embedding <=> $1::vector) AS similarity 
-            FROM company_knowledge_base 
-            ORDER BY embedding <=> $1::vector 
-            LIMIT $2
-        `;
+        // 2. Phân loại nhóm All-Access
+        const isAllAccess = 
+            role === 'SUPER_ADMIN' || 
+            role === 'VICE_PRESIDENT' || 
+            (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING');
+
+        // 3. Kiểm tra an toàn cho nhóm Local
+        if (!isAllAccess && !department_code) {
+            console.error(`CẢNH BÁO BẢO MẬT: Người dùng ${user.id} thiếu department_code khi truy cập RAG.`);
+            throw new Error("Tài khoản của bạn chưa được cấu hình phòng ban. Truy cập bị từ chối.");
+        }
+
+        let sql = "";
+        let params = [];
+
+        // 4. Tách nhánh Truy vấn sử dụng toán tử JSONB tối ưu (@>)
+        if (isAllAccess) {
+            sql = `
+                SELECT id, content, source_type, metadata, 
+                       1 - (embedding <=> $1::vector) AS similarity 
+                FROM company_knowledge_base 
+                ORDER BY embedding <=> $1::vector 
+                LIMIT $2
+            `;
+            params = [formatEmbedding, limit];
+        } else {
+            // Sử dụng toán tử @> để kích hoạt GIN Index, ép kiểu tường minh $3::text
+            sql = `
+                SELECT id, content, source_type, metadata, 
+                       1 - (embedding <=> $1::vector) AS similarity 
+                FROM company_knowledge_base 
+                WHERE metadata @> jsonb_build_object('department_code', $3::text)
+                ORDER BY embedding <=> $1::vector 
+                LIMIT $2
+            `;
+            params = [formatEmbedding, limit, department_code];
+        }
         
-        const { rows } = await pool.query(sql, [formatEmbedding, limit]);
+        const { rows } = await pool.query(sql, params);
         return rows;
     } catch (error) {
         console.error('searchKnowledgeBase Error:', error);
@@ -1817,7 +1860,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         // 2. LỤC LỌI TRÍ NHỚ (Truy xuất luật cũ)
         let ragContext = "";
         try {
-            const memoryResults = await searchKnowledgeBase(userMessage, 3);
+            const memoryResults = await searchKnowledgeBase(userMessage, req.user, 3);
             if (memoryResults && memoryResults.length > 0) {
                 ragContext = "\n\n[KIẾN THỨC NỀN TỪ DATABASE]:\n" + memoryResults.map(r => `- ${r.content}`).join("\n");
             }

@@ -205,5 +205,9 @@ CREATE TABLE IF NOT EXISTS company_knowledge_base (
 );
 
 -- Tạo Index để search tốc độ cao (HNSW)
-CREATE INDEX IF NOT EXISTS company_knowledge_base_embedding_idx 
+CREATE INDEX IF NOT EXISTS company_knowledge_vector_idx 
 ON company_knowledge_base USING hnsw (embedding vector_cosine_ops);
+
+-- GIN Index cho Metadata để phục vụ Filter RBAC siêu tốc
+CREATE INDEX IF NOT EXISTS company_knowledge_metadata_gin_idx 
+ON company_knowledge_base USING gin (metadata);
