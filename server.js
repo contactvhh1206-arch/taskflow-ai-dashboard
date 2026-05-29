@@ -2102,8 +2102,8 @@ async function executeGetRevenueTool(args, user) {
     const perms = getAiPermissions(user);
     
     // 2. Cảnh báo và Chặn Quyền Xuyên Không (Cross-facility)
-    if (!perms.isGlobal && facility_code && String(facility_code).toUpperCase().trim() !== String(perms.facilityCode).toUpperCase().trim()) {
-        console.warn(`[SECURITY ALERT] User ${user.id} (Facility Code ${perms.facilityCode}) cố gắng truy cập doanh thu Facility ${facility_code}`);
+    if (!perms.isGlobal && (!facility_code || String(facility_code).toUpperCase().trim() !== String(perms.facilityCode).toUpperCase().trim())) {
+        console.warn(`[SECURITY ALERT] User ${user.id} (Facility Code ${perms.facilityCode}) có hành vi truy cập bất hợp lệ với tham số: ${facility_code}`);
         return { error: `[SECURITY ALERT] Hệ thống từ chối: Tài khoản của bạn không đủ quyền tra cứu dữ liệu doanh thu của cơ sở chéo [${facility_code}].` };
     }
 
