@@ -2175,31 +2175,29 @@ async function executeGetRevenueTool(args, user) {
 
     if (!targetFacility) {
         // LUỒNG 1: All-Access
-        // Dynamic Date Parsing: Tự động phát hiện nếu chuỗi chứa dấu '-' thì ép kiểu thẳng, ngược lại dùng to_date.
+        // Ép kiểu chuẩn xác to_date($1::text) để tránh bug DateStyle của PostgreSQL
         sql = `SELECT COALESCE(SUM(total_revenue), 0) AS aggregated_revenue 
                FROM daily_financial_reports 
-               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date 
-                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date`;
+               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= to_date($1::text, 'DD/MM/YYYY') 
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= to_date($2::text, 'DD/MM/YYYY')`;
         params = [startDate, endDate];
     } else {
         // LUỒNG 2: Local Group
-        // 1. Phân giải Mixed Schemas: Bao phủ cả trường hợp "data là Array" và "data chứa mảng facilities".
-        // 2. Tích hợp vũ khí tối thượng: Regex Data Cleansing + Dynamic Date Parsing + RBAC.
-        sql = `SELECT COALESCE(SUM(
-                   (SELECT SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric) 
-                    FROM jsonb_array_elements(
-                        CASE 
-                            WHEN jsonb_typeof(data) = 'array' THEN data 
-                            WHEN jsonb_typeof(data->'facilities') = 'array' THEN data->'facilities' 
-                            ELSE '[]'::jsonb 
-                        END
-                    ) AS item 
-                    WHERE REPLACE(UPPER(item->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
-                       OR REPLACE(UPPER(item->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))
-               ), 0) AS aggregated_revenue
+        // 1. Phẳng hóa dữ liệu JSONB ra ngoài bằng CROSS JOIN LATERAL để giữ Context Mapping
+        // 2. Ép kiểu chuẩn xác to_date($1::text) để tránh bug DateStyle
+        sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
                FROM daily_financial_reports
-               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date 
-                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date`;
+               CROSS JOIN LATERAL jsonb_array_elements(
+                   CASE 
+                       WHEN jsonb_typeof(data) = 'array' THEN data 
+                       WHEN jsonb_typeof(data->'facilities') = 'array' THEN data->'facilities' 
+                       ELSE '[]'::jsonb 
+                   END
+               ) AS item
+               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= to_date($1::text, 'DD/MM/YYYY') 
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= to_date($2::text, 'DD/MM/YYYY')
+                 AND (REPLACE(UPPER(item->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
+                      OR REPLACE(UPPER(item->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))`;
         params = [startDate, endDate, targetFacility];
     }
     try {
