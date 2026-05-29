@@ -25,9 +25,7 @@ export default function AIAdvisor(props) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  React.useEffect(() => {
-      scrollToBottom();
-  }, [chatLog]);
+
 
 
   const getGreetingText = (userObj) => {
@@ -65,6 +63,10 @@ export default function AIAdvisor(props) {
   }] : [];
 
   const [chatLog, setChatLog] = useState(defaultLog);
+
+  React.useEffect(() => {
+      scrollToBottom();
+  }, [chatLog]);
 
   React.useEffect(() => {
     currentSessionIdRef.current = activeSessionId;
