@@ -240,14 +240,7 @@ initDB();
 // 1. MOCK DATABASE & MIDDLEWARE PHÃ‚N QUYá»€N (RBAC)
 // ==============================================================================
 
-const mockTasks = [
-  { id: 1, title: 'Báº£o trÃ¬ mÃ¡y láº¡nh', facility_id: 1, pic_id: 2, pic_name: 'Tráº§n Thá»‹ B', status: 'todo', deadline: '2026-05-15' },
-  { id: 2, title: 'Nghiá»‡m thu KPI', facility_id: 2, pic_id: 3, pic_name: 'LÃª VÄƒn C', status: 'review', deadline: '2026-05-12' }, // Trá»… 2 ngÃ y
-  { id: 3, title: 'LÃªn chiáº¿n dá»‹ch Ads', facility_id: 'ALL', pic_id: 4, pic_name: 'Pháº¡m D', status: 'in_progress', deadline: '2026-05-10' } // Trá»… 4 ngÃ y
-];
 
-// Báº£ng Log Nháº¯c viá»‡c AI (CÃ´ng khai cho Sáº¿p Tá»•ng / Tá»•ng quáº£n lÃ½)
-const mockAiPingLogs = [];
 
 // ==============================================================================
 // DAILY LOGS API
@@ -1587,11 +1580,17 @@ app.post('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) =>
 app.post('/api/ai/ping', authenticateUser, async (req, res) => {
   try {
     const { taskId } = req.body;
-    const task = mockTasks.find(t => t.id === taskId);
-
-    if (!task) {
+    const { rows: taskRows } = await pool.query(`
+      SELECT t.id, t.title, TO_CHAR(t.deadline, 'YYYY-MM-DD') as deadline, u.full_name as pic_name
+      FROM tasks t
+      LEFT JOIN users u ON t.pic_id = u.id
+      WHERE t.id = $1
+    `, [taskId]);
+    
+    if (taskRows.length === 0) {
       return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
     }
+    const task = taskRows[0];
 
     // 1. TÃ­nh toÃ¡n Tone nháº¯c viá»‡c dá»±a trÃªn Deadline
     const toneEscalation = calculateTone(task.deadline);
@@ -1669,9 +1668,8 @@ app.post('/api/internal/log-tokens', authenticateUser, async (req, res) => {
       INSERT INTO ai_token_usage_logs (user_id, username, prompt_tokens, completion_tokens, total_tokens)
       VALUES ($1, $2, $3, $4, $5)
     `;
-    // user.id is not available in mock token, so we rely on headers, assuming req.user.id is passed or handled.
-    // In our auth middleware, we only set req.user = { role, facility_id }. Let's assume we map it.
-    await pool.query(query, [null, username, prompt_tokens, completion_tokens, total_tokens]);
+    // Use req.user.id provided by the auth middleware instead of null
+    await pool.query(query, [req.user.id || null, username, prompt_tokens, completion_tokens, total_tokens]);
     res.json({ success: true });
   } catch (error) {
     console.error('Lá»—i lÆ°u log token:', error);
