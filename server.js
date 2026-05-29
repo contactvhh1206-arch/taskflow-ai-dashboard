@@ -1576,17 +1576,21 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
     }
   });
 
-  app.post('/api/ai/sessions', authenticateUser, checkAdmin, async (req, res) => {
+  app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
-      const { id, user_id, facility, title, chat_log, timestamp } = req.body;
+      const { id, title, chat_log, timestamp } = req.body;
+      const insert_user_id = req.user.id;
+      const insert_facility = req.user.facility_id || 'ALL';
+      
       await pool.query(
         `INSERT INTO ai_chat_sessions (id, user_id, facility, title, chat_log, timestamp)
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (id) DO UPDATE SET 
          chat_log = EXCLUDED.chat_log, 
          timestamp = EXCLUDED.timestamp,
-         title = EXCLUDED.title`,
-        [id, user_id, facility, title, JSON.stringify(chat_log || []), timestamp]
+         title = EXCLUDED.title
+         WHERE ai_chat_sessions.user_id = EXCLUDED.user_id`,
+        [id, insert_user_id, insert_facility, title, JSON.stringify(chat_log || []), timestamp]
       );
       res.json({ success: true });
     } catch (error) {
