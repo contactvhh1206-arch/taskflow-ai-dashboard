@@ -2155,17 +2155,6 @@ async function executeCreateTaskTool(args, user) {
 }
 
 async function executeGetRevenueTool(args, user) {
-    // =========================================================
-    // [DEBUG INJECTION: TRÍCH XUẤT RAW JSON ĐỂ TRUY VẾT 0 VNĐ]
-    // =========================================================
-    try {
-        const debugSql = `SELECT date, data FROM daily_financial_reports WHERE date LIKE '%05/2026' OR date LIKE '2026-05-%' LIMIT 1;`;
-        const debugResult = await pool.query(debugSql);
-        console.log("=== RAW DB JSON DATA ===", JSON.stringify(debugResult.rows[0], null, 2));
-    } catch (err) {
-        console.error("=== DEBUG QUERY FAILED ===", err);
-    }
-    // =========================================================
     const { date_range, facility_code } = args;
     
     const isAllAccess = user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT' || (user.role === 'DEPARTMENT_HEAD' && user.department_code === 'MARKETING');
@@ -2196,7 +2185,8 @@ async function executeGetRevenueTool(args, user) {
         // LUỒNG 2: Local Group
         // 1. Phẳng hóa dữ liệu JSONB ra ngoài bằng CROSS JOIN LATERAL để giữ Context Mapping
         // 2. Dynamic Date Parsing cho $1 và $2 để an toàn parse cả ISO lẫn VN format
-        sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
+        sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric), 0) + 
+              COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
                FROM daily_financial_reports
                CROSS JOIN LATERAL jsonb_array_elements(
                    CASE 
@@ -2207,7 +2197,8 @@ async function executeGetRevenueTool(args, user) {
                ) AS item
                WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= (CASE WHEN $1::text LIKE '%-%' THEN $1::date ELSE to_date($1::text, 'DD/MM/YYYY') END)
                  AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= (CASE WHEN $2::text LIKE '%-%' THEN $2::date ELSE to_date($2::text, 'DD/MM/YYYY') END)
-                 AND (REPLACE(UPPER(item->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
+                 AND (REPLACE(UPPER(item->>'name'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
+                      OR REPLACE(UPPER(item->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
                       OR REPLACE(UPPER(item->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))`;
         params = [startDate, endDate, targetFacility];
     }
@@ -2651,12 +2642,13 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         if (promptTokens > 0 || completionTokens > 0) {
             const totalTokens = promptTokens + completionTokens;
             // Ghi log token vào đúng phiên chat hiện tại
-            await pool.query(
-                `UPDATE ai_chat_sessions 
-                 SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{tokens}', jsonb_build_object('total', $1::int))
-                 WHERE id = $2`,
-                [totalTokens, session_id]
-            );
+            // Commenting out metadata logic because column does not exist yet in DB
+            // await pool.query(
+            //     `UPDATE ai_chat_sessions 
+            //      SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{tokens}', jsonb_build_object('total', $1::int))
+            //      WHERE id = $2`,
+            //     [totalTokens, session_id]
+            // );
         }
 
     } catch (error) {
