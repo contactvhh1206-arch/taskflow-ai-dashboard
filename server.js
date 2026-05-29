@@ -1984,39 +1984,55 @@ async function saveToKnowledgeBase(content, sourceType, metadata = {}) {
     }
 }
 
+
 // ==============================================================================
-// Táº¦NG RAG SEARCH Káº¾T Há»¢P RBAC FILTERING (VERSION 2 - CHUáº¨N KIáº¾N TRÃšC)
+// TRUNG TÂM PHÂN QUYỀN AI (AI RBAC GUARDRAIL)
+// ==============================================================================
+function getAiPermissions(user) {
+    if (!user || !user.role) {
+        return { isGlobal: false, departmentCode: null, facilityId: null };
+    }
+    
+    const role = user.role;
+    const departmentCode = user.department_code || null;
+    const facilityId = user.facility_id ? String(user.facility_id) : null;
+    
+    // Xác định quyền All-Access (Global)
+    const isGlobal = role === 'SUPER_ADMIN' || 
+                     role === 'VICE_PRESIDENT' || 
+                     (role === 'DEPARTMENT_HEAD' && departmentCode === 'MARKETING');
+                     
+    return {
+        isGlobal,
+        departmentCode,
+        facilityId
+    };
+}
+
+
+// ==============================================================================
+// TẦNG RAG SEARCH KẾT HỢP RBAC FILTERING (VERSION 2 - CHUẨN KIẾN TRÚC)
 // ==============================================================================
 async function searchKnowledgeBase(queryText, user, limit = 3) {
     try {
-        // 1. Validate dá»¯ liá»‡u Ä‘áº§u vÃ o cháº·t cháº½
-        if (!user || !user.role) {
-            throw new Error("ThÃ´ng tin ngÆ°á»i dÃ¹ng khÃ´ng há»£p lá»‡ Ä‘á»ƒ phÃ¢n quyá»n.");
+        const perms = getAiPermissions(user);
+        
+        // 1. Kiểm tra an toàn cho nhóm Local (Soft Reject)
+        if (!perms.isGlobal && !perms.departmentCode && !perms.facilityId) {
+            console.warn(`[SECURITY ALERT] User ${user.id} thiếu cả department_code và facility_id.`);
+            return [{ content: "Hệ thống từ chối: Tài khoản của bạn chưa được cấu hình phòng ban hoặc cơ sở để tra cứu tài liệu." }];
         }
 
         const queryEmbedding = await generateEmbedding(queryText);
-        if (!queryEmbedding) throw new Error("KhÃ´ng thá»ƒ táº¡o vector cho cÃ¢u truy váº¥n.");
+        if (!queryEmbedding) return [{ content: "Hệ thống: Không thể khởi tạo vector cho câu truy vấn." }];
         
         const formatEmbedding = `[${queryEmbedding.join(',')}]`;
-        const { role, department_code, facility_id } = user;
-        
-        // 2. PhÃ¢n loáº¡i nhÃ³m All-Access
-        const isAllAccess = 
-            role === 'SUPER_ADMIN' || 
-            role === 'VICE_PRESIDENT' || 
-            (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING');
-
-        // 3. Kiá»ƒm tra an toÃ n cho nhÃ³m Local
-        if (!isAllAccess && !department_code && !facility_id) {
-            console.error(`CẢNH BÁO BẢO MẬT: Người dùng ${user.id} thiếu cả department_code và facility_id.`);
-            throw new Error("Tài khoản của bạn chưa được cấu hình phòng ban hoặc cơ sở. Truy cập bị từ chối.");
-        }
 
         let sql = "";
         let params = [];
 
-        // 4. Tách nhánh Truy vấn sử dụng toán tử JSONB tối ưu (@>)
-        if (isAllAccess) {
+        // 2. Tách nhánh Truy vấn với biến perms chuẩn hóa
+        if (perms.isGlobal) {
             sql = `
                 SELECT id, content, source_type, metadata, created_at,
                        1 - (embedding <=> $1::vector) AS similarity 
@@ -2040,16 +2056,17 @@ async function searchKnowledgeBase(queryText, user, limit = 3) {
                     created_at DESC
                 LIMIT $2
             `;
-            params = [formatEmbedding, limit, department_code || null, facility_id || null];
+            params = [formatEmbedding, limit, perms.departmentCode, perms.facilityId];
         }
         
         const { rows } = await pool.query(sql, params);
         return rows;
     } catch (error) {
         console.error('searchKnowledgeBase Error:', error);
-        throw error;
+        return [{ content: "Hệ thống từ chối: Đã xảy ra lỗi nội bộ khi tra cứu cơ sở tri thức." }];
     }
 }
+
 
 
 // ==============================================================================
@@ -2154,12 +2171,20 @@ async function executeCreateTaskTool(args, user) {
     }
 }
 
+
 async function executeGetRevenueTool(args, user) {
     const { date_range, facility_code } = args;
     
-    const isAllAccess = user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT' || (user.role === 'DEPARTMENT_HEAD' && user.department_code === 'MARKETING');
-    // Ép kiểu String để tránh lỗi khi so sánh JSONB
-    const targetFacility = isAllAccess ? (facility_code ? String(facility_code) : null) : String(user.facility_id);
+    // 1. Áp dụng Hàm Trung Tâm Phân Quyền
+    const perms = getAiPermissions(user);
+    
+    // 2. Cảnh báo và Chặn Quyền Xuyên Không (Cross-facility)
+    if (!perms.isGlobal && facility_code && String(facility_code).toUpperCase().trim() !== String(perms.facilityId).toUpperCase().trim()) {
+        console.warn(`[SECURITY ALERT] User ${user.id} (Facility ${perms.facilityId}) cố gắng truy cập doanh thu Facility ${facility_code}`);
+        return { error: `Hệ thống từ chối: Tài khoản của bạn không đủ quyền tra cứu dữ liệu doanh thu của cơ sở chéo [${facility_code}].` };
+    }
+
+    const targetFacility = perms.isGlobal ? (facility_code ? String(facility_code) : null) : perms.facilityId;
 
     // ==============================================================
     // FALLBACK DATE LOGIC: MIỄN NHIỄM VỚI MỌI SAI SÓT TỪ USER/AI
@@ -2167,20 +2192,16 @@ async function executeGetRevenueTool(args, user) {
     let startDate, endDate;
 
     if (date_range && typeof date_range === 'object' && date_range.startDate && date_range.endDate) {
-        // AI truyền đúng cấu trúc Object { startDate, endDate }
         startDate = date_range.startDate;
         endDate = date_range.endDate;
     } else if (typeof date_range === 'string' && date_range.includes('-')) {
-        // AI truyền chuỗi khoảng thời gian (VD: '2026-05-01 - 2026-05-31' hoặc '01/05/2026-31/05/2026')
         const parts = date_range.split('-');
         startDate = parts[0]?.trim();
         endDate = parts[1]?.trim() || startDate; 
     } else {
-        // TRƯỜNG HỢP BẤT TỬ (FALLBACK): AI trả về Null, Undefined, hoặc chuỗi rác
         const today = new Date();
         const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
         
-        // Helper xuất chuỗi chuẩn YYYY-MM-DD (ISO) để khớp với regex %-% trong SQL
         const formatToISO = (d) => {
             const year = d.getFullYear();
             const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -2197,17 +2218,12 @@ async function executeGetRevenueTool(args, user) {
     let params = [];
 
     if (!targetFacility) {
-        // LUỒNG 1: All-Access
-        // Dynamic Date Parsing cho $1 và $2 để an toàn parse cả ISO lẫn VN format
         sql = `SELECT COALESCE(SUM(total_revenue), 0) AS aggregated_revenue 
                FROM daily_financial_reports 
                WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= (CASE WHEN $1::text LIKE '%-%' THEN $1::date ELSE to_date($1::text, 'DD/MM/YYYY') END) 
                  AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= (CASE WHEN $2::text LIKE '%-%' THEN $2::date ELSE to_date($2::text, 'DD/MM/YYYY') END)`;
         params = [startDate, endDate];
     } else {
-        // LUỒNG 2: Local Group
-        // 1. Phẳng hóa dữ liệu JSONB ra ngoài bằng CROSS JOIN LATERAL để giữ Context Mapping
-        // 2. Dynamic Date Parsing cho $1 và $2 để an toàn parse cả ISO lẫn VN format
         sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric), 0) + 
               COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
                FROM daily_financial_reports
@@ -2225,6 +2241,7 @@ async function executeGetRevenueTool(args, user) {
                       OR REPLACE(UPPER(item->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))`;
         params = [startDate, endDate, targetFacility];
     }
+    
     try {
         const { rows } = await pool.query(sql, params);
         return {
@@ -2233,9 +2250,10 @@ async function executeGetRevenueTool(args, user) {
         };
     } catch (error) {
         console.error("Revenue DB Error:", error);
-        throw new Error("Lỗi hệ thống khi trích xuất doanh thu.");
+        return { error: "Lỗi hệ thống khi trích xuất doanh thu từ cơ sở dữ liệu." };
     }
 }
+
 
 async function detectAndLearnRule(message, role, userId) {
     if (role !== 'SUPER_ADMIN' && role !== 'VICE_PRESIDENT') {
