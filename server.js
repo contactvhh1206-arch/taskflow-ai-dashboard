@@ -2182,8 +2182,8 @@ async function executeGetRevenueTool(args, user) {
         params = [startDate, endDate];
     } else {
         // LUỒNG 2: Local Group
-        // 1. REPLACE: Lột bỏ dấu phẩy. 2. NULLIF: Chặn chuỗi rỗng trước khi ép kiểu numeric để chống crash
-        sql = `SELECT COALESCE(SUM((NULLIF(REPLACE(data->>'totalRevenue', ',', ''), ''))::numeric), 0) AS aggregated_revenue
+        // 1. regexp_replace: Lột bỏ toàn bộ mọi ký tự rác. 2. NULLIF: Chặn chuỗi rỗng trước khi ép kiểu.
+        sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(data->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
                FROM daily_financial_reports
                WHERE to_date(date, 'DD/MM/YYYY') >= $1::date AND to_date(date, 'DD/MM/YYYY') <= $2::date
                  AND (REPLACE(UPPER(data->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
