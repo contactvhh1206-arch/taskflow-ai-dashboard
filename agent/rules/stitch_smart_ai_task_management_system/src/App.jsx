@@ -80,7 +80,7 @@ const getStatusConfig = (status) => {
   };
 
 // 1. Khởi tạo Auth Context
-export const AuthContext = createContext();
+import { AuthContext } from './contexts/AuthContext.jsx';
 
 const INITIAL_TASKS = [
   { id: 1, title: 'Bảo trì máy lạnh cơ sở 1', status: 'todo', facility: 'Cơ sở 1', pic: 'Quản lý Cơ sở 1', deadline: '2026-05-14', urgent: true, createdAt: '2026-05-13' },

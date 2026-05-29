@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../App.jsx';
+import { AuthContext } from '../contexts/AuthContext.jsx';
 import { saveData, fetchHistory } from '../services/dataService.js';
 
 export default function DailyCheckin({ onCheckinSuccess, showToast }) {
