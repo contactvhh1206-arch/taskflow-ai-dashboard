@@ -1994,7 +1994,7 @@ function getAiPermissions(user) {
     }
     
     const role = user.role;
-    const departmentCode = user.department_code || null;
+    const departmentCode = user.department_code || user.department_id || null;
     const facilityId = user.facility_id ? String(user.facility_id) : null;
     
     // Xác định quyền All-Access (Global)
@@ -2446,7 +2446,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                             },
                             facility_code: { 
                                 type: "string", 
-                                description: "Mã cơ sở cần xem (tùy chọn). Để trống nếu xem toàn hệ thống." 
+                                description: "Mã cơ sở cần xem (tùy chọn nhưng NẾU TRONG LỊCH SỬ CHAT CÓ ĐỀ CẬP THÌ BẮT BUỘC PHẢI LẤY MÃ ĐÓ). Để trống nếu xem toàn hệ thống." 
                             }
                         },
                         required: ["date_range"]
@@ -2521,12 +2521,15 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             // ADMIN STREAMING (Giá»¯ nguyÃªn)
             let reader = response.body.getReader();
             let decoder = new TextDecoder("utf-8");
+            let buffer = "";
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 
                 const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split(String.fromCharCode(10));
+                buffer += chunk;
+                const lines = buffer.split(String.fromCharCode(10));
+                buffer = lines.pop();
                 
                 for (const line of lines) {
                     if (line.startsWith("data: ") && line !== "data: [DONE]") {
