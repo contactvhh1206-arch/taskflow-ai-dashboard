@@ -1935,23 +1935,28 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 async function generateEmbedding(text) {
     if (!text || typeof text !== 'string') return null;
     try {
-        // Using OpenRouter API for embeddings
-        const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
-            method: 'POST',
+        const response = await fetch("https://openrouter.ai/api/v1/embeddings", {
+            method: "POST",
             headers: {
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://taskflow.ai',
-                'X-Title': 'TaskFlow'
+                "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://www.hubdb.app",
+                "X-Title": "Hub Dubai AI"
             },
             body: JSON.stringify({
-                model: 'openai/text-embedding-3-small',
-                input: text.replace(/\n/g, ' ')
+                model: "openai/text-embedding-3-small", 
+                input: text 
             })
         });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`OpenRouter Error: ${response.status} - ${errText}`);
+        }
+
         const data = await response.json();
         if (data.data && data.data.length > 0) {
-            return data.data[0].embedding; // Array of 1536 floats
+            return data.data[0].embedding; 
         }
         throw new Error(data.error?.message || 'Lỗi không xác định từ OpenRouter');
     } catch (error) {
