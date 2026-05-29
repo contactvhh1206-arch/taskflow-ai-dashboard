@@ -2433,21 +2433,24 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             }
         }
 
-        const messages = [
+        // ==========================================
+        // BƯỚC 3.1: LẮP RÁP PAYLOAD CHUẨN MỰC
+        // ==========================================
+        const messagesPayload = [
             { role: "system", content: finalSystemPrompt },
             ...chatHistory,
             { role: "user", content: userMessage }
         ];
 
         // ==========================================
-        // NHáº¬P 3: SSE STREAMING Vá»šI TOOL CALL
+        // BƯỚC 3.2: MỞ CỔNG SSE GIỮ KẾT NỐI CLIENT (CHỐNG TIMEOUT)
         // ==========================================
         res.setHeader('Content-Type', 'text/event-stream; charset=utf-8'); 
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         res.flushHeaders(); 
 
-                const tools = [
+        const tools = [
             {
                 type: "function",
                 function: {
@@ -2489,24 +2492,31 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             }
         ];
 
+        const openRouterPayload = {
+            model: process.env.AI_MODEL || 'google/gemini-2.5-pro', 
+            messages: messagesPayload,
+            tools: tools,
+            stream: true
+        };
+
+        // ==========================================
+        // BƯỚC 3.3: GỌI OPENROUTER API & BẮT LỖI TẦNG MẠNG
+        // ==========================================
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: { 
                 "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY || OPENROUTER_API_KEY}`, 
+                "HTTP-Referer": process.env.APP_URL || 'http://localhost:3000',
+                "X-Title": "TaskFlow AI Dashboard",
                 "Content-Type": "application/json" 
             },
-            body: JSON.stringify({
-                model: "openai/gpt-4o-mini",
-                messages: messages,
-                stream: !isLocalUser,
-                tools: tools,
-                stream_options: !isLocalUser ? { include_usage: true } : undefined
-            })
+            body: JSON.stringify(openRouterPayload)
         });
 
         if (!response.ok) {
-            console.error("OpenRouter Stream Error:", await response.text());
-            res.write(`data: ${JSON.stringify({ error: "Lá»—i káº¿t ná»‘i AI API" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+            const errText = await response.text();
+            console.error("🚨 OpenRouter API Error:", response.status, errText);
+            res.write(`data: ${JSON.stringify({ error: "Lỗi kết nối từ AI Core. Vui lòng kiểm tra lại cấu hình." })}\n\n`);
             return res.end();
         }
 
