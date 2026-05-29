@@ -2161,14 +2161,37 @@ async function executeGetRevenueTool(args, user) {
     // Ép kiểu String để tránh lỗi khi so sánh JSONB
     const targetFacility = isAllAccess ? (facility_code ? String(facility_code) : null) : String(user.facility_id);
 
-    // Hàm tiện ích tạo ngày (giả lập hoặc dùng thư viện date)
-    const getDates = (range) => {
+    // ==============================================================
+    // FALLBACK DATE LOGIC: MIỄN NHIỄM VỚI MỌI SAI SÓT TỪ USER/AI
+    // ==============================================================
+    let startDate, endDate;
+
+    if (date_range && typeof date_range === 'object' && date_range.startDate && date_range.endDate) {
+        // AI truyền đúng cấu trúc Object { startDate, endDate }
+        startDate = date_range.startDate;
+        endDate = date_range.endDate;
+    } else if (typeof date_range === 'string' && date_range.includes('-')) {
+        // AI truyền chuỗi khoảng thời gian (VD: '2026-05-01 - 2026-05-31' hoặc '01/05/2026-31/05/2026')
+        const parts = date_range.split('-');
+        startDate = parts[0]?.trim();
+        endDate = parts[1]?.trim() || startDate; 
+    } else {
+        // TRƯỜNG HỢP BẤT TỬ (FALLBACK): AI trả về Null, Undefined, hoặc chuỗi rác
         const today = new Date();
-        const endDate = today.toISOString().split('T')[0];
-        const startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-        return { startDate, endDate };
-    };
-    const { startDate, endDate } = getDates(date_range);
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        
+        // Helper xuất chuỗi chuẩn YYYY-MM-DD (ISO) để khớp với regex %-% trong SQL
+        const formatToISO = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        startDate = formatToISO(firstDay);
+        endDate = formatToISO(today);
+        console.warn(`[REVENUE TOOL] Missing date_range. Fallback to current month: ${startDate} -> ${endDate}`);
+    }
 
     let sql = "";
     let params = [];
