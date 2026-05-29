@@ -597,7 +597,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
     if (ALL_ACCESS_ROLES.includes(role)) {
         // Nhóm All-Access: Không áp dụng điều kiện lọc bổ sung
     } else {
-        // Nhóm Local: Áp dụng chung cho FACILITY_MANAGER, FINANCE_DEPT...
+        // Nhóm Local: Áp dụng chung cho FACILITY_MANAGER, LOCAL...
         params.push(department_code, id, id);
         query += ` AND (t.department_code = $${params.length - 2} OR t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
     }
