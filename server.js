@@ -2566,7 +2566,6 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                     }
                 }
             }
-        }
 
         // ==========================================
         // 3. XỬ LÝ VÀ GỘP NHIỀU TOOL CALLS THÀNH 1
@@ -2766,10 +2765,11 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
 
     } catch (error) {
-        console.error("AI Chat Stream error:", error);
+        console.error("Lỗi bao quát tại API AI Chat:", error);
         if (!res.headersSent) {
-            res.status(500).json({ error: "Lá»—i há»‡ thá»‘ng AI Chat." });
+            res.status(500).json({ error: "Lỗi máy chủ nội bộ." });
         } else {
+            res.write(`data: ${JSON.stringify({ error: "Lỗi đứt gãy Stream nội bộ." })}\n\n`);
             res.end();
         }
     }
