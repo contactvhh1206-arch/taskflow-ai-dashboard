@@ -737,33 +737,13 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
 
     if (!comment) return res.status(400).json({ error: 'Ná»™i dung bÃ¬nh luáº­n trá»‘ng' });
 
-    // 1. Láº¤Y USER_ID AN TOÃ€N VÃ€ CHáº¶N NGAY Náº¾U Rá»–NG (NguyÃªn nhÃ¢n gá»‘c gÃ¢y sáº­p)
-    let realUserId = null;
-    try {
-        if (req.user && req.user.id) {
-            realUserId = req.user.id;
-        } else {
-            const roleHeader = req.headers['x-user-role'];
-            if (roleHeader) {
-                const roleRes = await pool.query('SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE r.name = $1 LIMIT 1', [roleHeader]);
-                if (roleRes.rows.length > 0) realUserId = roleRes.rows[0].id;
-            }
-        }
-        
-        if (!realUserId) {
-            const fallbackRes = await pool.query('SELECT id FROM users ORDER BY id ASC LIMIT 1');
-            if (fallbackRes.rows.length > 0) realUserId = fallbackRes.rows[0].id;
-        }
-    } catch (parseErr) {
-        console.error("Lá»—i parse user an toÃ n:", parseErr);
+    // 1. LẤY USER_ID TỪ TOKEN, KHÔNG CHÂM CHƯỚC
+    if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: '401 Unauthorized: Không thể xác định danh tính. Vui lòng đăng nhập lại!' });
     }
+    const realUserId = req.user.id;
 
-    // [QUAN TRá»ŒNG NHáº¤T]: TRáº M GÃC CHá»NG Sáº¬P DB
-    if (!realUserId) {
-        return res.status(403).json({ error: 'KhÃ´ng thá»ƒ xÃ¡c Ä‘á»‹nh danh tÃ­nh. Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i!' });
-    }
-
-    // 2. THá»°C THI INSERT (LÃºc nÃ y realUserId Ä‘Ã£ Ä‘Æ°á»£c Ä‘áº£m báº£o 100% lÃ  an toÃ n)
+    // 2. THỰC THI INSERT (LÃºc nÃ y realUserId Ä‘Ã£ Ä‘Æ°á»£c Ä‘áº£m báº£o 100% lÃ  an toÃ n)
     const { rows } = await pool.query(`
       INSERT INTO task_comments (task_id, user_id, content)
       VALUES ($1, $2, $3) RETURNING *
