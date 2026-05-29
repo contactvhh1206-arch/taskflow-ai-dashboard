@@ -2507,7 +2507,8 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         let toolCallId = null;
         let toolCallName = null;
         let toolCallArguments = "";
-        let buffer = "";
+        let toolCallsMap = {}; 
+        let mainToolName = "";
 
         if (isLocalUser) {
             const data = await response.json();
@@ -2552,9 +2553,6 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 res.write(`data: ${JSON.stringify({ error: "Lỗi luồng kết nối AI. Vui lòng thử lại sau." })}\n\n`);
                 return res.end();
             }
-            // 1. KHỞI TẠO MAP CHỨA DATA ĐA LUỒNG (Để ngoài vòng lặp for await)
-            const toolCallsMap = {}; 
-            let mainToolName = "";
             let decoder = new TextDecoder("utf-8");
             let buffer = "";
             for await (const value of response.body) {
