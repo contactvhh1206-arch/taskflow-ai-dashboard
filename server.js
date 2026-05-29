@@ -2716,21 +2716,23 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 const saveAiMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)`;
                 await pool.query(saveAiMsgSql, [session_id, aiReplyContent]);
             } catch (innerErr) {
-                // Graceful Degradation: Bỏ qua lỗi thiếu bảng, cho phép luồng Chat tiếp tục
-                console.warn("Failed to save chat message: Table missing", innerErr.message);
+                console.error("Lỗi lưu tin nhắn AI vào DB:", innerErr.message);
             }
         }
 
         if (promptTokens > 0 || completionTokens > 0) {
             const totalTokens = promptTokens + completionTokens;
             // Ghi log token vào đúng phiên chat hiện tại
-            // Commenting out metadata logic because column does not exist yet in DB
-            // await pool.query(
-            //     `UPDATE ai_chat_sessions 
-            //      SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{tokens}', jsonb_build_object('total', $1::int))
-            //      WHERE id = $2`,
-            //     [totalTokens, session_id]
-            // );
+            try {
+                await pool.query(
+                    `UPDATE ai_chat_sessions 
+                     SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{tokens}', jsonb_build_object('total', $1::int))
+                     WHERE id = $2`,
+                    [totalTokens, session_id]
+                );
+            } catch (metaErr) {
+                console.error("Lỗi cập nhật metadata token:", metaErr.message);
+            }
         }
 
     } catch (error) {
