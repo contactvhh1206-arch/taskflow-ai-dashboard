@@ -2439,10 +2439,16 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             if (data.choices && data.choices.length > 0) {
                 const msg = data.choices[0].message;
                 if (msg.tool_calls && msg.tool_calls.length > 0) {
-                    const tc = msg.tool_calls[0];
-                    if (tc.id) toolCallId = tc.id;
-                    if (tc.function && tc.function.name) toolCallName = tc.function.name;
-                    if (tc.function && tc.function.arguments) toolCallArguments = tc.function.arguments;
+                    msg.tool_calls.forEach((tc, index) => {
+                        toolCallsMap[index] = {
+                            id: tc.id || '',
+                            name: tc.function ? tc.function.name : '',
+                            arguments: tc.function ? tc.function.arguments : ''
+                        };
+                        if (tc.function && tc.function.name) {
+                            mainToolName = tc.function.name;
+                        }
+                    });
                 }
                 if (msg.content) {
                     aiReplyContent = msg.content;
