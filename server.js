@@ -571,6 +571,8 @@ app.delete('/api/users/:id', authenticateUser, checkAdmin, async (req, res) => {
   }
 });
 
+const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'];
+
 app.get('/api/tasks', authenticateUser, async (req, res) => {
   try {
     const { role, facility_id, department_code, department_id, id } = req.user;
@@ -592,15 +594,11 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
     const params = [];
     const userDept = normalizeDept(department_code || department_id);
 
-    if (
-        role === 'SUPER_ADMIN' || 
-        role === 'VICE_PRESIDENT' || 
-        (role === 'DEPARTMENT_HEAD' && userDept === 'MARKETING')
-    ) {
-        // NhÃ³m All-Access: KhÃ´ng Ã¡p dá»¥ng Ä‘iá»u kiá»‡n lá»c bá»• sung
+    if (ALL_ACCESS_ROLES.includes(role)) {
+        // Nhóm All-Access: Không áp dụng điều kiện lọc bổ sung
     } else {
-        // NhÃ³m Local: Ãp dá»¥ng chung cho FACILITY_MANAGER, FINANCE_DEPT...
-        params.push(userDept, id, id);
+        // Nhóm Local: Áp dụng chung cho FACILITY_MANAGER, FINANCE_DEPT...
+        params.push(department_code, id, id);
         query += ` AND (t.department_code = $${params.length - 2} OR t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
     }
       
@@ -831,22 +829,13 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       let insert_dept_code = normalizeDept(department_code || facility);
       let insert_facility_id = null;
 
-      // 1. CHá»NG PAYLOAD SPOOFING: Ã‰P Cá»¨NG Äá»ŠNH DANH THEO ROLE
-      if (req.user.role === 'FACILITY_MANAGER') {
+      // 1. CHỐNG PAYLOAD SPOOFING: ÉP CỨNG ĐỊNH DANH THEO ROLE
+      if (!ALL_ACCESS_ROLES.includes(req.user.role)) {
+          // Nhóm Local (VD: FACILITY_MANAGER)
+          insert_dept_code = req.user.department_code;
           insert_facility_id = req.user.facility_id;
-      } else if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT' || req.user.role === 'LOCAL') {
-          insert_dept_code = normalizeDept(req.user.department_code || req.user.department_id);
-          
-          if (facility && facility !== 'HQ' && facility !== 'ALL') {
-              let parsedFac = parseInt(facility, 10);
-              if (!isNaN(parsedFac)) insert_facility_id = parsedFac;
-              else {
-                  const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
-                  if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
-              }
-          }
       } else {
-          // ADMIN hoáº·c VICE_PRESIDENT
+          // Nhóm All-Access
           if (facility && facility !== 'HQ' && facility !== 'ALL') {
               let parsedFac = parseInt(facility, 10);
               if (!isNaN(parsedFac)) insert_facility_id = parsedFac;
