@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AIAdvisor from './AIAdvisor';
 
 export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacilityFilter }) {
@@ -10,6 +10,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
       const [isLoading, setIsLoading] = useState(false);
       const [localFacFilter, setLocalFacFilter] = useState('ALL');
       const [facilitiesList] = useState(() => JSON.parse(localStorage.getItem('taskflow_facilities') || '[]'));
+      const hasPinged = useRef(false); // Khóa vòng lặp useEffect (Chống Spam AI Ping)
 
       const handleRequestSupport = async (taskId) => {
         try {
@@ -48,7 +49,10 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
       };
 
       useEffect(() => {
-        setIsLoading(true);
+        // Chỉ hiện Loading khi chưa có data (Ngăn chặn Flicker chớp màn hình khi re-render)
+        if (stats.total === -1) {
+          setIsLoading(true);
+        }
         const timer = setTimeout(async () => {
           try {
             // Safe array fallback and Row-level security
@@ -167,21 +171,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             const urgent = myTasks.filter(t => t?.status !== 'done' && t?.status !== 'revoked' && (t?.urgent || t?.pinned || (t?.deadline && t.deadline <= todayStr)));
             setUrgentTasks(urgent || []);
 
-            // Generate Empathetic AI Pings based on urgent tasks for this user
-            const sysPrompts = JSON.parse(localStorage.getItem('taskflow_system_prompts') || '{}');
-            const pingTemplate = sysPrompts.empatheticPing || 'Tôi thấy công việc "[TASK_TITLE]" đang tới hạn. Bạn có cần hỗ trợ điều phối thêm nhân sự không? Đừng quá áp lực nhé!';
-
-            const pings = (urgent || []).slice(0, 3).map((t, idx) => {
-              const message = pingTemplate.replace('[TASK_TITLE]', t.title);
-              console.log('[OpenRouter API Call] System Prompt Ping:', pingTemplate);
-              return {
-                id: `ping-${t.id}-${idx}`,
-                task: t,
-                message: message,
-                time: `${(idx + 1) * 15} phút trước`
-              };
-            });
-            setAiPings(pings);
+            // AI Pings now handled by a separate useEffect with useRef lock to call Node API
 
             if (window.DataService) {
               const history = await window.DataService.fetchHistory({ entry_type: 'Operation_Log' });
@@ -202,10 +192,62 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
           } finally {
             setIsLoading(false);
           }
-        }, 600); // Simulate API latency
+        }, 50); // Giảm latency ảo xuống 50ms để tối ưu tốc độ UI
 
         return () => clearTimeout(timer);
       }, [tasks, user, timeFilter, user?.facility_id, user?.facility_name, globalFacilityFilter, localFacFilter]);
+
+      // --- NEW AI PING ENGINE (NODE API CALL) ---
+      useEffect(() => {
+        if (!hasPinged.current && urgentTasks.length > 0) {
+          hasPinged.current = true; // Khóa ngay lập tức, ngăn chặn Infinite Loop
+          
+          const callAiPing = async () => {
+            const topUrgent = urgentTasks.slice(0, 3);
+            const pingPromises = topUrgent.map(async (t, idx) => {
+              try {
+                const token = localStorage.getItem('token') || localStorage.getItem('taskflow_token');
+                const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/ai/ping`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ taskId: t.id })
+                });
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  if (data.success) {
+                    return {
+                      id: `ping-${t.id}-${idx}`,
+                      task: t,
+                      message: data.data.generated_message,
+                      time: 'Vừa xong'
+                    };
+                  }
+                }
+              } catch (e) {
+                console.error('Lỗi gọi AI Ping từ Node:', e);
+              }
+              
+              // Fallback tĩnh khi mạng lỗi (Không call AI trực tiếp từ React)
+              return {
+                id: `ping-${t.id}-${idx}-fallback`,
+                task: t,
+                message: `Hệ thống: Công việc "${t.title}" đang tới hạn. Cần đẩy nhanh tiến độ.`,
+                time: 'Vừa xong'
+              };
+            });
+            
+            const results = await Promise.all(pingPromises);
+            setAiPings(results);
+          };
+          
+          callAiPing();
+        }
+      }, [urgentTasks]);
+      // ------------------------------------------
       if (isLoading) {
         return (
           <div className="space-y-6 animate-fade-in">
