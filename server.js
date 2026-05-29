@@ -2155,6 +2155,17 @@ async function executeCreateTaskTool(args, user) {
 }
 
 async function executeGetRevenueTool(args, user) {
+    // =========================================================
+    // [DEBUG INJECTION: TRÍCH XUẤT RAW JSON ĐỂ TRUY VẾT 0 VNĐ]
+    // =========================================================
+    try {
+        const debugSql = `SELECT date, data FROM daily_financial_reports WHERE date LIKE '%05/2026' OR date LIKE '2026-05-%' LIMIT 1;`;
+        const debugResult = await pool.query(debugSql);
+        console.log("=== RAW DB JSON DATA ===", JSON.stringify(debugResult.rows[0], null, 2));
+    } catch (err) {
+        console.error("=== DEBUG QUERY FAILED ===", err);
+    }
+    // =========================================================
     const { date_range, facility_code } = args;
     
     const isAllAccess = user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT' || (user.role === 'DEPARTMENT_HEAD' && user.department_code === 'MARKETING');
