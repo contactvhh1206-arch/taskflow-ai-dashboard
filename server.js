@@ -1908,12 +1908,13 @@ async function saveToKnowledgeBase(content, sourceType, metadata = {}) {
 // ==============================================================================
 function getAiPermissions(user) {
     if (!user || !user.role) {
-        return { isGlobal: false, departmentCode: null, facilityId: null };
+        return { isGlobal: false, departmentCode: null, facilityId: null, facilityCode: null };
     }
     
     const role = user.role;
     const departmentCode = user.department_code || user.department_id || '';
     const facilityId = user.facility_id ? String(user.facility_id) : null;
+    const facilityCode = user.facility_code ? String(user.facility_code) : null;
     
     // Quét toàn bộ mọi biến thể tiếng Việt và tiếng Anh của khối Marketing
     const isMarketing = Boolean(String(departmentCode).match(/MARKETING|TRUYỀN THÔNG|MKT|MEDIA/i));
@@ -1927,7 +1928,8 @@ function getAiPermissions(user) {
     return {
         isGlobal,
         departmentCode,
-        facilityId
+        facilityId,
+        facilityCode
     };
 }
 
@@ -2100,12 +2102,12 @@ async function executeGetRevenueTool(args, user) {
     const perms = getAiPermissions(user);
     
     // 2. Cảnh báo và Chặn Quyền Xuyên Không (Cross-facility)
-    if (!perms.isGlobal && facility_code && String(facility_code).toUpperCase().trim() !== String(perms.facilityId).toUpperCase().trim()) {
-        console.warn(`[SECURITY ALERT] User ${user.id} (Facility ${perms.facilityId}) cố gắng truy cập doanh thu Facility ${facility_code}`);
-        return { error: `Hệ thống từ chối: Tài khoản của bạn không đủ quyền tra cứu dữ liệu doanh thu của cơ sở chéo [${facility_code}].` };
+    if (!perms.isGlobal && facility_code && String(facility_code).toUpperCase().trim() !== String(perms.facilityCode).toUpperCase().trim()) {
+        console.warn(`[SECURITY ALERT] User ${user.id} (Facility Code ${perms.facilityCode}) cố gắng truy cập doanh thu Facility ${facility_code}`);
+        return { error: `[SECURITY ALERT] Hệ thống từ chối: Tài khoản của bạn không đủ quyền tra cứu dữ liệu doanh thu của cơ sở chéo [${facility_code}].` };
     }
 
-    const targetFacility = perms.isGlobal ? (facility_code ? String(facility_code) : null) : perms.facilityId;
+    const targetFacility = perms.isGlobal ? (facility_code ? String(facility_code) : null) : perms.facilityCode;
 
     // ==============================================================
     // FALLBACK DATE LOGIC: MIỄN NHIỄM VỚI MỌI SAI SÓT TỪ USER/AI
