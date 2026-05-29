@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'HubDB_Global_Temp_Secret_2026_!!!';
@@ -2100,7 +2100,7 @@ async function executeCreateTaskTool(args, user) {
         (user.role === 'DEPARTMENT_HEAD' && user.department_code === 'MARKETING');
 
     if (!isAllAccess) {
-        const userDept = normalizeDeptCode(user.department_code || user.facility_code || '');
+        const userDept = normalizeDeptCode(user.department_code || (user.facility_id ? String(user.facility_id) : 'GLOBAL'));
         if (normalizedDept !== userDept) {
             throw new Error(`AI Tá»ª CHá»I: Báº¡n khÃ´ng cÃ³ quyá»n táº¡o task cho phÃ²ng ban [${normalizedDept}]. Tháº©m quyá»n cá»§a báº¡n giá»›i háº¡n táº¡i: [${userDept}].`);
         }
@@ -2534,10 +2534,13 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 
         if (promptTokens > 0 || completionTokens > 0) {
             const totalTokens = promptTokens + completionTokens;
-            await pool.query(`
-                INSERT INTO ai_ping_logs (user_id, facility_id, prompt_tokens, completion_tokens, total_tokens)
-                VALUES ($1, $2, $3, $4, $5)
-            `, [req.user.id, req.user.facility_id || null, promptTokens, completionTokens, totalTokens]);
+            // Ghi log token vào đúng phiên chat hiện tại
+            await pool.query(
+                `UPDATE ai_chat_sessions 
+                 SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{tokens}', jsonb_build_object('total', $1::int))
+                 WHERE id = $2`,
+                [totalTokens, session_id]
+            );
         }
 
     } catch (error) {
