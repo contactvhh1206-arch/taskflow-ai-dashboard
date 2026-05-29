@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'HubDB_Global_Temp_Secret_2026_!!!';
@@ -14,7 +14,7 @@ dotenv.config();
 const normalizeDept = (code) => {
     if (!code) return '';
     let normalized = code.toString().trim().toUpperCase();
-    normalized = normalized.replace(/^PHÒNG\s+/i, '').replace(/^PHONG\s+/i, '');
+    normalized = normalized.replace(/^PHÃ’NG\s+/i, '').replace(/^PHONG\s+/i, '');
     if (normalized === 'MKT') return 'MARKETING';
     return normalized;
 };
@@ -46,7 +46,7 @@ setInterval(() => {
     });
 }, 15000);
 
-// HÀM PHÂN QUYỀN SSE BROADCAST
+// HÃ€M PHÃ‚N QUYá»€N SSE BROADCAST
 async function sendRealtimeNotification(taskId, type, message, actorId = null) {
     if (!taskId) return;
     try {
@@ -54,7 +54,7 @@ async function sendRealtimeNotification(taskId, type, message, actorId = null) {
         if (taskCheck.rows.length === 0) return;
         const task = taskCheck.rows[0];
 
-        // Lấy danh sách User hợp lệ (Sếp tổng/phó HOẶC trùng facility_id/department_code)
+        // Láº¥y danh sÃ¡ch User há»£p lá»‡ (Sáº¿p tá»•ng/phÃ³ HOáº¶C trÃ¹ng facility_id/department_code)
         const usersRes = await pool.query(`
             SELECT u.id 
             FROM users u
@@ -68,14 +68,14 @@ async function sendRealtimeNotification(taskId, type, message, actorId = null) {
         const allowedUserIds = usersRes.rows.map(r => r.id);
         
         for (const uid of allowedUserIds) {
-            // Lưu DB Notifications
+            // LÆ°u DB Notifications
             const notifRes = await pool.query(`
                 INSERT INTO notifications (user_id, task_id, type, message, actor_id)
                 VALUES ($1, $2, $3, $4, $5) RETURNING *
             `, [uid, taskId, type, message, actorId]);
             const newNotif = notifRes.rows[0];
 
-            // Bắn SSE an toàn đúng kênh
+            // Báº¯n SSE an toÃ n Ä‘Ãºng kÃªnh
             if (sseClients.has(parseInt(uid))) {
                 sseClients.get(parseInt(uid)).write(`data: ${JSON.stringify(newNotif)}\n\n`);
             } else if (sseClients.has(String(uid))) {
@@ -125,11 +125,11 @@ const initDB = async () => {
     )`);
     
     // =========================================
-    // KÍCH HOẠT VECTOR VÀ BẢNG RAG (KNOWLEDGE BASE)
+    // KÃCH HOáº T VECTOR VÃ€ Báº¢NG RAG (KNOWLEDGE BASE)
     // =========================================
     await pool.query(`CREATE EXTENSION IF NOT EXISTS vector`);
 
-    // Dọn dẹp DB theo lệnh CTO
+    // Dá»n dáº¹p DB theo lá»‡nh CTO
     try {
         await pool.query(`DROP TABLE IF EXISTS ai_token_usage_logs CASCADE`);
     } catch (e) { console.error(e); }
@@ -178,7 +178,7 @@ const initDB = async () => {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_created_by ON tasks USING btree (created_by);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tasks_pic_id ON tasks USING btree (pic_id);`);
     
-    // Yêu cầu bắt buộc: Bổ sung is_deleted cho facilities
+    // YÃªu cáº§u báº¯t buá»™c: Bá»• sung is_deleted cho facilities
     await pool.query(`ALTER TABLE facilities ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false;`);
     
     await pool.query(`CREATE TABLE IF NOT EXISTS daily_financial_reports (
@@ -237,16 +237,16 @@ const initDB = async () => {
 initDB();
 
 // ==============================================================================
-// 1. MOCK DATABASE & MIDDLEWARE PHÂN QUYỀN (RBAC)
+// 1. MOCK DATABASE & MIDDLEWARE PHÃ‚N QUYá»€N (RBAC)
 // ==============================================================================
 
 const mockTasks = [
-  { id: 1, title: 'Bảo trì máy lạnh', facility_id: 1, pic_id: 2, pic_name: 'Trần Thị B', status: 'todo', deadline: '2026-05-15' },
-  { id: 2, title: 'Nghiệm thu KPI', facility_id: 2, pic_id: 3, pic_name: 'Lê Văn C', status: 'review', deadline: '2026-05-12' }, // Trễ 2 ngày
-  { id: 3, title: 'Lên chiến dịch Ads', facility_id: 'ALL', pic_id: 4, pic_name: 'Phạm D', status: 'in_progress', deadline: '2026-05-10' } // Trễ 4 ngày
+  { id: 1, title: 'Báº£o trÃ¬ mÃ¡y láº¡nh', facility_id: 1, pic_id: 2, pic_name: 'Tráº§n Thá»‹ B', status: 'todo', deadline: '2026-05-15' },
+  { id: 2, title: 'Nghiá»‡m thu KPI', facility_id: 2, pic_id: 3, pic_name: 'LÃª VÄƒn C', status: 'review', deadline: '2026-05-12' }, // Trá»… 2 ngÃ y
+  { id: 3, title: 'LÃªn chiáº¿n dá»‹ch Ads', facility_id: 'ALL', pic_id: 4, pic_name: 'Pháº¡m D', status: 'in_progress', deadline: '2026-05-10' } // Trá»… 4 ngÃ y
 ];
 
-// Bảng Log Nhắc việc AI (Công khai cho Sếp Tổng / Tổng quản lý)
+// Báº£ng Log Nháº¯c viá»‡c AI (CÃ´ng khai cho Sáº¿p Tá»•ng / Tá»•ng quáº£n lÃ½)
 const mockAiPingLogs = [];
 
 // ==============================================================================
@@ -257,7 +257,7 @@ app.get('/api/logs', async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM daily_logs ORDER BY id DESC');
     res.json({ success: true, data: rows });
   } catch (error) {
-    res.status(500).json({ error: `Lỗi server: ${error.message}` });
+    res.status(500).json({ error: `Lá»—i server: ${error.message}` });
   }
 });
 
@@ -270,7 +270,7 @@ app.post('/api/logs', async (req, res) => {
     );
     res.json({ success: true, data: rows[0] });
   } catch (error) {
-    res.status(500).json({ error: `Lỗi server: ${error.message}` });
+    res.status(500).json({ error: `Lá»—i server: ${error.message}` });
   }
 });
 
@@ -283,14 +283,14 @@ app.get('/api/facilities', async (req, res) => {
     const mapped = rows.map(r => ({ ...r, is_active: r.status === 'ACTIVE' }));
     res.json({ success: true, data: mapped });
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi server khi lấy danh sách cơ sở' });
+    res.status(500).json({ error: 'Lá»—i server khi láº¥y danh sÃ¡ch cÆ¡ sá»Ÿ' });
   }
 });
 
 app.post('/api/facilities', async (req, res) => {
   try {
     const { name, address, code } = req.body;
-    if (!name) return res.status(400).json({ error: 'Tên cơ sở không được để trống.' });
+    if (!name) return res.status(400).json({ error: 'TÃªn cÆ¡ sá»Ÿ khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng.' });
     
     let facCode = code || name.replace(/\s+/g, '').toUpperCase();
     const { rows } = await pool.query(
@@ -299,7 +299,7 @@ app.post('/api/facilities', async (req, res) => {
     );
     res.json({ success: true, data: { ...rows[0], is_active: true } });
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi khi tạo cơ sở (có thể trùng mã).' });
+    res.status(500).json({ error: 'Lá»—i khi táº¡o cÆ¡ sá»Ÿ (cÃ³ thá»ƒ trÃ¹ng mÃ£).' });
   }
 });
 
@@ -310,7 +310,7 @@ app.put('/api/facilities/:id', async (req, res) => {
     
     // First check if the facility exists
     const checkRes = await pool.query('SELECT * FROM facilities WHERE id = $1', [id]);
-    if (checkRes.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy cơ sở.' });
+    if (checkRes.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÆ¡ sá»Ÿ.' });
 
     // Update facility
     const { rows } = await pool.query(
@@ -320,7 +320,7 @@ app.put('/api/facilities/:id', async (req, res) => {
     res.json({ success: true, data: { ...rows[0], is_active: rows[0].status === 'ACTIVE' } });
   } catch (error) {
     console.error('Update facility error:', error);
-    res.status(500).json({ error: 'Lỗi server khi cập nhật cơ sở.' });
+    res.status(500).json({ error: 'Lá»—i server khi cáº­p nháº­t cÆ¡ sá»Ÿ.' });
   }
 });
 
@@ -328,10 +328,10 @@ app.put('/api/facilities/:id/archive', async (req, res) => {
   try {
     const { id } = req.params;
     const { rows } = await pool.query(`UPDATE facilities SET status = 'INACTIVE' WHERE id = $1 RETURNING *`, [id]);
-    if(rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy cơ sở.' });
+    if(rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÆ¡ sá»Ÿ.' });
     res.json({ success: true, data: { ...rows[0], is_active: false } });
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi server' });
+    res.status(500).json({ error: 'Lá»—i server' });
   }
 });
 
@@ -339,10 +339,10 @@ app.put('/api/facilities/:id/restore', async (req, res) => {
   try {
     const { id } = req.params;
     const { rows } = await pool.query(`UPDATE facilities SET status = 'ACTIVE' WHERE id = $1 RETURNING *`, [id]);
-    if(rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy cơ sở.' });
+    if(rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÆ¡ sá»Ÿ.' });
     res.json({ success: true, data: { ...rows[0], is_active: true } });
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi server' });
+    res.status(500).json({ error: 'Lá»—i server' });
   }
 });
 
@@ -395,7 +395,7 @@ const authenticateUser = async (req, res, next) => {
                 facilityRaw = req.headers['x-facility-id'];
                 departmentId = req.headers['x-department-id'];
             } else {
-                console.error('[Auth Middleware] Lỗi giải mã Token:', jwtErr.message);
+                console.error('[Auth Middleware] Lá»—i giáº£i mÃ£ Token:', jwtErr.message);
                 return res.status(401).json({ success: false, message: 'Invalid or Expired Token' });
             }
         }
@@ -419,7 +419,7 @@ const authenticateUser = async (req, res, next) => {
         next();
     } catch (err) {
         console.error("Auth middleware error:", err);
-        return res.status(500).json({ error: 'Lỗi xác thực nội bộ.' });
+        return res.status(500).json({ error: 'Lá»—i xÃ¡c thá»±c ná»™i bá»™.' });
     }
 };
 
@@ -431,14 +431,14 @@ app.get('/api/roles', async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM roles ORDER BY id ASC');
     res.json({ success: true, data: rows });
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi lấy danh sách vai trò' });
+    res.status(500).json({ error: 'Lá»—i láº¥y danh sÃ¡ch vai trÃ²' });
   }
 });
 
 
 const checkAdmin = (req, res, next) => {
     if (!req.user || req.user.role !== 'ADMIN') {
-        return res.status(403).json({ error: "403 Forbidden: Quyền lực này chỉ dành cho Kẻ Gác Đền (ADMIN)!" });
+        return res.status(403).json({ error: "403 Forbidden: Quyá»n lá»±c nÃ y chá»‰ dÃ nh cho Káº» GÃ¡c Äá»n (ADMIN)!" });
     }
     next();
 };
@@ -448,8 +448,8 @@ app.get('/api/users/directory', authenticateUser, async (req, res) => {
     const { rows: users } = await pool.query('SELECT id AS user_id, email, full_name, role_id, facility_id FROM users');
     res.json({ success: true, data: users });
   } catch (error) {
-    console.error("Lỗi lấy danh bạ:", error);
-    res.status(500).json({ error: 'Lỗi server.' });
+    console.error("Lá»—i láº¥y danh báº¡:", error);
+    res.status(500).json({ error: 'Lá»—i server.' });
   }
 });
 
@@ -469,7 +469,7 @@ app.get('/api/users', async (req, res) => {
     }));
     res.json({ success: true, data: mapped });
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi lấy danh sách người dùng' });
+    res.status(500).json({ error: 'Lá»—i láº¥y danh sÃ¡ch ngÆ°á»i dÃ¹ng' });
   }
 });
 
@@ -481,7 +481,7 @@ app.post('/api/users', authenticateUser, checkAdmin, async (req, res) => {
     const hash = await bcrypt.hash(password.trim(), salt);
     
     const roleRes = await pool.query('SELECT id FROM roles WHERE name = $1', [role]);
-    if (roleRes.rows.length === 0) return res.status(400).json({ error: 'Vai trò không hợp lệ.' });
+    if (roleRes.rows.length === 0) return res.status(400).json({ error: 'Vai trÃ² khÃ´ng há»£p lá»‡.' });
     const role_id = roleRes.rows[0].id;
     
     let facId = null;
@@ -500,8 +500,8 @@ app.post('/api/users', authenticateUser, checkAdmin, async (req, res) => {
     
     res.json({ success: true, data: { id: rows[0].id } });
   } catch (error) {
-    console.error("Lỗi tạo user:", error);
-    res.status(500).json({ error: 'Lỗi tạo tài khoản (có thể username đã tồn tại).' });
+    console.error("Lá»—i táº¡o user:", error);
+    res.status(500).json({ error: 'Lá»—i táº¡o tÃ i khoáº£n (cÃ³ thá»ƒ username Ä‘Ã£ tá»“n táº¡i).' });
   }
 });
 // In-memory store for hardcoded accounts (for demo purposes)
@@ -518,16 +518,16 @@ app.put('/api/users/change-password', authenticateUser, async (req, res) => {
     // Check hardcoded accounts first
     if (hardcodedPasswords[username]) {
       if (hardcodedPasswords[username] !== currentPassword) {
-        return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
+        return res.status(400).json({ error: 'Máº­t kháº©u hiá»‡n táº¡i khÃ´ng chÃ­nh xÃ¡c.' });
       }
       hardcodedPasswords[username] = newPassword;
-      return res.json({ success: true, message: 'Đổi mật khẩu thành công (tài khoản demo).' });
+      return res.json({ success: true, message: 'Äá»•i máº­t kháº©u thÃ nh cÃ´ng (tÃ i khoáº£n demo).' });
     }
     
     // Find user in DB
     const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy thông tin tài khoản.' });
+      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n.' });
     }
     
     const user = rows[0];
@@ -537,7 +537,7 @@ app.put('/api/users/change-password', authenticateUser, async (req, res) => {
     const passToCheck = user.password || user.password_hash;
     
     if (!(isMatch || passToCheck === currentPassword || passToCheck === Buffer.from(currentPassword).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === currentPassword)) {
-      return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
+      return res.status(400).json({ error: 'Máº­t kháº©u hiá»‡n táº¡i khÃ´ng chÃ­nh xÃ¡c.' });
     }
     
     // Update new password
@@ -551,10 +551,10 @@ app.put('/api/users/change-password', authenticateUser, async (req, res) => {
       await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
     }
     
-    res.json({ success: true, message: 'Đổi mật khẩu thành công.' });
+    res.json({ success: true, message: 'Äá»•i máº­t kháº©u thÃ nh cÃ´ng.' });
   } catch (error) {
-    console.error("Lỗi đổi mật khẩu:", error);
-    res.status(500).json({ error: 'Lỗi máy chủ khi đổi mật khẩu.' });
+    console.error("Lá»—i Ä‘á»•i máº­t kháº©u:", error);
+    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ khi Ä‘á»•i máº­t kháº©u.' });
   }
 });
 
@@ -592,8 +592,8 @@ app.put('/api/users/:id', authenticateUser, checkAdmin, async (req, res) => {
     }
     res.json({ success: true });
   } catch (error) {
-    console.error("Lỗi cập nhật user:", error);
-    res.status(500).json({ error: 'Lỗi cập nhật tài khoản.' });
+    console.error("Lá»—i cáº­p nháº­t user:", error);
+    res.status(500).json({ error: 'Lá»—i cáº­p nháº­t tÃ i khoáº£n.' });
   }
 });
 
@@ -603,7 +603,7 @@ app.delete('/api/users/:id', authenticateUser, checkAdmin, async (req, res) => {
     await pool.query('DELETE FROM users WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Không thể xóa user vì đang có dữ liệu công việc liên quan.' });
+    res.status(500).json({ error: 'KhÃ´ng thá»ƒ xÃ³a user vÃ¬ Ä‘ang cÃ³ dá»¯ liá»‡u cÃ´ng viá»‡c liÃªn quan.' });
   }
 });
 
@@ -633,9 +633,9 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
         role === 'VICE_PRESIDENT' || 
         (role === 'DEPARTMENT_HEAD' && userDept === 'MARKETING')
     ) {
-        // Nhóm All-Access: Không áp dụng điều kiện lọc bổ sung
+        // NhÃ³m All-Access: KhÃ´ng Ã¡p dá»¥ng Ä‘iá»u kiá»‡n lá»c bá»• sung
     } else {
-        // Nhóm Local: Áp dụng chung cho FACILITY_MANAGER, FINANCE_DEPT...
+        // NhÃ³m Local: Ãp dá»¥ng chung cho FACILITY_MANAGER, FINANCE_DEPT...
         params.push(userDept, id, id);
         query += ` AND (t.department_code = $${params.length - 2} OR t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
     }
@@ -645,8 +645,8 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
     const { rows } = await pool.query(query, params);
     res.json({ success: true, data: rows });
   } catch (error) {
-    console.error("Lỗi chi tiết từ DB:", error.message, error.stack);
-    res.status(500).json({ error: 'Lỗi server.' });
+    console.error("Lá»—i chi tiáº¿t tá»« DB:", error.message, error.stack);
+    res.status(500).json({ error: 'Lá»—i server.' });
   }
 });
 
@@ -655,18 +655,18 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
     const { id } = req.params;
     const { status, evidence } = req.body;
 
-    // Tường lửa chống IDOR
+    // TÆ°á»ng lá»­a chá»‘ng IDOR
     const taskCheck = await pool.query('SELECT facility_id, department_code FROM tasks WHERE id = $1', [id]);
-    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
     const task = taskCheck.rows[0];
     
     if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
-        return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của cơ sở khác!' });
+        return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a cÆ¡ sá»Ÿ khÃ¡c!' });
     }
     if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
         const userDept = normalizeDept(req.user.department_code || req.user.department_id);
         if (task.department_code !== userDept) {
-            return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của phòng ban khác!' });
+            return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
         }
     }
 
@@ -681,13 +681,13 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
     const { rows } = await pool.query(updateQuery, [status, id]);
     
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
     }
     
     res.json({ success: true, data: rows[0] });
   } catch (error) {
-    console.error("Lỗi cập nhật trạng thái:", error);
-    res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
+    console.error("Lá»—i cáº­p nháº­t tráº¡ng thÃ¡i:", error);
+    res.status(500).json({ error: 'Lá»—i server khi cáº­p nháº­t tráº¡ng thÃ¡i.' });
   }
 });
 
@@ -695,18 +695,18 @@ app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Tường lửa chống IDOR
+    // TÆ°á»ng lá»­a chá»‘ng IDOR
     const taskCheck = await pool.query('SELECT facility_id, department_code FROM tasks WHERE id = $1', [id]);
-    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
     const task = taskCheck.rows[0];
     
     if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
-        return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của cơ sở khác!' });
+        return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a cÆ¡ sá»Ÿ khÃ¡c!' });
     }
     if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
         const userDept = normalizeDept(req.user.department_code || req.user.department_id);
         if (task.department_code !== userDept) {
-            return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của phòng ban khác!' });
+            return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
         }
     }
 
@@ -720,13 +720,13 @@ app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
     const { rows } = await pool.query(updateQuery, [id]);
     
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
     }
 
-    res.json({ success: true, message: 'Đã gửi yêu cầu hỗ trợ đến Ban Giám Đốc', data: rows[0] });
+    res.json({ success: true, message: 'ÄÃ£ gá»­i yÃªu cáº§u há»— trá»£ Ä‘áº¿n Ban GiÃ¡m Äá»‘c', data: rows[0] });
   } catch (error) {
-    console.error("Lỗi server khi yêu cầu hỗ trợ:", error);
-    res.status(500).json({ error: 'Lỗi máy chủ nội bộ' });
+    console.error("Lá»—i server khi yÃªu cáº§u há»— trá»£:", error);
+    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™' });
   }
 });
 
@@ -744,8 +744,8 @@ app.get('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     `, [id]);
     res.json({ success: true, data: rows });
   } catch (err) {
-    console.error("[API GET Comment] Lỗi 500:", err);
-    res.status(500).json({ success: false, error: 'Lỗi tải bình luận: ' + err.message });
+    console.error("[API GET Comment] Lá»—i 500:", err);
+    res.status(500).json({ success: false, error: 'Lá»—i táº£i bÃ¬nh luáº­n: ' + err.message });
   }
 });
 
@@ -754,24 +754,24 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     const { id } = req.params;
     const comment = req.body.comment || req.body.content;
 
-    // Tường lửa chống IDOR
+    // TÆ°á»ng lá»­a chá»‘ng IDOR
     const taskCheck = await pool.query('SELECT facility_id, department_code FROM tasks WHERE id = $1', [id]);
-    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
     const task = taskCheck.rows[0];
     
     if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
-        return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của cơ sở khác!' });
+        return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a cÆ¡ sá»Ÿ khÃ¡c!' });
     }
     if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
         const userDept = normalizeDept(req.user.department_code || req.user.department_id);
         if (task.department_code !== userDept) {
-            return res.status(403).json({ error: '403 Forbidden: Không có quyền sửa thẻ công việc của phòng ban khác!' });
+            return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
         }
     }
 
-    if (!comment) return res.status(400).json({ error: 'Nội dung bình luận trống' });
+    if (!comment) return res.status(400).json({ error: 'Ná»™i dung bÃ¬nh luáº­n trá»‘ng' });
 
-    // 1. LẤY USER_ID AN TOÀN VÀ CHẶN NGAY NẾU RỖNG (Nguyên nhân gốc gây sập)
+    // 1. Láº¤Y USER_ID AN TOÃ€N VÃ€ CHáº¶N NGAY Náº¾U Rá»–NG (NguyÃªn nhÃ¢n gá»‘c gÃ¢y sáº­p)
     let realUserId = null;
     try {
         if (req.user && req.user.id) {
@@ -789,15 +789,15 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
             if (fallbackRes.rows.length > 0) realUserId = fallbackRes.rows[0].id;
         }
     } catch (parseErr) {
-        console.error("Lỗi parse user an toàn:", parseErr);
+        console.error("Lá»—i parse user an toÃ n:", parseErr);
     }
 
-    // [QUAN TRỌNG NHẤT]: TRẠM GÁC CHỐNG SẬP DB
+    // [QUAN TRá»ŒNG NHáº¤T]: TRáº M GÃC CHá»NG Sáº¬P DB
     if (!realUserId) {
-        return res.status(403).json({ error: 'Không thể xác định danh tính. Vui lòng đăng nhập lại!' });
+        return res.status(403).json({ error: 'KhÃ´ng thá»ƒ xÃ¡c Ä‘á»‹nh danh tÃ­nh. Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i!' });
     }
 
-    // 2. THỰC THI INSERT (Lúc này realUserId đã được đảm bảo 100% là an toàn)
+    // 2. THá»°C THI INSERT (LÃºc nÃ y realUserId Ä‘Ã£ Ä‘Æ°á»£c Ä‘áº£m báº£o 100% lÃ  an toÃ n)
     const { rows } = await pool.query(`
       INSERT INTO task_comments (task_id, user_id, content)
       VALUES ($1, $2, $3) RETURNING *
@@ -805,7 +805,7 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     
 
 
-        // 4. KHỞI TẠO BIẾN TRẢ VỀ TỪ CƠ SỞ DỮ LIỆU
+        // 4. KHá»žI Táº O BIáº¾N TRáº¢ Vá»€ Tá»ª CÆ  Sá»ž Dá»® LIá»†U
     const newCommentId = (rows && rows.length > 0) ? rows[0].id : null;
     
     if (newCommentId) {
@@ -819,21 +819,21 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
         const fullComment = await pool.query(getCommentSql, [newCommentId]);
         return res.json({ success: true, data: fullComment.rows[0] });
     } else {
-        return res.status(500).json({ success: false, error: 'Không thể tạo bình luận' });
+        return res.status(500).json({ success: false, error: 'KhÃ´ng thá»ƒ táº¡o bÃ¬nh luáº­n' });
     }
   } catch (error) {
     if (error.code === '23503') {
-        console.warn(`[API Comment] Cố gắng bình luận vào Task không tồn tại: task_id=${req.params.id}`);
+        console.warn(`[API Comment] Cá»‘ gáº¯ng bÃ¬nh luáº­n vÃ o Task khÃ´ng tá»“n táº¡i: task_id=${req.params.id}`);
         return res.status(404).json({ 
             success: false, 
-            message: 'Task này không còn tồn tại hoặc đã bị xóa. Vui lòng làm mới trang.' 
+            message: 'Task nÃ y khÃ´ng cÃ²n tá»“n táº¡i hoáº·c Ä‘Ã£ bá»‹ xÃ³a. Vui lÃ²ng lÃ m má»›i trang.' 
         });
     }
 
-    console.error('[API Comment] Lỗi 500:', error);
+    console.error('[API Comment] Lá»—i 500:', error);
     return res.status(500).json({ 
         success: false, 
-        message: 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.' 
+        message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™. Vui lÃ²ng thá»­ láº¡i sau.' 
     });
   }
 });
@@ -850,7 +850,7 @@ app.get('/api/notifications', authenticateUser, async (req, res) => {
         );
         res.json({ success: true, data: rows });
     } catch (err) {
-        res.status(500).json({ error: 'Lỗi tải thông báo' });
+        res.status(500).json({ error: 'Lá»—i táº£i thÃ´ng bÃ¡o' });
     }
 });
 
@@ -876,7 +876,7 @@ app.put('/api/notifications/:id/read', authenticateUser, async (req, res) => {
         await pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: 'Lỗi cập nhật' });
+        res.status(500).json({ error: 'Lá»—i cáº­p nháº­t' });
     }
 });
 
@@ -887,7 +887,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       let insert_dept_code = normalizeDept(department_code || facility);
       let insert_facility_id = null;
 
-      // 1. CHỐNG PAYLOAD SPOOFING: ÉP CỨNG ĐỊNH DANH THEO ROLE
+      // 1. CHá»NG PAYLOAD SPOOFING: Ã‰P Cá»¨NG Äá»ŠNH DANH THEO ROLE
       if (req.user.role === 'FACILITY_MANAGER') {
           insert_facility_id = req.user.facility_id;
       } else if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT' || req.user.role === 'LOCAL') {
@@ -902,7 +902,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
               }
           }
       } else {
-          // ADMIN hoặc VICE_PRESIDENT
+          // ADMIN hoáº·c VICE_PRESIDENT
           if (facility && facility !== 'HQ' && facility !== 'ALL') {
               let parsedFac = parseInt(facility, 10);
               if (!isNaN(parsedFac)) insert_facility_id = parsedFac;
@@ -917,7 +917,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
       else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
 
-      // 2. KIỂM TRA CHÉO PIC (Người phụ trách)
+      // 2. KIá»‚M TRA CHÃ‰O PIC (NgÆ°á»i phá»¥ trÃ¡ch)
       let pic_id = null;
       if (pic) {
           let picQuery = 'SELECT id, facility_id, department_code FROM users WHERE (full_name = $1 OR email = $1)';
@@ -937,7 +937,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           
           if (picUser.rows.length === 0) {
               if (req.user.role === 'FACILITY_MANAGER' || req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
-                  return res.status(403).json({message: "Lỗi 403: Không được gán chéo nhân sự ngoài thẩm quyền!"});
+                  return res.status(403).json({message: "Lá»—i 403: KhÃ´ng Ä‘Æ°á»£c gÃ¡n chÃ©o nhÃ¢n sá»± ngoÃ i tháº©m quyá»n!"});
               } else {
                    const checkExist = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
                    if (checkExist.rows.length > 0) pic_id = checkExist.rows[0].id;
@@ -977,7 +977,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     
     const newTask = {
       ...rows[0],
-      pic: pic || 'Chưa gán',
+      pic: pic || 'ChÆ°a gÃ¡n',
       picId: pic || 'unassigned',
       facility: facility || 'HQ',
       facilityId: facility || 'HQ'
@@ -986,20 +986,20 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
 
       res.json({ success: true, data: newTask });
   } catch (error) {
-    console.error("Lỗi chi tiết từ DB:", error.message, error.stack);
-    res.status(500).json({ error: 'Lỗi server khi lưu công việc.' });
+    console.error("Lá»—i chi tiáº¿t tá»« DB:", error.message, error.stack);
+    res.status(500).json({ error: 'Lá»—i server khi lÆ°u cÃ´ng viá»‡c.' });
   }
 });
 
-// API Đăng nhập giả lập
+// API ÄÄƒng nháº­p giáº£ láº­p
 app.delete('/api/system/reset', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
     if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
-       return res.status(403).json({ error: 'Không đủ quyền' });
+       return res.status(403).json({ error: 'KhÃ´ng Ä‘á»§ quyá»n' });
     }
     
-    // Khởi tạo Transaction bảo vệ tính toàn vẹn dữ liệu
+    // Khá»Ÿi táº¡o Transaction báº£o vá»‡ tÃ­nh toÃ n váº¹n dá»¯ liá»‡u
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -1010,16 +1010,16 @@ app.delete('/api/system/reset', authenticateUser, async (req, res) => {
       await client.query('DELETE FROM daily_logs WHERE entry_type != $1', ['SYSTEM_CONFIG']);
       await client.query('DELETE FROM daily_financial_reports');
       await client.query('COMMIT');
-      res.json({ success: true, message: 'Đã dọn dẹp toàn bộ dữ liệu kiểm thử' });
+      res.json({ success: true, message: 'ÄÃ£ dá»n dáº¹p toÃ n bá»™ dá»¯ liá»‡u kiá»ƒm thá»­' });
     } catch (dbError) {
       await client.query('ROLLBACK');
-      throw dbError; // Ném lỗi ra ngoài catch tổng
+      throw dbError; // NÃ©m lá»—i ra ngoÃ i catch tá»•ng
     } finally {
       client.release();
     }
   } catch (error) {
-    console.error("Lỗi reset system:", error);
-    res.status(500).json({ error: 'Lỗi máy chủ khi reset system' });
+    console.error("Lá»—i reset system:", error);
+    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ khi reset system' });
   }
 });
 
@@ -1035,19 +1035,19 @@ app.post('/api/login', async (req, res) => {
       return res.json({
         success: true,
         token: 'mock-jwt-token-admin',
-        user: { name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL', username: 'admin' }
+        user: { name: 'Sáº¿p Tá»•ng', role: 'SUPER_ADMIN', facility_id: 'ALL', username: 'admin' }
       });
     } else if (username === 'manager1' && password === hardcodedPasswords['manager1']) {
       return res.json({
         success: true,
         token: 'mock-jwt-token-manager',
-        user: { name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1', username: 'manager1' }
+        user: { name: 'Quáº£n lÃ½ CÆ¡ sá»Ÿ 1', role: 'FACILITY_MANAGER', facility_id: 'CÆ¡ sá»Ÿ 1', username: 'manager1' }
       });
     } else if (username === 'sysadmin' && password === hardcodedPasswords['sysadmin']) {
       return res.json({
         success: true,
         token: 'mock-jwt-token-sysadmin',
-        user: { name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL', username: 'sysadmin' }
+        user: { name: 'Quáº£n trá»‹ viÃªn Há»‡ thá»‘ng (IT)', role: 'ADMIN', facility_id: 'ALL', username: 'sysadmin' }
       });
     }
   
@@ -1063,7 +1063,7 @@ app.post('/api/login', async (req, res) => {
             const user = rows[0];
             
             if (user.status !== 'ACTIVE') {
-              return res.status(403).json({ success: false, error: 'Tài khoản đã bị khóa.' });
+              return res.status(403).json({ success: false, error: 'TÃ i khoáº£n Ä‘Ã£ bá»‹ khÃ³a.' });
             }
             
             const isMatch = await bcrypt.compare(password, user.password_hash || '');
@@ -1089,19 +1089,19 @@ app.post('/api/login', async (req, res) => {
                     }
                 });
             } else {
-                console.error("Sai mật khẩu cho user:", username);
+                console.error("Sai máº­t kháº©u cho user:", username);
             }
         }
     } catch (e) {
-        console.error("Lỗi đăng nhập DB:", e);
+        console.error("Lá»—i Ä‘Äƒng nháº­p DB:", e);
     }
 
-    console.error("Lỗi 401: Không tìm thấy tài khoản hoặc mật khẩu không khớp. Payload:", req.body);
-    return res.status(401).json({ success: false, error: 'Tài khoản hoặc mật khẩu không chính xác.' });
+    console.error("Lá»—i 401: KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n hoáº·c máº­t kháº©u khÃ´ng khá»›p. Payload:", req.body);
+    return res.status(401).json({ success: false, error: 'TÃ i khoáº£n hoáº·c máº­t kháº©u khÃ´ng chÃ­nh xÃ¡c.' });
 });
 
 // ==============================================================================
-// 1.5. API DAILY CHECK-IN (BÁO CÁO ĐẦU GIỜ)
+// 1.5. API DAILY CHECK-IN (BÃO CÃO Äáº¦U GIá»œ)
 // ==============================================================================
 
 // POST /api/checkin was removed because it is now handled by POST /api/logs
@@ -1125,25 +1125,25 @@ app.get('/api/checkin/status', authenticateUser, async (req, res) => {
     const statusList = targetFacilities.map(fac => {
       const checkins = rows.filter(c => c.org_unit === fac);
       const ca1 = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca 1'));
-      const calo = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca Lỡ'));
+      const calo = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca Lá»¡'));
       const ca2 = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca 2'));
       return {
         facility_id: fac,
-        ca1: ca1 ? `Đã báo cáo lúc ${ca1.display_time}` : 'Chưa báo cáo',
-        calo: calo ? `Đã báo cáo lúc ${calo.display_time}` : 'Chưa báo cáo',
-        ca2: ca2 ? `Đã báo cáo lúc ${ca2.display_time}` : 'Chưa báo cáo',
+        ca1: ca1 ? `ÄÃ£ bÃ¡o cÃ¡o lÃºc ${ca1.display_time}` : 'ChÆ°a bÃ¡o cÃ¡o',
+        calo: calo ? `ÄÃ£ bÃ¡o cÃ¡o lÃºc ${calo.display_time}` : 'ChÆ°a bÃ¡o cÃ¡o',
+        ca2: ca2 ? `ÄÃ£ bÃ¡o cÃ¡o lÃºc ${ca2.display_time}` : 'ChÆ°a bÃ¡o cÃ¡o',
         details: checkins
       };
     });
 
     res.json({ success: true, data: statusList });
   } catch (error) {
-    res.status(500).json({ error: `Lỗi server: ${error.message}` });
+    res.status(500).json({ error: `Lá»—i server: ${error.message}` });
   }
 });
 
 // ==============================================================================
-// 2. AUTO-TASKING AI (TÍCH HỢP OPENROUTER)
+// 2. AUTO-TASKING AI (TÃCH Há»¢P OPENROUTER)
 // ==============================================================================
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-xxxxxxxxxxxx'; 
@@ -1153,19 +1153,19 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-xxxxxxxxx
 
 const upload = multer({ 
     storage: multer.memoryStorage(),
-    limits: { fileSize: 500 * 1024 }, // Giới hạn 500KB cho file text
+    limits: { fileSize: 500 * 1024 }, // Giá»›i háº¡n 500KB cho file text
     fileFilter: (req, file, cb) => {
         if (file.mimetype === 'text/plain' || file.originalname.endsWith('.txt')) {
             cb(null, true);
         } else {
-            cb(new Error('HỆ THỐNG TỪ CHỐI: Chỉ cho phép tải lên định dạng văn bản thuần (.txt)'));
+            cb(new Error('Há»† THá»NG Tá»ª CHá»I: Chá»‰ cho phÃ©p táº£i lÃªn Ä‘á»‹nh dáº¡ng vÄƒn báº£n thuáº§n (.txt)'));
         }
     }
 });
 
-// API NẠP TRI THỨC VÀO RAG
+// API Náº P TRI THá»¨C VÃ€O RAG
 app.post('/api/rag/upload', authenticateUser, checkAdmin, (req, res, next) => {
-    // Bọc middleware upload để hứng lỗi file extension
+    // Bá»c middleware upload Ä‘á»ƒ há»©ng lá»—i file extension
     upload.single('file')(req, res, (err) => {
         if (err) return res.status(400).json({ error: err.message });
         next();
@@ -1173,25 +1173,25 @@ app.post('/api/rag/upload', authenticateUser, checkAdmin, (req, res, next) => {
 }, async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: "Vui lòng đính kèm một file .txt hợp lệ." });
+            return res.status(400).json({ error: "Vui lÃ²ng Ä‘Ã­nh kÃ¨m má»™t file .txt há»£p lá»‡." });
         }
 
-        // Đọc nội dung file từ Buffer
+        // Äá»c ná»™i dung file tá»« Buffer
         const textContent = req.file.buffer.toString('utf-8');
         if (!textContent.trim()) {
-            return res.status(400).json({ error: "File rỗng, không có dữ liệu để nạp." });
+            return res.status(400).json({ error: "File rá»—ng, khÃ´ng cÃ³ dá»¯ liá»‡u Ä‘á»ƒ náº¡p." });
         }
 
         // ==========================================
-        // THUẬT TOÁN CHUNKING (NGỮ NGHĨA)
+        // THUáº¬T TOÃN CHUNKING (NGá»® NGHÄ¨A)
         // ==========================================
         const chunks = [];
-        // Tách văn bản thành các câu dựa trên dấu kết thúc câu hoặc dấu xuống dòng
+        // TÃ¡ch vÄƒn báº£n thÃ nh cÃ¡c cÃ¢u dá»±a trÃªn dáº¥u káº¿t thÃºc cÃ¢u hoáº·c dáº¥u xuá»‘ng dÃ²ng
         const sentences = textContent.split(/(?<=[.!?\n])\s+/);
         
         let currentChunk = "";
         for (const sentence of sentences) {
-            // Giới hạn max ~1000 ký tự mỗi chunk
+            // Giá»›i háº¡n max ~1000 kÃ½ tá»± má»—i chunk
             if (currentChunk.length + sentence.length > 1000) {
                 if (currentChunk.trim()) {
                     chunks.push(currentChunk.trim());
@@ -1206,14 +1206,14 @@ app.post('/api/rag/upload', authenticateUser, checkAdmin, (req, res, next) => {
         }
 
         // ==========================================
-        // VÒNG LẶP EMBEDDING & BƠM VÀO VECTOR DB
+        // VÃ’NG Láº¶P EMBEDDING & BÆ M VÃ€O VECTOR DB
         // ==========================================
-        // Nếu Sếp (All-Access) không có phòng ban, đưa về GLOBAL để chia sẻ chung
+        // Náº¿u Sáº¿p (All-Access) khÃ´ng cÃ³ phÃ²ng ban, Ä‘Æ°a vá» GLOBAL Ä‘á»ƒ chia sáº» chung
         const departmentCode = req.user.department_code || 'GLOBAL'; 
         let successCount = 0;
 
         for (const chunk of chunks) {
-            // Gọi AI tạo Vector 1536 chiều
+            // Gá»i AI táº¡o Vector 1536 chiá»u
             const embedding = await generateEmbedding(chunk);
             if (embedding) {
                 const formatEmbedding = `[${embedding.join(',')}]`;
@@ -1223,7 +1223,7 @@ app.post('/api/rag/upload', authenticateUser, checkAdmin, (req, res, next) => {
                     chunk_size: chunk.length
                 };
                 
-                // Lưu vào CSDL PgVector
+                // LÆ°u vÃ o CSDL PgVector
                 await pool.query(`
                     INSERT INTO company_knowledge_base (content, embedding, source_type, metadata, created_at)
                     VALUES ($1, $2::vector, $3, $4, NOW())
@@ -1235,12 +1235,12 @@ app.post('/api/rag/upload', authenticateUser, checkAdmin, (req, res, next) => {
 
         return res.json({ 
             success: true, 
-            message: `Nạp tri thức thành công! Đã băm thành ${successCount} mảnh (chunks) và nhúng an toàn vào Vector DB.`,
+            message: `Náº¡p tri thá»©c thÃ nh cÃ´ng! ÄÃ£ bÄƒm thÃ nh ${successCount} máº£nh (chunks) vÃ  nhÃºng an toÃ n vÃ o Vector DB.`,
         });
 
     } catch (error) {
-        console.error("Lỗi hệ thống khi nạp tài liệu RAG:", error);
-        return res.status(500).json({ error: "Lỗi máy chủ khi nhúng tài liệu (Embedding Error)." });
+        console.error("Lá»—i há»‡ thá»‘ng khi náº¡p tÃ i liá»‡u RAG:", error);
+        return res.status(500).json({ error: "Lá»—i mÃ¡y chá»§ khi nhÃºng tÃ i liá»‡u (Embedding Error)." });
     }
 });
 
@@ -1249,11 +1249,11 @@ app.post('/api/ai/auto-tasking', authenticateUser, async (req, res) => {
     const { meetingTranscript, facilityId } = req.body;
 
     if (!meetingTranscript) {
-      return res.status(400).json({ error: 'Vui lòng cung cấp biên bản cuộc họp.' });
+      return res.status(400).json({ error: 'Vui lÃ²ng cung cáº¥p biÃªn báº£n cuá»™c há»p.' });
     }
 
-    const systemPrompt = `Bạn là một AI điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
-Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY').`;
+    const systemPrompt = `Báº¡n lÃ  má»™t AI Ä‘iá»u phá»‘i CÃ´ng viá»‡c xuáº¥t sáº¯c. Nhiá»‡m vá»¥: Äá»c biÃªn báº£n cuá»™c há»p vÃ  tá»± Ä‘á»™ng trÃ­ch xuáº¥t cÃ¡c cÃ´ng viá»‡c cáº§n lÃ m thÃ nh Ä‘á»‹nh dáº¡ng JSON strict.
+TrÃ­ch xuáº¥t máº£ng "tasks" vá»›i cáº¥u trÃºc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, máº·c Ä‘á»‹nh 17:00 náº¿u khÃ´ng cÃ³ giá»), "target_facility" (TÃªn cÆ¡ sá»Ÿ, vÃ­ dá»¥: CÆ¡ sá»Ÿ 1), "priority_level" (QuÃ©t vÄƒn báº£n: Náº¿u cÃ³ 'kháº©n cáº¥p', 'gáº¥p', 'ngay', 'há»a tá»‘c' -> 'URGENT'. Náº¿u khÃ´ng -> 'PRIORITY').`;
 
     const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
     const aiConfig = configRows.length > 0 ? configRows[0].data : {};
@@ -1291,19 +1291,19 @@ Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" 
             }
         }
       } catch (e) {
-        console.error("AI không trả về JSON hợp lệ");
+        console.error("AI khÃ´ng tráº£ vá» JSON há»£p lá»‡");
       }
     }
 
-    res.json({ success: true, message: 'Trích xuất Auto-Tasking thành công.', data: extractedTasks });
+    res.json({ success: true, message: 'TrÃ­ch xuáº¥t Auto-Tasking thÃ nh cÃ´ng.', data: extractedTasks });
 
   } catch (error) {
-    res.status(500).json({ error: 'Lỗi khi gọi AI API.' });
+    res.status(500).json({ error: 'Lá»—i khi gá»i AI API.' });
   }
 });
 
 // ==============================================================================
-// 2.5. AI REVENUE EXTRACTION (PROXY CHO FRONTEND ĐỂ TRÁNH CORS)
+// 2.5. AI REVENUE EXTRACTION (PROXY CHO FRONTEND Äá»‚ TRÃNH CORS)
 // ==============================================================================
 
 app.post('/api/internal/extract-revenue', express.json({limit: '50mb'}), async (req, res) => {
@@ -1311,10 +1311,10 @@ app.post('/api/internal/extract-revenue', express.json({limit: '50mb'}), async (
     const { imageBase64 } = req.body;
     
     if (!imageBase64) {
-      return res.status(400).json({ error: 'Thiếu dữ liệu hình ảnh (Base64).' });
+      return res.status(400).json({ error: 'Thiáº¿u dá»¯ liá»‡u hÃ¬nh áº£nh (Base64).' });
     }
 
-    const systemPrompt = `Đây là bảng doanh thu. Cột 1 là Thứ, Cột 2 là Ngày. Các cột tiếp theo là Doanh thu của DB41, ACE, PQ, PA, PAV, DB01. Hãy bỏ qua các hàng tiêu đề. Đọc từ hàng có chứa ngày tháng. Trả về mảng JSON: [{"date": "DD/MM/YYYY", "revenues": {"DUBAI 41": 100000, "DUBAI ACE": 200000, "DUBAI PHÚ QUỐC": 300000, "DUBAI PA": 400000, "DUBAI PAV": 500000, "DUBAI PAK": 600000}}]`;
+    const systemPrompt = `ÄÃ¢y lÃ  báº£ng doanh thu. Cá»™t 1 lÃ  Thá»©, Cá»™t 2 lÃ  NgÃ y. CÃ¡c cá»™t tiáº¿p theo lÃ  Doanh thu cá»§a DB41, ACE, PQ, PA, PAV, DB01. HÃ£y bá» qua cÃ¡c hÃ ng tiÃªu Ä‘á». Äá»c tá»« hÃ ng cÃ³ chá»©a ngÃ y thÃ¡ng. Tráº£ vá» máº£ng JSON: [{"date": "DD/MM/YYYY", "revenues": {"DUBAI 41": 100000, "DUBAI ACE": 200000, "DUBAI PHÃš QUá»C": 300000, "DUBAI PA": 400000, "DUBAI PAV": 500000, "DUBAI PAK": 600000}}]`;
 
     const payload = {
       model: "anthropic/claude-3.5-sonnet",
@@ -1344,7 +1344,7 @@ app.post('/api/internal/extract-revenue', express.json({limit: '50mb'}), async (
     if (!response.ok) {
       const errText = await response.text();
       console.error("OpenRouter Response Error:", errText);
-      return res.status(response.status).json({ error: 'Lỗi từ OpenRouter API.' });
+      return res.status(response.status).json({ error: 'Lá»—i tá»« OpenRouter API.' });
     }
 
     const aiData = await response.json();
@@ -1356,15 +1356,15 @@ app.post('/api/internal/extract-revenue', express.json({limit: '50mb'}), async (
       if (jsonMatch) {
         parsedData = JSON.parse(jsonMatch[0]);
       } else {
-         return res.status(500).json({ error: 'AI không trả về JSON hợp lệ.' });
+         return res.status(500).json({ error: 'AI khÃ´ng tráº£ vá» JSON há»£p lá»‡.' });
       }
     }
 
     res.json({ success: true, data: parsedData });
 
   } catch (error) {
-    console.error('Lỗi khi gọi AI Extract API:', error);
-    res.status(500).json({ error: 'Lỗi máy chủ nội bộ khi gọi AI API.' });
+    console.error('Lá»—i khi gá»i AI Extract API:', error);
+    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™ khi gá»i AI API.' });
   }
 });
 
@@ -1373,7 +1373,7 @@ app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res
     const { prompt, content } = req.body;
     
     if (!prompt || !content) {
-      return res.status(400).json({ error: 'Thiếu dữ liệu prompt hoặc nội dung.' });
+      return res.status(400).json({ error: 'Thiáº¿u dá»¯ liá»‡u prompt hoáº·c ná»™i dung.' });
     }
 
     const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
@@ -1403,7 +1403,7 @@ app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res
     if (!response.ok) {
       const errText = await response.text();
       console.error("OpenRouter Response Error:", errText);
-      return res.status(response.status).json({ error: 'Lỗi từ OpenRouter API.' });
+      return res.status(response.status).json({ error: 'Lá»—i tá»« OpenRouter API.' });
     }
 
     const aiData = await response.json();
@@ -1417,75 +1417,75 @@ app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res
         if (parsedData.data) parsedData = parsedData.data;
         if (!Array.isArray(parsedData)) parsedData = [parsedData];
       } else {
-         return res.status(500).json({ error: 'AI không trả về JSON hợp lệ.' });
+         return res.status(500).json({ error: 'AI khÃ´ng tráº£ vá» JSON há»£p lá»‡.' });
       }
     }
 
-    // Trả về usage token để frontend log
+    // Tráº£ vá» usage token Ä‘á»ƒ frontend log
     res.json({ success: true, data: parsedData, usage: aiData.usage });
 
   } catch (error) {
-    console.error('Lỗi khi gọi AI Extract API (Text):', error);
-    res.status(500).json({ error: 'Lỗi máy chủ nội bộ khi gọi AI API.' });
+    console.error('Lá»—i khi gá»i AI Extract API (Text):', error);
+    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™ khi gá»i AI API.' });
   }
 });
 
 // ==============================================================================
-// 3. AI PING THẤU CẢM (EMPATHETIC PING) & TONE ESCALATION
+// 3. AI PING THáº¤U Cáº¢M (EMPATHETIC PING) & TONE ESCALATION
 // ==============================================================================
 
-// Hàm tính toán mức độ trễ hạn (Tone Escalation)
+// HÃ m tÃ­nh toÃ¡n má»©c Ä‘á»™ trá»… háº¡n (Tone Escalation)
 const calculateTone = (deadlineDateStr) => {
   const deadline = new Date(deadlineDateStr);
-  const today = new Date('2026-05-14T00:00:00Z'); // Lấy mốc thời gian hiện tại theo context
+  const today = new Date('2026-05-14T00:00:00Z'); // Láº¥y má»‘c thá»i gian hiá»‡n táº¡i theo context
   
-  // Tính độ chênh lệch số ngày
+  // TÃ­nh Ä‘á»™ chÃªnh lá»‡ch sá»‘ ngÃ y
   const diffTime = deadline - today;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
   if (diffDays > 1) {
     return {
-      level: 'Hỗ trợ',
-      guidance: 'Thể hiện sự quan tâm tinh tế, hỏi thăm xem PIC có gặp khó khăn hay thiếu nguồn lực nào không để kịp deadline.'
+      level: 'Há»— trá»£',
+      guidance: 'Thá»ƒ hiá»‡n sá»± quan tÃ¢m tinh táº¿, há»i thÄƒm xem PIC cÃ³ gáº·p khÃ³ khÄƒn hay thiáº¿u nguá»“n lá»±c nÃ o khÃ´ng Ä‘á»ƒ ká»‹p deadline.'
     };
   } else if (diffDays === 0 || diffDays === 1) {
     return {
       level: 'Pre-deadline',
-      guidance: 'Tông giọng Khích lệ & Chuẩn bị. Hỏi thăm xem bạn đã sẵn sàng nghiệm thu chưa. Ví dụ: "Ngày mai là hạn chốt, bạn đã sẵn sàng nghiệm thu chưa?"'
+      guidance: 'TÃ´ng giá»ng KhÃ­ch lá»‡ & Chuáº©n bá»‹. Há»i thÄƒm xem báº¡n Ä‘Ã£ sáºµn sÃ ng nghiá»‡m thu chÆ°a. VÃ­ dá»¥: "NgÃ y mai lÃ  háº¡n chá»‘t, báº¡n Ä‘Ã£ sáºµn sÃ ng nghiá»‡m thu chÆ°a?"'
     };
   } else if (diffDays < 0 && diffDays >= -3) {
     return {
-      level: 'Nhắc nhở chuyên nghiệp',
-      guidance: 'Nhắc nhở lịch sự nhưng kiên quyết. Yêu cầu cập nhật tình hình hiện tại và đưa ra cam kết hoàn thành.'
+      level: 'Nháº¯c nhá»Ÿ chuyÃªn nghiá»‡p',
+      guidance: 'Nháº¯c nhá»Ÿ lá»‹ch sá»± nhÆ°ng kiÃªn quyáº¿t. YÃªu cáº§u cáº­p nháº­t tÃ¬nh hÃ¬nh hiá»‡n táº¡i vÃ  Ä‘Æ°a ra cam káº¿t hoÃ n thÃ nh.'
     };
   } else {
     return {
-      level: 'Cảnh báo kỷ luật',
-      guidance: 'Giọng điệu nghiêm túc, quyết liệt. Nhấn mạnh việc đã trễ hạn quá lâu, yêu cầu báo cáo nguyên nhân gốc rễ và giải trình lên cấp quản lý ngay lập tức.'
+      level: 'Cáº£nh bÃ¡o ká»· luáº­t',
+      guidance: 'Giá»ng Ä‘iá»‡u nghiÃªm tÃºc, quyáº¿t liá»‡t. Nháº¥n máº¡nh viá»‡c Ä‘Ã£ trá»… háº¡n quÃ¡ lÃ¢u, yÃªu cáº§u bÃ¡o cÃ¡o nguyÃªn nhÃ¢n gá»‘c rá»… vÃ  giáº£i trÃ¬nh lÃªn cáº¥p quáº£n lÃ½ ngay láº­p tá»©c.'
     };
   }
 };
 
-  // API: Lịch sử hội thoại AI toàn cầu (Global Memory)
+  // API: Lá»‹ch sá»­ há»™i thoáº¡i AI toÃ n cáº§u (Global Memory)
   
-// API: AI Tự Học Từ Chat (Admin One-Click)
+// API: AI Tá»± Há»c Tá»« Chat (Admin One-Click)
 app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
     try {
         const { role, department_code } = req.user;
         
-        // Bảo mật (RBAC): Chỉ các cấp cao được phép "dạy" AI
+        // Báº£o máº­t (RBAC): Chá»‰ cÃ¡c cáº¥p cao Ä‘Æ°á»£c phÃ©p "dáº¡y" AI
         if (role !== 'SUPER_ADMIN' && role !== 'VICE_PRESIDENT' && role !== 'ADMIN') {
-            return res.status(403).json({ error: "Chỉ Admin/Sếp mới có quyền nạp dữ liệu Chat vào RAG." });
+            return res.status(403).json({ error: "Chá»‰ Admin/Sáº¿p má»›i cÃ³ quyá»n náº¡p dá»¯ liá»‡u Chat vÃ o RAG." });
         }
 
         const { content } = req.body;
         if (!content || !content.trim()) {
-            return res.status(400).json({ error: "Nội dung đoạn chat không được để trống." });
+            return res.status(400).json({ error: "Ná»™i dung Ä‘oáº¡n chat khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng." });
         }
 
         const textContent = content.trim();
 
-        // Thuật toán Chunking (Ngữ nghĩa)
+        // Thuáº­t toÃ¡n Chunking (Ngá»¯ nghÄ©a)
         const chunks = [];
         const sentences = textContent.split(/(?<=[.!?\n])\s+/);
         
@@ -1531,12 +1531,12 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
         res.json({ 
             success: true, 
             chunks_processed: successCount, 
-            message: `Đã nạp thành công ${successCount} khối kiến thức vào não AI.` 
+            message: `ÄÃ£ náº¡p thÃ nh cÃ´ng ${successCount} khá»‘i kiáº¿n thá»©c vÃ o nÃ£o AI.` 
         });
 
     } catch (error) {
-        console.error("Lỗi learn-from-chat:", error);
-        res.status(500).json({ error: "Lỗi máy chủ khi nhúng dữ liệu chat." });
+        console.error("Lá»—i learn-from-chat:", error);
+        res.status(500).json({ error: "Lá»—i mÃ¡y chá»§ khi nhÃºng dá»¯ liá»‡u chat." });
     }
 });
   app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
@@ -1546,16 +1546,16 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
       let query = '';
       let queryParams = [];
 
-      // Nhóm All-Access (Toàn quyền)
+      // NhÃ³m All-Access (ToÃ n quyá»n)
       if (
         role === 'SUPER_ADMIN' || 
-        role === 'ADMIN' || // BỔ SUNG ROLE NÀY NGAY LẬP TỨC
+        role === 'ADMIN' || // Bá»” SUNG ROLE NÃ€Y NGAY Láº¬P Tá»¨C
         role === 'VICE_PRESIDENT' || 
         (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING')
       ) {
         query = 'SELECT * FROM ai_chat_sessions ORDER BY timestamp DESC LIMIT 100';
       } else {
-        // Nhóm Local (Theo phòng ban/cơ sở)
+        // NhÃ³m Local (Theo phÃ²ng ban/cÆ¡ sá»Ÿ)
         query = `
           SELECT s.* 
           FROM ai_chat_sessions s
@@ -1564,14 +1564,14 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
           ORDER BY s.timestamp DESC
           LIMIT 100
         `;
-        // BỌC LÓT LỖI UNDEFINED TRÁNH CRASH DB
+        // Bá»ŒC LÃ“T Lá»–I UNDEFINED TRÃNH CRASH DB
         queryParams = [department_code || 'UNKNOWN'];
       }
 
       const { rows } = await pool.query(query, queryParams);
       res.json({ success: true, data: rows });
     } catch (error) {
-      console.error("Lỗi get AI sessions:", error);
+      console.error("Lá»—i get AI sessions:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -1598,7 +1598,7 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
     }
   });
 
-// API: Lưu và lấy danh sách vi phạm AI
+// API: LÆ°u vÃ  láº¥y danh sÃ¡ch vi pháº¡m AI
 app.get('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT data FROM system_config WHERE key = $1', ['ai_violations']);
@@ -1608,8 +1608,8 @@ app.get('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) => 
     }
     res.json({ success: true, data: violations });
   } catch (error) {
-    console.error('Lỗi lấy AI violations:', error);
-    res.status(500).json({ error: 'Lỗi server' });
+    console.error('Lá»—i láº¥y AI violations:', error);
+    res.status(500).json({ error: 'Lá»—i server' });
   }
 });
 
@@ -1632,38 +1632,38 @@ app.post('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) =>
     
     res.json({ success: true });
   } catch (error) {
-    console.error('Lỗi lưu AI violations:', error);
-    res.status(500).json({ error: 'Lỗi server' });
+    console.error('Lá»—i lÆ°u AI violations:', error);
+    res.status(500).json({ error: 'Lá»—i server' });
   }
 });
 
-// API: Kích hoạt AI Ping đôn đốc công việc
+// API: KÃ­ch hoáº¡t AI Ping Ä‘Ã´n Ä‘á»‘c cÃ´ng viá»‡c
 app.post('/api/ai/ping', authenticateUser, async (req, res) => {
   try {
     const { taskId } = req.body;
     const task = mockTasks.find(t => t.id === taskId);
 
     if (!task) {
-      return res.status(404).json({ error: 'Không tìm thấy công việc.' });
+      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
     }
 
-    // 1. Tính toán Tone nhắc việc dựa trên Deadline
+    // 1. TÃ­nh toÃ¡n Tone nháº¯c viá»‡c dá»±a trÃªn Deadline
     const toneEscalation = calculateTone(task.deadline);
 
-    // 2. Gọi OpenRouter để sinh nội dung nhắc việc thấu cảm theo Tone đã tính
+    // 2. Gá»i OpenRouter Ä‘á»ƒ sinh ná»™i dung nháº¯c viá»‡c tháº¥u cáº£m theo Tone Ä‘Ã£ tÃ­nh
     const systemPrompt = `
-      Bạn là một Trợ lý AI Cố vấn (AI Executive Advisor) trong hệ thống TaskFlow AI. 
-      Bạn đang thực hiện tính năng "Đôn đốc Thấu cảm" (Empathetic Ping) nhằm tạo áp lực tiến độ một cách tinh tế.
+      Báº¡n lÃ  má»™t Trá»£ lÃ½ AI Cá»‘ váº¥n (AI Executive Advisor) trong há»‡ thá»‘ng TaskFlow AI. 
+      Báº¡n Ä‘ang thá»±c hiá»‡n tÃ­nh nÄƒng "ÄÃ´n Ä‘á»‘c Tháº¥u cáº£m" (Empathetic Ping) nháº±m táº¡o Ã¡p lá»±c tiáº¿n Ä‘á»™ má»™t cÃ¡ch tinh táº¿.
       
-      Thông tin công việc:
-      - Tên công việc: "${task.title}"
-      - Người phụ trách (PIC): ${task.pic_name}
-      - Hạn chót: ${task.deadline}
-      - Mức độ cảnh báo (Tone Escalation): ${toneEscalation.level}
-      - Định hướng giọng điệu: ${toneEscalation.guidance}
+      ThÃ´ng tin cÃ´ng viá»‡c:
+      - TÃªn cÃ´ng viá»‡c: "${task.title}"
+      - NgÆ°á»i phá»¥ trÃ¡ch (PIC): ${task.pic_name}
+      - Háº¡n chÃ³t: ${task.deadline}
+      - Má»©c Ä‘á»™ cáº£nh bÃ¡o (Tone Escalation): ${toneEscalation.level}
+      - Äá»‹nh hÆ°á»›ng giá»ng Ä‘iá»‡u: ${toneEscalation.guidance}
 
-      Nhiệm vụ: Viết một tin nhắn ngắn gọn (dưới 50 chữ), xưng hô lịch sự với ${task.pic_name}.
-      Đúng chuẩn mức độ cảnh báo được yêu cầu. Không thêm lời chào thừa thãi như "Chào bạn", đi thẳng vào vấn đề theo cách thấu cảm.
+      Nhiá»‡m vá»¥: Viáº¿t má»™t tin nháº¯n ngáº¯n gá»n (dÆ°á»›i 50 chá»¯), xÆ°ng hÃ´ lá»‹ch sá»± vá»›i ${task.pic_name}.
+      ÄÃºng chuáº©n má»©c Ä‘á»™ cáº£nh bÃ¡o Ä‘Æ°á»£c yÃªu cáº§u. KhÃ´ng thÃªm lá»i chÃ o thá»«a thÃ£i nhÆ° "ChÃ o báº¡n", Ä‘i tháº³ng vÃ o váº¥n Ä‘á» theo cÃ¡ch tháº¥u cáº£m.
     `;
 
     const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
@@ -1682,13 +1682,13 @@ app.post('/api/ai/ping', authenticateUser, async (req, res) => {
     });
 
     const aiData = await response.json();
-    let pingMessage = "Đã xảy ra lỗi sinh nội dung nhắc việc.";
+    let pingMessage = "ÄÃ£ xáº£y ra lá»—i sinh ná»™i dung nháº¯c viá»‡c.";
     
     if (aiData.choices && aiData.choices.length > 0) {
       pingMessage = aiData.choices[0].message.content.trim();
     }
 
-    // 3. Ghi vào "Bảng Log Nhắc việc AI" công khai
+    // 3. Ghi vÃ o "Báº£ng Log Nháº¯c viá»‡c AI" cÃ´ng khai
     await pool.query('INSERT INTO ai_ping_logs (task_id, message) VALUES ($1, $2)', [task.id, pingMessage]);
     const logEntry = {
       task_id: task.id,
@@ -1698,7 +1698,7 @@ app.post('/api/ai/ping', authenticateUser, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Đã gửi AI Ping thành công.',
+      message: 'ÄÃ£ gá»­i AI Ping thÃ nh cÃ´ng.',
       data: {
         tone_escalation: toneEscalation.level,
         generated_message: pingMessage,
@@ -1707,13 +1707,13 @@ app.post('/api/ai/ping', authenticateUser, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Lỗi khi gọi AI Ping:', error);
-    res.status(500).json({ error: 'Lỗi khi gọi AI API.' });
+    console.error('Lá»—i khi gá»i AI Ping:', error);
+    res.status(500).json({ error: 'Lá»—i khi gá»i AI API.' });
   }
 });
 
 // ==============================================================================
-// 4. BÁO CÁO THỐNG KÊ TOKEN (DB VẬT LÝ)
+// 4. BÃO CÃO THá»NG KÃŠ TOKEN (DB Váº¬T LÃ)
 // ==============================================================================
 
 app.post('/api/internal/log-tokens', authenticateUser, async (req, res) => {
@@ -1728,8 +1728,8 @@ app.post('/api/internal/log-tokens', authenticateUser, async (req, res) => {
     await pool.query(query, [null, username, prompt_tokens, completion_tokens, total_tokens]);
     res.json({ success: true });
   } catch (error) {
-    console.error('Lỗi lưu log token:', error);
-    res.status(500).json({ error: 'Lỗi server khi lưu token.' });
+    console.error('Lá»—i lÆ°u log token:', error);
+    res.status(500).json({ error: 'Lá»—i server khi lÆ°u token.' });
   }
 });
 
@@ -1737,7 +1737,7 @@ app.get('/api/internal/ai-token-stats', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
     if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ error: 'Quyền truy cập bị từ chối. Bạn không có quyền truy cập dữ liệu hệ thống.' });
+      return res.status(403).json({ error: 'Quyá»n truy cáº­p bá»‹ tá»« chá»‘i. Báº¡n khÃ´ng cÃ³ quyá»n truy cáº­p dá»¯ liá»‡u há»‡ thá»‘ng.' });
     }
 
     const limit = parseInt(req.query.limit) || 5;
@@ -1751,8 +1751,8 @@ app.get('/api/internal/ai-token-stats', authenticateUser, async (req, res) => {
     const result = await pool.query(query, [limit]);
     res.json({ success: true, top_users: result.rows });
   } catch (error) {
-    console.error('Lỗi truy xuất thống kê token:', error);
-    res.status(500).json({ error: 'Lỗi kết nối cơ sở dữ liệu vật lý.' });
+    console.error('Lá»—i truy xuáº¥t thá»‘ng kÃª token:', error);
+    res.status(500).json({ error: 'Lá»—i káº¿t ná»‘i cÆ¡ sá»Ÿ dá»¯ liá»‡u váº­t lÃ½.' });
   }
 });
 
@@ -1764,7 +1764,7 @@ app.get('/api/reports', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
     if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'FACILITY_MANAGER'].includes(role)) {
-      return res.status(403).json({ error: 'Không đủ quyền xem báo cáo tài chính.' });
+      return res.status(403).json({ error: 'KhÃ´ng Ä‘á»§ quyá»n xem bÃ¡o cÃ¡o tÃ i chÃ­nh.' });
     }
     
     let query = 'SELECT * FROM daily_financial_reports WHERE 1=1';
@@ -1785,8 +1785,8 @@ app.get('/api/reports', authenticateUser, async (req, res) => {
     }));
     res.json({ success: true, data: mappedRows });
   } catch (error) {
-    console.error('Lỗi lấy báo cáo doanh thu:', error);
-    res.status(500).json({ error: 'Lỗi server khi lấy doanh thu.' });
+    console.error('Lá»—i láº¥y bÃ¡o cÃ¡o doanh thu:', error);
+    res.status(500).json({ error: 'Lá»—i server khi láº¥y doanh thu.' });
   }
 });
 
@@ -1794,7 +1794,7 @@ app.post('/api/reports', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
     if (role !== 'FINANCE_DEPT' && role !== 'SUPER_ADMIN') {
-      return res.status(403).json({ error: 'Không đủ quyền lưu báo cáo.' });
+      return res.status(403).json({ error: 'KhÃ´ng Ä‘á»§ quyá»n lÆ°u bÃ¡o cÃ¡o.' });
     }
     
     const isArray = Array.isArray(req.body);
@@ -1821,8 +1821,8 @@ app.post('/api/reports', authenticateUser, async (req, res) => {
     
     res.json({ success: true, data: isArray ? results : results[0] });
   } catch (error) {
-    console.error('Lỗi lưu báo cáo doanh thu:', error);
-    res.status(500).json({ error: 'Lỗi server khi lưu báo cáo doanh thu.' });
+    console.error('Lá»—i lÆ°u bÃ¡o cÃ¡o doanh thu:', error);
+    res.status(500).json({ error: 'Lá»—i server khi lÆ°u bÃ¡o cÃ¡o doanh thu.' });
   }
 });
 
@@ -1839,8 +1839,8 @@ app.get('/api/kpi', authenticateUser, async (req, res) => {
       res.json({ success: true, data: null });
     }
   } catch (error) {
-    console.error('Lỗi lấy KPI:', error);
-    res.status(500).json({ error: 'Lỗi server khi lấy KPI.' });
+    console.error('Lá»—i láº¥y KPI:', error);
+    res.status(500).json({ error: 'Lá»—i server khi láº¥y KPI.' });
   }
 });
 
@@ -1848,7 +1848,7 @@ app.post('/api/kpi', authenticateUser, async (req, res) => {
   try {
     const { role, name, username } = req.user;
     if (!['SUPER_ADMIN', 'GENERAL_MANAGER', 'VICE_PRESIDENT', 'FINANCE_DEPT'].includes(role)) {
-      return res.status(403).json({ error: 'Không đủ quyền lưu cấu hình KPI.' });
+      return res.status(403).json({ error: 'KhÃ´ng Ä‘á»§ quyá»n lÆ°u cáº¥u hÃ¬nh KPI.' });
     }
     
     const { apply_month, data } = req.body;
@@ -1873,8 +1873,8 @@ app.post('/api/kpi', authenticateUser, async (req, res) => {
     
     res.json({ success: true, data: rows[0] });
   } catch (error) {
-    console.error('Lỗi lưu cấu hình KPI:', error);
-    res.status(500).json({ error: 'Lỗi server khi lưu cấu hình KPI.' });
+    console.error('Lá»—i lÆ°u cáº¥u hÃ¬nh KPI:', error);
+    res.status(500).json({ error: 'Lá»—i server khi lÆ°u cáº¥u hÃ¬nh KPI.' });
   }
 });
 
@@ -1888,8 +1888,8 @@ app.get('/api/config', authenticateUser, checkAdmin, async (req, res) => {
     rows.forEach(row => { configData[row.key] = row.data; });
     res.json({ success: true, data: configData });
   } catch (error) {
-    console.error('Lỗi tải system config:', error);
-    res.status(500).json({ error: 'Lỗi server khi tải cấu hình.' });
+    console.error('Lá»—i táº£i system config:', error);
+    res.status(500).json({ error: 'Lá»—i server khi táº£i cáº¥u hÃ¬nh.' });
   }
 });
 
@@ -1897,7 +1897,7 @@ app.post('/api/config', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user || {};
     if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
-       return res.status(403).json({ error: 'Không có quyền lưu cấu hình hệ thống.' });
+       return res.status(403).json({ error: 'KhÃ´ng cÃ³ quyá»n lÆ°u cáº¥u hÃ¬nh há»‡ thá»‘ng.' });
     }
     
     const { ai_config, system_prompts } = req.body;
@@ -1920,8 +1920,8 @@ app.post('/api/config', authenticateUser, async (req, res) => {
     
     res.json({ success: true });
   } catch (error) {
-    console.error('Lỗi lưu system config:', error);
-    res.status(500).json({ error: 'Lỗi server khi lưu cấu hình hệ thống.' });
+    console.error('Lá»—i lÆ°u system config:', error);
+    res.status(500).json({ error: 'Lá»—i server khi lÆ°u cáº¥u hÃ¬nh há»‡ thá»‘ng.' });
   }
 });
 
@@ -1951,7 +1951,7 @@ async function generateEmbedding(text) {
         if (data.data && data.data.length > 0) {
             return data.data[0].embedding; // Array of 1536 floats
         }
-        throw new Error(data.error?.message || 'Lỗi không xác định từ OpenAI');
+        throw new Error(data.error?.message || 'Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh tá»« OpenAI');
     } catch (error) {
         console.error('generateEmbedding Error:', error);
         return null;
@@ -1961,14 +1961,14 @@ async function generateEmbedding(text) {
 async function saveToKnowledgeBase(content, sourceType, metadata = {}) {
     try {
         const embedding = await generateEmbedding(content);
-        if (!embedding) throw new Error("Không thể tạo vector cho nội dung.");
+        if (!embedding) throw new Error("KhÃ´ng thá»ƒ táº¡o vector cho ná»™i dung.");
         
         const sql = `
             INSERT INTO company_knowledge_base (content, embedding, source_type, metadata)
             VALUES ($1, $2::vector, $3, $4)
             RETURNING id
         `;
-        const formatEmbedding = `[${embedding.join(',')}]`; // Định dạng vector cho PgVector
+        const formatEmbedding = `[${embedding.join(',')}]`; // Äá»‹nh dáº¡ng vector cho PgVector
         const { rows } = await pool.query(sql, [content, formatEmbedding, sourceType, JSON.stringify(metadata)]);
         return rows[0].id;
     } catch (error) {
@@ -1978,56 +1978,55 @@ async function saveToKnowledgeBase(content, sourceType, metadata = {}) {
 }
 
 // ==============================================================================
-// TẦNG RAG SEARCH KẾT HỢP RBAC FILTERING (VERSION 2 - CHUẨN KIẾN TRÚC)
+// Táº¦NG RAG SEARCH Káº¾T Há»¢P RBAC FILTERING (VERSION 2 - CHUáº¨N KIáº¾N TRÃšC)
 // ==============================================================================
 async function searchKnowledgeBase(queryText, user, limit = 3) {
     try {
-        // 1. Validate dữ liệu đầu vào chặt chẽ
+        // 1. Validate dá»¯ liá»‡u Ä‘áº§u vÃ o cháº·t cháº½
         if (!user || !user.role) {
-            throw new Error("Thông tin người dùng không hợp lệ để phân quyền.");
+            throw new Error("ThÃ´ng tin ngÆ°á»i dÃ¹ng khÃ´ng há»£p lá»‡ Ä‘á»ƒ phÃ¢n quyá»n.");
         }
 
         const queryEmbedding = await generateEmbedding(queryText);
-        if (!queryEmbedding) throw new Error("Không thể tạo vector cho câu truy vấn.");
+        if (!queryEmbedding) throw new Error("KhÃ´ng thá»ƒ táº¡o vector cho cÃ¢u truy váº¥n.");
         
         const formatEmbedding = `[${queryEmbedding.join(',')}]`;
-        const { role, department_code } = user;
+        const { role, department_code, facility_id } = user;
         
-        // 2. Phân loại nhóm All-Access
+        // 2. PhÃ¢n loáº¡i nhÃ³m All-Access
         const isAllAccess = 
             role === 'SUPER_ADMIN' || 
             role === 'VICE_PRESIDENT' || 
             (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING');
 
-        // 3. Kiểm tra an toàn cho nhóm Local
-        if (!isAllAccess && !department_code) {
-            console.error(`CẢNH BÁO BẢO MẬT: Người dùng ${user.id} thiếu department_code khi truy cập RAG.`);
-            throw new Error("Tài khoản của bạn chưa được cấu hình phòng ban. Truy cập bị từ chối.");
+        // 3. Kiá»ƒm tra an toÃ n cho nhÃ³m Local
+        if (!isAllAccess && !department_code && !facility_id) {
+            console.error(`CẢNH BÁO BẢO MẬT: Người dùng ${user.id} thiếu cả department_code và facility_id.`);
+            throw new Error("Tài khoản của bạn chưa được cấu hình phòng ban hoặc cơ sở. Truy cập bị từ chối.");
         }
 
         let sql = "";
         let params = [];
 
-        // 4. Tách nhánh Truy vấn sử dụng toán tử JSONB tối ưu (@>)
+        // 4. TÃ¡ch nhÃ¡nh Truy váº¥n sá»­ dá»¥ng toÃ¡n tá»­ JSONB tá»‘i Æ°u (@>)
         if (isAllAccess) {
             sql = `
                 SELECT id, content, source_type, metadata, created_at,
                        1 - (embedding <=> $1::vector) AS similarity 
+        } else {
+            sql = `
+                SELECT id, content, source_type, metadata, created_at,
+                       1 - (embedding <=> $1::vector) AS similarity 
                 FROM company_knowledge_base 
+                WHERE (metadata @> '{"department_code": "GLOBAL"}'::jsonb)
+                   OR ($3::text IS NOT NULL AND metadata @> jsonb_build_object('department_code', $3::text))
+                   OR ($4::text IS NOT NULL AND metadata @> jsonb_build_object('facility_id', $4::text))
                 ORDER BY 
                     (embedding <=> $1::vector) ASC, 
                     created_at DESC
                 LIMIT $2
             `;
-            params = [formatEmbedding, limit];
-        } else {
-            // Sử dụng toán tử @> để kích hoạt GIN Index, ép kiểu tường minh $3::text
-            sql = `
-                SELECT id, content, source_type, metadata, created_at,
-                       1 - (embedding <=> $1::vector) AS similarity 
-                FROM company_knowledge_base 
-                WHERE (metadata @> jsonb_build_object('department_code', $3::text)) 
-                   OR (metadata @> '{"department_code": "GLOBAL"}'::jsonb)
+            params = [formatEmbedding, limit, department_code || null, facility_id || null];
                 ORDER BY 
                     (embedding <=> $1::vector) ASC, 
                     created_at DESC
@@ -2051,12 +2050,12 @@ async function searchKnowledgeBase(queryText, user, limit = 3) {
 
 
 // ==============================================================================
-// BƯỚC 2.1: HÀM CHUẨN HÓA MÃ PHÒNG BAN (NÂNG CẤP XÓA DẤU TIẾNG VIỆT)
+// BÆ¯á»šC 2.1: HÃ€M CHUáº¨N HÃ“A MÃƒ PHÃ’NG BAN (NÃ‚NG Cáº¤P XÃ“A Dáº¤U TIáº¾NG VIá»†T)
 // ==============================================================================
 function normalizeDeptCode(rawCode) {
     if (!rawCode) return null;
     
-    // Loại bỏ dấu Tiếng Việt và đưa về in hoa
+    // Loáº¡i bá» dáº¥u Tiáº¿ng Viá»‡t vÃ  Ä‘Æ°a vá» in hoa
     const normalized = rawCode.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
     
     const map = {
@@ -2071,22 +2070,22 @@ function normalizeDeptCode(rawCode) {
         'BAN GIAM DOC': 'BGD'
     };
     
-    // Nếu có trong từ điển thì lấy, không thì giữ nguyên các ký tự chữ/số và gạch dưới
+    // Náº¿u cÃ³ trong tá»« Ä‘iá»ƒn thÃ¬ láº¥y, khÃ´ng thÃ¬ giá»¯ nguyÃªn cÃ¡c kÃ½ tá»± chá»¯/sá»‘ vÃ  gáº¡ch dÆ°á»›i
     return map[normalized] || normalized.replace(/[^A-Z0-9]/g, '_');
 }
 
 // ==============================================================================
-// BƯỚC 2.2 & 2.3: HÀM THỰC THI CHÍNH (CHUẨN RBAC & DATA INTEGRITY)
+// BÆ¯á»šC 2.2 & 2.3: HÃ€M THá»°C THI CHÃNH (CHUáº¨N RBAC & DATA INTEGRITY)
 // ==============================================================================
 async function executeCreateTaskTool(args, user) {
     const { title, department_code, deadline, priority } = args;
     
     const normalizedDept = normalizeDeptCode(department_code);
     if (!normalizedDept) {
-        throw new Error("Lỗi: Mã phòng ban/cơ sở không hợp lệ hoặc bị trống.");
+        throw new Error("Lá»—i: MÃ£ phÃ²ng ban/cÆ¡ sá»Ÿ khÃ´ng há»£p lá»‡ hoáº·c bá»‹ trá»‘ng.");
     }
 
-    // 1. RBAC Guardrail: Tái sử dụng logic chuẩn từ RAG
+    // 1. RBAC Guardrail: TÃ¡i sá»­ dá»¥ng logic chuáº©n tá»« RAG
     const isAllAccess = 
         user.role === 'SUPER_ADMIN' || 
         user.role === 'VICE_PRESIDENT' || 
@@ -2095,37 +2094,37 @@ async function executeCreateTaskTool(args, user) {
     if (!isAllAccess) {
         const userDept = normalizeDeptCode(user.department_code || user.facility_code || '');
         if (normalizedDept !== userDept) {
-            throw new Error(`AI TỪ CHỐI: Bạn không có quyền tạo task cho phòng ban [${normalizedDept}]. Thẩm quyền của bạn giới hạn tại: [${userDept}].`);
+            throw new Error(`AI Tá»ª CHá»I: Báº¡n khÃ´ng cÃ³ quyá»n táº¡o task cho phÃ²ng ban [${normalizedDept}]. Tháº©m quyá»n cá»§a báº¡n giá»›i háº¡n táº¡i: [${userDept}].`);
         }
     }
 
-    // 2. Validate Deadline chống Crash DB
+    // 2. Validate Deadline chá»‘ng Crash DB
     let deadlineVal = null;
     if (deadline) {
         const parsedDate = new Date(deadline);
         if (isNaN(parsedDate.getTime())) {
-            throw new Error(`Lỗi: AI truyền định dạng ngày tháng không hợp lệ (${deadline}). Yêu cầu định dạng YYYY-MM-DD.`);
+            throw new Error(`Lá»—i: AI truyá»n Ä‘á»‹nh dáº¡ng ngÃ y thÃ¡ng khÃ´ng há»£p lá»‡ (${deadline}). YÃªu cáº§u Ä‘á»‹nh dáº¡ng YYYY-MM-DD.`);
         }
         deadlineVal = parsedDate;
     }
 
-    // 3. Xử lý logic Facility ID thông minh (Không Hardcode)
+    // 3. Xá»­ lÃ½ logic Facility ID thÃ´ng minh (KhÃ´ng Hardcode)
     let finalFacilityId = user.facility_id;
     
-    // Nếu All-Access user tạo task cho cơ sở khác, tự động tra cứu ID của cơ sở đó
+    // Náº¿u All-Access user táº¡o task cho cÆ¡ sá»Ÿ khÃ¡c, tá»± Ä‘á»™ng tra cá»©u ID cá»§a cÆ¡ sá»Ÿ Ä‘Ã³
     if (isAllAccess && normalizedDept !== normalizeDeptCode(user.department_code)) {
         const { rows } = await pool.query(`SELECT id FROM facilities WHERE code = $1 LIMIT 1`, [normalizedDept]);
         if (rows.length > 0) {
             finalFacilityId = rows[0].id;
         } else {
-            // Fallback nếu không tìm thấy, ép dùng facility_id của người tạo (hoặc ném lỗi tùy logic PO)
+            // Fallback náº¿u khÃ´ng tÃ¬m tháº¥y, Ã©p dÃ¹ng facility_id cá»§a ngÆ°á»i táº¡o (hoáº·c nÃ©m lá»—i tÃ¹y logic PO)
             finalFacilityId = user.facility_id; 
         }
     }
 
     const priorityLevel = priority || 'MEDIUM';
 
-    // 4. Thực thi Database Insert
+    // 4. Thá»±c thi Database Insert
     const insertQuery = `
         INSERT INTO tasks (title, department_code, deadline, priority_level, created_by, facility_id) 
         VALUES ($1, $2, $3, $4, $5, $6) 
@@ -2139,21 +2138,21 @@ async function executeCreateTaskTool(args, user) {
         
         return {
             status: "success",
-            message: `Tạo công việc thành công. ID: ${result.rows[0].id}`
+            message: `Táº¡o cÃ´ng viá»‡c thÃ nh cÃ´ng. ID: ${result.rows[0].id}`
         };
     } catch (error) {
         console.error("Database Error (executeCreateTaskTool):", error);
-        throw new Error("Lỗi hệ thống khi lưu công việc vào cơ sở dữ liệu.");
+        throw new Error("Lá»—i há»‡ thá»‘ng khi lÆ°u cÃ´ng viá»‡c vÃ o cÆ¡ sá»Ÿ dá»¯ liá»‡u.");
     }
 }
 
 async function detectAndLearnRule(message, role, userId) {
     if (role !== 'SUPER_ADMIN' && role !== 'VICE_PRESIDENT') {
-        return null; // Chỉ Sếp mới được tạo luật
+        return null; // Chá»‰ Sáº¿p má»›i Ä‘Æ°á»£c táº¡o luáº­t
     }
     
     try {
-        const systemPrompt = "Bạn là bộ lọc chỉ đạo. Hãy đọc câu của Sếp. Nếu đó là một chỉ đạo, quy định, hoặc nội quy mới về công việc, hãy trích xuất gọn gàng nội dung cốt lõi của chỉ đạo đó. Nếu đó chỉ là câu chat bình thường hoặc hỏi đáp, trả về chính xác chữ 'NULL'.";
+        const systemPrompt = "Báº¡n lÃ  bá»™ lá»c chá»‰ Ä‘áº¡o. HÃ£y Ä‘á»c cÃ¢u cá»§a Sáº¿p. Náº¿u Ä‘Ã³ lÃ  má»™t chá»‰ Ä‘áº¡o, quy Ä‘á»‹nh, hoáº·c ná»™i quy má»›i vá» cÃ´ng viá»‡c, hÃ£y trÃ­ch xuáº¥t gá»n gÃ ng ná»™i dung cá»‘t lÃµi cá»§a chá»‰ Ä‘áº¡o Ä‘Ã³. Náº¿u Ä‘Ã³ chá»‰ lÃ  cÃ¢u chat bÃ¬nh thÆ°á»ng hoáº·c há»i Ä‘Ã¡p, tráº£ vá» chÃ­nh xÃ¡c chá»¯ 'NULL'.";
         
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
@@ -2173,7 +2172,7 @@ async function detectAndLearnRule(message, role, userId) {
         const data = await response.json();
         if (data.choices && data.choices.length > 0) {
             let result = data.choices[0].message.content.trim();
-            // Xóa ngoặc kép nếu có
+            // XÃ³a ngoáº·c kÃ©p náº¿u cÃ³
             if (result.startsWith('"') && result.endsWith('"')) {
                 result = result.slice(1, -1);
             }
@@ -2190,7 +2189,7 @@ async function detectAndLearnRule(message, role, userId) {
 
 
 /**
- * Lấy lịch sử chat ngắn hạn, có bọc Auth Check chống ID Harvesting
+ * Láº¥y lá»‹ch sá»­ chat ngáº¯n háº¡n, cÃ³ bá»c Auth Check chá»‘ng ID Harvesting
  */
 async function getConversationContext(sessionId, userId) {
     if (!sessionId) return [];
@@ -2203,8 +2202,8 @@ async function getConversationContext(sessionId, userId) {
         const { rows: sessionRows } = await pool.query(authCheckSql, [sessionId, userId]);
         
         if (sessionRows.length === 0) {
-            console.warn(`[SECURITY ALERT] User ${userId} cố gắng truy cập trái phép Session ${sessionId}`);
-            throw new Error("403 Forbidden: Bạn không có quyền truy cập vào phiên chat này!");
+            console.warn(`[SECURITY ALERT] User ${userId} cá»‘ gáº¯ng truy cáº­p trÃ¡i phÃ©p Session ${sessionId}`);
+            throw new Error("403 Forbidden: Báº¡n khÃ´ng cÃ³ quyá»n truy cáº­p vÃ o phiÃªn chat nÃ y!");
         }
 
         const historySql = `
@@ -2222,7 +2221,7 @@ async function getConversationContext(sessionId, userId) {
         }));
 
     } catch (error) {
-        console.error("Lỗi getConversationContext:", error);
+        console.error("Lá»—i getConversationContext:", error);
         throw error;
     }
 }
@@ -2235,38 +2234,38 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         if (!userMessage) return res.status(400).json({ error: "Message is required" });
 
         // ==========================================
-        // NHẬP 1: LƯU CÂU HỎI & CHỐNG MẤT DỮ LIỆU
+        // NHáº¬P 1: LÆ¯U CÃ‚U Há»ŽI & CHá»NG Máº¤T Dá»® LIá»†U
         // ==========================================
         if (session_id) {
             const checkSession = await pool.query("SELECT id FROM ai_chat_sessions WHERE id = $1 AND user_id = $2", [session_id, req.user.id]);
-            if (checkSession.rowCount === 0) return res.status(403).json({ error: "Lỗi phiên làm việc." });
+            if (checkSession.rowCount === 0) return res.status(403).json({ error: "Lá»—i phiÃªn lÃ m viá»‡c." });
             
             const saveUserMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'user', $2)`;
             await pool.query(saveUserMsgSql, [session_id, userMessage]);
         }
 
         // ==========================================
-        // NHẬP 2: RAG & MẠNG LỌC TIỀM THỨC
+        // NHáº¬P 2: RAG & Máº NG Lá»ŒC TIá»€M THá»¨C
         // ==========================================
         let learnedRule = await detectAndLearnRule(userMessage, req.user.role, req.user.id);
         let systemPromptAddition = "";
         
         if (learnedRule) {
-            systemPromptAddition = String.fromCharCode(10) + `[HỆ THỐNG]: Bạn vừa tự động nạp chỉ đạo mới này vào trí nhớ RAG: "${learnedRule}". Hãy trả lời người dùng một cách ngắn gọn, diện ảnh và thông báo rằng bạn đã ghi nhớ luật này vào hệ thống lõi.`;
+            systemPromptAddition = String.fromCharCode(10) + `[Há»† THá»NG]: Báº¡n vá»«a tá»± Ä‘á»™ng náº¡p chá»‰ Ä‘áº¡o má»›i nÃ y vÃ o trÃ­ nhá»› RAG: "${learnedRule}". HÃ£y tráº£ lá»i ngÆ°á»i dÃ¹ng má»™t cÃ¡ch ngáº¯n gá»n, diá»‡n áº£nh vÃ  thÃ´ng bÃ¡o ráº±ng báº¡n Ä‘Ã£ ghi nhá»› luáº­t nÃ y vÃ o há»‡ thá»‘ng lÃµi.`;
         }
 
         const ragContextRows = await searchKnowledgeBase(userMessage, req.user, 3);
         const rawRagText = ragContextRows.map(row => row.content).join("\n\n");
-        const ragContextText = rawRagText.length > 4000 ? rawRagText.substring(0, 4000) + "\n... [Đã cắt bớt do giới hạn bộ nhớ]" : rawRagText;
+        const ragContextText = rawRagText.length > 4000 ? rawRagText.substring(0, 4000) + "\n... [ÄÃ£ cáº¯t bá»›t do giá»›i háº¡n bá»™ nhá»›]" : rawRagText;
         
         const isLocalUser = req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'VICE_PRESIDENT' && req.user.role !== 'ADMIN';
         
-        let finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow." + String.fromCharCode(10) + 
-                                  (ragContextText ? "Dữ liệu tham khảo:" + String.fromCharCode(10) + ragContextText : "") + 
+        let finalSystemPrompt = "Báº¡n lÃ  trá»£ lÃ½ áº£o AI Advisor thÃ´ng minh cá»§a há»‡ thá»‘ng TaskFlow." + String.fromCharCode(10) + 
+                                  (ragContextText ? "Dá»¯ liá»‡u tham kháº£o:" + String.fromCharCode(10) + ragContextText : "") + 
                                   systemPromptAddition;
 
         if (isLocalUser) {
-            finalSystemPrompt += String.fromCharCode(10) + "LƯU Ý BẢO MẬT: Bạn chỉ được trả lời các câu hỏi liên quan sát sườn đến nghiệp vụ phòng ban của người dùng. Nếu người dùng hỏi đùa, hỏi xàm, tán tỉnh hoặc hỏi các kiến thức ngoài công việc, bạn BẮT BUỘC phải trả về đúng từ khóa: [BLOCK_MISCONDUCT]";
+            finalSystemPrompt += String.fromCharCode(10) + "LÆ¯U Ã Báº¢O Máº¬T: Báº¡n chá»‰ Ä‘Æ°á»£c tráº£ lá»i cÃ¡c cÃ¢u há»i liÃªn quan sÃ¡t sÆ°á»n Ä‘áº¿n nghiá»‡p vá»¥ phÃ²ng ban cá»§a ngÆ°á»i dÃ¹ng. Náº¿u ngÆ°á»i dÃ¹ng há»i Ä‘Ã¹a, há»i xÃ m, tÃ¡n tá»‰nh hoáº·c há»i cÃ¡c kiáº¿n thá»©c ngoÃ i cÃ´ng viá»‡c, báº¡n Báº®T BUá»˜C pháº£i tráº£ vá» Ä‘Ãºng tá»« khÃ³a: [BLOCK_MISCONDUCT]";
         }
 
         let chatHistory = [];
@@ -2281,7 +2280,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         ];
 
         // ==========================================
-        // NHẬP 3: SSE STREAMING VỚI TOOL CALL
+        // NHáº¬P 3: SSE STREAMING Vá»šI TOOL CALL
         // ==========================================
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -2293,13 +2292,13 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 type: "function",
                 function: {
                     name: "create_system_task",
-                    description: "Tạo hoặc giao một công việc mới cho phòng ban/cơ sở trên hệ thống.",
+                    description: "Táº¡o hoáº·c giao má»™t cÃ´ng viá»‡c má»›i cho phÃ²ng ban/cÆ¡ sá»Ÿ trÃªn há»‡ thá»‘ng.",
                     parameters: {
                         type: "object",
                         properties: {
-                            title: { type: "string", description: "Tiêu đề công việc" },
-                            department_code: { type: "string", description: "Tên phòng ban (VD: Truyền thông, Kế toán, DB41)" },
-                            deadline: { type: "string", description: "Hạn chót (ISO format hoặc text)" },
+                            title: { type: "string", description: "TiÃªu Ä‘á» cÃ´ng viá»‡c" },
+                            department_code: { type: "string", description: "TÃªn phÃ²ng ban (VD: Truyá»n thÃ´ng, Káº¿ toÃ¡n, DB41)" },
+                            deadline: { type: "string", description: "Háº¡n chÃ³t (ISO format hoáº·c text)" },
                             priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }
                         },
                         required: ["title", "department_code"]
@@ -2325,7 +2324,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 
         if (!response.ok) {
             console.error("OpenRouter Stream Error:", await response.text());
-            res.write(`data: ${JSON.stringify({ error: "Lỗi kết nối AI API" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+            res.write(`data: ${JSON.stringify({ error: "Lá»—i káº¿t ná»‘i AI API" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
             return res.end();
         }
 
@@ -2355,23 +2354,23 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 }
             }
             
-            // XỬ LÝ BLOCK MISCONDUCT NGAY LẬP TỨC
+            // Xá»¬ LÃ BLOCK MISCONDUCT NGAY Láº¬P Tá»¨C
             if (aiReplyContent.includes('[BLOCK_MISCONDUCT]')) {
                 await pool.query(`
                     INSERT INTO daily_logs (entry_type, user_id, action_details, created_at)
                     VALUES ($1, $2, $3, NOW())
-                `, ['SECURITY_ALERT', req.user.id, `Nhân viên hỏi xàm hệ thống AI. Nội dung: "${userMessage}"`]);
-                res.write(`data: ${JSON.stringify({ error: "HỆ THỐNG CẢNH BÁO: Câu hỏi của bạn vi phạm tiêu chuẩn nghiệp vụ nội bộ. Hành vi này đã được ghi nhận và gửi về tài khoản Admin để tiến hành truy vết kỷ luật!" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                `, ['SECURITY_ALERT', req.user.id, `NhÃ¢n viÃªn há»i xÃ m há»‡ thá»‘ng AI. Ná»™i dung: "${userMessage}"`]);
+                res.write(`data: ${JSON.stringify({ error: "Há»† THá»NG Cáº¢NH BÃO: CÃ¢u há»i cá»§a báº¡n vi pháº¡m tiÃªu chuáº©n nghiá»‡p vá»¥ ná»™i bá»™. HÃ nh vi nÃ y Ä‘Ã£ Ä‘Æ°á»£c ghi nháº­n vÃ  gá»­i vá» tÃ i khoáº£n Admin Ä‘á»ƒ tiáº¿n hÃ nh truy váº¿t ká»· luáº­t!" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
                 res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
                 return res.end();
             }
             
-            // NẾU SẠCH SẼ, ĐẨY DỮ LIỆU XUỐNG SSE
+            // Náº¾U Sáº CH Sáº¼, Äáº¨Y Dá»® LIá»†U XUá»NG SSE
             if (aiReplyContent) {
                 res.write(`data: ${JSON.stringify({ content: aiReplyContent })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
             }
         } else {
-            // ADMIN STREAMING (Giữ nguyên)
+            // ADMIN STREAMING (Giá»¯ nguyÃªn)
             let reader = response.body.getReader();
             let decoder = new TextDecoder("utf-8");
             while (true) {
@@ -2403,7 +2402,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                                 }
                             }
                         } catch (e) {
-                            console.error("Lỗi parse JSON stream chunk:", e);
+                            console.error("Lá»—i parse JSON stream chunk:", e);
                         }
                     }
                 }
@@ -2411,7 +2410,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
 
         // ==========================================
-        // NHẬP 3.5: THỰC THI TOOL VÀ FAIL-FAST
+        // NHáº¬P 3.5: THá»°C THI TOOL VÃ€ FAIL-FAST
         // ==========================================
         if (toolCallName === "create_system_task" && toolCallArguments) {
             try {
@@ -2461,13 +2460,13 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                         if (msg2.content) {
                             aiReplyContent += msg2.content;
                             
-                            // XỬ LÝ BLOCK LẦN 2
+                            // Xá»¬ LÃ BLOCK Láº¦N 2
                             if (aiReplyContent.includes('[BLOCK_MISCONDUCT]')) {
                                 await pool.query(`
                                     INSERT INTO daily_logs (entry_type, user_id, action_details, created_at)
                                     VALUES ($1, $2, $3, NOW())
-                                `, ['SECURITY_ALERT', req.user.id, `Nhân viên hỏi xàm hệ thống AI. Nội dung: "${userMessage}"`]);
-                                res.write(`data: ${JSON.stringify({ error: "HỆ THỐNG CẢNH BÁO: Câu hỏi của bạn vi phạm tiêu chuẩn nghiệp vụ nội bộ. Hành vi này đã được ghi nhận và gửi về tài khoản Admin để tiến hành truy vết kỷ luật!" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                                `, ['SECURITY_ALERT', req.user.id, `NhÃ¢n viÃªn há»i xÃ m há»‡ thá»‘ng AI. Ná»™i dung: "${userMessage}"`]);
+                                res.write(`data: ${JSON.stringify({ error: "Há»† THá»NG Cáº¢NH BÃO: CÃ¢u há»i cá»§a báº¡n vi pháº¡m tiÃªu chuáº©n nghiá»‡p vá»¥ ná»™i bá»™. HÃ nh vi nÃ y Ä‘Ã£ Ä‘Æ°á»£c ghi nháº­n vÃ  gá»­i vá» tÃ i khoáº£n Admin Ä‘á»ƒ tiáº¿n hÃ nh truy váº¿t ká»· luáº­t!" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
                                 res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
                                 return res.end();
                             }
@@ -2511,14 +2510,14 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             }
         }
 
-        // Kết thúc luồng stream an toàn
+        // Káº¿t thÃºc luá»“ng stream an toÃ n
         if (!res.writableEnded) {
             res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
             res.end();
         }
 
         // ==========================================
-        // NHẬP 4: LƯU DB & GHI LOG BẢO MẬT
+        // NHáº¬P 4: LÆ¯U DB & GHI LOG Báº¢O Máº¬T
         // ==========================================
         if (session_id && aiReplyContent) {
             const saveAiMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)`;
@@ -2536,7 +2535,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
     } catch (error) {
         console.error("AI Chat Stream error:", error);
         if (!res.headersSent) {
-            res.status(500).json({ error: "Lỗi hệ thống AI Chat." });
+            res.status(500).json({ error: "Lá»—i há»‡ thá»‘ng AI Chat." });
         } else {
             res.end();
         }
@@ -2545,7 +2544,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 TaskFlow AI Server đang chạy tại http://localhost:${PORT}`);
+  console.log(`ðŸš€ TaskFlow AI Server Ä‘ang cháº¡y táº¡i http://localhost:${PORT}`);
   console.log(`[DB] DATABASE_URL: ${process.env.DATABASE_URL ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_HOST: ${process.env.DB_HOST ? 'OK' : 'UNDEFINED'}`);
   console.log(`[DB] DB_NAME: ${process.env.DB_NAME ? 'OK' : 'UNDEFINED'}`);
@@ -2553,4 +2552,5 @@ app.listen(PORT, () => {
   console.log(`[DB] DB_PORT: ${process.env.DB_PORT ? 'OK' : 'UNDEFINED'}`);
   console.log(`[API] SUPABASE_KEY: ${process.env.SUPABASE_KEY ? 'OK' : 'UNDEFINED'}`);
 });
+
 
