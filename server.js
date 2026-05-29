@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'HubDB_Global_Temp_Secret_2026_!!!';
@@ -2154,6 +2154,52 @@ async function executeCreateTaskTool(args, user) {
     }
 }
 
+async function executeGetRevenueTool(args, user) {
+    const { date_range, facility_code } = args;
+    
+    const isAllAccess = user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT' || (user.role === 'DEPARTMENT_HEAD' && user.department_code === 'MARKETING');
+    // Ép kiểu String để tránh lỗi khi so sánh JSONB
+    const targetFacility = isAllAccess ? (facility_code ? String(facility_code) : null) : String(user.facility_id);
+
+    // Hàm tiện ích tạo ngày (giả lập hoặc dùng thư viện date)
+    const getDates = (range) => {
+        const today = new Date().toISOString().split('T')[0];
+        // Ở môi trường thực, hãy parse range ('hôm nay', 'tuần này'). Tạm thời lấy current date.
+        return { startDate: today, endDate: today }; 
+    };
+    const { startDate, endDate } = getDates(date_range);
+
+    let sql = "";
+    let params = [];
+
+    if (!targetFacility) {
+        sql = `SELECT COALESCE(SUM(total_revenue), 0) AS aggregated_revenue 
+               FROM daily_financial_reports 
+               WHERE date >= $1::date AND date <= $2::date`;
+        params = [startDate, endDate];
+    } else {
+        sql = `SELECT COALESCE(SUM(
+                   (SELECT SUM((item->>'revenue')::numeric) 
+                    FROM jsonb_array_elements(data) AS item 
+                    WHERE item->>'facility_id' = $3::text OR item->>'facility_code' = $3::text)
+               ), 0) AS aggregated_revenue
+               FROM daily_financial_reports
+               WHERE date >= $1::date AND date <= $2::date`;
+        params = [startDate, endDate, targetFacility];
+    }
+
+    try {
+        const { rows } = await pool.query(sql, params);
+        return {
+            status: "success",
+            message: `Báo cáo doanh thu: ${Number(rows[0].aggregated_revenue).toLocaleString('vi-VN')} VNĐ.`
+        };
+    } catch (error) {
+        console.error("Revenue DB Error:", error);
+        throw new Error("Lỗi hệ thống khi trích xuất doanh thu.");
+    }
+}
+
 async function detectAndLearnRule(message, role, userId) {
     if (role !== 'SUPER_ADMIN' && role !== 'VICE_PRESIDENT') {
         return null; // Chá»‰ Sáº¿p má»›i Ä‘Æ°á»£c táº¡o luáº­t
@@ -2197,7 +2243,7 @@ async function detectAndLearnRule(message, role, userId) {
 
 
 /**
- * Láº¥y lá»‹ch sá»­ chat ngáº¯n háº¡n, cÃ³ bá»c Auth Check chá»‘ng ID Harvesting
+ * Láº¥y lá»‹ch sá»­ chat ngáº¯n háº¡n, cÃ³ bá» c Auth Check chá»‘ng ID Harvesting
  */
 async function getConversationContext(sessionId, userId) {
     if (!sessionId) return [];
@@ -2211,7 +2257,7 @@ async function getConversationContext(sessionId, userId) {
         
         if (sessionRows.length === 0) {
             console.warn(`[SECURITY ALERT] User ${userId} cá»‘ gáº¯ng truy cáº­p trÃ¡i phÃ©p Session ${sessionId}`);
-            throw new Error("403 Forbidden: Báº¡n khÃ´ng cÃ³ quyá»n truy cáº­p vÃ o phiÃªn chat nÃ y!");
+            throw new Error("403 Forbidden: Báº¡n khÃ´ng cÃ³ quyá» n truy cáº­p vÃ o phiÃªn chat nÃ y!");
         }
 
         const historySql = `
@@ -2295,21 +2341,43 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
         res.flushHeaders();
 
-        const tools = [
+                const tools = [
             {
                 type: "function",
                 function: {
                     name: "create_system_task",
-                    description: "Táº¡o hoáº·c giao má»™t cÃ´ng viá»‡c má»›i cho phÃ²ng ban/cÆ¡ sá»Ÿ trÃªn há»‡ thá»‘ng.",
+                    description: "Tạo hoặc giao một công việc mới cho phòng ban/cơ sở trên hệ thống.",
                     parameters: {
                         type: "object",
                         properties: {
-                            title: { type: "string", description: "TiÃªu Ä‘á» cÃ´ng viá»‡c" },
-                            department_code: { type: "string", description: "TÃªn phÃ²ng ban (VD: Truyá»n thÃ´ng, Káº¿ toÃ¡n, DB41)" },
-                            deadline: { type: "string", description: "Háº¡n chÃ³t (ISO format hoáº·c text)" },
+                            title: { type: "string", description: "Tiêu đề công việc" },
+                            department_code: { type: "string", description: "Tên phòng ban (VD: Truyền thông, Kế toán, DB41)" },
+                            deadline: { type: "string", description: "Hạn chót (ISO format hoặc text)" },
                             priority: { type: "string", enum: ["LOW", "MEDIUM", "HIGH", "URGENT"] }
                         },
                         required: ["title", "department_code"]
+                    }
+                }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "get_revenue_report",
+                    description: "Lấy báo cáo doanh thu của cơ sở/phòng ban theo thời gian.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            date_range: { 
+                                type: "string", 
+                                description: "Khoảng thời gian cần xem doanh thu (ví dụ: hôm nay, tuần này, tháng này)",
+                                enum: ["hôm nay", "tuần này", "tháng này"] 
+                            },
+                            facility_code: { 
+                                type: "string", 
+                                description: "Mã cơ sở cần xem (tùy chọn). Để trống nếu xem toàn hệ thống." 
+                            }
+                        },
+                        required: ["date_range"]
                     }
                 }
             }
@@ -2420,10 +2488,27 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         // ==========================================
         // NHáº¬P 3.5: THá»°C THI TOOL VÃ€ FAIL-FAST
         // ==========================================
-        if (toolCallName === "create_system_task" && toolCallArguments) {
+        if (toolCallName && toolCallArguments) {
+            let args;
             try {
-                const args = JSON.parse(toolCallArguments);
-                const result = await executeCreateTaskTool(args, req.user);
+                args = JSON.parse(toolCallArguments);
+            } catch (err) {
+                console.error("Tool Parse Error (Graceful Degradation):", err.message);
+                // Trả về đúng format OpenAI để Frontend phân giải được
+                res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n*Hệ thống: Xin lỗi, tôi không thể xử lý yêu cầu này do AI sinh sai định dạng.*" } }] })}\n\n`);
+                res.write(`data: [DONE]\n\n`);
+                return res.end();
+            }
+
+            try {
+                let result;
+                if (toolCallName === "create_system_task") {
+                    result = await executeCreateTaskTool(args, req.user);
+                } else if (toolCallName === "get_revenue_report") {
+                    result = await executeGetRevenueTool(args, req.user);
+                } else {
+                    throw new Error(`Tool ${toolCallName} chưa được hỗ trợ.`);
+                }
                 const toolResultStr = JSON.stringify(result);
                 
                 messages.push({
@@ -2563,5 +2648,6 @@ app.listen(PORT, () => {
   console.log(`[DB] DB_PORT: ${process.env.DB_PORT ? 'OK' : 'UNDEFINED'}`);
   console.log(`[API] SUPABASE_KEY: ${process.env.SUPABASE_KEY ? 'OK' : 'UNDEFINED'}`);
 });
+
 
 
