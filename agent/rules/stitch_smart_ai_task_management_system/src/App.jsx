@@ -17,15 +17,17 @@ import RevenueLog from './components/RevenueLog.jsx';
 import KPISettings from './components/KPISettings.jsx';
 import ArchivedFacilitiesDashboard from './components/ArchivedFacilitiesDashboard.jsx';
 
-// --- GLOBAL FETCH INTERCEPTOR ---
+// --- GLOBAL FETCH INTERCEPTOR (VÁ BỞI HUBDB 333) ---
+// File: src/App.jsx
+
+let isLoggingOut = false; // Cờ khóa: Ngăn chặn bão 401 gọi hàm liên tục (Race Condition)
+
 const originalFetch = window.fetch;
 window.fetch = async (...args) => {
   let [resource, config] = args;
   
+  // 1. Xử lý kẹp Token vào Request
   if (typeof resource === 'string' && resource.includes('/api/')) {
-    config = config || {};
-    config.headers = config.headers || {};
-    
     let token = localStorage.getItem('token') || localStorage.getItem('taskflow_token');
     if (!token || token === 'undefined' || token === 'null') {
       try {
@@ -34,35 +36,38 @@ window.fetch = async (...args) => {
       } catch(e) {}
     }
     
-    
     if (token && token !== 'undefined' && token !== 'null') {
-      if (config.headers instanceof Headers) {
-        config.headers.set('Authorization', `Bearer ${token}`);
-      } else {
-        // Force overwrite the garbage Authorization header passed by callers
-        Object.keys(config.headers).forEach(k => {
-          if (k.toLowerCase() === 'authorization') delete config.headers[k];
-        });
-        config.headers['Authorization'] = `Bearer ${token}`;
-      }
-    } else {
-      if (config.headers instanceof Headers) {
-        config.headers.delete('Authorization');
-      } else {
-        Object.keys(config.headers).forEach(k => {
-          if (k.toLowerCase() === 'authorization') delete config.headers[k];
-        });
-      }
+      config = config || {};
+      config.headers = {
+        ...config.headers,
+        'Authorization': `Bearer ${token}`
+      };
+      args = [resource, config];
     }
-    args[1] = config;
   }
   
+  // 2. Thực thi Fetch và Đánh chặn Response
   return originalFetch(...args).then(res => {
+    // Nếu bị lỗi 401 Unauthorized từ Server
     if (res.status === 401) {
+      
+      // BỎ QUA NẾU: Đang ở trang login (tránh lặp vô tận ở màn login) 
+      // HOẶC hệ thống đang trong tiến trình đá user ra ngoài (isLoggingOut = true)
+      if (window.location.pathname === '/login' || isLoggingOut) {
+        return res;
+      }
+
+      // Kích hoạt cờ khóa an toàn
+      isLoggingOut = true;
+      
+      // Dọn dẹp sạch sẽ toàn bộ Cache
       localStorage.removeItem('token');
       localStorage.removeItem('taskflow_token');
       localStorage.removeItem('taskflow_auth');
-      window.location.reload();
+      localStorage.removeItem('user'); 
+      
+      // [QUAN TRỌNG] ĐÁ THẲNG VỀ /login thay vì reload tại chỗ
+      window.location.href = '/login'; 
     }
     return res;
   });
