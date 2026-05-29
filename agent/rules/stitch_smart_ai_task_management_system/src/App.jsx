@@ -733,7 +733,7 @@ function MainDashboard() {
                           if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
                               const newNotif = {
                                   title: 'Công việc mới',
-                                  message: Bạn được giao công việc: ,
+                                  message: 'Bạn được giao công việc: ' + task.title,
                                   time: new Date().toLocaleTimeString('vi-VN')
                               };
                               const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
