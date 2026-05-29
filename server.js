@@ -2008,11 +2008,18 @@ async function searchKnowledgeBase(queryText, user, limit = 3) {
         let sql = "";
         let params = [];
 
-        // 4. TÃ¡ch nhÃ¡nh Truy váº¥n sá»­ dá»¥ng toÃ¡n tá»­ JSONB tá»‘i Æ°u (@>)
+        // 4. Tách nhánh Truy vấn sử dụng toán tử JSONB tối ưu (@>)
         if (isAllAccess) {
             sql = `
                 SELECT id, content, source_type, metadata, created_at,
                        1 - (embedding <=> $1::vector) AS similarity 
+                FROM company_knowledge_base 
+                ORDER BY 
+                    (embedding <=> $1::vector) ASC, 
+                    created_at DESC
+                LIMIT $2
+            `;
+            params = [formatEmbedding, limit];
         } else {
             sql = `
                 SELECT id, content, source_type, metadata, created_at,
@@ -2027,12 +2034,6 @@ async function searchKnowledgeBase(queryText, user, limit = 3) {
                 LIMIT $2
             `;
             params = [formatEmbedding, limit, department_code || null, facility_id || null];
-                ORDER BY 
-                    (embedding <=> $1::vector) ASC, 
-                    created_at DESC
-                LIMIT $2
-            `;
-            params = [formatEmbedding, limit, department_code];
         }
         
         const { rows } = await pool.query(sql, params);
