@@ -2552,6 +2552,9 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 res.write(`data: ${JSON.stringify({ error: "Lỗi luồng kết nối AI. Vui lòng thử lại sau." })}\n\n`);
                 return res.end();
             }
+            // 1. KHỞI TẠO MAP CHỨA DATA ĐA LUỒNG (Để ngoài vòng lặp for await)
+            const toolCallsMap = {}; 
+            let mainToolName = "";
             let decoder = new TextDecoder("utf-8");
             let buffer = "";
             for await (const value of response.body) {
@@ -2571,11 +2574,22 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                             }
                             if (parsed.choices && parsed.choices.length > 0) {
                                 const delta = parsed.choices[0].delta;
+                                // 2. HỨNG DỮ LIỆU CHUẨN PARALLEL CALLING
                                 if (delta && delta.tool_calls) {
-                                    const tc = delta.tool_calls[0];
-                                    if (tc.id) toolCallId = tc.id;
-                                    if (tc.function && tc.function.name) toolCallName = tc.function.name;
-                                    if (tc.function && tc.function.arguments) toolCallArguments += tc.function.arguments;
+                                    for (const tc of delta.tool_calls) {
+                                        // Nếu chưa có index này trong Map, tạo mới
+                                        if (!toolCallsMap[tc.index]) {
+                                            toolCallsMap[tc.index] = { id: '', name: '', arguments: '' };
+                                        }
+                                        if (tc.id) toolCallsMap[tc.index].id = tc.id;
+                                        if (tc.function && tc.function.name) {
+                                            toolCallsMap[tc.index].name = tc.function.name;
+                                            mainToolName = tc.function.name; // Lưu lại tên Tool chính
+                                        }
+                                        if (tc.function && tc.function.arguments) {
+                                            toolCallsMap[tc.index].arguments += tc.function.arguments;
+                                        }
+                                    }
                                 }
                                 if (delta && delta.content) {
                                     aiReplyContent += delta.content;
@@ -2591,92 +2605,94 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
 
         // ==========================================
-        // NHáº¬P 3.5: THá»°C THI TOOL VÃ€ FAIL-FAST
+        // 3. XỬ LÝ VÀ GỘP NHIỀU TOOL CALLS THÀNH 1
         // ==========================================
-        if (toolCallName && toolCallArguments) {
-            // ==========================================
-            // BỌC THÉP PARSE JSON CHO GEMINI & CHỐNG TREO UI
-            // ==========================================
-            let args = {};
-            try {
-                // 1. Thuật toán "Gắp lõi JSON" (Xuyên thủng mọi lớp Markdown của Gemini)
-                let cleanJsonString = toolCallArguments;
-                const firstBraceIdx = cleanJsonString.indexOf('{');
-                const lastBraceIdx = cleanJsonString.lastIndexOf('}');
-                
-                if (firstBraceIdx !== -1 && lastBraceIdx !== -1 && lastBraceIdx >= firstBraceIdx) {
-                    // Cắt bỏ chính xác phần ruột từ dấu { đến dấu }, phớt lờ rác ở ngoài
-                    cleanJsonString = cleanJsonString.substring(firstBraceIdx, lastBraceIdx + 1);
+        if (Object.keys(toolCallsMap).length > 0) {
+            const parsedArgsList = [];
+            const mappedToolCallsForHistory = [];
+            
+            // Parse an toàn từng Tool Call
+            for (const index in toolCallsMap) {
+                let rawArgs = toolCallsMap[index].arguments;
+                try {
+                    // Thuật toán Gắp lõi JSON xuyên Markdown (Cho Gemini)
+                    const firstIdx = rawArgs.indexOf('{');
+                    const lastIdx = rawArgs.lastIndexOf('}');
+                    if (firstIdx !== -1 && lastIdx !== -1) {
+                        rawArgs = rawArgs.substring(firstIdx, lastIdx + 1);
+                    }
+                    parsedArgsList.push(JSON.parse(rawArgs));
+                    mappedToolCallsForHistory.push({
+                        id: toolCallsMap[index].id || `call_generated_${index}`,
+                        type: "function",
+                        function: { name: toolCallsMap[index].name || mainToolName, arguments: rawArgs }
+                    });
+                } catch (err) {
+                    console.warn(`[WARNING] Bỏ qua 1 Tool Chunk do lỗi Parse tại index ${index}:`, err.message);
                 }
-
-                // 2. Ép kiểu an toàn sau khi đã làm sạch
-                args = JSON.parse(cleanJsonString);
-
-            } catch (err) {
-                console.error("[CRITICAL] Tool Parse Error - Gemini sinh sai định dạng:", err.message, "Raw input:", toolCallArguments);
-                
-                // 3. Dọn dẹp nhịp tim (Keep-Alive) nếu có
-                if (typeof keepAliveInterval !== 'undefined') clearInterval(keepAliveInterval);
-
-                // 4. Giải cứu UI: BẮT BUỘC có finish_reason: "stop" để Frontend tắt Spinner
-                const errorPayload = {
-                    id: "tool-error",
-                    object: "chat.completion.chunk",
-                    choices: [{
-                        index: 0,
-                        delta: { role: "assistant", content: "\n\n❌ *Hệ thống: Xin lỗi, AI Gemini đã bị lỗi định dạng tham số khi truy xuất. Xin vui lòng thử lại bằng cách chỉ định rõ 1-2 cơ sở cụ thể.*" },
-                        finish_reason: "stop" // <--- CHÌA KHÓA TẮT SPINNER
-                    }]
-                };
-
-                res.write(`data: ${JSON.stringify(errorPayload)}\n\n`);
-                res.write(`data: [DONE]\n\n`);
-                return res.end(); // Kết thúc an toàn
             }
 
+            // Nếu không parse thành công được cục nào, báo lỗi UI
+            if (parsedArgsList.length === 0) {
+                res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n❌ *Hệ thống: AI trả về định dạng tham số không hợp lệ. Vui lòng thử lại.*" }, finish_reason: "stop" }] })}\n\n`);
+                res.write(`data: [DONE]\n\n`);
+                return res.end();
+            }
+
+            // GỘP THAM SỐ (MERGE PARAMS)
+            let finalArgs = parsedArgsList[0]; // Lấy cục đầu tiên làm gốc
+            
+            if (parsedArgsList.length > 1 && mainToolName === "get_revenue_report") {
+                // Gộp tất cả facility_code từ các object khác nhau lại thành 1 chuỗi: "DB41, DBACE, DBPQ..."
+                const mergedFacilities = parsedArgsList.map(a => a.facility_code).filter(Boolean).join(',');
+                finalArgs.facility_code = mergedFacilities;
+            }
+
+            // 4. BẬT NHỊP TIM VÀ GỌI DB CHỈ MỘT LẦN DUY NHẤT
+            res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n⏳ *Hệ thống: Đang tổng hợp báo cáo quy mô lớn, vui lòng đợi...*\n\n" } }] })}\n\n`);
+            const keepAliveInterval = setInterval(() => res.write(': keep-alive ping\n\n'), 10000);
+
             try {
-                res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n⏳ *Hệ thống: Đang tổng hợp báo cáo quy mô lớn, vui lòng đợi trong giây lát...*\n\n" } }] })}\n\n`);
-
-                const keepAliveInterval = setInterval(() => {
-                    res.write(': keep-alive ping\n\n'); 
-                }, 10000);
-
                 let result;
-                try {
-                    if (toolCallName === "create_system_task") {
-                        result = await executeCreateTaskTool(args, req.user);
-                    } else if (toolCallName === "get_revenue_report") {
-                        result = await executeGetRevenueTool(args, req.user);
-                    } else {
-                        throw new Error(`Tool ${toolCallName} chưa được hỗ trợ.`);
-                    }
-                } catch (toolError) {
-                    console.error("Lỗi thực thi Tool:", toolError);
-                    result = JSON.stringify({ error: "Lỗi truy xuất hệ thống." });
-                } finally {
-                    clearInterval(keepAliveInterval);
+                if (mainToolName === "create_system_task") {
+                    result = await executeCreateTaskTool(finalArgs, req.user);
+                } else if (mainToolName === "get_revenue_report") {
+                    // Database chỉ chạy 1 lần với chuỗi "DB41, DBACE...", cực kỳ nhanh và không bị timeout!
+                    result = await executeGetRevenueTool(finalArgs, req.user); 
+                } else {
+                    throw new Error(`Tool ${mainToolName} chưa được hỗ trợ.`);
                 }
+
+                // 5. CẮT CHUỖI CHỐNG TRÀN TOKEN (Truncation)
                 let stringifiedResult = typeof result === 'string' ? result : JSON.stringify(result);
                 if (stringifiedResult.length > 15000) {
-                    stringifiedResult = stringifiedResult.substring(0, 15000) + "\n... [HỆ THỐNG: DỮ LIỆU CỦA NHIỀU CƠ SỞ QUÁ LỚN NÊN ĐÃ BỊ CẮT BỚT. VUI LÒNG HỎI CỤ THỂ 1-2 CƠ SỞ].";
+                    stringifiedResult = stringifiedResult.substring(0, 15000) + "\n... [DỮ LIỆU ĐÃ BỊ CẮT BỚT. VUI LÒNG HỎI CỤ THỂ TỪNG CƠ SỞ].";
                 }
                 const toolResultStr = stringifiedResult;
                 
                 messages.push({
                     role: "assistant",
                     content: aiReplyContent || "",
-                    tool_calls: [{
-                        id: toolCallId || "call_generated",
-                        type: "function",
-                        function: { name: toolCallName, arguments: toolCallArguments }
-                    }]
+                    tool_calls: mappedToolCallsForHistory
                 });
-                messages.push({
-                    role: "tool",
-                    tool_call_id: toolCallId || "call_generated",
-                    name: toolCallName,
-                    content: toolResultStr
-                });
+                
+                // Trả lời kết quả cho TẤT CẢ các tool call id mà AI yêu cầu
+                for (const tc of mappedToolCallsForHistory) {
+                    messages.push({
+                        role: "tool",
+                        tool_call_id: tc.id,
+                        name: tc.function.name,
+                        content: toolResultStr
+                    });
+                }
+            } catch (dbError) {
+                console.error("[CRITICAL] Lỗi chạy Tool DB:", dbError);
+                res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n❌ *Hệ thống: Lỗi nội bộ khi truy xuất dữ liệu từ CSDL.*" }, finish_reason: "stop" }] })}\n\n`);
+                res.write(`data: [DONE]\n\n`);
+                return res.end();
+            } finally {
+                clearInterval(keepAliveInterval);
+            }
 
                 const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                     method: "POST",
