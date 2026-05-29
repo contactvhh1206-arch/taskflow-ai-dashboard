@@ -2778,13 +2778,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                         }
                     }
                 }
-            } catch (err) {
-                console.error("Tool Execution Error:", err.message);
-                res.write(`data: ${JSON.stringify({ error: err.message })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
-                res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
-                return res.end();
-            }
-        }
+            } // closes if (Object.keys(toolCallsMap).length > 0)
 
         // Káº¿t thÃºc luá»“ng stream an toÃ n
         if (!res.writableEnded) {
