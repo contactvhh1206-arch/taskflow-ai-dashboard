@@ -2412,7 +2412,15 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 // Map cho AI format
                 chatHistory = rows.map(r => {
                     const msg = { role: r.role, content: r.content };
-                    if (r.tool_calls) msg.tool_calls = r.tool_calls;
+                    
+                    // [BẢN VÁ]: Phân tách rõ ràng format cho Assistant và Tool
+                    if (r.role === 'assistant' && r.tool_calls) {
+                        msg.tool_calls = r.tool_calls; // Trả lại mảng tool_calls
+                    } else if (r.role === 'tool' && r.tool_calls) {
+                        msg.tool_call_id = r.tool_calls.tool_call_id; // Đưa ra top-level
+                        msg.name = r.tool_calls.name;                 // Đưa ra top-level
+                    }
+                    
                     return msg;
                 });
             } catch (err) {
