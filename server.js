@@ -2246,11 +2246,11 @@ async function executeGetRevenueTool(args, user) {
                WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date
                  AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date
                  AND EXISTS (
-                     SELECT 1 FROM unnest(string_to_array($3::text, ',')) AS f
-                     WHERE TRIM(f) != '' AND (
-                         REPLACE(REPLACE(UPPER(item->>'name'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(f)), 'DUBAI', 'DB'), ' ', '')
-                         OR REPLACE(REPLACE(UPPER(item->>'facilityCode'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(f)), 'DUBAI', 'DB'), ' ', '')
-                         OR REPLACE(REPLACE(UPPER(item->>'facilityName'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(f)), 'DUBAI', 'DB'), ' ', '')
+                     SELECT 1 FROM unnest(string_to_array($3::text, ',')) AS t(val)
+                     WHERE TRIM(t.val) != '' AND (
+                         REPLACE(REPLACE(UPPER(item->>'name'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', 'DB'), ' ', '')
+                         OR REPLACE(REPLACE(UPPER(item->>'facilityCode'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', 'DB'), ' ', '')
+                         OR REPLACE(REPLACE(UPPER(item->>'facilityName'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', 'DB'), ' ', '')
                      )
                  )`;
         params = [startDate, endDate, targetFacility];
@@ -2401,8 +2401,8 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
 
         let chatHistory = [];
-        if (session_id) {
-            chatHistory = await getConversationContext(session_id, req.user.id);
+        if (req_session_id) {
+            chatHistory = await getConversationContext(req_session_id, req.user.id);
         }
 
         const messages = [
