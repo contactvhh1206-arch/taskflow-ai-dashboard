@@ -1935,15 +1935,17 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 async function generateEmbedding(text) {
     if (!text || typeof text !== 'string') return null;
     try {
-        // Using standard native fetch
-        const response = await fetch('https://api.openai.com/v1/embeddings', {
+        // Using OpenRouter API for embeddings
+        const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                'Content-Type': 'application/json'
+                'Authorization': "Bearer $((process.env.OPENROUTER_API_KEY || OPENROUTER_API_KEY))",
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://taskflow.ai',
+                'X-Title': 'TaskFlow'
             },
             body: JSON.stringify({
-                model: 'text-embedding-3-small',
+                model: 'openai/text-embedding-3-small',
                 input: text.replace(/\n/g, ' ')
             })
         });
@@ -1951,7 +1953,7 @@ async function generateEmbedding(text) {
         if (data.data && data.data.length > 0) {
             return data.data[0].embedding; // Array of 1536 floats
         }
-        throw new Error(data.error?.message || 'Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh tá»« OpenAI');
+        throw new Error(data.error?.message || 'Lỗi không xác định từ OpenRouter');
     } catch (error) {
         console.error('generateEmbedding Error:', error);
         return null;
