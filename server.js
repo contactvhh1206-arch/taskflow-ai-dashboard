@@ -2659,11 +2659,14 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 } else {
                     let reader2 = response2.body.getReader();
                     let decoder2 = new TextDecoder("utf-8");
+                    let buffer2 = "";
                     while (true) {
                         const { done, value } = await reader2.read();
                         if (done) break;
                         const chunk = decoder2.decode(value, { stream: true });
-                        const lines = chunk.split(String.fromCharCode(10));
+                        buffer2 += chunk;
+                        const lines = buffer2.split(String.fromCharCode(10));
+                        buffer2 = lines.pop();
                         for (const line of lines) {
                             if (line.startsWith("data: ") && line !== "data: [DONE]") {
                                 try {
