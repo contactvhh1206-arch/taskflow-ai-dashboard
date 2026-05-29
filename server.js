@@ -2398,7 +2398,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                                   systemPromptAddition;
 
         if (isLocalUser) {
-            finalSystemPrompt += String.fromCharCode(10) + "LÆ¯U Ã Báº¢O Máº¬T: Báº¡n chá»‰ Ä‘Æ°á»£c tráº£ lá»i cÃ¡c cÃ¢u há»i liÃªn quan sÃ¡t sÆ°á»n Ä‘áº¿n nghiá»‡p vá»¥ phÃ²ng ban cá»§a ngÆ°á»i dÃ¹ng. Náº¿u ngÆ°á»i dÃ¹ng há»i Ä‘Ã¹a, há»i xÃ m, tÃ¡n tá»‰nh hoáº·c há»i cÃ¡c kiáº¿n thá»©c ngoÃ i cÃ´ng viá»‡c, báº¡n Báº®T BUá»˜C pháº£i tráº£ vá» Ä‘Ãºng tá»« khÃ³a: [BLOCK_MISCONDUCT]";
+            finalSystemPrompt += String.fromCharCode(10) + "LÆ¯U Ã  Báº¢O Máº¬T: Báº¡n chá»‰ Ä‘Æ°á»£c tráº£ lá» i cÃ¡c cÃ¢u há» i liÃªn quan sÃ¡t sÆ°á» n Ä‘áº¿n nghiá»‡p vá»¥ phÃ²ng ban cá»§a ngÆ°á» i dÃ¹ng. Náº¿u ngÆ°á» i dÃ¹ng há» i Ä‘Ã¹a, há» i xÃ m, tÃ¡n tá»‰nh hoáº·c há» i cÃ¡c kiáº¿n thá»©c ngoÃ i cÃ´ng viá»‡c, báº¡n Báº®T BUá»˜C pháº£i tráº£ vá»  Ä‘Ãºng tá»« khÃ³a: [BLOCK_MISCONDUCT]";
         }
 
         let chatHistory = [];
@@ -2489,6 +2489,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         let toolCallId = null;
         let toolCallName = null;
         let toolCallArguments = "";
+        let buffer = "";
 
         if (isLocalUser) {
             const data = await response.json();
@@ -2509,18 +2510,20 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 }
             }
             
-            // Xá»¬ LÃ BLOCK MISCONDUCT NGAY Láº¬P Tá»¨C
+            // Xá»¬ LÃ  BLOCK MISCONDUCT NGAY Láº¬P Tá»¨C
             if (aiReplyContent.includes('[BLOCK_MISCONDUCT]')) {
-                await pool.query(`
-                    INSERT INTO daily_logs (entry_type, user_id, action_details, created_at)
-                    VALUES ($1, $2, $3, NOW())
-                `, ['SECURITY_ALERT', req.user.id, `NhÃ¢n viÃªn há»i xÃ m há»‡ thá»‘ng AI. Ná»™i dung: "${userMessage}"`]);
-                res.write(`data: ${JSON.stringify({ error: "Há»† THá»NG Cáº¢NH BÃO: CÃ¢u há»i cá»§a báº¡n vi pháº¡m tiÃªu chuáº©n nghiá»‡p vá»¥ ná»™i bá»™. HÃ nh vi nÃ y Ä‘Ã£ Ä‘Æ°á»£c ghi nháº­n vÃ  gá»­i vá» tÃ i khoáº£n Admin Ä‘á»ƒ tiáº¿n hÃ nh truy váº¿t ká»· luáº­t!" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
+                try {
+                    await pool.query(`
+                        INSERT INTO daily_logs (org_unit, entry_type, content)
+                        VALUES ($1, $2, $3)
+                    `, ['SYSTEM', 'SECURITY_ALERT', JSON.stringify({ user_id: req.user.id, action_details: `Nhân viên hỏi xàm hệ thống AI. Nội dung: "${userMessage}"` })]);
+                } catch(e) { console.error("Log error", e); }
+                res.write(`data: ${JSON.stringify({ error: "Há»† THá» NG Cáº¢NH BÃ O: CÃ¢u há» i cá»§a báº¡n vi pháº¡m tiÃªu chuáº©n nghiá»‡p vá»¥ ná»™i bá»™. HÃ nh vi nÃ y Ä‘Ã£ Ä‘Æ°á»£c ghi nháº­n vÃ  gá»­i vá»  tÃ i khoáº£n Admin Ä‘á»ƒ tiáº¿n hÃ nh truy váº¿t ká»· luáº­t!" })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
                 res.write(`data: [DONE]${String.fromCharCode(10)}${String.fromCharCode(10)}`);
                 return res.end();
             }
             
-            // Náº¾U Sáº CH Sáº¼, Äáº¨Y Dá»® LIá»†U XUá»NG SSE
+            // Náº¾U Sáº CH Sáº¼, Ä áº¨Y Dá»® LIá»†U XUá» NG SSE
             if (aiReplyContent) {
                 res.write(`data: ${JSON.stringify({ content: aiReplyContent })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
             }
@@ -2576,7 +2579,6 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 args = JSON.parse(toolCallArguments);
             } catch (err) {
                 console.error("Tool Parse Error (Graceful Degradation):", err.message);
-                // Trả về đúng format OpenAI để Frontend phân giải được
                 res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n*Hệ thống: Xin lỗi, tôi không thể xử lý yêu cầu này do AI sinh sai định dạng.*" } }] })}\n\n`);
                 res.write(`data: [DONE]\n\n`);
                 return res.end();
@@ -2591,7 +2593,11 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 } else {
                     throw new Error(`Tool ${toolCallName} chưa được hỗ trợ.`);
                 }
-                const toolResultStr = JSON.stringify(result);
+                let stringifiedResult = typeof result === 'string' ? result : JSON.stringify(result);
+                if (stringifiedResult.length > 12000) {
+                    stringifiedResult = stringifiedResult.substring(0, 12000) + "... [DỮ LIỆU ĐÃ BỊ CẮT GIẢM DO QUÁ DÀI. HÃY YÊU CẦU USER CHỈ ĐỊNH RÕ 1-2 CƠ SỞ].";
+                }
+                const toolResultStr = stringifiedResult;
                 
                 messages.push({
                     role: "assistant",
@@ -2625,9 +2631,9 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 });
 
                 if (!response2.ok) {
-                    const errorBody = await response2.text();
-                    console.error("OpenRouter Fetch 2 Error:", errorBody);
-                    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n*Hệ thống: Xin lỗi, AI không thể phân tích kết quả doanh thu lúc này do lỗi kết nối.*" } }] })}\n\n`);
+                    const errorText = await response2.text();
+                    console.error("[CRITICAL] OpenRouter API Error lần 2:", errorText);
+                    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n*Hệ thống: Trích xuất thành công nhưng dữ liệu quá lớn, AI không thể phân tích hết. Vui lòng hỏi cụ thể từng cơ sở.*" } }] })}\n\n`);
                     res.write(`data: [DONE]\n\n`);
                     return res.end();
                 }
