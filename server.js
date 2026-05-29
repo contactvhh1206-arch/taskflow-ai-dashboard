@@ -500,22 +500,16 @@ app.put('/api/users/change-password', authenticateUser, async (req, res) => {
     
     // Verify current password
     const isMatch = await bcrypt.compare(currentPassword, user.password_hash || '');
-    const passToCheck = user.password || user.password_hash;
     
-    if (!(isMatch || passToCheck === currentPassword || passToCheck === Buffer.from(currentPassword).toString('base64') || Buffer.from(passToCheck || '').toString('base64') === currentPassword)) {
-      return res.status(400).json({ error: 'Máº­t kháº©u hiá»‡n táº¡i khÃ´ng chÃ­nh xÃ¡c.' });
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Mật khẩu hiện tại không chính xác.' });
     }
     
     // Update new password
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(newPassword, salt);
     
-    try {
-      await pool.query('UPDATE users SET password_hash = $1, password = NULL WHERE id = $2', [hash, user.id]);
-    } catch (dbErr) {
-      // Fallback if 'password' column does not exist
-      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
-    }
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, user.id]);
     
     res.json({ success: true, message: 'Äá»•i máº­t kháº©u thÃ nh cÃ´ng.' });
   } catch (error) {
