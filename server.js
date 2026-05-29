@@ -2183,14 +2183,21 @@ async function executeGetRevenueTool(args, user) {
         params = [startDate, endDate];
     } else {
         // LUỒNG 2: Local Group
-        // 1. Dynamic Date Parsing cho mệnh đề WHERE.
-        // 2. Lớp giáp siêu cấp cho data: regexp_replace (lọc rác) -> NULLIF (chặn rỗng) -> ::numeric.
-        sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(data->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
+        // Tích hợp vũ khí tối thượng: Unnesting mảng con + Regex Data Cleansing + Dynamic Date Parsing + RBAC
+        sql = `SELECT COALESCE(SUM(
+                   (SELECT SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric) 
+                    FROM jsonb_array_elements(
+                        CASE 
+                            WHEN jsonb_typeof(data->'facilities') = 'array' THEN data->'facilities' 
+                            ELSE '[]'::jsonb 
+                        END
+                    ) AS item 
+                    WHERE REPLACE(UPPER(item->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
+                       OR REPLACE(UPPER(item->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))
+               ), 0) AS aggregated_revenue
                FROM daily_financial_reports
                WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date 
-                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date
-                 AND (REPLACE(UPPER(data->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
-                      OR REPLACE(UPPER(data->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))`;
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date`;
         params = [startDate, endDate, targetFacility];
     }
     try {
