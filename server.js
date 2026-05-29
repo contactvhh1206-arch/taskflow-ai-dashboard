@@ -2362,15 +2362,6 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
     try {
         const { message, session_id } = req.body;
         
-        // BẢO ĐẢM DỮ LIỆU USER MỚI NHẤT & CHUẨN HOÁ ROLE TỪ DB ĐỂ TRÁNH LỖI PHÂN QUYỀN
-        try {
-            const userDbInfo = await pool.query(`SELECT role, department_code, facility_id FROM users WHERE id = $1`, [req.user.id]);
-            if (userDbInfo.rows.length > 0) {
-                req.user.role = String(userDbInfo.rows[0].role).toUpperCase();
-                req.user.department_code = userDbInfo.rows[0].department_code;
-                req.user.facility_id = userDbInfo.rows[0].facility_id;
-            }
-        } catch (dbErr) { console.error("Lỗi lấy thông tin user:", dbErr); }
         const userMessage = message || req.body.content;
         
         if (!userMessage) return res.status(400).json({ error: "Message is required" });
@@ -2404,8 +2395,9 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         const rawRagText = ragContextRows.map(row => row.content).join("\n\n");
         const ragContextText = rawRagText.length > 4000 ? rawRagText.substring(0, 4000) + "\n... [ÄÃ£ cáº¯t bá»›t do giá»›i háº¡n bá»™ nhá»›]" : rawRagText;
         
+        const safeRole = req.user.role ? String(req.user.role).toUpperCase().trim() : '';
         const globalRoles = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'ADMIN', 'DEPARTMENT_HEAD'];
-        const isLocalUser = !globalRoles.includes(req.user.role);
+        const isLocalUser = !globalRoles.includes(safeRole);
 
         // Xây dựng Ngữ cảnh User (User Context)
         const userFacility = req.user.facility_code ? req.user.facility_code : 'Toàn cầu (Global)';
@@ -2415,7 +2407,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 
         let finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow.\n" + 
             "THÔNG TIN BẮT BUỘC VỀ NGƯỜI DÙNG HIỆN TẠI:\n" +
-            `- Chức vụ (Role): ${req.user.role}\n` +
+            `- Chức vụ (Role): ${safeRole}\n` +
             `- Mã cơ sở (Facility Code): ${userFacility}\n` +
             `- Quyền hạn: ${userPermissions}\n\n` +
             (ragContextText ? "Dữ liệu tham khảo:\n" + ragContextText : "") + 
@@ -2424,6 +2416,8 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         if (isLocalUser) {
             finalSystemPrompt += "\nLƯU Ý BẢO MẬT: Bạn chỉ được trả lời các câu hỏi liên quan sát sườn đến nghiệp vụ phòng ban của người dùng. Nếu người dùng hỏi ngoài phạm vi quyền hạn trên, bắt buộc trả về: [BLOCK_MISCONDUCT]";
         }
+
+        finalSystemPrompt += "\nQUAN TRỌNG: BẮT BUỘC gọi Tool bằng MỘT CHUỖI JSON DUY NHẤT. TUYỆT ĐỐI KHÔNG giải thích, KHÔNG thêm bất kỳ văn bản nào ngoài cặp dấu ngoặc nhọn {}.";
 
         let chatHistory = [];
         if (session_id) {
@@ -2633,8 +2627,8 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                     clearInterval(keepAliveInterval);
                 }
                 let stringifiedResult = typeof result === 'string' ? result : JSON.stringify(result);
-                if (stringifiedResult.length > 12000) {
-                    stringifiedResult = stringifiedResult.substring(0, 12000) + "... [DỮ LIỆU ĐÃ BỊ CẮT GIẢM DO QUÁ DÀI. HÃY YÊU CẦU USER CHỈ ĐỊNH RÕ 1-2 CƠ SỞ].";
+                if (stringifiedResult.length > 15000) {
+                    stringifiedResult = stringifiedResult.substring(0, 15000) + "\n... [HỆ THỐNG: DỮ LIỆU CỦA NHIỀU CƠ SỞ QUÁ LỚN NÊN ĐÃ BỊ CẮT BỚT. VUI LÒNG HỎI CỤ THỂ 1-2 CƠ SỞ].";
                 }
                 const toolResultStr = stringifiedResult;
                 
@@ -2669,15 +2663,12 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                     })
                 });
 
-                if (!response2.ok || !response2.body) {
-                    const errorBody = await response2.text();
-                    console.error("[CRITICAL] Lỗi OpenRouter Lần 2 (Quá tải Data/Token):", errorBody);
-                    
-                    // Dọn dẹp Keep-Alive chống rò rỉ bộ nhớ
+                if (!response2.ok) {
+                    console.error("[CRITICAL] Lỗi OpenRouter Lần 2 (Tràn Token):", await response2.text());
                     if (typeof keepAliveInterval !== 'undefined') clearInterval(keepAliveInterval);
                     
-                    // Bắn thông báo tử tế về UI thay vì bong bóng rỗng
-                    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n❌ *Hệ thống: Dữ liệu trích xuất từ nhiều cơ sở quá lớn, vượt giới hạn xử lý của AI. Xin vui lòng tra cứu riêng từng cơ sở (VD: Doanh thu DB41).* \n\n" } }] })}\n\n`);
+                    // Bắn thông báo ra UI thay vì im lặng đóng kết nối
+                    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n❌ *Hệ thống: Dữ liệu quá lớn, AI không thể phân tích hết trong một lần. Xin vui lòng tra cứu riêng từng cơ sở.* \n\n" } }] })}\n\n`);
                     res.write(`data: [DONE]\n\n`);
                     return res.end();
                 }
