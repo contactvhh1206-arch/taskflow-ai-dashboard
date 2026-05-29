@@ -2184,14 +2184,15 @@ async function executeGetRevenueTool(args, user) {
         // LUỒNG 2: Local Group
         // Dùng CASE WHEN để chặn lỗi Scalar. Nếu không phải Array, biến nó thành mảng rỗng '[]'
         sql = `SELECT COALESCE(SUM(
-                   (SELECT SUM((item->>'revenue')::numeric) 
+                   (SELECT SUM((item->>'totalRevenue')::numeric) 
                     FROM jsonb_array_elements(
                         CASE 
                             WHEN jsonb_typeof(data) = 'array' THEN data 
                             ELSE '[]'::jsonb 
                         END
                     ) AS item 
-                    WHERE REPLACE(UPPER(item->>'facility_id'), ' ', '') = REPLACE(UPPER($3::text), ' ', '') OR REPLACE(UPPER(item->>'facility_code'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))
+                    WHERE REPLACE(UPPER(item->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
+                       OR REPLACE(UPPER(item->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))
                ), 0) AS aggregated_revenue
                FROM daily_financial_reports
                WHERE date::date >= $1::date AND date::date <= $2::date`;
