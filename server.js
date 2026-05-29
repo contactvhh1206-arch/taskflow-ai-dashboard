@@ -2163,9 +2163,10 @@ async function executeGetRevenueTool(args, user) {
 
     // Hàm tiện ích tạo ngày (giả lập hoặc dùng thư viện date)
     const getDates = (range) => {
-        const today = new Date().toISOString().split('T')[0];
-        // Ở môi trường thực, hãy parse range ('hôm nay', 'tuần này'). Tạm thời lấy current date.
-        return { startDate: today, endDate: today }; 
+        const today = new Date();
+        const endDate = today.toISOString().split('T')[0];
+        const startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        return { startDate, endDate };
     };
     const { startDate, endDate } = getDates(date_range);
 
@@ -2190,7 +2191,7 @@ async function executeGetRevenueTool(args, user) {
                             ELSE '[]'::jsonb 
                         END
                     ) AS item 
-                    WHERE item->>'facility_id' = $3::text OR item->>'facility_code' = $3::text)
+                    WHERE REPLACE(UPPER(item->>'facility_id'), ' ', '') = REPLACE(UPPER($3::text), ' ', '') OR REPLACE(UPPER(item->>'facility_code'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))
                ), 0) AS aggregated_revenue
                FROM daily_financial_reports
                WHERE date::date >= $1::date AND date::date <= $2::date`;
@@ -2200,7 +2201,7 @@ async function executeGetRevenueTool(args, user) {
         const { rows } = await pool.query(sql, params);
         return {
             status: "success",
-            message: `Báo cáo doanh thu: ${Number(rows[0].aggregated_revenue).toLocaleString('vi-VN')} VNĐ.`
+            message: `Báo cáo doanh thu của hệ thống/cơ sở [${targetFacility || 'Toàn hệ thống'}] từ ngày ${startDate} đến ${endDate} là: ${Number(rows[0].aggregated_revenue).toLocaleString('vi-VN')} VNĐ.`
         };
     } catch (error) {
         console.error("Revenue DB Error:", error);
