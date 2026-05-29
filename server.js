@@ -2321,26 +2321,31 @@ async function getConversationContext(sessionId, userId) {
         const { rows: sessionRows } = await pool.query(authCheckSql, [sessionId, userId]);
         
         if (sessionRows.length === 0) {
-            console.warn(`[SECURITY ALERT] User ${userId} cá»‘ gáº¯ng truy cáº­p trÃ¡i phÃ©p Session ${sessionId}`);
-            throw new Error("403 Forbidden: Báº¡n khÃ´ng cÃ³ quyá» n truy cáº­p vÃ o phiÃªn chat nÃ y!");
+            console.warn(`[SECURITY ALERT] User ${userId} cố gắng truy cập trái phép Session ${sessionId}`);
+            throw new Error("403 Forbidden: Bạn không có quyền truy cập vào phiên chat này!");
         }
 
-        const historySql = `
-            SELECT role, content 
-            FROM ai_chat_messages 
-            WHERE session_id = $1 
-            ORDER BY created_at DESC 
-            LIMIT 6
-        `;
-        const { rows: historyRows } = await pool.query(historySql, [sessionId]);
-        
-        return historyRows.reverse().map(msg => ({
-            role: msg.role,
-            content: msg.content
-        }));
+        try {
+            const historySql = `
+                SELECT role, content 
+                FROM ai_chat_messages 
+                WHERE session_id = $1 
+                ORDER BY created_at DESC 
+                LIMIT 6
+            `;
+            const { rows: historyRows } = await pool.query(historySql, [sessionId]);
+            
+            return historyRows.reverse().map(msg => ({
+                role: msg.role,
+                content: msg.content
+            }));
+        } catch (innerError) {
+            console.warn("[WARNING] Missing ai_chat_messages table, returning empty context.");
+            return [];
+        }
 
     } catch (error) {
-        console.error("Lá»—i getConversationContext:", error);
+        console.error("Lỗi getConversationContext:", error);
         throw error;
     }
 }
