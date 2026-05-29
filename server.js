@@ -2402,8 +2402,8 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         }
 
         let chatHistory = [];
-        if (req_session_id) {
-            chatHistory = await getConversationContext(req_session_id, req.user.id);
+        if (session_id) {
+            chatHistory = await getConversationContext(session_id, req.user.id);
         }
 
         const messages = [
