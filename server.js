@@ -474,14 +474,21 @@ app.post('/api/users', authenticateUser, checkAdmin, async (req, res) => {
     }
     
     const { rows } = await pool.query(`
-      INSERT INTO users (email, password_hash, full_name, role_id, facility_id, managed_facilities,    // Find user in DB
-    const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n.' });hÃ­nh xÃ¡c.' });
-      }
-      hardcodedPasswords[username] = newPassword;
-      return res.json({ success: true, message: 'Äá»•i máº­t kháº©u thÃ nh cÃ´ng (tÃ i khoáº£n demo).' });
-    }
+      INSERT INTO users (email, password_hash, full_name, role_id, facility_id, managed_facilities, status)
+      VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE') RETURNING id
+    `, [username.trim().toLowerCase(), hash, name, role_id, facId, managedFacs]);
+    
+    res.json({ success: true, data: { id: rows[0].id } });
+  } catch (error) {
+    console.error("Lá»—i táº¡o user:", error);
+    res.status(500).json({ error: 'Lá»—i táº¡o tÃ i khoáº£n (cÃ³ thá»ƒ username Ä‘Ã£ tá»“n táº¡i).' });
+  }
+});
+
+app.put('/api/users/change-password', authenticateUser, async (req, res) => {
+  try {
+    const { username, currentPassword, newPassword } = req.body;
+    
     
     // Find user in DB
     const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
@@ -989,7 +996,6 @@ app.post('/api/login', async (req, res) => {
       if (username) {
         username = username.trim().toLowerCase();
       }
-      
     try {
         const { rows } = await pool.query(`
             SELECT u.*, r.name AS role_name, f.code AS facility_code, f.name AS facility_name 
