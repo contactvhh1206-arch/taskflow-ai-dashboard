@@ -2394,7 +2394,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         const rawRagText = ragContextRows.map(row => row.content).join("\n\n");
         const ragContextText = rawRagText.length > 4000 ? rawRagText.substring(0, 4000) + "\n... [ÄÃ£ cáº¯t bá»›t do giá»›i háº¡n bá»™ nhá»›]" : rawRagText;
         
-        const globalRoles = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'ADMIN'];
+        const globalRoles = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'ADMIN', 'DEPARTMENT_HEAD'];
         const isLocalUser = !globalRoles.includes(req.user.role);
 
         // Xây dựng Ngữ cảnh User (User Context)
@@ -2429,10 +2429,10 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         // ==========================================
         // NHáº¬P 3: SSE STREAMING Vá»šI TOOL CALL
         // ==========================================
-        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8'); 
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
-        res.flushHeaders();
+        res.flushHeaders(); 
 
                 const tools = [
             {
@@ -2543,6 +2543,11 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             }
         } else {
             // ADMIN STREAMING (Giá»¯ nguyÃªn)
+            if (!response.body || typeof response.body.getReader !== 'function') {
+                console.error("[CRITICAL] Lỗi OpenRouter Lần 1: getReader is not a function. Trạng thái HTTP:", response.status);
+                res.write(`data: ${JSON.stringify({ error: "Lỗi luồng kết nối AI. Vui lòng thử lại sau." })}\n\n`);
+                return res.end();
+            }
             let reader = response.body.getReader();
             let decoder = new TextDecoder("utf-8");
             let buffer = "";
@@ -2657,10 +2662,15 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                     })
                 });
 
-                if (!response2.ok) {
-                    const errorText = await response2.text();
-                    console.error("[CRITICAL] OpenRouter API Error lần 2:", errorText);
-                    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n*Hệ thống: Trích xuất thành công nhưng dữ liệu quá lớn, AI không thể phân tích hết. Vui lòng hỏi cụ thể từng cơ sở.*" } }] })}\n\n`);
+                if (!response2.ok || !response2.body) {
+                    const errorBody = await response2.text();
+                    console.error("[CRITICAL] Lỗi OpenRouter Lần 2 (Quá tải Data/Token):", errorBody);
+                    
+                    // Dọn dẹp Keep-Alive chống rò rỉ bộ nhớ
+                    if (typeof keepAliveInterval !== 'undefined') clearInterval(keepAliveInterval);
+                    
+                    // Bắn thông báo tử tế về UI thay vì bong bóng rỗng
+                    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n❌ *Hệ thống: Dữ liệu trích xuất từ nhiều cơ sở quá lớn, vượt giới hạn xử lý của AI. Xin vui lòng tra cứu riêng từng cơ sở (VD: Doanh thu DB41).* \n\n" } }] })}\n\n`);
                     res.write(`data: [DONE]\n\n`);
                     return res.end();
                 }
@@ -2691,6 +2701,12 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                         }
                     }
                 } else {
+                    if (typeof response2.body.getReader !== 'function') {
+                        console.error("[CRITICAL] Lỗi OpenRouter Lần 2: getReader is not a function. Trạng thái HTTP:", response2.status);
+                        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n❌ *Hệ thống: Lỗi kết nối luồng AI lần 2.* \n\n" } }] })}\n\n`);
+                        res.write(`data: [DONE]\n\n`);
+                        return res.end();
+                    }
                     let reader2 = response2.body.getReader();
                     let decoder2 = new TextDecoder("utf-8");
                     let buffer2 = "";
