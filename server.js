@@ -2329,10 +2329,14 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         // ==========================================
         if (session_id) {
             const checkSession = await pool.query("SELECT id FROM ai_chat_sessions WHERE id = $1 AND user_id = $2", [session_id, req.user.id]);
-            if (checkSession.rowCount === 0) return res.status(403).json({ error: "Lá»—i phiÃªn lÃ m viá»‡c." });
+            if (checkSession.rowCount === 0) return res.status(403).json({ error: "Lỗi phiên làm việc." });
             
-            const saveUserMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'user', $2)`;
-            await pool.query(saveUserMsgSql, [session_id, userMessage]);
+            try {
+                const saveUserMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'user', $2)`;
+                await pool.query(saveUserMsgSql, [session_id, userMessage]);
+            } catch (err) {
+                console.warn("Failed to save user chat message: Table missing", err.message);
+            }
         }
 
         // ==========================================
