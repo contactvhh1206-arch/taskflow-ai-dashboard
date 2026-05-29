@@ -2175,17 +2175,20 @@ async function executeGetRevenueTool(args, user) {
 
     if (!targetFacility) {
         // LUỒNG 1: All-Access
-        // Ép kiểu chuỗi ngày DD/MM/YYYY sang định dạng Date tiêu chuẩn của PostgreSQL
+        // Dynamic Date Parsing: Tự động phát hiện nếu chuỗi chứa dấu '-' thì ép kiểu thẳng, ngược lại dùng to_date.
         sql = `SELECT COALESCE(SUM(total_revenue), 0) AS aggregated_revenue 
                FROM daily_financial_reports 
-               WHERE to_date(date, 'DD/MM/YYYY') >= $1::date AND to_date(date, 'DD/MM/YYYY') <= $2::date`;
+               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date 
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date`;
         params = [startDate, endDate];
     } else {
         // LUỒNG 2: Local Group
-        // 1. regexp_replace: Lột bỏ toàn bộ mọi ký tự rác. 2. NULLIF: Chặn chuỗi rỗng trước khi ép kiểu.
+        // 1. Dynamic Date Parsing cho mệnh đề WHERE.
+        // 2. Lớp giáp siêu cấp cho data: regexp_replace (lọc rác) -> NULLIF (chặn rỗng) -> ::numeric.
         sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(data->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
                FROM daily_financial_reports
-               WHERE to_date(date, 'DD/MM/YYYY') >= $1::date AND to_date(date, 'DD/MM/YYYY') <= $2::date
+               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date 
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date
                  AND (REPLACE(UPPER(data->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
                       OR REPLACE(UPPER(data->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))`;
         params = [startDate, endDate, targetFacility];
