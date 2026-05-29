@@ -2175,16 +2175,16 @@ async function executeGetRevenueTool(args, user) {
 
     if (!targetFacility) {
         // LUỒNG 1: All-Access
-        // Ép kiểu chuẩn xác to_date($1::text) để tránh bug DateStyle của PostgreSQL
+        // Dynamic Date Parsing cho $1 và $2 để an toàn parse cả ISO lẫn VN format
         sql = `SELECT COALESCE(SUM(total_revenue), 0) AS aggregated_revenue 
                FROM daily_financial_reports 
-               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= to_date($1::text, 'DD/MM/YYYY') 
-                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= to_date($2::text, 'DD/MM/YYYY')`;
+               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= (CASE WHEN $1::text LIKE '%-%' THEN $1::date ELSE to_date($1::text, 'DD/MM/YYYY') END) 
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= (CASE WHEN $2::text LIKE '%-%' THEN $2::date ELSE to_date($2::text, 'DD/MM/YYYY') END)`;
         params = [startDate, endDate];
     } else {
         // LUỒNG 2: Local Group
         // 1. Phẳng hóa dữ liệu JSONB ra ngoài bằng CROSS JOIN LATERAL để giữ Context Mapping
-        // 2. Ép kiểu chuẩn xác to_date($1::text) để tránh bug DateStyle
+        // 2. Dynamic Date Parsing cho $1 và $2 để an toàn parse cả ISO lẫn VN format
         sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
                FROM daily_financial_reports
                CROSS JOIN LATERAL jsonb_array_elements(
@@ -2194,8 +2194,8 @@ async function executeGetRevenueTool(args, user) {
                        ELSE '[]'::jsonb 
                    END
                ) AS item
-               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= to_date($1::text, 'DD/MM/YYYY') 
-                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= to_date($2::text, 'DD/MM/YYYY')
+               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= (CASE WHEN $1::text LIKE '%-%' THEN $1::date ELSE to_date($1::text, 'DD/MM/YYYY') END)
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= (CASE WHEN $2::text LIKE '%-%' THEN $2::date ELSE to_date($2::text, 'DD/MM/YYYY') END)
                  AND (REPLACE(UPPER(item->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
                       OR REPLACE(UPPER(item->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))`;
         params = [startDate, endDate, targetFacility];
