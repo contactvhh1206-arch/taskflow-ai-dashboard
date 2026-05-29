@@ -1939,7 +1939,7 @@ async function generateEmbedding(text) {
         const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
             method: 'POST',
             headers: {
-                'Authorization': "Bearer $((process.env.OPENROUTER_API_KEY || OPENROUTER_API_KEY))",
+                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || OPENROUTER_API_KEY}`,
                 'Content-Type': 'application/json',
                 'HTTP-Referer': 'https://taskflow.ai',
                 'X-Title': 'TaskFlow'
