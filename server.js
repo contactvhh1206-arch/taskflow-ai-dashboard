@@ -383,21 +383,8 @@ const authenticateUser = async (req, res, next) => {
             facilityRaw = payload.facility_id;
             departmentId = payload.department_id;
         } catch (jwtErr) {
-            if (token === 'mock-jwt-token-admin') {
-                userId = 1; userRole = 'SUPER_ADMIN'; facilityRaw = 'ALL';
-            } else if (token === 'mock-jwt-token-manager') {
-                userId = 2; userRole = 'FACILITY_MANAGER'; facilityRaw = '1';
-            } else if (token === 'mock-jwt-token-sysadmin') {
-                userId = 3; userRole = 'ADMIN'; facilityRaw = 'ALL';
-            } else if (token.startsWith('jwt-token-')) {
-                userId = parseInt(token.replace('jwt-token-', ''), 10);
-                userRole = req.headers['x-user-role'];
-                facilityRaw = req.headers['x-facility-id'];
-                departmentId = req.headers['x-department-id'];
-            } else {
-                console.error('[Auth Middleware] Lá»—i giáº£i mÃ£ Token:', jwtErr.message);
-                return res.status(401).json({ success: false, message: 'Invalid or Expired Token' });
-            }
+            console.error('[Auth Middleware] Lỗi giải mã Token:', jwtErr.message);
+            return res.status(401).json({ success: false, message: 'Invalid or Expired Token' });
         }
         
         let facilityId = parseInt(facilityRaw, 10);
@@ -494,31 +481,10 @@ app.post('/api/users', authenticateUser, checkAdmin, async (req, res) => {
     }
     
     const { rows } = await pool.query(`
-      INSERT INTO users (email, password_hash, full_name, role_id, facility_id, managed_facilities, status)
-      VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE') RETURNING id
-    `, [username.trim().toLowerCase(), hash, name, role_id, facId, managedFacs]);
-    
-    res.json({ success: true, data: { id: rows[0].id } });
-  } catch (error) {
-    console.error("Lá»—i táº¡o user:", error);
-    res.status(500).json({ error: 'Lá»—i táº¡o tÃ i khoáº£n (cÃ³ thá»ƒ username Ä‘Ã£ tá»“n táº¡i).' });
-  }
-});
-// In-memory store for hardcoded accounts (for demo purposes)
-const hardcodedPasswords = {
-  'admin': 'admin123',
-  'manager1': 'manager123',
-  'sysadmin': 'admin123'
-};
-
-app.put('/api/users/change-password', authenticateUser, async (req, res) => {
-  try {
-    const { username, currentPassword, newPassword } = req.body;
-    
-    // Check hardcoded accounts first
-    if (hardcodedPasswords[username]) {
-      if (hardcodedPasswords[username] !== currentPassword) {
-        return res.status(400).json({ error: 'Máº­t kháº©u hiá»‡n táº¡i khÃ´ng chÃ­nh xÃ¡c.' });
+      INSERT INTO users (email, password_hash, full_name, role_id, facility_id, managed_facilities,    // Find user in DB
+    const { rows } = await pool.query(`SELECT * FROM users WHERE email = $1 OR full_name = $1`, [username]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin tÃ i khoáº£n.' });hÃ­nh xÃ¡c.' });
       }
       hardcodedPasswords[username] = newPassword;
       return res.json({ success: true, message: 'Äá»•i máº­t kháº©u thÃ nh cÃ´ng (tÃ i khoáº£n demo).' });
@@ -1031,26 +997,6 @@ app.post('/api/login', async (req, res) => {
         username = username.trim().toLowerCase();
       }
       
-      if (username === 'admin' && password === hardcodedPasswords['admin']) {
-      return res.json({
-        success: true,
-        token: 'mock-jwt-token-admin',
-        user: { name: 'Sáº¿p Tá»•ng', role: 'SUPER_ADMIN', facility_id: 'ALL', username: 'admin' }
-      });
-    } else if (username === 'manager1' && password === hardcodedPasswords['manager1']) {
-      return res.json({
-        success: true,
-        token: 'mock-jwt-token-manager',
-        user: { name: 'Quáº£n lÃ½ CÆ¡ sá»Ÿ 1', role: 'FACILITY_MANAGER', facility_id: 'CÆ¡ sá»Ÿ 1', username: 'manager1' }
-      });
-    } else if (username === 'sysadmin' && password === hardcodedPasswords['sysadmin']) {
-      return res.json({
-        success: true,
-        token: 'mock-jwt-token-sysadmin',
-        user: { name: 'Quáº£n trá»‹ viÃªn Há»‡ thá»‘ng (IT)', role: 'ADMIN', facility_id: 'ALL', username: 'sysadmin' }
-      });
-    }
-  
     try {
         const { rows } = await pool.query(`
             SELECT u.*, r.name AS role_name, f.code AS facility_code, f.name AS facility_name 
