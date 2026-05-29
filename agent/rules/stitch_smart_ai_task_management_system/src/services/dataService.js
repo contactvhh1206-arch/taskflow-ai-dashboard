@@ -146,6 +146,7 @@ export const streamAIChat = async (message, sessionId, token, onChunk, onDone, o
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
+        let buffer = '';
 
         while (true) {
             const { done, value } = await reader.read();
@@ -155,8 +156,9 @@ export const streamAIChat = async (message, sessionId, token, onChunk, onDone, o
             }
             
             const chunk = decoder.decode(value, { stream: true });
-            // Dùng \n chuẩn xác để split chunk
-            const lines = chunk.split('\n');
+            buffer += chunk;
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Giữ lại phần lỡ dở cho lần lặp sau
             
             for (const line of lines) {
                 if (line.startsWith('data: ') && line !== 'data: [DONE]') {
