@@ -2031,7 +2031,7 @@ async function executeCreateTaskTool(args, user) {
     
     const normalizedDept = normalizeDeptCode(department_code);
     if (!normalizedDept) {
-        throw new Error("Lá»—i: MÃ£ phÃ²ng ban/cÆ¡ sá»Ÿ khÃ´ng há»£p lá»‡ hoáº·c bá»‹ trá»‘ng.");
+        return { error: "Lỗi: Mã phòng ban/cơ sở không hợp lệ hoặc bị trống." };
     }
 
     // 1. RBAC Guardrail: TÃ¡i sá»­ dá»¥ng logic chuáº©n tá»« RAG
@@ -2040,7 +2040,7 @@ async function executeCreateTaskTool(args, user) {
     if (!perms.isGlobal) {
         const userDept = normalizeDeptCode(perms.departmentCode || (perms.facilityId ? String(perms.facilityId) : 'GLOBAL'));
         if (normalizedDept !== userDept) {
-            throw new Error(`AI Tá»ª CHá»I: Báº¡n khÃ´ng cÃ³ quyá»n táº¡o task cho phÃ²ng ban [${normalizedDept}]. Tháº©m quyá»n cá»§a báº¡n giá»›i háº¡n táº¡i: [${userDept}].`);
+            return { error: `AI TỪ CHỐI: Bạn không có quyền tạo task cho phòng ban [${normalizedDept}]. Thẩm quyền của bạn giới hạn tại: [${userDept}].` };
         }
     }
 
@@ -2049,7 +2049,7 @@ async function executeCreateTaskTool(args, user) {
     if (deadline) {
         const parsedDate = new Date(deadline);
         if (isNaN(parsedDate.getTime())) {
-            throw new Error(`Lá»—i: AI truyá»n Ä‘á»‹nh dáº¡ng ngÃ y thÃ¡ng khÃ´ng há»£p lá»‡ (${deadline}). YÃªu cáº§u Ä‘á»‹nh dáº¡ng YYYY-MM-DD.`);
+            return { error: `Lỗi: AI truyền định dạng ngày tháng không hợp lệ (${deadline}). Yêu cầu định dạng YYYY-MM-DD.` };
         }
         deadlineVal = parsedDate;
     }
