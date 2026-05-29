@@ -368,6 +368,8 @@ const authenticateUser = async (req, res, next) => {
         let userRole = null;
         let facilityRaw = null;
         let departmentId = null;
+        let departmentCode = null;
+        let facilityCode = null;
 
         try {
             const payload = jwt.verify(token, SECRET_KEY);
@@ -375,6 +377,8 @@ const authenticateUser = async (req, res, next) => {
             userRole = payload.role;
             facilityRaw = payload.facility_id;
             departmentId = payload.department_id;
+            departmentCode = payload.department_code;
+            facilityCode = payload.facility_code;
         } catch (jwtErr) {
             console.error('[Auth Middleware] Lỗi giải mã Token:', jwtErr.message);
             return res.status(401).json({ success: false, message: 'Invalid or Expired Token' });
@@ -395,7 +399,7 @@ const authenticateUser = async (req, res, next) => {
             facilityId = 'ALL';
         }
       
-        req.user = { id: userId, role: userRole, facility_id: facilityId, department_id: departmentId };
+        req.user = { id: userId, role: userRole, facility_id: facilityId, department_id: departmentId, department_code: departmentCode, facility_code: facilityCode };
         next();
     } catch (err) {
         console.error("Auth middleware error:", err);
@@ -993,8 +997,9 @@ app.post('/api/login', async (req, res) => {
                     id: user.id,
                     role: user.role_name,
                     facility_id: user.managed_facilities || user.facility_name || 'ALL',
-                    facility_code: user.facility_code || '',
-                    department_id: user.department_id || null
+                    facility_code: user.facility_code || 'ALL',
+                    department_id: user.department_id || null,
+                    department_code: user.department_code || null
                 };
                 return res.json({
                     success: true,
