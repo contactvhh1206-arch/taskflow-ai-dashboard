@@ -2594,14 +2594,44 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         // NHáº¬P 3.5: THá»°C THI TOOL VÃ€ FAIL-FAST
         // ==========================================
         if (toolCallName && toolCallArguments) {
-            let args;
+            // ==========================================
+            // BỌC THÉP PARSE JSON CHO GEMINI & CHỐNG TREO UI
+            // ==========================================
+            let args = {};
             try {
-                args = JSON.parse(toolCallArguments);
+                // 1. Thuật toán "Gắp lõi JSON" (Xuyên thủng mọi lớp Markdown của Gemini)
+                let cleanJsonString = toolCallArguments;
+                const firstBraceIdx = cleanJsonString.indexOf('{');
+                const lastBraceIdx = cleanJsonString.lastIndexOf('}');
+                
+                if (firstBraceIdx !== -1 && lastBraceIdx !== -1 && lastBraceIdx >= firstBraceIdx) {
+                    // Cắt bỏ chính xác phần ruột từ dấu { đến dấu }, phớt lờ rác ở ngoài
+                    cleanJsonString = cleanJsonString.substring(firstBraceIdx, lastBraceIdx + 1);
+                }
+
+                // 2. Ép kiểu an toàn sau khi đã làm sạch
+                args = JSON.parse(cleanJsonString);
+
             } catch (err) {
-                console.error("Tool Parse Error (Graceful Degradation):", err.message);
-                res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n*Hệ thống: Xin lỗi, tôi không thể xử lý yêu cầu này do AI sinh sai định dạng.*" } }] })}\n\n`);
+                console.error("[CRITICAL] Tool Parse Error - Gemini sinh sai định dạng:", err.message, "Raw input:", toolCallArguments);
+                
+                // 3. Dọn dẹp nhịp tim (Keep-Alive) nếu có
+                if (typeof keepAliveInterval !== 'undefined') clearInterval(keepAliveInterval);
+
+                // 4. Giải cứu UI: BẮT BUỘC có finish_reason: "stop" để Frontend tắt Spinner
+                const errorPayload = {
+                    id: "tool-error",
+                    object: "chat.completion.chunk",
+                    choices: [{
+                        index: 0,
+                        delta: { role: "assistant", content: "\n\n❌ *Hệ thống: Xin lỗi, AI Gemini đã bị lỗi định dạng tham số khi truy xuất. Xin vui lòng thử lại bằng cách chỉ định rõ 1-2 cơ sở cụ thể.*" },
+                        finish_reason: "stop" // <--- CHÌA KHÓA TẮT SPINNER
+                    }]
+                };
+
+                res.write(`data: ${JSON.stringify(errorPayload)}\n\n`);
                 res.write(`data: [DONE]\n\n`);
-                return res.end();
+                return res.end(); // Kết thúc an toàn
             }
 
             try {
