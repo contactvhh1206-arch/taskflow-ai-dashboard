@@ -9,7 +9,6 @@ import ApiConfigPanel from './components/ApiConfigPanel.jsx';
 import AIUsageLogs from './components/AIUsageLogs.jsx';
 import RAGManagerPanel from './components/RAGManagerPanel.jsx';
 import FacilityDashboard from './components/FacilityDashboard.jsx';
-import PerformanceReport from './components/PerformanceReport.jsx';
 import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
 import DailyRevenueReport from './components/DailyRevenueReport.jsx';
 import RevenueLog from './components/RevenueLog.jsx';
@@ -1173,10 +1172,6 @@ function MainDashboard() {
             ) : activeTab === 'revenue-log' && ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SUPER_ADMIN'].includes(user.role) ? (
               <ErrorBoundary>
                 <RevenueLog user={user} showToast={showToast} />
-              </ErrorBoundary>
-            ) : ['dept-reports'].includes(activeTab) ? (
-              <ErrorBoundary>
-                <PerformanceReport user={user} tasks={tasks} globalFacilityFilter={globalFacilityFilter} />
               </ErrorBoundary>
             ) : (
               <>
