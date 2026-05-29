@@ -2183,11 +2183,13 @@ async function executeGetRevenueTool(args, user) {
         params = [startDate, endDate];
     } else {
         // LUỒNG 2: Local Group
-        // Tích hợp vũ khí tối thượng: Unnesting mảng con + Regex Data Cleansing + Dynamic Date Parsing + RBAC
+        // 1. Phân giải Mixed Schemas: Bao phủ cả trường hợp "data là Array" và "data chứa mảng facilities".
+        // 2. Tích hợp vũ khí tối thượng: Regex Data Cleansing + Dynamic Date Parsing + RBAC.
         sql = `SELECT COALESCE(SUM(
                    (SELECT SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric) 
                     FROM jsonb_array_elements(
                         CASE 
+                            WHEN jsonb_typeof(data) = 'array' THEN data 
                             WHEN jsonb_typeof(data->'facilities') = 'array' THEN data->'facilities' 
                             ELSE '[]'::jsonb 
                         END
