@@ -1667,7 +1667,10 @@ export default function AppContainer() {
 
   const logout = () => {
     localStorage.removeItem('taskflow_auth');
+    localStorage.removeItem('taskflow_active_ai_session_id');
+    localStorage.removeItem('taskflow_ai_sessions');
     setUser(null);
+    window.location.reload();
   };
 
   if (loading) return null;
