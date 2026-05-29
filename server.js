@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'HubDB_Global_Temp_Secret_2026_!!!';
@@ -2521,7 +2521,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 
                 messages.push({
                     role: "assistant",
-                    content: null,
+                    content: aiReplyContent || "",
                     tool_calls: [{
                         id: toolCallId || "call_generated",
                         type: "function",
@@ -2549,6 +2549,14 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                         stream_options: !isLocalUser ? { include_usage: true } : undefined
                     })
                 });
+
+                if (!response2.ok) {
+                    const errorBody = await response2.text();
+                    console.error("OpenRouter Fetch 2 Error:", errorBody);
+                    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n*Hệ thống: Xin lỗi, AI không thể phân tích kết quả doanh thu lúc này do lỗi kết nối.*" } }] })}\n\n`);
+                    res.write(`data: [DONE]\n\n`);
+                    return res.end();
+                }
 
                 if (isLocalUser) {
                     const data2 = await response2.json();
