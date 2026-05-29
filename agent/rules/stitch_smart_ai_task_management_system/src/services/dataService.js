@@ -122,3 +122,53 @@ export const saveReport = async (reportData, token, role, facility_id) => {
     return false;
   }
 };
+
+export const streamAIChat = async (message, sessionId, token, onChunk, onDone, onError) => {
+    try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/ai/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // Bắt buộc truyền Token JWT từ Context
+            },
+            body: JSON.stringify({ message, session_id: sessionId })
+        });
+
+        if (!response.ok) throw new Error("Lỗi kết nối hệ thống AI.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                if (onDone) onDone();
+                break;
+            }
+            
+            const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // Giữ lại phần lỡ dở cho lần lặp sau
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    try {
+                        const parsed = JSON.parse(line.substring(6));
+                        if (parsed.content && onChunk) {
+                            onChunk(parsed.content); // Bắn chữ về UI
+                        } else if (parsed.error && onError) {
+                            onError(parsed.error);
+                        }
+                    } catch (e) {
+                        // Bỏ qua lỗi parse dở dang của luồng Stream
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Lỗi streamAIChat:", error);
+        if (onError) onError(error);
+    }
+};
