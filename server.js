@@ -2000,6 +2000,7 @@ function getAiPermissions(user) {
     // Xác định quyền All-Access (Global)
     const isGlobal = role === 'SUPER_ADMIN' || 
                      role === 'VICE_PRESIDENT' || 
+                     role === 'FINANCE_DEPT' ||
                      (role === 'DEPARTMENT_HEAD' && departmentCode === 'MARKETING');
                      
     return {
@@ -2111,13 +2112,10 @@ async function executeCreateTaskTool(args, user) {
     }
 
     // 1. RBAC Guardrail: TÃ¡i sá»­ dá»¥ng logic chuáº©n tá»« RAG
-    const isAllAccess = 
-        user.role === 'SUPER_ADMIN' || 
-        user.role === 'VICE_PRESIDENT' || 
-        (user.role === 'DEPARTMENT_HEAD' && user.department_code === 'MARKETING');
+    const perms = getAiPermissions(user);
 
-    if (!isAllAccess) {
-        const userDept = normalizeDeptCode(user.department_code || (user.facility_id ? String(user.facility_id) : 'GLOBAL'));
+    if (!perms.isGlobal) {
+        const userDept = normalizeDeptCode(perms.departmentCode || (perms.facilityId ? String(perms.facilityId) : 'GLOBAL'));
         if (normalizedDept !== userDept) {
             throw new Error(`AI Tá»ª CHá»I: Báº¡n khÃ´ng cÃ³ quyá»n táº¡o task cho phÃ²ng ban [${normalizedDept}]. Tháº©m quyá»n cá»§a báº¡n giá»›i háº¡n táº¡i: [${userDept}].`);
         }
@@ -2137,7 +2135,7 @@ async function executeCreateTaskTool(args, user) {
     let finalFacilityId = user.facility_id;
     
     // Náº¿u All-Access user táº¡o task cho cÆ¡ sá»Ÿ khÃ¡c, tá»± Ä‘á»™ng tra cá»©u ID cá»§a cÆ¡ sá»Ÿ Ä‘Ã³
-    if (isAllAccess && normalizedDept !== normalizeDeptCode(user.department_code)) {
+    if (perms.isGlobal && normalizedDept !== normalizeDeptCode(perms.departmentCode)) {
         const { rows } = await pool.query(`SELECT id FROM facilities WHERE code = $1 LIMIT 1`, [normalizedDept]);
         if (rows.length > 0) {
             finalFacilityId = rows[0].id;
