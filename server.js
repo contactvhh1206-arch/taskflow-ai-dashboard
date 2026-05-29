@@ -2417,7 +2417,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             finalSystemPrompt += "\nLƯU Ý BẢO MẬT: Bạn chỉ được trả lời các câu hỏi liên quan sát sườn đến nghiệp vụ phòng ban của người dùng. Nếu người dùng hỏi ngoài phạm vi quyền hạn trên, bắt buộc trả về: [BLOCK_MISCONDUCT]";
         }
 
-        finalSystemPrompt += "\nQUAN TRỌNG: BẮT BUỘC gọi Tool bằng MỘT CHUỖI JSON DUY NHẤT. TUYỆT ĐỐI KHÔNG giải thích, KHÔNG thêm bất kỳ văn bản nào ngoài cặp dấu ngoặc nhọn {}.";
+
 
         let chatHistory = [];
         if (session_id) {
