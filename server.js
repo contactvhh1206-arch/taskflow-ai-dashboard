@@ -2173,21 +2173,29 @@ async function executeGetRevenueTool(args, user) {
     let params = [];
 
     if (!targetFacility) {
+        // LUỒNG 1: All-Access
+        // Ép cột date từ VARCHAR sang DATE để so sánh
         sql = `SELECT COALESCE(SUM(total_revenue), 0) AS aggregated_revenue 
                FROM daily_financial_reports 
-               WHERE date >= $1::date AND date <= $2::date`;
+               WHERE date::date >= $1::date AND date::date <= $2::date`;
         params = [startDate, endDate];
     } else {
+        // LUỒNG 2: Local Group
+        // Dùng CASE WHEN để chặn lỗi Scalar. Nếu không phải Array, biến nó thành mảng rỗng '[]'
         sql = `SELECT COALESCE(SUM(
                    (SELECT SUM((item->>'revenue')::numeric) 
-                    FROM jsonb_array_elements(data) AS item 
+                    FROM jsonb_array_elements(
+                        CASE 
+                            WHEN jsonb_typeof(data) = 'array' THEN data 
+                            ELSE '[]'::jsonb 
+                        END
+                    ) AS item 
                     WHERE item->>'facility_id' = $3::text OR item->>'facility_code' = $3::text)
                ), 0) AS aggregated_revenue
                FROM daily_financial_reports
-               WHERE date >= $1::date AND date <= $2::date`;
+               WHERE date::date >= $1::date AND date::date <= $2::date`;
         params = [startDate, endDate, targetFacility];
     }
-
     try {
         const { rows } = await pool.query(sql, params);
         return {
