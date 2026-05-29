@@ -2361,6 +2361,16 @@ async function getConversationContext(sessionId, userId) {
 app.post('/api/ai/chat', authenticateUser, async (req, res) => {
     try {
         const { message, session_id } = req.body;
+        
+        // BẢO ĐẢM DỮ LIỆU USER MỚI NHẤT & CHUẨN HOÁ ROLE TỪ DB ĐỂ TRÁNH LỖI PHÂN QUYỀN
+        try {
+            const userDbInfo = await pool.query(`SELECT role, department_code, facility_id FROM users WHERE id = $1`, [req.user.id]);
+            if (userDbInfo.rows.length > 0) {
+                req.user.role = String(userDbInfo.rows[0].role).toUpperCase();
+                req.user.department_code = userDbInfo.rows[0].department_code;
+                req.user.facility_id = userDbInfo.rows[0].facility_id;
+            }
+        } catch (dbErr) { console.error("Lỗi lấy thông tin user:", dbErr); }
         const userMessage = message || req.body.content;
         
         if (!userMessage) return res.status(400).json({ error: "Message is required" });
@@ -2542,18 +2552,15 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 res.write(`data: ${JSON.stringify({ content: aiReplyContent })}${String.fromCharCode(10)}${String.fromCharCode(10)}`);
             }
         } else {
-            // ADMIN STREAMING (Giá»¯ nguyÃªn)
-            if (!response.body || typeof response.body.getReader !== 'function') {
-                console.error("[CRITICAL] Lỗi OpenRouter Lần 1: getReader is not a function. Trạng thái HTTP:", response.status);
+            // ADMIN STREAMING (Hỗ trợ Node-fetch / async iteration)
+            if (!response.body) {
+                console.error("[CRITICAL] Lỗi OpenRouter Lần 1: Không có response.body. HTTP:", response.status);
                 res.write(`data: ${JSON.stringify({ error: "Lỗi luồng kết nối AI. Vui lòng thử lại sau." })}\n\n`);
                 return res.end();
             }
-            let reader = response.body.getReader();
             let decoder = new TextDecoder("utf-8");
             let buffer = "";
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+            for await (const value of response.body) {
                 
                 const chunk = decoder.decode(value, { stream: true });
                 buffer += chunk;
@@ -2701,18 +2708,15 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                         }
                     }
                 } else {
-                    if (typeof response2.body.getReader !== 'function') {
-                        console.error("[CRITICAL] Lỗi OpenRouter Lần 2: getReader is not a function. Trạng thái HTTP:", response2.status);
+                    if (!response2.body) {
+                        console.error("[CRITICAL] Lỗi OpenRouter Lần 2: Không có response2.body. HTTP:", response2.status);
                         res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n❌ *Hệ thống: Lỗi kết nối luồng AI lần 2.* \n\n" } }] })}\n\n`);
                         res.write(`data: [DONE]\n\n`);
                         return res.end();
                     }
-                    let reader2 = response2.body.getReader();
                     let decoder2 = new TextDecoder("utf-8");
                     let buffer2 = "";
-                    while (true) {
-                        const { done, value } = await reader2.read();
-                        if (done) break;
+                    for await (const value of response2.body) {
                         const chunk = decoder2.decode(value, { stream: true });
                         buffer2 += chunk;
                         const lines = buffer2.split(String.fromCharCode(10));
