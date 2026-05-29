@@ -2396,13 +2396,23 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         
         const globalRoles = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'ADMIN'];
         const isLocalUser = !globalRoles.includes(req.user.role);
-        
-        let finalSystemPrompt = "Báº¡n lÃ  trá»£ lÃ½ áº£o AI Advisor thÃ´ng minh cá»§a há»‡ thá»‘ng TaskFlow." + String.fromCharCode(10) + 
-                                  (ragContextText ? "Dá»¯ liá»‡u tham kháº£o:" + String.fromCharCode(10) + ragContextText : "") + 
-                                  systemPromptAddition;
+
+        // Xây dựng Ngữ cảnh User (User Context)
+        const userFacility = req.user.facility_code ? req.user.facility_code : 'Toàn cầu (Global)';
+        const userPermissions = isLocalUser 
+            ? 'Bạn chỉ có quyền xem dữ liệu nội bộ của cơ sở bạn đang quản lý.' 
+            : 'Bạn có đặc quyền truy cập dữ liệu toàn hệ thống (Global).';
+
+        let finalSystemPrompt = "Bạn là trợ lý ảo AI Advisor thông minh của hệ thống TaskFlow.\n" + 
+            "THÔNG TIN BẮT BUỘC VỀ NGƯỜI DÙNG HIỆN TẠI:\n" +
+            `- Chức vụ (Role): ${req.user.role}\n` +
+            `- Mã cơ sở (Facility Code): ${userFacility}\n` +
+            `- Quyền hạn: ${userPermissions}\n\n` +
+            (ragContextText ? "Dữ liệu tham khảo:\n" + ragContextText : "") + 
+            systemPromptAddition;
 
         if (isLocalUser) {
-            finalSystemPrompt += String.fromCharCode(10) + "LÆ¯U Ã  Báº¢O Máº¬T: Báº¡n chá»‰ Ä‘Æ°á»£c tráº£ lá» i cÃ¡c cÃ¢u há» i liÃªn quan sÃ¡t sÆ°á» n Ä‘áº¿n nghiá»‡p vá»¥ phÃ²ng ban cá»§a ngÆ°á» i dÃ¹ng. Náº¿u ngÆ°á» i dÃ¹ng há» i Ä‘Ã¹a, há» i xÃ m, tÃ¡n tá»‰nh hoáº·c há» i cÃ¡c kiáº¿n thá»©c ngoÃ i cÃ´ng viá»‡c, báº¡n Báº®T BUá»˜C pháº£i tráº£ vá»  Ä‘Ãºng tá»« khÃ³a: [BLOCK_MISCONDUCT]";
+            finalSystemPrompt += "\nLƯU Ý BẢO MẬT: Bạn chỉ được trả lời các câu hỏi liên quan sát sườn đến nghiệp vụ phòng ban của người dùng. Nếu người dùng hỏi ngoài phạm vi quyền hạn trên, bắt buộc trả về: [BLOCK_MISCONDUCT]";
         }
 
         let chatHistory = [];
@@ -2589,13 +2599,26 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
             }
 
             try {
+                res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n⏳ *Hệ thống: Đang tổng hợp báo cáo quy mô lớn, vui lòng đợi trong giây lát...*\n\n" } }] })}\n\n`);
+
+                const keepAliveInterval = setInterval(() => {
+                    res.write(': keep-alive ping\n\n'); 
+                }, 10000);
+
                 let result;
-                if (toolCallName === "create_system_task") {
-                    result = await executeCreateTaskTool(args, req.user);
-                } else if (toolCallName === "get_revenue_report") {
-                    result = await executeGetRevenueTool(args, req.user);
-                } else {
-                    throw new Error(`Tool ${toolCallName} chưa được hỗ trợ.`);
+                try {
+                    if (toolCallName === "create_system_task") {
+                        result = await executeCreateTaskTool(args, req.user);
+                    } else if (toolCallName === "get_revenue_report") {
+                        result = await executeGetRevenueTool(args, req.user);
+                    } else {
+                        throw new Error(`Tool ${toolCallName} chưa được hỗ trợ.`);
+                    }
+                } catch (toolError) {
+                    console.error("Lỗi thực thi Tool:", toolError);
+                    result = JSON.stringify({ error: "Lỗi truy xuất hệ thống." });
+                } finally {
+                    clearInterval(keepAliveInterval);
                 }
                 let stringifiedResult = typeof result === 'string' ? result : JSON.stringify(result);
                 if (stringifiedResult.length > 12000) {
