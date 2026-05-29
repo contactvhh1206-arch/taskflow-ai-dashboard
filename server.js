@@ -2635,8 +2635,13 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         // NHáº¬P 4: LÆ¯U DB & GHI LOG Báº¢O Máº¬T
         // ==========================================
         if (session_id && aiReplyContent) {
-            const saveAiMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)`;
-            await pool.query(saveAiMsgSql, [session_id, aiReplyContent]);
+            try {
+                const saveAiMsgSql = `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)`;
+                await pool.query(saveAiMsgSql, [session_id, aiReplyContent]);
+            } catch (innerErr) {
+                // Graceful Degradation: Bỏ qua lỗi thiếu bảng, cho phép luồng Chat tiếp tục
+                console.warn("Failed to save chat message: Table missing", innerErr.message);
+            }
         }
 
         if (promptTokens > 0 || completionTokens > 0) {

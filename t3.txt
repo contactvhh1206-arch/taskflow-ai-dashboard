@@ -1,0 +1,4 @@
+﻿        const { rows } = await pool.query(sql, params);
+        return {
+            status: "success",
+            message: `Báo cáo doanh thu: ${Number(rows[0].aggregated_revenue).toLocaleString('vi-VN')} VNĐ.`
