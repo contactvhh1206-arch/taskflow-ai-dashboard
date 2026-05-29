@@ -2390,7 +2390,8 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
         const rawRagText = ragContextRows.map(row => row.content).join("\n\n");
         const ragContextText = rawRagText.length > 4000 ? rawRagText.substring(0, 4000) + "\n... [ÄÃ£ cáº¯t bá»›t do giá»›i háº¡n bá»™ nhá»›]" : rawRagText;
         
-        const isLocalUser = req.user.role !== 'SUPER_ADMIN' && req.user.role !== 'VICE_PRESIDENT' && req.user.role !== 'ADMIN';
+        const globalRoles = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'ADMIN'];
+        const isLocalUser = !globalRoles.includes(req.user.role);
         
         let finalSystemPrompt = "Báº¡n lÃ  trá»£ lÃ½ áº£o AI Advisor thÃ´ng minh cá»§a há»‡ thá»‘ng TaskFlow." + String.fromCharCode(10) + 
                                   (ragContextText ? "Dá»¯ liá»‡u tham kháº£o:" + String.fromCharCode(10) + ragContextText : "") + 
