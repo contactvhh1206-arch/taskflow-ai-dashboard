@@ -1994,14 +1994,17 @@ function getAiPermissions(user) {
     }
     
     const role = user.role;
-    const departmentCode = user.department_code || user.department_id || null;
+    const departmentCode = user.department_code || user.department_id || '';
     const facilityId = user.facility_id ? String(user.facility_id) : null;
+    
+    // Quét toàn bộ mọi biến thể tiếng Việt và tiếng Anh của khối Marketing
+    const isMarketing = Boolean(String(departmentCode).match(/MARKETING|TRUYỀN THÔNG|MKT|MEDIA/i));
     
     // Xác định quyền All-Access (Global)
     const isGlobal = role === 'SUPER_ADMIN' || 
                      role === 'VICE_PRESIDENT' || 
                      role === 'FINANCE_DEPT' ||
-                     (role === 'DEPARTMENT_HEAD' && departmentCode === 'MARKETING');
+                     (role === 'DEPARTMENT_HEAD' && isMarketing);
                      
     return {
         isGlobal,
@@ -2242,10 +2245,13 @@ async function executeGetRevenueTool(args, user) {
                ) AS item
                WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date
                  AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date
-                 AND (
-                     REPLACE(REPLACE(UPPER(item->>'name'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER($3::text), 'DUBAI', 'DB'), ' ', '')
-                     OR REPLACE(REPLACE(UPPER(item->>'facilityCode'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER($3::text), 'DUBAI', 'DB'), ' ', '')
-                     OR REPLACE(REPLACE(UPPER(item->>'facilityName'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER($3::text), 'DUBAI', 'DB'), ' ', '')
+                 AND EXISTS (
+                     SELECT 1 FROM unnest(string_to_array($3::text, ',')) AS f
+                     WHERE TRIM(f) != '' AND (
+                         REPLACE(REPLACE(UPPER(item->>'name'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(f)), 'DUBAI', 'DB'), ' ', '')
+                         OR REPLACE(REPLACE(UPPER(item->>'facilityCode'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(f)), 'DUBAI', 'DB'), ' ', '')
+                         OR REPLACE(REPLACE(UPPER(item->>'facilityName'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(f)), 'DUBAI', 'DB'), ' ', '')
+                     )
                  )`;
         params = [startDate, endDate, targetFacility];
     }
