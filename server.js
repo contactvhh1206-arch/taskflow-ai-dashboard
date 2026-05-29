@@ -2218,10 +2218,18 @@ async function executeGetRevenueTool(args, user) {
     let params = [];
 
     if (!targetFacility) {
-        sql = `SELECT COALESCE(SUM(total_revenue), 0) AS aggregated_revenue 
-               FROM daily_financial_reports 
-               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= (CASE WHEN $1::text LIKE '%-%' THEN $1::date ELSE to_date($1::text, 'DD/MM/YYYY') END) 
-                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= (CASE WHEN $2::text LIKE '%-%' THEN $2::date ELSE to_date($2::text, 'DD/MM/YYYY') END)`;
+        sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric), 0) + 
+              COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
+               FROM daily_financial_reports
+               CROSS JOIN LATERAL jsonb_array_elements(
+                   CASE 
+                       WHEN jsonb_typeof(data) = 'array' THEN data 
+                       WHEN jsonb_typeof(data->'facilities') = 'array' THEN data->'facilities' 
+                       ELSE '[]'::jsonb 
+                   END
+               ) AS item
+               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date`;
         params = [startDate, endDate];
     } else {
         sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric), 0) + 
@@ -2234,11 +2242,13 @@ async function executeGetRevenueTool(args, user) {
                        ELSE '[]'::jsonb 
                    END
                ) AS item
-               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= (CASE WHEN $1::text LIKE '%-%' THEN $1::date ELSE to_date($1::text, 'DD/MM/YYYY') END)
-                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= (CASE WHEN $2::text LIKE '%-%' THEN $2::date ELSE to_date($2::text, 'DD/MM/YYYY') END)
-                 AND (REPLACE(UPPER(item->>'name'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
-                      OR REPLACE(UPPER(item->>'facilityCode'), ' ', '') = REPLACE(UPPER($3::text), ' ', '')
-                      OR REPLACE(UPPER(item->>'facilityName'), ' ', '') = REPLACE(UPPER($3::text), ' ', ''))`;
+               WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date
+                 AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date
+                 AND (
+                     REPLACE(REPLACE(UPPER(item->>'name'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER($3::text), 'DUBAI', 'DB'), ' ', '')
+                     OR REPLACE(REPLACE(UPPER(item->>'facilityCode'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER($3::text), 'DUBAI', 'DB'), ' ', '')
+                     OR REPLACE(REPLACE(UPPER(item->>'facilityName'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER($3::text), 'DUBAI', 'DB'), ' ', '')
+                 )`;
         params = [startDate, endDate, targetFacility];
     }
     
