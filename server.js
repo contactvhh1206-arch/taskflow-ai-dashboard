@@ -2159,16 +2159,18 @@ async function executeCreateTaskTool(args, user) {
     
     try {
         const result = await pool.query(insertQuery, [
-            title, normalizedDept, deadlineVal, priorityLevel, user.id, finalFacilityId
+            title || null, normalizedDept || null, deadlineVal || null, priorityLevel || null, user.id || null, finalFacilityId || null
         ]);
         
         return {
             status: "success",
-            message: `Táº¡o cÃ´ng viá»‡c thÃ nh cÃ´ng. ID: ${result.rows[0].id}`
+            message: `Tạo công việc thành công. ID: ${result.rows[0].id}`
         };
     } catch (error) {
-        console.error("Database Error (executeCreateTaskTool):", error);
-        throw new Error("Lá»—i há»‡ thá»‘ng khi lÆ°u cÃ´ng viá»‡c vÃ o cÆ¡ sá»Ÿ dá»¯ liá»‡u.");
+        console.error("[CRITICAL TOOL ERROR] Lỗi khi thực thi Tool Tạo Công Việc:", error.message);
+        return JSON.stringify({ 
+            error: "Lỗi nội bộ khi lưu công việc. Hãy thông báo cho User biết hệ thống đang gặp sự cố." 
+        });
     }
 }
 
@@ -2231,7 +2233,7 @@ async function executeGetRevenueTool(args, user) {
                ) AS item
                WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date
                  AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date`;
-        params = [startDate, endDate];
+        params = [startDate || null, endDate || null];
     } else {
         sql = `SELECT COALESCE(SUM((NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric), 0) + 
               COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS aggregated_revenue
@@ -2253,7 +2255,7 @@ async function executeGetRevenueTool(args, user) {
                          OR REPLACE(REPLACE(UPPER(item->>'facilityName'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', 'DB'), ' ', '')
                      )
                  )`;
-        params = [startDate, endDate, targetFacility];
+        params = [startDate || null, endDate || null, targetFacility || null];
     }
     
     try {
@@ -2263,8 +2265,10 @@ async function executeGetRevenueTool(args, user) {
             message: `Báo cáo doanh thu của hệ thống/cơ sở [${targetFacility || 'Toàn hệ thống'}] từ ngày ${startDate} đến ${endDate} là: ${Number(rows[0].aggregated_revenue).toLocaleString('vi-VN')} VNĐ.`
         };
     } catch (error) {
-        console.error("Revenue DB Error:", error);
-        return { error: "Lỗi hệ thống khi trích xuất doanh thu từ cơ sở dữ liệu." };
+        console.error("[CRITICAL TOOL ERROR] Lỗi khi thực thi Tool Doanh Thu:", error.message);
+        return JSON.stringify({ 
+            error: "Lỗi nội bộ khi truy xuất CSDL. Hãy thông báo cho User biết hệ thống đang gặp sự cố và không thể lấy số liệu lúc này." 
+        });
     }
 }
 
