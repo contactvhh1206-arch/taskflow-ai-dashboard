@@ -2464,6 +2464,19 @@ async function getConversationContext(sessionId, userId) {
 // ==========================================
 // API LẤY LỊCH SỬ CHAT (Chỉ lấy Messages)
 // ==========================================
+app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
+    try {
+        const { rows } = await pool.query(
+            "INSERT INTO ai_chat_sessions (user_id, title) VALUES ($1, 'Cuộc trò chuyện mới') RETURNING *",
+            [req.user.id]
+        );
+        res.status(201).json({ success: true, data: rows[0] });
+    } catch (error) {
+        console.error("Lỗi tạo session AI:", error);
+        res.status(500).json({ error: "Lỗi máy chủ khi tạo session." });
+    }
+});
+
 app.get('/api/ai/chat-sessions/:id/messages', authenticateUser, async (req, res) => {
     try {
         const sessionId = req.params.id;

@@ -1019,6 +1019,30 @@ function MainDashboard() {
     else document.documentElement.classList.remove('dark');
   };
 
+  const handleCreateAISession = async () => {
+    try {
+      const res = await axiosClient.post('/api/ai/sessions');
+      if (res.success && res.data) {
+         const newSession = res.data;
+         // Cập nhật State danh sách session để hiển thị session mới lên UI
+         setAiSessions(prev => [newSession, ...prev]);
+         // Tự động set activeSessionId bằng ID của session vừa tạo
+         setActiveAiSessionId(newSession.id);
+         
+         if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) {
+             setActiveTab('ai-advisor');
+         } else {
+             setShowAITaskModal(true);
+         }
+      } else {
+         showToast('Không thể tạo phiên chat AI mới: ' + (res.error || 'Lỗi không xác định'));
+      }
+    } catch (err) {
+      console.error('Lỗi tạo session:', err);
+      showToast('Lỗi tạo phiên làm việc AI.');
+    }
+  };
+
   return (
     <div className={`flex h-screen w-full font-sans overflow-hidden ${darkMode ? 'dark bg-[#121212] text-white' : 'bg-surface text-on-surface'}`}>
       {/* Mobile Sidebar Overlay */}
@@ -1097,10 +1121,10 @@ function MainDashboard() {
           )}
 
           {true && (
-             <div className="mt-6 mb-2 px-4">
+              <div className="mt-6 mb-2 px-4">
                 <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-3 flex items-center justify-between tracking-widest uppercase">
                    Lịch sử trò chuyện AI
-                   <button onClick={() => { setActiveAiSessionId(null); if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor'); } else { setShowAITaskModal(true); } }} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
+                   <button onClick={handleCreateAISession} className="hover:text-primary transition-colors flex items-center" title="Cuộc hội thoại mới">
                       <span className="material-symbols-outlined text-[16px]">add_circle</span>
                    </button>
                 </div>
