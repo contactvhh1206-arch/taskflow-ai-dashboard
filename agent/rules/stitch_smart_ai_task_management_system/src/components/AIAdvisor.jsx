@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import axiosClient from '../api/axiosClient';
 import { fetchHistory, fetchAiSessions, saveAiSession, streamAIChat } from '../services/dataService.js';
 
 export default function AIAdvisor(props) {
@@ -79,11 +80,8 @@ export default function AIAdvisor(props) {
     }
     const loadHistory = async () => {
         try {
-            const token = localStorage.getItem('taskflow_token');
-            const res = await fetch('/api/ai/chat-sessions/' + activeSessionId + '/messages', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            const data = await res.json();
+            const data = await axiosClient.get(`/ai/chat-sessions/${activeSessionId}/messages`);
+            
             if (data.success && data.data.length > 0) {
                 setChatLog(data.data.map(m => ({ role: m.role, content: m.content })));
             } else {
