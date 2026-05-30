@@ -1,4 +1,5 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
+import axiosClient from './api/axiosClient.js';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -333,6 +334,7 @@ const filterTaskForDeptHead = (t, currentUser, deptId) => {
 };
 
 function MainDashboard() {
+  const isFetchingTasks = useRef(false);
   const { user, logout } = useContext(AuthContext);
   const [viewMode, setViewMode] = useState('kanban');
   const [darkMode, setDarkMode] = useState(false);
@@ -880,117 +882,110 @@ function MainDashboard() {
   };
 
   useEffect(() => {
-    if (user) {
-      const fetchTasks = async () => {
-          try {
-            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
-              headers: {
-                'x-user-role': user.role,
-                'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
-              }
-            });
-            
-            if (res.status === 500 || !res.ok) {
-               setTasks([]);
-               showToast('Lỗi máy chủ khi tải dữ liệu, vui lòng thử lại');
-               return;
-            }
-            
-            const data = await res.json();
-            if (data.success) {
-              const fetchedTasks = data.data || [];
-              setTasks(fetchedTasks);
-              
-              // Notification polling logic
-              const currentIds = new Set(fetchedTasks.map(t => t.id));
-              const currentComments = fetchedTasks.reduce((acc, t) => ({...acc, [t.id]: parseInt(t.comments_count || 0)}), {});
-              let prevIds = new Set();
-              let prevComments = {};
-              try {
-                  const storedIds = sessionStorage.getItem('taskflow_prev_ids');
-                  if (storedIds) prevIds = new Set(JSON.parse(storedIds));
-                  const storedComments = sessionStorage.getItem('taskflow_prev_comments');
-                  if (storedComments) prevComments = JSON.parse(storedComments);
-              } catch (e) {}
-              
-              if ((prevIds.size > 0 || Object.keys(prevComments).length > 0) && user) {
-                  fetchedTasks.forEach(task => {
-                      const myNames = [String(user.name).toLowerCase(), String(user.username).toLowerCase(), '@' + String(user.username).toLowerCase()];
-                      let isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
-                      
-                      if (!isAssignedToMe) {
-                          const isVP = user?.role === 'VICE_PRESIDENT';
-                          const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
-                          const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
-                          const rawFac = user?.facility_code || user?.facility_id || '';
-                          const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
-                          const tFacCode = String(task?.facilityId || task?.facility || '').toLowerCase();
-                          const tFacName = String(task?.facility || '').toLowerCase();
-                          
-                          if (isDeptHead) {
-                              if (filterTaskForDeptHead(task, user, deptId)) {
-                                  isAssignedToMe = true;
-                              }
-                          } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
-                              if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
-                                  isAssignedToMe = true;
-                              }
-                          }
-                      }
-                      
-                      if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
-                          if (!prevIds.has(task.id) && task.status === 'todo') {
-                              const newNotif = {
-                                  title: 'Công việc mới',
-                                  message: 'Bạn được giao công việc: ' + task.title,
-                                  time: new Date().toLocaleTimeString('vi-VN')
-                              };
-                              const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
-                              localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
-                              window.dispatchEvent(new Event('taskflow_notify'));
-                              setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
-                          }
-                      }
-                      
-                      const prevC = prevComments[task.id] || 0;
-                      const currC = parseInt(task.comments_count || 0);
-                      if (currC > prevC && task.latest_comment) {
-                          const lc = task.latest_comment.toLowerCase();
-                          const isMentioned = myNames.some(n => lc.includes(n)) || lc.includes('@all') || lc.includes('@tất cả') || (lc.includes('@ban giám đốc') && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role));
-                          if (isMentioned && String(task.latest_comment_user_id) !== String(user.id)) {
-                              const newNotif = {
-                                  title: 'Nhắc tên (@)',
-                                  message: 'Bạn được nhắc đến trong bình luận của công việc: ' + task.title,
-                                  time: new Date().toLocaleTimeString('vi-VN')
-                              };
-                              const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
-                              localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
-                              window.dispatchEvent(new Event('taskflow_notify'));
-                              setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
-                          }
-                      }
-                  });
-              }
-              sessionStorage.setItem('taskflow_prev_ids', JSON.stringify(Array.from(currentIds)));
-              sessionStorage.setItem('taskflow_prev_comments', JSON.stringify(currentComments));
+    if (!user?.id || isFetchingTasks.current) return;
 
-              
-            } else {
-              setTasks([]);
-              showToast('Lấy dữ liệu thất bại: ' + (data.error || ''));
-            }
-          } catch (e) {
-            console.error(e);
-            showToast('Lỗi kết nối khi lấy dữ liệu');
+    const fetchTasks = async () => {
+        isFetchingTasks.current = true;
+        try {
+          const res = await axiosClient.get('/tasks');
+          
+          if (!res.success) {
+             setTasks([]);
+             showToast('Lấy dữ liệu thất bại: ' + (res.error || ''));
+             return;
           }
-        };
-        fetchTasks();
-        const pollInterval = setInterval(() => {
-          fetchTasks();
-        }, 10000);
-        return () => clearInterval(pollInterval);
-    }
-  }, [user?.id, user?.role, user?.facility_id]);
+          
+          const fetchedTasks = res.data || [];
+          setTasks(fetchedTasks);
+          
+          // Notification polling logic
+          const currentIds = new Set(fetchedTasks.map(t => t.id));
+          const currentComments = fetchedTasks.reduce((acc, t) => ({...acc, [t.id]: parseInt(t.comments_count || 0)}), {});
+          let prevIds = new Set();
+          let prevComments = {};
+          try {
+              const storedIds = sessionStorage.getItem('taskflow_prev_ids');
+              if (storedIds) prevIds = new Set(JSON.parse(storedIds));
+              const storedComments = sessionStorage.getItem('taskflow_prev_comments');
+              if (storedComments) prevComments = JSON.parse(storedComments);
+          } catch (e) {}
+          
+          if ((prevIds.size > 0 || Object.keys(prevComments).length > 0) && user) {
+              fetchedTasks.forEach(task => {
+                  const myNames = [String(user.name).toLowerCase(), String(user.username).toLowerCase(), '@' + String(user.username).toLowerCase()];
+                  let isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
+                  
+                  if (!isAssignedToMe) {
+                      const isVP = user?.role === 'VICE_PRESIDENT';
+                      const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
+                      const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
+                      const rawFac = user?.facility_code || user?.facility_id || '';
+                      const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
+                      const tFacCode = String(task?.facilityId || task?.facility || '').toLowerCase();
+                      const tFacName = String(task?.facility || '').toLowerCase();
+                      
+                      if (isDeptHead) {
+                          if (filterTaskForDeptHead(task, user, deptId)) {
+                              isAssignedToMe = true;
+                          }
+                      } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+                          if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
+                              isAssignedToMe = true;
+                          }
+                      }
+                  }
+                  
+                  if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
+                      if (!prevIds.has(task.id) && task.status === 'todo') {
+                          const newNotif = {
+                              title: 'Công việc mới',
+                              message: 'Bạn được giao công việc: ' + task.title,
+                              time: new Date().toLocaleTimeString('vi-VN')
+                          };
+                          const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+                          localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
+                          window.dispatchEvent(new Event('taskflow_notify'));
+                          setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
+                      }
+                  }
+                  
+                  const prevC = prevComments[task.id] || 0;
+                  const currC = parseInt(task.comments_count || 0);
+                  if (currC > prevC && task.latest_comment) {
+                      const lc = task.latest_comment.toLowerCase();
+                      const isMentioned = myNames.some(n => lc.includes(n)) || lc.includes('@all') || lc.includes('@tất cả') || (lc.includes('@ban giám đốc') && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role));
+                      if (isMentioned && String(task.latest_comment_user_id) !== String(user.id)) {
+                          const newNotif = {
+                              title: 'Nhắc tên (@)',
+                              message: 'Bạn được nhắc đến trong bình luận của công việc: ' + task.title,
+                              time: new Date().toLocaleTimeString('vi-VN')
+                          };
+                          const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+                          localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
+                          window.dispatchEvent(new Event('taskflow_notify'));
+                          setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
+                      }
+                  }
+              });
+          }
+          sessionStorage.setItem('taskflow_prev_ids', JSON.stringify(Array.from(currentIds)));
+          sessionStorage.setItem('taskflow_prev_comments', JSON.stringify(currentComments));
+        } catch (error) {
+          console.error("Lỗi tải tasks:", error);
+          showToast('Lỗi kết nối khi lấy dữ liệu');
+        } finally {
+          isFetchingTasks.current = false;
+        }
+    };
+
+    fetchTasks();
+    const pollInterval = setInterval(() => {
+        if (!isFetchingTasks.current) {
+            fetchTasks();
+        }
+    }, 10000);
+    return () => clearInterval(pollInterval);
+  }, [user?.id]);
 
   const fetchFacilityStatuses = async () => {
     try {
