@@ -2904,7 +2904,28 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 });
 
 // --- BẮT ĐẦU KHỐI CODE AI CHAT STREAM ---
-console.log("=== BINGO! ROUTE AI STREAM ĐÃ ĐƯỢC LOAD VÀO SERVER ===");
+
+// Viết một hàm helper phân tích ý định bằng LLM
+async function parseUserIntent(message) {
+    try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                response_format: { type: "json_object" },
+                messages: [{ 
+                    role: "system", 
+                    content: "Bạn là hệ thống trích xuất dữ liệu. Hãy phân tích câu hỏi của người dùng và trả về JSON chuẩn xác: { 'intent': 'revenue' | 'task' | 'hr' | 'attendance' | 'general', 'org_unit': 'tên cơ sở (nếu có)', 'month': 'số tháng (nếu có)' }. Ví dụ: 'dt db41 t5' -> {'intent':'revenue', 'org_unit':'db41', 'month':'05'}."
+                }, { role: "user", content: message }]
+            })
+        });
+        const data = await response.json();
+        return JSON.parse(data.choices[0].message.content);
+    } catch (e) { return { intent: 'general' }; }
+}
+
+console.log("=== BINGO! ROUTE AI STREAM ĐĐƯỢC LOAD VÀO SERVER ===");
 app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
   // 1. THIẾT LẬP HEADER CHUẨN SSE
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -2945,13 +2966,15 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     userMsgId = userMsgResult.rows[0].id;
 
     // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
-    let systemContext = "Bạn là Master AI Cố vấn của hệ thống HubDB. VỀ MẶT SỐ LIỆU VÀ TÌNH TRẠNG CƠ SỞ, BẮT BUỘC chỉ sử dụng các dữ liệu nội bộ được cung cấp dưới đây. VỀ MẶT CHIẾN LƯỢC VÀ GIẢI PHÁP, hãy tự do sử dụng kiến thức quản trị chuyên sâu của bạn để phân tích, kết nối các dữ kiện, chỉ ra điểm nghẽn và đưa ra lời khuyên thực tế nhất cho sếp.\n\n";
+    let systemContext = "Bạn là Master AI Cố vấn của hệ thống HubDB. VỀ MẶT SỐ LIỆU VÀ TÌNH TRẠNG CƠ SỞ, BẮT BUỘC chỉ sử dụng các dữ liệu nội bộ được cung cấp dưới đây. VỀ MẶT CHIẾN LƯỢC VÀ GIẢI PHÁP, hãy tự do sử dụng kiến thức quản trị chuyên sâu của bạn để phân tích, kết nối các dữ kiện, chỉ ra điểm nghẽn và đưa ra lời khuyên thực tế nhất cho sếp. Về số liệu, tuân thủ tuyệt đối. Về phong cách: Đọc vị ngữ cảnh sếp. Hỏi số liệu nhanh -> Trả lời siêu ngắn gọn. Hỏi phân tích -> Bung lụa chiến lược.\n\n";
     let hasData = false;
     const lowerMsg = message.toLowerCase();
 
     try {
+        const intentData = await parseUserIntent(message);
+
         // Quét từ khóa Công việc (Tasks)
-        if (lowerMsg.includes('task') || lowerMsg.includes('công việc') || lowerMsg.includes('trễ')) {
+        if (intentData.intent === 'task') {
             const { rows } = await pool.query("SELECT status, COUNT(*) as count FROM tasks GROUP BY status");
             const taskData = rows.map(r => `[${r.status}: ${r.count} task]`).join(', ');
             systemContext += `- Tình trạng công việc hiện tại: ${taskData}.\n`;
@@ -2959,20 +2982,17 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         }
         
         // Quét từ khóa Nhân sự / User
-        if (lowerMsg.includes('nhân sự') || lowerMsg.includes('người dùng') || lowerMsg.includes('nhân viên')) {
+        if (intentData.intent === 'hr') {
             const { rows } = await pool.query("SELECT COUNT(*) as count FROM users");
             systemContext += `- Tổng số nhân sự hệ thống: ${rows[0].count} người.\n`;
             hasData = true;
         }
 
-        // 3. Quét từ khóa Doanh thu / Tài chính / Báo cáo chung (Dynamic JSONB mở rộng)
-        if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || 
-            lowerMsg.includes('báo cáo') || lowerMsg.includes('tình hình') || 
-            lowerMsg.includes('tổng quan') || lowerMsg.includes('kết quả') ||
-            lowerMsg.match(/(db[a-z0-9]+)/i)) {
+        // 3. Quét từ khóa Doanh thu / Tài chính
+        if (intentData.intent === 'revenue') {
             // Khai báo Limit động
             let recordLimit = 7; // Mặc định hỏi chung chung thì lấy 7 ngày (1 tuần)
-            if (lowerMsg.includes('tháng')) recordLimit = 31;
+            if (lowerMsg.includes('tháng') || intentData.month) recordLimit = 31;
             if (lowerMsg.includes('quý')) recordLimit = 90;
             if (lowerMsg.includes('năm')) recordLimit = 365;
 
@@ -2981,16 +3001,14 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             const queryParams = [];
             
             // Bắt từ khóa Cơ sở (ví dụ db41, dbace) bằng cách ép kiểu data sang text để tìm kiếm
-            const matchOrg = lowerMsg.match(/(db[a-z0-9]+)/i);
-            if (matchOrg) {
-                queryParams.push(`%${matchOrg[1].toLowerCase()}%`);
+            if (intentData.org_unit) {
+                queryParams.push(`%${intentData.org_unit.toLowerCase()}%`);
                 queryStr += ` AND lower(data::text) LIKE $${queryParams.length}`;
             }
             
             // Bắt từ khóa Tháng (tháng 5, tháng 05)
-            const matchMonth = lowerMsg.match(/tháng (\d+)/i);
-            if (matchMonth) {
-                const monthStr = matchMonth[1].padStart(2, '0');
+            if (intentData.month) {
+                const monthStr = String(intentData.month).padStart(2, '0');
                 queryParams.push(`%/${monthStr}/%`);
                 queryParams.push(`%-${monthStr}-%`);
                 queryStr += ` AND (date LIKE $${queryParams.length - 1} OR date LIKE $${queryParams.length})`;
@@ -3010,7 +3028,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         }
 
         // Quét từ khóa Check-in / Điểm danh
-        if (lowerMsg.includes('check-in') || lowerMsg.includes('checkin') || lowerMsg.includes('điểm danh') || lowerMsg.includes('chấm công')) {
+        if (intentData.intent === 'attendance') {
             const todayStr = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
             const { rows } = await pool.query(
                 "SELECT org_unit, COUNT(*) as count FROM daily_logs WHERE entry_type = 'Attendance' AND date = $1 GROUP BY org_unit",

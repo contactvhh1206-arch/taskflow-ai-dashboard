@@ -407,7 +407,7 @@ export default function AIAdvisor(props) {
                    )}
                  </div>
               )}
-              <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm">{msg?.content || "⚠️ Lỗi hiển thị tin nhắn"}</ReactMarkdown>
+              <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm">{msg?.content ?? "⚠️ Lỗi hiển thị tin nhắn"}</ReactMarkdown>
             </div>
           </div>
         ))}
