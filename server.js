@@ -123,6 +123,27 @@ const initDB = async () => {
       chat_log JSONB,
       timestamp BIGINT
     )`);
+
+    // =========================================
+    // MIGRATION BẢNG AI CHAT MESSAGES & SESSIONS
+    // =========================================
+    try {
+      await pool.query(`ALTER TABLE ai_chat_sessions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS ai_chat_messages (
+          id SERIAL PRIMARY KEY,
+          session_id VARCHAR(255) REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+          role VARCHAR(50) NOT NULL,
+          content TEXT NOT NULL,
+          tool_calls JSONB DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_session ON ai_chat_messages(session_id, created_at ASC);`);
+      console.log('Migration Success: ai_chat_messages & metadata applied.');
+    } catch (error) {
+      console.error('Migration Failed for AI Chat Memory:', error);
+    }
     
     // =========================================
     // KÃCH HOáº T VECTOR VÃ€ Báº¢NG RAG (KNOWLEDGE BASE)
@@ -2439,6 +2460,36 @@ async function getConversationContext(sessionId, userId) {
         throw error;
     }
 }
+
+// ==========================================
+// API LẤY LỊCH SỬ CHAT (Chỉ lấy Messages)
+// ==========================================
+app.get('/api/ai/chat-sessions/:id/messages', authenticateUser, async (req, res) => {
+    try {
+        const sessionId = req.params.id;
+        const checkSession = await pool.query(
+            "SELECT id FROM ai_chat_sessions WHERE id = $1 AND user_id = $2", 
+            [sessionId, req.user.id]
+        );
+        
+        if (checkSession.rowCount === 0) {
+            return res.status(403).json({ error: "Lỗi phân quyền: Phiên làm việc không tồn tại hoặc không thuộc về bạn." });
+        }
+
+        const { rows: messages } = await pool.query(
+            `SELECT role, content, tool_calls, created_at 
+             FROM ai_chat_messages 
+             WHERE session_id = $1 
+             ORDER BY created_at ASC`,
+            [sessionId]
+        );
+
+        res.json({ success: true, data: messages });
+    } catch (error) {
+        console.error("Lỗi lấy lịch sử chat:", error);
+        res.status(500).json({ error: "Lỗi máy chủ khi lấy dữ liệu chat." });
+    }
+});
 
 app.post('/api/ai/chat', authenticateUser, async (req, res) => {
     try {

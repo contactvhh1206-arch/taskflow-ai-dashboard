@@ -197,54 +197,57 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
         return () => clearTimeout(timer);
       }, [tasks, user, timeFilter, user?.facility_id, user?.facility_name, globalFacilityFilter, localFacFilter]);
 
-      // --- NEW AI PING ENGINE (NODE API CALL) ---
+      // --- BƯỚC 1 & 2: ENGINE AI PING GỌI BATCH API VỀ NODE.JS (VÁ BỞI HUBDB 333) ---
       useEffect(() => {
         if (!hasPinged.current && urgentTasks.length > 0) {
-          hasPinged.current = true; // Khóa ngay lập tức, ngăn chặn Infinite Loop
+          hasPinged.current = true; 
           
-          const callAiPing = async () => {
+          const callAiPingBatch = async () => {
             const topUrgent = urgentTasks.slice(0, 3);
-            const pingPromises = topUrgent.map(async (t, idx) => {
-              try {
-                const token = localStorage.getItem('token') || localStorage.getItem('taskflow_token');
-                const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/ai/ping`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                  },
-                  body: JSON.stringify({ taskId: t.id })
-                });
-                
-                if (res.ok) {
-                  const data = await res.json();
-                  if (data.success) {
-                    return {
-                      id: `ping-${t.id}-${idx}`,
-                      task: t,
-                      message: data.data.generated_message,
-                      time: 'Vừa xong'
-                    };
-                  }
-                }
-              } catch (e) {
-                console.error('Lỗi gọi AI Ping từ Node:', e);
-              }
-              
-              // Fallback tĩnh khi mạng lỗi (Không call AI trực tiếp từ React)
-              return {
-                id: `ping-${t.id}-${idx}-fallback`,
-                task: t,
-                message: `Hệ thống: Công việc "${t.title}" đang tới hạn. Cần đẩy nhanh tiến độ.`,
-                time: 'Vừa xong'
-              };
-            });
+            const taskIds = topUrgent.map(t => t.id); // Chỉ lấy mảng ID gửi đi
             
-            const results = await Promise.all(pingPromises);
-            setAiPings(results);
+            try {
+              const token = localStorage.getItem('token') || localStorage.getItem('taskflow_token');
+              
+              // CHỈ GỌI 1 LẦN DUY NHẤT VỚI MẢNG taskIds
+              const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/ai/ping-batch`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ taskIds }) 
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                if (data.success && data.data) {
+                  // Map kết quả trả về từ Backend vào UI
+                  const formattedPings = data.data.map((pingRes, idx) => ({
+                    id: `ping-${pingRes.taskId}-${idx}`,
+                    task: topUrgent.find(t => t.id === pingRes.taskId) || topUrgent[0],
+                    message: pingRes.generated_message,
+                    time: 'Vừa xong'
+                  }));
+                  setAiPings(formattedPings);
+                  return; // Thành công thì thoát
+                }
+              }
+            } catch (e) {
+              console.error('Lỗi gọi Batch AI Ping từ Node:', e);
+            }
+            
+            // FALLBACK NẾU LỖI MẠNG (Chỉ chạy khi Try/Catch thất bại)
+            const fallbackPings = topUrgent.map((t, idx) => ({
+              id: `ping-${t.id}-${idx}-fallback`,
+              task: t,
+              message: `Hệ thống: Công việc "${t.title}" đang tới hạn. Cần đẩy nhanh tiến độ.`,
+              time: 'Vừa xong'
+            }));
+            setAiPings(fallbackPings);
           };
           
-          callAiPing();
+          callAiPingBatch();
         }
       }, [urgentTasks]);
       // ------------------------------------------

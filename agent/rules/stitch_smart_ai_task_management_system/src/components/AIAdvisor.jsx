@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { fetchHistory, fetchAiSessions, saveAiSession, streamAIChat } from '../services/dataService.js';
 
 export default function AIAdvisor(props) {
@@ -16,6 +17,8 @@ export default function AIAdvisor(props) {
   } catch(e) {}
   
   const [query, setQuery] = useState('');
+  const [streamingText, setStreamingText] = useState('');
+  const abortControllerRef = useRef(null);
   const currentSessionIdRef = React.useRef(activeSessionId);
   const isInitialMount = React.useRef(true);
 
@@ -70,77 +73,30 @@ export default function AIAdvisor(props) {
 
   React.useEffect(() => {
     currentSessionIdRef.current = activeSessionId;
-    if (activeSessionId) {
-       const sessions = JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]');
-       const session = sessions.find(s => s.id === activeSessionId);
-       if (session) {
-         setChatLog(session.chatLog || []);
-       }
-    } else {
+    if (!activeSessionId) {
        setChatLog(defaultLog);
+       return;
     }
+    const loadHistory = async () => {
+        try {
+            const token = localStorage.getItem('taskflow_token');
+            const res = await fetch('/api/ai/chat-sessions/' + activeSessionId + '/messages', {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            const data = await res.json();
+            if (data.success && data.data.length > 0) {
+                setChatLog(data.data.map(m => ({ role: m.role, content: m.content })));
+            } else {
+                setChatLog(defaultLog);
+            }
+        } catch (err) {
+            console.error("Lỗi tải lịch sử chat:", err);
+        }
+    };
+    loadHistory();
   }, [activeSessionId, user?.role]);
 
-  React.useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    if (chatLog.length === 0) return;
-    if (chatLog.length === 1 && chatLog[0].role === 'ai' && user?.role === 'FACILITY_MANAGER') return;
-
-    let sessions = JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]');
-    let currentId = currentSessionIdRef.current;
-    
-    if (!currentId) {
-      currentId = 'session_' + Date.now();
-      currentSessionIdRef.current = currentId;
-      
-      const title = chatLog.find(m => m.role === 'user')?.content?.substring(0, 30) || 'Phiên AI mới';
-      sessions.unshift({
-        id: currentId,
-        userId: user?.username || user?.id,
-        title: title,
-        chatLog: chatLog,
-        timestamp: Date.now()
-      });
-      if (onSessionCreated) onSessionCreated(currentId);
-    } else {
-      const idx = sessions.findIndex(s => s.id === currentId);
-      if (idx !== -1) {
-        sessions[idx].chatLog = chatLog;
-        sessions[idx].timestamp = Date.now();
-      } else {
-        const title = chatLog.find(m => m.role === 'user')?.content?.substring(0, 30) || 'Phiên AI mới';
-        sessions.unshift({
-          id: currentId,
-          userId: user?.username || user?.id,
-          title: title,
-          chatLog: chatLog,
-          timestamp: Date.now()
-        });
-      }
-    }
-    
-    localStorage.setItem('taskflow_ai_sessions', JSON.stringify(sessions));
-    if (onSessionUpdate) {
-      onSessionUpdate(sessions);
-    }
-    
-    // Đồng bộ lên backend (Global Memory)
-    try {
-      const currentSessionData = sessions.find(s => s.id === currentId);
-      if (currentSessionData) {
-         const token = localStorage.getItem('taskflow_token');
-         if (token) {
-            saveAiSession({
-               ...currentSessionData,
-               facility: user?.facilityName || user?.facility_id || 'HQ'
-            }, token, user?.role, user?.facility_id);
-         }
-      }
-    } catch (e) {}
-  }, [chatLog, user?.id, onSessionUpdate]);
+  // Removed localStorage logic - Using Backend API exclusively
   const [isTyping, setIsTyping] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [attachment, setAttachment] = useState(null);
@@ -288,52 +244,52 @@ export default function AIAdvisor(props) {
       const token = localStorage.getItem('taskflow_token');
       const sessionId = currentSessionIdRef.current;
       
-      // Tạo trước một tin nhắn AI trống trong State để hứng luồng Stream
-      setChatLog(prev => [...prev, { role: 'ai', content: '' }]);
+      abortControllerRef.current = new AbortController();
+      setStreamingText("");
+      setIsTyping(true);
 
-      // Đẩy việc xử lý AI cho Backend thông qua hàm streamAIChat
-      await streamAIChat(
-          userQuery,
-          sessionId,
-          token,
-          (chunkText) => {
-              // onChunk chuẩn kiến trúc React Immutability
-              setChatLog(prev => {
-                  const newLog = [...prev];
-                  const lastIndex = newLog.length - 1;
-                  const lastMsg = newLog[lastIndex];
-                  
-                  if (lastMsg && lastMsg.role === 'ai') {
-                      // Tạo hẳn một Object mới, copy các thuộc tính cũ và cộng dồn content
-                      newLog[lastIndex] = { 
-                          ...lastMsg, 
-                          content: lastMsg.content + chunkText 
-                      };
+      const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ message: userQuery, session_id: sessionId }),
+          signal: abortControllerRef.current.signal
+      });
+
+      if (!res.ok) throw new Error("Lỗi máy chủ");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let tempStreamingText = "";
+
+      while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+          for (const line of lines) {
+              if (line.replace(/^data: /, '').trim() === '[DONE]') {
+                  setChatLog(prev => [...prev, { role: 'ai', content: tempStreamingText }]);
+                  setStreamingText("");
+                  setIsTyping(false);
+                  abortControllerRef.current = null;
+                  return;
+              }
+
+              if (line.startsWith('data: ')) {
+                  try {
+                      const parsed = JSON.parse(line.slice(6));
+                      if (parsed.error) throw new Error(parsed.error);
+                      
+                      tempStreamingText += parsed.text || "";
+                      setStreamingText(tempStreamingText); 
+                  } catch (e) {
+                      console.warn("Parse stream chunk error", e);
                   }
-                  return newLog;
-              });
-          },
-          () => {
-              // onDone
-              setIsTyping(false);
-          },
-          (errorMsg) => {
-              // onError: Xử lý hiển thị thông báo lỗi ngay trong luồng chat
-              console.error("Lỗi AI stream:", errorMsg);
-              setChatLog(prev => {
-                  const newLog = [...prev];
-                  const lastIndex = newLog.length - 1;
-                  // Ghi đè tin nhắn đang stream dở bằng thông báo lỗi màu đỏ
-                  newLog[lastIndex] = { 
-                      role: 'ai', 
-                      content: `[HỆ THỐNG TỪ CHỐI]: ${errorMsg}`,
-                      isError: true 
-                  };
-                  return newLog;
-              });
-              setIsTyping(false);
+              }
           }
-      );
+      }
     } catch (err) {
       console.error("AI Error:", err);
       setChatLog(prev => [...prev, { role: 'ai', content: `Xin lỗi, đã xảy ra lỗi khi kết nối (${err.message}).` }]);
@@ -389,16 +345,23 @@ export default function AIAdvisor(props) {
                    )}
                  </div>
               )}
-              <p className="whitespace-pre-line leading-relaxed">{msg.content}</p>
+              <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm">{msg.content}</ReactMarkdown>
             </div>
           </div>
         ))}
-        {isTyping && (
+        {isTyping && !streamingText && (
           <div className="flex justify-start">
             <div className="bg-surface-container dark:bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-outline-variant dark:border-gray-700 flex gap-2 items-center h-12">
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce"></div>
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce delay-100"></div>
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce delay-200"></div>
+            </div>
+          </div>
+        )}
+        {isTyping && streamingText && (
+          <div className="flex justify-start">
+            <div className="max-w-[80%] p-4 rounded-2xl text-sm bg-surface-container dark:bg-[#2a2a2a] dark:text-white rounded-tl-none border border-outline-variant dark:border-gray-700">
+               <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm">{streamingText}</ReactMarkdown>
             </div>
           </div>
         )}
@@ -476,6 +439,19 @@ export default function AIAdvisor(props) {
             <span className="material-symbols-outlined text-[20px]">{isRecording ? 'mic' : 'mic_none'}</span>
             {isRecording && <span className="absolute inset-0 rounded-full border border-error animate-ping opacity-50"></span>}
           </button>
+          {isTyping && abortControllerRef.current && (
+             <button onClick={() => {
+                 if (abortControllerRef.current) {
+                     abortControllerRef.current.abort();
+                     abortControllerRef.current = null;
+                     if (streamingText.trim()) {
+                         setChatLog(prev => [...prev, { role: 'ai', content: streamingText + "\n\n*[ĐÃ NGẮT BỞI NGƯỜI DÙNG]*" }]);
+                         setStreamingText("");
+                     }
+                     setIsTyping(false);
+                 }
+             }} className="mr-2 text-xs text-red-500 font-bold border border-red-500 rounded px-2 hover:bg-red-50 dark:hover:bg-red-900/20">DỪNG</button>
+          )}
           <input type="text" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAsk()} placeholder="Ví dụ: So sánh hiệu suất trực ca của Cơ sở 1 và Cơ sở 2..." className="flex-1 min-w-0 bg-surface-container dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl pl-[5.5rem] pr-4 py-3 outline-none focus:ring-2 focus:ring-secondary text-sm dark:text-white transition-all shadow-inner relative" />
           <button onClick={handleAsk} disabled={(!query.trim() && !attachment) || isTyping} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
             <span className="material-symbols-outlined">send</span> <span className="hidden sm:inline">Gửi</span>
