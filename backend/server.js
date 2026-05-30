@@ -2948,13 +2948,94 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     res.end();
   });
 
+  let userMsgId = null; // Khai báo ngoài try-catch để rollback trong catch
+
   try {
     const { message, session_id } = req.body;
+    const user_id = req.user.id;
     
-    // (Khung trống chờ xử lý logic AI/DB)
+    if (!message || !session_id) {
+        throw new Error("Thiếu message hoặc session_id");
+    }
+
+    // 1. LƯU TIN NHẮN USER & GIỮ LẠI ID ĐỂ ROLLBACK
+    const userMsgResult = await pool.query(
+      `INSERT INTO ai_chat_messages (session_id, user_id, sender_type, message) VALUES ($1, $2, 'USER', $3) RETURNING id`,
+      [session_id, user_id, message]
+    );
+    userMsgId = userMsgResult.rows[0].id;
+
+    // 2. GỌI API OPENROUTER (CHỈ TEST STREAM CƠ BẢN)
+    const openRouterResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        stream: true,
+        messages: [{ role: "user", content: message }]
+      })
+    });
+
+    if (!openRouterResponse.ok) {
+      throw new Error(`Lỗi từ OpenRouter: ${openRouterResponse.status}`);
+    }
+
+    // 3. STREAM & GOM TEXT
+    let fullAiResponse = "";
+    
+    for await (const chunk of openRouterResponse.body) {
+      const textChunk = chunk.toString('utf-8');
+      const lines = textChunk.split('\n').filter(line => line.trim() !== '');
+      
+      for (const line of lines) {
+        if (line === 'data: [DONE]') continue;
+        if (line.startsWith('data: ')) {
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            const chunkText = parsed.choices[0]?.delta?.content || "";
+            
+            if (chunkText) {
+              fullAiResponse += chunkText;
+              res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+            }
+          } catch (e) {
+            console.warn("Parse error:", e);
+          }
+        }
+      }
+    }
+
+    // 4. LƯU TIN NHẮN AI & KẾT THÚC RESPONSE
+    res.write('data: [DONE]\n\n');
+
+    if (fullAiResponse) {
+      await pool.query(
+        `INSERT INTO ai_chat_messages (session_id, user_id, sender_type, message) VALUES ($1, $2, 'AI', $3)`,
+        [session_id, user_id, fullAiResponse]
+      );
+    }
+
+    res.end();
 
   } catch (error) {
     console.error("Lỗi AI Chat Stream:", error);
+    
+    // XỬ LÝ NGOẠI LỆ (ROLLBACK): Đánh dấu lỗi nếu có ID tin nhắn User
+    if (userMsgId) {
+      try {
+        await pool.query(
+          `UPDATE ai_chat_messages SET is_error = true WHERE id = $1`,
+          [userMsgId]
+        );
+        console.log(`Đã rollback (đánh dấu is_error = true) cho tin nhắn User ID: ${userMsgId}`);
+      } catch (dbError) {
+        console.error("Lỗi khi update is_error:", dbError);
+      }
+    }
+
     res.write(`data: ${JSON.stringify({ error: "Lỗi máy chủ" })}\n\n`);
     res.end();
   }
