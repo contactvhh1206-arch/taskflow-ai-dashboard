@@ -10,8 +10,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
       const [isLoading, setIsLoading] = useState(false);
       const [localFacFilter, setLocalFacFilter] = useState('ALL');
       const [facilitiesList] = useState(() => JSON.parse(localStorage.getItem('taskflow_facilities') || '[]'));
-      const hasPinged = useRef(false); // Khóa vòng lặp useEffect (Chống Spam AI Ping)
-
+      const hasPingedAI = useRef(false); // 1. Tạo cờ khóa vĩnh viễn cho session hiện tại
       const handleRequestSupport = async (taskId) => {
         try {
           const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/support`, {
@@ -207,59 +206,71 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
          loadRecentLogs();
       }, [user?.id, user?.role, user?.department_id, user?.username, user?.facility_id, globalFacilityFilter]);
 
-      // --- BƯỚC 1 & 2: ENGINE AI PING GỌI BATCH API VỀ NODE.JS (VÁ BỞI HUBDB 333) ---
+      // --- BƯỚC 1 & 2: ENGINE AI PING GỌI BATCH API VỀ NODE.JS ---
       useEffect(() => {
-        if (!hasPinged.current && urgentTasks.length > 0) {
-          hasPinged.current = true; 
+        // 2. Kiểm tra điều kiện: Nếu chưa có tasks, user, hoặc ĐÃ PING RỒI thì dừng ngay!
+        if (!user?.id || !tasks || tasks.length === 0 || hasPingedAI.current) return;
+
+        const runAIPing = async () => {
+          // 3. Khóa chết cờ NGAY LẬP TỨC trước khi gọi API
+          hasPingedAI.current = true; 
           
-          const callAiPingBatch = async () => {
-            const topUrgent = urgentTasks.slice(0, 3);
-            const taskIds = topUrgent.map(t => t.id); // Chỉ lấy mảng ID gửi đi
+          try {
+            console.log("[OpenRouter API Call] System Prompt Ping...");
             
-            try {
-              const token = localStorage.getItem('token') || localStorage.getItem('taskflow_token');
-              
-              // CHỈ GỌI 1 LẦN DUY NHẤT VỚI MẢNG taskIds
-              const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/ai/ping-batch`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ taskIds }) 
-              });
-              
-              if (res.ok) {
-                const data = await res.json();
-                if (data.success && data.data) {
-                  // Map kết quả trả về từ Backend vào UI
-                  const formattedPings = data.data.map((pingRes, idx) => ({
-                    id: `ping-${pingRes.taskId}-${idx}`,
-                    task: topUrgent.find(t => t.id === pingRes.taskId) || topUrgent[0],
-                    message: pingRes.generated_message,
-                    time: 'Vừa xong'
-                  }));
-                  setAiPings(formattedPings);
-                  return; // Thành công thì thoát
-                }
+            const topUrgent = tasks.filter(t => t?.status !== 'done' && t?.status !== 'revoked' && (t?.urgent || t?.pinned)).slice(0, 3);
+            if (topUrgent.length === 0) return;
+            
+            const taskIds = topUrgent.map(t => t.id);
+            const token = localStorage.getItem('token') || localStorage.getItem('taskflow_token');
+            
+            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/ai/ping-batch`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ taskIds }) 
+            });
+            
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success && data.data) {
+                const formattedPings = data.data.map((pingRes, idx) => ({
+                  id: `ping-${pingRes.taskId}-${idx}`,
+                  task: topUrgent.find(t => t.id === pingRes.taskId) || topUrgent[0],
+                  message: pingRes.generated_message,
+                  time: 'Vừa xong'
+                }));
+                setAiPings(formattedPings);
+                return;
               }
-            } catch (e) {
-              console.error('Lỗi gọi Batch AI Ping từ Node:', e);
             }
-            
-            // FALLBACK NẾU LỖI MẠNG (Chỉ chạy khi Try/Catch thất bại)
-            const fallbackPings = topUrgent.map((t, idx) => ({
+          } catch (error) {
+             console.error("Lỗi AI Ping:", error);
+          }
+          
+          // FALLBACK NẾU LỖI MẠNG HOẶC API THẤT BẠI
+          const topUrgent = tasks.filter(t => t?.status !== 'done' && t?.status !== 'revoked' && (t?.urgent || t?.pinned)).slice(0, 3);
+          const fallbackPings = topUrgent.map((t, idx) => {
+            const prompts = JSON.parse(localStorage.getItem('taskflow_system_prompts') || '{}');
+            const empatheticPingTemplate = prompts.empatheticPing || 'Tôi thấy công việc "[TASK_TITLE]" đang tới hạn. Bạn có cần hỗ trợ điều phối thêm nhân sự không? Đừng quá áp lực nhé!';
+            const msg = empatheticPingTemplate.replace("[TASK_TITLE]", t.title);
+            console.log("[OpenRouter API Call] System Prompt Ping:", msg);
+            return {
               id: `ping-${t.id}-${idx}-fallback`,
               task: t,
-              message: `Hệ thống: Công việc "${t.title}" đang tới hạn. Cần đẩy nhanh tiến độ.`,
+              message: msg,
               time: 'Vừa xong'
-            }));
-            setAiPings(fallbackPings);
-          };
-          
-          callAiPingBatch();
-        }
-      }, [urgentTasks]);
+            };
+          });
+          setAiPings(fallbackPings);
+        };
+
+        // Chạy hàm
+        runAIPing();
+
+      }, [user?.id, tasks]);
       // ------------------------------------------
       if (isLoading) {
         return (
