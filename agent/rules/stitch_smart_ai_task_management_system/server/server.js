@@ -652,52 +652,87 @@ const calculateTone = (deadlineDateStr) => {
 // API: KÃ­ch hoáº¡t AI Ping Ä‘Ã´n Ä‘á»‘c cÃ´ng viá»‡c
 
 app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
   try {
     const { message, session_id } = req.body;
     
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+    // 1. DB-FIRST: Lưu ngay tin nhắn User vào Database
+    await pool.query(
+      `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+      [session_id, 'user', message]
+    );
 
-    const systemPrompt = `Báº¡n lÃ  Trá»£ lÃ½ AI Cá»‘ váº¥n. HÃ£y tÆ° vÃ¢n ngáº¯n gá» n vÃ  tháº¥u cáº£m.`; 
+    // 2. Tải Context (20 tin nhắn gần nhất để AI nhớ bối cảnh)
+    const { rows: history } = await pool.query(
+      `SELECT role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      [session_id]
+    );
+    const context = history.reverse().map(r => ({ role: r.role === 'ai' ? 'assistant' : r.role, content: r.content }));
 
+    const systemPrompt = `Bạn là Trợ lý AI TaskFlow.`; 
+    const finalMessages = [{ role: "system", content: systemPrompt }, ...context];
+
+    // 3. Gọi OpenRouter
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3-8b-instruct",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message }
-        ],
+        model: "google/gemini-2.5-flash", // Hoặc model Sếp đang dùng
+        messages: finalMessages,
         stream: true
       })
     });
 
-    if (!response.ok) {
-      res.write(`data: ${JSON.stringify({ error: "Lá»—i OpenRouter" })}\n\n`);
-      return res.end();
-    }
-
+    // 4. PARSING LUỒNG CHUẨN XÁC
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
+    let aiFullResponse = "";
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) {
-        res.write("data: [DONE]\n\n");
-        break;
-      }
+      if (done) break;
+      
       const chunk = decoder.decode(value, { stream: true });
-      res.write(chunk);
+      const lines = chunk.split('\n').filter(line => line.trim() !== '');
+      
+      for (const line of lines) {
+        if (line === 'data: [DONE]') continue;
+        if (line.startsWith('data: ')) {
+          try {
+            // Bóc tách chunk của OpenRouter
+            const parsed = JSON.parse(line.slice(6));
+            const tokenText = parsed.choices[0]?.delta?.content || "";
+            
+            aiFullResponse += tokenText;
+            // Đóng gói lại thành format JSON chuấn mà Frontend đang mong đợi: { text: "..." }
+            res.write(`data: ${JSON.stringify({ text: tokenText })}\n\n`);
+          } catch (e) {
+            console.warn("Parse error:", e);
+          }
+        }
+      }
     }
+
+    // 5. DB-SAVE: Lưu kết quả của AI vào Database
+    if (aiFullResponse) {
+       await pool.query(
+         `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+         [session_id, 'assistant', aiFullResponse]
+       );
+    }
+
+    res.write("data: [DONE]\n\n");
     res.end();
+
   } catch (error) {
-    console.error("Lá»—i AI Chat Stream:", error);
-    res.write(`data: ${JSON.stringify({ error: "Lá»—i mÃ¡y chá»§" })}\n\n`);
+    console.error("Lỗi AI Chat Stream:", error);
+    res.write(`data: ${JSON.stringify({ error: "Lỗi máy chủ" })}\n\n`);
     res.end();
   }
 });
