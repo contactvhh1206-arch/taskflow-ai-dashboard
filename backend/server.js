@@ -3001,6 +3001,39 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             systemContext += `- Phân bổ nhân sự: ${userData}.\n`;
             hasData = true;
         }
+
+        // Quét từ khóa Doanh thu / Tài chính
+        if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền')) {
+            const { rows } = await pool.query(`
+                SELECT date, SUM(total_revenue) as total 
+                FROM daily_financial_reports 
+                GROUP BY date 
+                ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT 3
+            `);
+            if (rows.length > 0) {
+                const revenueData = rows.map(r => `[Ngày ${r.date}: ${Number(r.total).toLocaleString('vi-VN')} VNĐ]`).join(', ');
+                systemContext += `- Tổng doanh thu hệ thống gần đây: ${revenueData}.\n`;
+            } else {
+                systemContext += `- Doanh thu: Chưa có dữ liệu ghi nhận.\n`;
+            }
+            hasData = true;
+        }
+
+        // Quét từ khóa Check-in / Điểm danh
+        if (lowerMsg.includes('check-in') || lowerMsg.includes('checkin') || lowerMsg.includes('điểm danh') || lowerMsg.includes('chấm công')) {
+            const todayStr = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
+            const { rows } = await pool.query(
+                "SELECT org_unit, COUNT(*) as count FROM daily_logs WHERE entry_type = 'Attendance' AND date = $1 GROUP BY org_unit",
+                [todayStr]
+            );
+            if (rows.length > 0) {
+                const checkinData = rows.map(r => `[${r.org_unit}: ${r.count} lượt]`).join(', ');
+                systemContext += `- Dữ liệu điểm danh hôm nay (${todayStr}): ${checkinData}.\n`;
+            } else {
+                systemContext += `- Điểm danh hôm nay (${todayStr}): Chưa có dữ liệu điểm danh nào được báo cáo.\n`;
+            }
+            hasData = true;
+        }
     } catch (dbErr) {
         console.error("Lỗi móc dữ liệu RAG (Bỏ qua để không sập AI):", dbErr);
     }
