@@ -2472,22 +2472,14 @@ app.get('/api/ai/chat-sessions/:id/messages', authenticateUser, async (req, res)
         }
 
         const { rows: messages } = await pool.query(
-            `SELECT id, sender_type, message, created_at 
+            `SELECT id, role, content, created_at 
              FROM ai_chat_messages 
              WHERE session_id = $1 
              ORDER BY created_at ASC`,
             [sessionId]
         );
 
-        // Data Mapping (Frontend cần { role, content })
-        const mappedMessages = messages.map(msg => ({
-            id: msg.id,
-            role: String(msg.sender_type).toLowerCase() === 'user' ? 'user' : 'ai',
-            content: msg.message,
-            created_at: msg.created_at
-        }));
-
-        res.json({ success: true, data: mappedMessages });
+        res.json({ success: true, data: messages });
     } catch (error) {
         console.error("Lỗi lấy lịch sử chat:", error);
         res.status(500).json({ error: "Lỗi máy chủ khi lấy dữ liệu chat." });
@@ -2963,8 +2955,8 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
     // 1. LƯU TIN NHẮN USER & GIỮ LẠI ID ĐỂ ROLLBACK
     const userMsgResult = await pool.query(
-      `INSERT INTO ai_chat_messages (session_id, user_id, sender_type, message) VALUES ($1, $2, 'USER', $3) RETURNING id`,
-      [session_id, user_id, message]
+      `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'user', $2) RETURNING id`,
+      [session_id, message]
     );
     userMsgId = userMsgResult.rows[0].id;
 
@@ -3016,8 +3008,8 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
     if (fullAiResponse) {
       await pool.query(
-        `INSERT INTO ai_chat_messages (session_id, user_id, sender_type, message) VALUES ($1, $2, 'AI', $3)`,
-        [session_id, user_id, fullAiResponse]
+        `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'ai', $2)`,
+        [session_id, fullAiResponse]
       );
     }
 
@@ -3030,10 +3022,10 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     if (userMsgId) {
       try {
         await pool.query(
-          `UPDATE ai_chat_messages SET is_error = true WHERE id = $1`,
+          `DELETE FROM ai_chat_messages WHERE id = $1`,
           [userMsgId]
         );
-        console.log(`Đã rollback (đánh dấu is_error = true) cho tin nhắn User ID: ${userMsgId}`);
+        console.log(`Đã rollback (xóa) tin nhắn User ID: ${userMsgId}`);
       } catch (dbError) {
         console.error("Lỗi khi update is_error:", dbError);
       }
