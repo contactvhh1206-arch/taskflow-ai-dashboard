@@ -2971,28 +2971,25 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
       })
     });
 
-    // 4. PARSING LUỒNG CHUẨN XÁC
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let aiFullResponse = "";
+    // KHÔNG DÙNG getReader() Ở NODE.JS! Dùng Async Iterator:
+    if (!response.ok) {
+        throw new Error(`Lỗi từ OpenRouter: ${response.status}`);
+    }
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n').filter(line => line.trim() !== '');
+    let aiFullResponse = "";
+    for await (const chunk of response.body) {
+      // Chunk có thể là Buffer hoặc Uint8Array, cần ép kiểu về String
+      const textChunk = chunk.toString('utf-8');
+      const lines = textChunk.split('\n').filter(line => line.trim() !== '');
       
       for (const line of lines) {
         if (line === 'data: [DONE]') continue;
         if (line.startsWith('data: ')) {
           try {
-            // Bóc tách chunk của OpenRouter
             const parsed = JSON.parse(line.slice(6));
             const tokenText = parsed.choices[0]?.delta?.content || "";
             
             aiFullResponse += tokenText;
-            // Đóng gói lại thành format JSON chuấn mà Frontend đang mong đợi: { text: "..." }
             res.write(`data: ${JSON.stringify({ text: tokenText })}\n\n`);
           } catch (e) {
             console.warn("Parse error:", e);
