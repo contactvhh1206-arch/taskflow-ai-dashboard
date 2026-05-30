@@ -1511,27 +1511,7 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
     }
   });
 
-  app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
-    try {
-      const { id, title, chat_log, timestamp } = req.body;
-      const insert_user_id = req.user.id;
-      const insert_facility = req.user.facility_id || 'ALL';
-      
-      await pool.query(
-        `INSERT INTO ai_chat_sessions (id, user_id, facility, title, chat_log, timestamp)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (id) DO UPDATE SET 
-         chat_log = EXCLUDED.chat_log, 
-         timestamp = EXCLUDED.timestamp,
-         title = EXCLUDED.title
-         WHERE ai_chat_sessions.user_id = EXCLUDED.user_id`,
-        [id, insert_user_id, insert_facility, title, JSON.stringify(chat_log || []), timestamp]
-      );
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  });
+
 
 // API: LÆ°u vÃ  láº¥y danh sÃ¡ch vi pháº¡m AI
 app.get('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) => {
@@ -2475,7 +2455,7 @@ app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
         res.status(201).json({ success: true, data: rows[0] });
     } catch (error) {
         console.error("Lỗi tạo session AI:", error);
-        res.status(500).json({ error: "Lỗi máy chủ khi tạo session." });
+        res.status(500).json({ error: error.message }); // Ép trả về lỗi thực tế
     }
 });
 
