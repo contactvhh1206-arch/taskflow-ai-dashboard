@@ -192,7 +192,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
       }
     };
     fetchUsers();
-  }, [user]);
+  }, [user?.id, user?.role, user?.facility_id, user?.facility_name]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -740,7 +740,7 @@ function MainDashboard() {
     if (user) {
       fetchDashboardStats(timeFilter);
     }
-  }, [user, timeFilter]); // Fetch when timeFilter changes
+  }, [user?.id, timeFilter]); // Fetch when timeFilter changes
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -990,7 +990,7 @@ function MainDashboard() {
         }, 10000);
         return () => clearInterval(pollInterval);
     }
-  }, [user]);
+  }, [user?.id, user?.role, user?.facility_id]);
 
   const fetchFacilityStatuses = async () => {
     try {

@@ -173,19 +173,6 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
 
             // AI Pings now handled by a separate useEffect with useRef lock to call Node API
 
-            if (window.DataService) {
-              const history = await window.DataService.fetchHistory({ entry_type: 'Operation_Log' });
-              let filteredLogs = history;
-              if (['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)) {
-                 const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (user?.username === 'marketing' ? 'MARKETING' : 'ALL'));
-                 filteredLogs = history.filter(h => h.org_unit === deptId);
-              } else {
-                 const facFilter = globalFacilityFilter === 'ALL' ? '' : globalFacilityFilter;
-                 filteredLogs = facFilter ? history.filter(h => h.org_unit === facFilter || h.org_unit === user?.facility_id) : history;
-              }
-              setRecentLogs(filteredLogs.slice(0, 10));
-            }
-
           } catch (err) {
             console.error("Dashboard calculation error:", err);
             setStats({ error: true });
@@ -195,7 +182,30 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
         }, 50); // Giảm latency ảo xuống 50ms để tối ưu tốc độ UI
 
         return () => clearTimeout(timer);
-      }, [tasks, user, timeFilter, user?.facility_id, user?.facility_name, globalFacilityFilter, localFacFilter]);
+      }, [tasks, timeFilter, user?.id, user?.facility_id, user?.facility_name, globalFacilityFilter, localFacFilter]);
+
+      // --- TÁCH LUỒNG API ĐỂ TRÁNH INFINITE LOOP ---
+      useEffect(() => {
+         const loadRecentLogs = async () => {
+            if (window.DataService) {
+              try {
+                const history = await window.DataService.fetchHistory({ entry_type: 'Operation_Log' });
+                let filteredLogs = history;
+                if (['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)) {
+                   const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (user?.username === 'marketing' ? 'MARKETING' : 'ALL'));
+                   filteredLogs = history.filter(h => h.org_unit === deptId);
+                } else {
+                   const facFilter = globalFacilityFilter === 'ALL' ? '' : globalFacilityFilter;
+                   filteredLogs = facFilter ? history.filter(h => h.org_unit === facFilter || h.org_unit === user?.facility_id) : history;
+                }
+                setRecentLogs(filteredLogs.slice(0, 10));
+              } catch (e) {
+                console.error("Error loading logs", e);
+              }
+            }
+         };
+         loadRecentLogs();
+      }, [user?.id, user?.role, user?.department_id, user?.username, user?.facility_id, globalFacilityFilter]);
 
       // --- BƯỚC 1 & 2: ENGINE AI PING GỌI BATCH API VỀ NODE.JS (VÁ BỞI HUBDB 333) ---
       useEffect(() => {
