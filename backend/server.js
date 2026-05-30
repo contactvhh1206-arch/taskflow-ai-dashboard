@@ -2472,14 +2472,22 @@ app.get('/api/ai/chat-sessions/:id/messages', authenticateUser, async (req, res)
         }
 
         const { rows: messages } = await pool.query(
-            `SELECT role, content, tool_calls, created_at 
+            `SELECT id, sender_type, message, created_at 
              FROM ai_chat_messages 
              WHERE session_id = $1 
              ORDER BY created_at ASC`,
             [sessionId]
         );
 
-        res.json({ success: true, data: messages });
+        // Data Mapping (Frontend cần { role, content })
+        const mappedMessages = messages.map(msg => ({
+            id: msg.id,
+            role: String(msg.sender_type).toLowerCase() === 'user' ? 'user' : 'ai',
+            content: msg.message,
+            created_at: msg.created_at
+        }));
+
+        res.json({ success: true, data: mappedMessages });
     } catch (error) {
         console.error("Lỗi lấy lịch sử chat:", error);
         res.status(500).json({ error: "Lỗi máy chủ khi lấy dữ liệu chat." });
