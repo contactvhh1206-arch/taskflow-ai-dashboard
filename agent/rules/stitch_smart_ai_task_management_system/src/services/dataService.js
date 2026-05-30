@@ -1,4 +1,4 @@
-const API_URL = 'https://taskflow-ai-dashboard.onrender.com/api/logs';
+import axiosClient from '../api/axiosClient';
 
 export const saveData = async ({ org_unit, entry_type, content, attachments = [], aiVectorData = '' }) => {
   const now = new Date();
@@ -6,10 +6,7 @@ export const saveData = async ({ org_unit, entry_type, content, attachments = []
   const date = now.toLocaleDateString('vi-VN');
 
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const result = await axiosClient.post('/logs', {
         org_unit,
         entry_type,
         content,
@@ -17,11 +14,8 @@ export const saveData = async ({ org_unit, entry_type, content, attachments = []
         ai_vector_data: aiVectorData,
         date,
         display_time: displayTime
-      })
     });
     
-    if (!response.ok) throw new Error('Network response was not ok');
-    const result = await response.json();
     if (result.success) {
       return { ...result.data, displayTime: result.data.display_time, aiVectorData: result.data.ai_vector_data };
     }
@@ -33,9 +27,7 @@ export const saveData = async ({ org_unit, entry_type, content, attachments = []
 
 export const fetchHistory = async (filters = {}) => {
   try {
-    const response = await fetch(API_URL);
-    if (!response.ok) throw new Error('Network response was not ok');
-    const result = await response.json();
+    const result = await axiosClient.get('/logs');
     if (result.success) {
       let filtered = result.data.map(item => ({
         ...item,
@@ -55,17 +47,9 @@ export const fetchHistory = async (filters = {}) => {
   return [];
 };
 
-export const fetchAiSessions = async (token, role, facility_id) => {
+export const fetchAiSessions = async () => {
   try {
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (role) headers['x-user-role'] = role;
-    if (facility_id) headers['x-facility-id'] = facility_id;
-
-    const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/sessions', {
-       headers
-    });
-    const result = await response.json();
+    const result = await axiosClient.get('/ai/sessions');
     if (result.success) return result.data;
   } catch (error) {
     console.error('Lỗi fetch ai sessions:', error);
@@ -73,35 +57,17 @@ export const fetchAiSessions = async (token, role, facility_id) => {
   return [];
 };
 
-export const saveAiSession = async (sessionData, token, role, facility_id) => {
+export const saveAiSession = async (sessionData) => {
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (role) headers['x-user-role'] = role;
-    if (facility_id) headers['x-facility-id'] = facility_id;
-
-    await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/sessions', {
-       method: 'POST',
-       headers,
-       body: JSON.stringify(sessionData)
-    });
+    await axiosClient.post('/ai/sessions', sessionData);
   } catch (error) {
     console.error('Lỗi save ai session:', error);
   }
 };
 
-const REPORTS_API_URL = 'https://taskflow-ai-dashboard.onrender.com/api/reports';
-
-export const fetchReports = async (token, role, facility_id) => {
+export const fetchReports = async () => {
   try {
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (role) headers['x-user-role'] = role;
-    if (facility_id) headers['x-facility-id'] = facility_id;
-
-    const response = await fetch(REPORTS_API_URL, { headers });
-    if (!response.ok) throw new Error('Failed to fetch reports');
-    const result = await response.json();
+    const result = await axiosClient.get('/reports');
     if (result.success) return result.data;
   } catch (error) {
     console.error('Lỗi lấy báo cáo doanh thu:', error);
@@ -109,20 +75,9 @@ export const fetchReports = async (token, role, facility_id) => {
   return [];
 };
 
-export const saveReport = async (reportData, token, role, facility_id) => {
+export const saveReport = async (reportData) => {
   try {
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (role) headers['x-user-role'] = role;
-    if (facility_id) headers['x-facility-id'] = facility_id;
-
-    const response = await fetch(REPORTS_API_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(reportData)
-    });
-    if (!response.ok) throw new Error('Failed to save report');
-    const result = await response.json();
+    const result = await axiosClient.post('/reports', reportData);
     return result.success;
   } catch (error) {
     console.error('Lỗi lưu báo cáo doanh thu:', error);

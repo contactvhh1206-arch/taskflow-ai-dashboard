@@ -92,7 +92,7 @@ export default function AIAdvisor(props) {
         }
     };
     loadHistory();
-  }, [activeSessionId, user?.role]);
+  }, [activeSessionId]);
 
   // Removed localStorage logic - Using Backend API exclusively
   const [isTyping, setIsTyping] = useState(false);
