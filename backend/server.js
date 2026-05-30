@@ -2965,8 +2965,11 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             hasData = true;
         }
 
-        // 3. Quét từ khóa Doanh thu / Tài chính (Dynamic JSONB)
-        if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền')) {
+        // 3. Quét từ khóa Doanh thu / Tài chính / Báo cáo chung (Dynamic JSONB mở rộng)
+        if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || 
+            lowerMsg.includes('báo cáo') || lowerMsg.includes('tình hình') || 
+            lowerMsg.includes('tổng quan') || lowerMsg.includes('kết quả') ||
+            lowerMsg.match(/(db[a-z0-9]+)/i)) {
             // Khai báo Limit động
             let recordLimit = 7; // Mặc định hỏi chung chung thì lấy 7 ngày (1 tuần)
             if (lowerMsg.includes('tháng')) recordLimit = 31;
