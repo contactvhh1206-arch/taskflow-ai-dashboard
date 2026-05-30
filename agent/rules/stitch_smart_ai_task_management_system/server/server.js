@@ -651,92 +651,6 @@ const calculateTone = (deadlineDateStr) => {
 
 // API: KÃ­ch hoáº¡t AI Ping Ä‘Ã´n Ä‘á»‘c cÃ´ng viá»‡c
 
-app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  try {
-    const { message, session_id } = req.body;
-    
-    // 1. DB-FIRST: Lưu ngay tin nhắn User vào Database
-    await pool.query(
-      `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
-      [session_id, 'user', message]
-    );
-
-    // 2. Tải Context (20 tin nhắn gần nhất để AI nhớ bối cảnh)
-    const { rows: history } = await pool.query(
-      `SELECT role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [session_id]
-    );
-    const context = history.reverse().map(r => ({ role: r.role === 'ai' ? 'assistant' : r.role, content: r.content }));
-
-    const systemPrompt = `Bạn là Trợ lý AI TaskFlow.`; 
-    const finalMessages = [{ role: "system", content: systemPrompt }, ...context];
-
-    // 3. Gọi OpenRouter
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash", // Hoặc model Sếp đang dùng
-        messages: finalMessages,
-        stream: true
-      })
-    });
-
-    // 4. PARSING LUỒNG CHUẨN XÁC
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let aiFullResponse = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n').filter(line => line.trim() !== '');
-      
-      for (const line of lines) {
-        if (line === 'data: [DONE]') continue;
-        if (line.startsWith('data: ')) {
-          try {
-            // Bóc tách chunk của OpenRouter
-            const parsed = JSON.parse(line.slice(6));
-            const tokenText = parsed.choices[0]?.delta?.content || "";
-            
-            aiFullResponse += tokenText;
-            // Đóng gói lại thành format JSON chuấn mà Frontend đang mong đợi: { text: "..." }
-            res.write(`data: ${JSON.stringify({ text: tokenText })}\n\n`);
-          } catch (e) {
-            console.warn("Parse error:", e);
-          }
-        }
-      }
-    }
-
-    // 5. DB-SAVE: Lưu kết quả của AI vào Database
-    if (aiFullResponse) {
-       await pool.query(
-         `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
-         [session_id, 'assistant', aiFullResponse]
-       );
-    }
-
-    res.write("data: [DONE]\n\n");
-    res.end();
-
-  } catch (error) {
-    console.error("Lỗi AI Chat Stream:", error);
-    res.write(`data: ${JSON.stringify({ error: "Lỗi máy chủ" })}\n\n`);
-    res.end();
-  }
-});
-
 app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
@@ -998,10 +912,98 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
   }
 });
 
-// 404 Not Found Handler (PHẢI LUÔN Ở CUỐI CÙNG TRƯỚC LÚC START SERVER)
+// --- BẮT ĐẦU KHỐI CODE AI CHAT STREAM ---
+app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  try {
+    const { message, session_id } = req.body;
+    
+    // 1. DB-FIRST: Lưu ngay tin nhắn User vào Database
+    await pool.query(
+      `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+      [session_id, 'user', message]
+    );
+
+    // 2. Tải Context (20 tin nhắn gần nhất để AI nhớ bối cảnh)
+    const { rows: history } = await pool.query(
+      `SELECT role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      [session_id]
+    );
+    const context = history.reverse().map(r => ({ role: r.role === 'ai' ? 'assistant' : r.role, content: r.content }));
+
+    const systemPrompt = `Bạn là Trợ lý AI TaskFlow.`; 
+    const finalMessages = [{ role: "system", content: systemPrompt }, ...context];
+
+    // 3. Gọi OpenRouter
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash", // Hoặc model Sếp đang dùng
+        messages: finalMessages,
+        stream: true
+      })
+    });
+
+    // 4. PARSING LUỒNG CHUẨN XÁC
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let aiFullResponse = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n').filter(line => line.trim() !== '');
+      
+      for (const line of lines) {
+        if (line === 'data: [DONE]') continue;
+        if (line.startsWith('data: ')) {
+          try {
+            // Bóc tách chunk của OpenRouter
+            const parsed = JSON.parse(line.slice(6));
+            const tokenText = parsed.choices[0]?.delta?.content || "";
+            
+            aiFullResponse += tokenText;
+            // Đóng gói lại thành format JSON chuấn mà Frontend đang mong đợi: { text: "..." }
+            res.write(`data: ${JSON.stringify({ text: tokenText })}\n\n`);
+          } catch (e) {
+            console.warn("Parse error:", e);
+          }
+        }
+      }
+    }
+
+    // 5. DB-SAVE: Lưu kết quả của AI vào Database
+    if (aiFullResponse) {
+       await pool.query(
+         `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
+         [session_id, 'assistant', aiFullResponse]
+       );
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+
+  } catch (error) {
+    console.error("Lỗi AI Chat Stream:", error);
+    res.write(`data: ${JSON.stringify({ error: "Lỗi máy chủ" })}\n\n`);
+    res.end();
+  }
+});
+
+// --- CHẶN 404 TOÀN CỤC ---
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint không tồn tại trên hệ thống.' });
 });
+// --- KẾT THÚC ---
 
 // Start server
 const PORT = process.env.PORT || 3000;
