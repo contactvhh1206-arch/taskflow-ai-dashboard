@@ -2425,9 +2425,11 @@ app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
 app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
         const newId = crypto.randomUUID();
+        const user_id = req.user.id;
+        
         const { rows } = await pool.query(
             "INSERT INTO ai_chat_sessions (id, user_id, title) VALUES ($1, $2, 'Cuộc trò chuyện mới') RETURNING *",
-            [newId, req.user.id]
+            [newId, user_id]
         );
         res.status(201).json({ success: true, data: rows[0] });
     } catch (error) {
@@ -2926,6 +2928,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
   try {
     const { message, session_id } = req.body;
     const user_id = req.user.id;
+    console.log("=== ĐANG XỬ LÝ CHAT CHO SESSION ID:", session_id, "===");
     
     if (!message || !session_id) {
         throw new Error("Thiếu message hoặc session_id");
