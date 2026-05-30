@@ -651,6 +651,57 @@ const calculateTone = (deadlineDateStr) => {
 
 // API: KÃ­ch hoáº¡t AI Ping Ä‘Ã´n Ä‘á»‘c cÃ´ng viá»‡c
 
+app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
+  try {
+    const { message, session_id } = req.body;
+    
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const systemPrompt = `Báº¡n lÃ  Trá»£ lÃ½ AI Cá»‘ váº¥n. HÃ£y tÆ° vÃ¢n ngáº¯n gá» n vÃ  tháº¥u cáº£m.`; 
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "meta-llama/llama-3-8b-instruct",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: message }
+        ],
+        stream: true
+      })
+    });
+
+    if (!response.ok) {
+      res.write(`data: ${JSON.stringify({ error: "Lá»—i OpenRouter" })}\n\n`);
+      return res.end();
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        res.write("data: [DONE]\n\n");
+        break;
+      }
+      const chunk = decoder.decode(value, { stream: true });
+      res.write(chunk);
+    }
+    res.end();
+  } catch (error) {
+    console.error("Lá»—i AI Chat Stream:", error);
+    res.write(`data: ${JSON.stringify({ error: "Lá»—i mÃ¡y chá»§" })}\n\n`);
+    res.end();
+  }
+});
+
 app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;

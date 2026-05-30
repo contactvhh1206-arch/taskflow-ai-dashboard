@@ -246,7 +246,8 @@ export default function AIAdvisor(props) {
       setStreamingText("");
       setIsTyping(true);
 
-      const res = await fetch('/api/ai/chat', {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
+      const res = await fetch(`${API_BASE_URL}/api/ai/chat-stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
           body: JSON.stringify({ message: userQuery, session_id: sessionId }),
