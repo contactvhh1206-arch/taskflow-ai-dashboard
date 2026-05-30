@@ -298,6 +298,15 @@ export default function AIAdvisor(props) {
                       // Cập nhật session_id từ Backend
                       if (parsed.new_session_id) {
                           if (props.onSessionCreated) props.onSessionCreated(parsed.new_session_id);
+                          sessionId = parsed.new_session_id; // Gán cứng cho biến cục bộ của hàm chat hiện tại
+                          console.log("🛠️ Frontend đã đồng bộ UUID mới từ Server:", sessionId);
+                          
+                          // Đồng bộ Sidebar ngay lập tức
+                          fetchAiSessions().then(res => {
+                              if (res.success && props.onSessionUpdate) {
+                                  props.onSessionUpdate(res.data);
+                              }
+                          }).catch(err => console.error("Lỗi fetch sidebar:", err));
                           continue;
                       }
                       
