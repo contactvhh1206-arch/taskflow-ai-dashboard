@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'HubDB_Global_Temp_Secret_2026_!!!';
@@ -2466,9 +2467,10 @@ async function getConversationContext(sessionId, userId) {
 // ==========================================
 app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
+        const newId = crypto.randomUUID();
         const { rows } = await pool.query(
-            "INSERT INTO ai_chat_sessions (user_id, title) VALUES ($1, 'Cuộc trò chuyện mới') RETURNING *",
-            [req.user.id]
+            "INSERT INTO ai_chat_sessions (id, user_id, title) VALUES ($1, $2, 'Cuộc trò chuyện mới') RETURNING *",
+            [newId, req.user.id]
         );
         res.status(201).json({ success: true, data: rows[0] });
     } catch (error) {
