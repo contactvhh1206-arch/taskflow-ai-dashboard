@@ -2966,14 +2966,51 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         throw new Error("Thiếu message hoặc session_id");
     }
 
-    // 1. LƯU TIN NHẮN USER & GIỮ LẠI ID ĐỂ ROLLBACK
+    // 1. LẤY LỊCH SỬ CHAT
+    const { rows: historyRows } = await pool.query(
+      `SELECT role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY created_at ASC`,
+      [session_id]
+    );
+    const formattedHistory = historyRows.map(r => ({ role: r.role, content: r.content }));
+
+    // 2. LƯU TIN NHẮN USER & GIỮ LẠI ID ĐỂ ROLLBACK
     const userMsgResult = await pool.query(
       `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'user', $2) RETURNING id`,
       [session_id, message]
     );
     userMsgId = userMsgResult.rows[0].id;
 
-    // 2. GỌI API OPENROUTER (CHỈ TEST STREAM CƠ BẢN)
+    // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
+    let systemContext = "Bạn là Master AI Cố vấn của hệ thống HubDB. Hãy trả lời ngắn gọn, chuyên nghiệp. Dựa TUYỆT ĐỐI vào các số liệu nội bộ sau đây để phân tích nếu được hỏi:\n";
+    let hasData = false;
+    const lowerMsg = message.toLowerCase();
+
+    try {
+        // Quét từ khóa Công việc (Tasks)
+        if (lowerMsg.includes('task') || lowerMsg.includes('công việc') || lowerMsg.includes('trễ')) {
+            const { rows } = await pool.query("SELECT status, COUNT(*) as count FROM tasks GROUP BY status");
+            const taskData = rows.map(r => `[${r.status}: ${r.count} task]`).join(', ');
+            systemContext += `- Tình trạng công việc hiện tại: ${taskData}.\n`;
+            hasData = true;
+        }
+        
+        // Quét từ khóa Nhân sự / User
+        if (lowerMsg.includes('nhân sự') || lowerMsg.includes('người dùng') || lowerMsg.includes('nhân viên')) {
+            const { rows } = await pool.query("SELECT role, COUNT(*) as count FROM users GROUP BY role");
+            const userData = rows.map(r => `[${r.role}: ${r.count} người]`).join(', ');
+            systemContext += `- Phân bổ nhân sự: ${userData}.\n`;
+            hasData = true;
+        }
+    } catch (dbErr) {
+        console.error("Lỗi móc dữ liệu RAG (Bỏ qua để không sập AI):", dbErr);
+    }
+
+    // Build mảng tin nhắn gửi cho OpenRouter
+    const messagesForAI = hasData 
+        ? [{ role: "system", content: systemContext }, ...formattedHistory, { role: "user", content: message }]
+        : [...formattedHistory, { role: "user", content: message }];
+
+    // 4. GỌI API OPENROUTER (KÈM CONTEXT & STREAM)
     const openRouterResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -2983,7 +3020,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         stream: true,
-        messages: [{ role: "user", content: message }]
+        messages: messagesForAI
       })
     });
 
