@@ -76,6 +76,10 @@ export default function AIAdvisor(props) {
   }] : [];
 
   const [chatLog, setChatLog] = useState(defaultLog);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [attachment, setAttachment] = useState(null);
+  const fileInputRef = React.useRef(null);
 
   React.useEffect(() => {
       scrollToBottom();
@@ -103,11 +107,7 @@ export default function AIAdvisor(props) {
     loadHistory();
   }, [activeSessionId, isTyping]);
 
-  // Removed localStorage logic - Using Backend API exclusively
-  const [isTyping, setIsTyping] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [attachment, setAttachment] = useState(null);
-  const fileInputRef = React.useRef(null);
+
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
