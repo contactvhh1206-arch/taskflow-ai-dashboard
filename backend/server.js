@@ -2945,7 +2945,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     userMsgId = userMsgResult.rows[0].id;
 
     // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
-    let systemContext = "Bạn là Master AI Cố vấn của hệ thống HubDB. Hãy trả lời ngắn gọn, chuyên nghiệp. Dựa TUYỆT ĐỐI vào các số liệu nội bộ sau đây để phân tích nếu được hỏi:\n";
+    let systemContext = "Bạn là Master AI Cố vấn của hệ thống HubDB. VỀ MẶT SỐ LIỆU VÀ TÌNH TRẠNG CƠ SỞ, BẮT BUỘC chỉ sử dụng các dữ liệu nội bộ được cung cấp dưới đây. VỀ MẶT CHIẾN LƯỢC VÀ GIẢI PHÁP, hãy tự do sử dụng kiến thức quản trị chuyên sâu của bạn để phân tích, kết nối các dữ kiện, chỉ ra điểm nghẽn và đưa ra lời khuyên thực tế nhất cho sếp.\n\n";
     let hasData = false;
     const lowerMsg = message.toLowerCase();
 
@@ -2965,19 +2965,35 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             hasData = true;
         }
 
-        // Quét từ khóa Doanh thu / Tài chính
+        // 3. Quét từ khóa Doanh thu / Tài chính (Dynamic)
         if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền')) {
-            const { rows } = await pool.query(`
-                SELECT date, SUM(total_revenue) as total 
-                FROM daily_financial_reports 
-                GROUP BY date 
-                ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT 3
-            `);
+            let queryStr = "SELECT org_unit, date, SUM(total_revenue) as total FROM daily_financial_reports WHERE 1=1";
+            const queryParams = [];
+            
+            // Bắt từ khóa Cơ sở (ví dụ db41, dbace)
+            const matchOrg = lowerMsg.match(/(db[a-z0-9]+)/i);
+            if (matchOrg) {
+                queryParams.push(`%${matchOrg[1].toLowerCase()}%`);
+                queryStr += ` AND lower(org_unit) LIKE $${queryParams.length}`;
+            }
+            
+            // Bắt từ khóa Tháng (ví dụ tháng 5, tháng 05)
+            const matchMonth = lowerMsg.match(/tháng (\d+)/i);
+            if (matchMonth) {
+                const monthStr = matchMonth[1].padStart(2, '0');
+                queryParams.push(`%/${monthStr}/%`);
+                queryParams.push(`%-${monthStr}-%`);
+                queryStr += ` AND (date LIKE $${queryParams.length - 1} OR date LIKE $${queryParams.length})`;
+            }
+
+            queryStr += " GROUP BY org_unit, date ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT 15";
+
+            const { rows } = await pool.query(queryStr, queryParams);
             if (rows.length > 0) {
-                const revenueData = rows.map(r => `[Ngày ${r.date}: ${Number(r.total).toLocaleString('vi-VN')} VNĐ]`).join(', ');
-                systemContext += `- Tổng doanh thu hệ thống gần đây: ${revenueData}.\n`;
+                const revenueData = rows.map(r => `[${r.org_unit} - Ngày ${r.date}: ${Number(r.total).toLocaleString('vi-VN')} VNĐ]`).join(', ');
+                systemContext += `- Dữ liệu doanh thu tìm thấy: ${revenueData}.\n`;
             } else {
-                systemContext += `- Doanh thu: Chưa có dữ liệu ghi nhận.\n`;
+                systemContext += `- Doanh thu: Không tìm thấy dữ liệu khớp với yêu cầu của sếp.\n`;
             }
             hasData = true;
         }

@@ -83,10 +83,10 @@ export default function AIAdvisor(props) {
 
   React.useEffect(() => {
     currentSessionIdRef.current = activeSessionId;
-    if (!activeSessionId) {
-       setChatLog(defaultLog);
-       return;
-    }
+    
+    // CHẶN NGAY: Nếu không có session hoặc AI ĐANG GÕ THÌ CẤM LOAD LỊCH SỬ ĐÈ LÊN
+    if (!activeSessionId || isTyping) return; 
+    
     const loadHistory = async () => {
         try {
             const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`);
@@ -101,7 +101,7 @@ export default function AIAdvisor(props) {
         }
     };
     loadHistory();
-  }, [activeSessionId]);
+  }, [activeSessionId, isTyping]);
 
   // Removed localStorage logic - Using Backend API exclusively
   const [isTyping, setIsTyping] = useState(false);
