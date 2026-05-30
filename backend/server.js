@@ -1352,16 +1352,16 @@ app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res
         if (parsedData.data) parsedData = parsedData.data;
         if (!Array.isArray(parsedData)) parsedData = [parsedData];
       } else {
-         return res.status(500).json({ error: 'AI khÃ´ng tráº£ vá» JSON há»£p lá»‡.' });
+         return res.status(500).json({ error: 'AI khÃ´ng tráº£ vá»  JSON há»£p lá»‡.' });
       }
     }
 
-    // Tráº£ vá» usage token Ä‘á»ƒ frontend log
+    // Tráº£ vá»  usage token Ä‘á»ƒ frontend log
     res.json({ success: true, data: parsedData, usage: aiData.usage });
 
   } catch (error) {
-    console.error('Lá»—i khi gá»i AI Extract API (Text):', error);
-    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™ khi gá»i AI API.' });
+    console.error('Lá»—i khi gá» i AI Extract API (Text):', error);
+    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™ khi gá» i AI API.' });
   }
 });
 
@@ -1397,7 +1397,6 @@ const calculateTone = (deadlineDateStr) => {
     return {
       level: 'Cáº£nh bÃ¡o ká»· luáº­t',
       guidance: 'Giá»ng Ä‘iá»‡u nghiÃªm tÃºc, quyáº¿t liá»‡t. Nháº¥n máº¡nh viá»‡c Ä‘Ã£ trá»… háº¡n quÃ¡ lÃ¢u, yÃªu cáº§u bÃ¡o cÃ¡o nguyÃªn nhÃ¢n gá»‘c rá»… vÃ  giáº£i trÃ¬nh lÃªn cáº¥p quáº£n lÃ½ ngay láº­p tá»©c.'
-      guidance: 'Giá» ng Ä‘iá»‡u nghiÃªm tÃºc, quyáº¿t liá»‡t. Nháº¥n máº¡nh viá»‡c Ä‘Ã£ trá»… háº¡n quÃ¡ lÃ¢u, yÃªu cáº§u bÃ¡o cÃ¡o nguyÃªn nhÃ¢n gá»‘c rá»… vÃ  giáº£i trÃ¬nh lÃªn cáº¥p quáº£n lÃ½ ngay láº­p tá»©c.'
     };
   }
 };
