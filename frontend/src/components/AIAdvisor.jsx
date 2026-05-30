@@ -94,7 +94,7 @@ export default function AIAdvisor(props) {
             if (data.success && data.data.length > 0) {
                 setChatLog(data.data.map(m => ({ role: m.role, content: m.content })));
             } else {
-                setChatLog(defaultLog);
+                setChatLog(prev => prev.length > 0 ? prev : defaultLog);
             }
         } catch (err) {
             console.error("Lỗi tải lịch sử chat:", err);
@@ -325,6 +325,7 @@ export default function AIAdvisor(props) {
                       setChatLog(prev => {
                           const newLog = [...prev];
                           const lastIdx = newLog.length - 1;
+                          if (lastIdx < 0 || !newLog[lastIdx]) return newLog;
                           newLog[lastIdx] = { 
                               ...newLog[lastIdx], 
                               content: newLog[lastIdx].content + newText 
