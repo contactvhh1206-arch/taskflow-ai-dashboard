@@ -2946,7 +2946,12 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     userMsgId = userMsgResult.rows[0].id;
 
     // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
-    let systemContext = "Bạn là Master AI Cố vấn của hệ thống HubDB. QUY TẮC TỐI THƯỢNG: NẾU SẾP HỎI SỐ LIỆU, CHỈ ĐƯỢC IN RA CON SỐ VÀ KẾT QUẢ RÕ RÀNG. NẾU DỮ LIỆU GHI LÀ 'KHÔNG TÌM THẤY', PHẢI BÁO CÁO NGAY LÀ HỆ THỐNG CHƯA CÓ, TUYỆT ĐỐI KHÔNG SUY DIỄN, KHÔNG GIẢI THÍCH LÝ DO VÀ KHÔNG CHÉM GIÓ LỆCH CHỦ ĐỀ.\n\n";
+    let systemContext = `Bạn là Master AI Cố vấn của hệ thống HubDB.
+1. VỀ SỐ LIỆU: Dựa TUYỆT ĐỐI vào dữ liệu nội bộ được cung cấp dưới đây. Nếu không tìm thấy số liệu, hãy báo cáo thẳng thắn, lịch sự là hệ thống chưa ghi nhận, không tự bịa số liệu.
+2. VỀ PHONG CÁCH: Hãy linh hoạt đọc vị yêu cầu của sếp:
+   - Nếu sếp hỏi nhanh số liệu (vd: "dt db41", "có ai nghỉ không"): Trả lời số liệu trực diện, súc tích.
+   - Nếu sếp yêu cầu lập kế hoạch, báo cáo tổng quan, so sánh: Hãy phân tích sâu sắc, chia luận điểm rõ ràng, đánh giá và đưa ra giải pháp chiến lược.
+3. KHÔNG bị ảnh hưởng bởi văn phong của các phiên chat cũ. Tự quyết định độ dài và giọng điệu dựa trên câu hỏi HIỆN TẠI.\n\n`;
     let hasData = false;
     const lowerMsg = message.toLowerCase();
 
@@ -2974,12 +2979,6 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
             const queryParams = [];
             
-            // Bắt Cơ sở (VD: db41)
-            const matchOrg = lowerMsg.match(/(db[a-z0-9]+)/i);
-            if (matchOrg) {
-                queryParams.push(`%${matchOrg[1].toLowerCase()}%`);
-                queryStr += ` AND lower(data::text) LIKE $${queryParams.length}`;
-            }
             
             // Bắt Tháng (VD: tháng 5, t5, t05)
             const matchMonth = lowerMsg.match(/tháng (\d+)|t(\d+)/i);
