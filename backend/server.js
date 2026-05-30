@@ -1397,20 +1397,20 @@ const calculateTone = (deadlineDateStr) => {
     return {
       level: 'Cáº£nh bÃ¡o ká»· luáº­t',
       guidance: 'Giá»ng Ä‘iá»‡u nghiÃªm tÃºc, quyáº¿t liá»‡t. Nháº¥n máº¡nh viá»‡c Ä‘Ã£ trá»… háº¡n quÃ¡ lÃ¢u, yÃªu cáº§u bÃ¡o cÃ¡o nguyÃªn nhÃ¢n gá»‘c rá»… vÃ  giáº£i trÃ¬nh lÃªn cáº¥p quáº£n lÃ½ ngay láº­p tá»©c.'
+      guidance: 'Giá» ng Ä‘iá»‡u nghiÃªm tÃºc, quyáº¿t liá»‡t. Nháº¥n máº¡nh viá»‡c Ä‘Ã£ trá»… háº¡n quÃ¡ lÃ¢u, yÃªu cáº§u bÃ¡o cÃ¡o nguyÃªn nhÃ¢n gá»‘c rá»… vÃ  giáº£i trÃ¬nh lÃªn cáº¥p quáº£n lÃ½ ngay láº­p tá»©c.'
     };
   }
 };
 
-  // API: Lá»‹ch sá»­ há»™i thoáº¡i AI toÃ n cáº§u (Global Memory)
-  
-// API: AI Tá»± Há»c Tá»« Chat (Admin One-Click)
+
+// API: AI Tá»± Há» C Tá»« Chat (Admin One-Click)
 app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
     try {
         const { role, department_code } = req.user;
         
-        // Báº£o máº­t (RBAC): Chá»‰ cÃ¡c cáº¥p cao Ä‘Æ°á»£c phÃ©p "dáº¡y" AI
+        // Báº£o máº­t (RBAC): Chá»‰ cÃ¡c cáº¥p cao Ä‘Æ°á»­c phÃ©p "dáº¡y" AI
         if (role !== 'SUPER_ADMIN' && role !== 'VICE_PRESIDENT' && role !== 'ADMIN') {
-            return res.status(403).json({ error: "Chá»‰ Admin/Sáº¿p má»›i cÃ³ quyá»n náº¡p dá»¯ liá»‡u Chat vÃ o RAG." });
+            return res.status(403).json({ error: "Chá»‰ Admin/Sáº¿p má»›i cÃ³ quyá» n náº¡p dá»¯ liá»‡u Chat vÃ o RAG." });
         }
 
         const { content } = req.body;
@@ -1474,42 +1474,6 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
         res.status(500).json({ error: "Lá»—i mÃ¡y chá»§ khi nhÃºng dá»¯ liá»‡u chat." });
     }
 });
-  app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
-    try {
-      const { role, department_code } = req.user;
-      
-      let query = '';
-      let queryParams = [];
-
-      // NhÃ³m All-Access (ToÃ n quyá»n)
-      if (
-        role === 'SUPER_ADMIN' || 
-        role === 'ADMIN' || // Bá»” SUNG ROLE NÃ€Y NGAY Láº¬P Tá»¨C
-        role === 'VICE_PRESIDENT' || 
-        (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING')
-      ) {
-        query = 'SELECT * FROM ai_chat_sessions ORDER BY timestamp DESC LIMIT 100';
-      } else {
-        // NhÃ³m Local (Theo phÃ²ng ban/cÆ¡ sá»Ÿ)
-        query = `
-          SELECT s.* 
-          FROM ai_chat_sessions s
-          INNER JOIN users u ON s.user_id = u.id::varchar
-          WHERE u.department_code = $1
-          ORDER BY s.timestamp DESC
-          LIMIT 100
-        `;
-        // Bá»ŒC LÃ“T Lá»–I UNDEFINED TRÃNH CRASH DB
-        queryParams = [department_code || 'UNKNOWN'];
-      }
-
-      const { rows } = await pool.query(query, queryParams);
-      res.json({ success: true, data: rows });
-    } catch (error) {
-      console.error("Lá»—i get AI sessions:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
 
 
 
@@ -2447,14 +2411,15 @@ async function getConversationContext(sessionId, userId) {
 // ==========================================
 app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
+        // Chỉ lấy ID và TITLE. Không JOIN. Không GROUP BY. 
         const { rows } = await pool.query(
             "SELECT id, title FROM ai_chat_sessions WHERE user_id = $1 ORDER BY id DESC",
             [req.user.id]
         );
         res.json({ success: true, data: rows });
     } catch (error) {
-        console.error("Lỗi lấy danh sách session:", error);
-        res.status(500).json({ error: "Lỗi máy chủ" });
+        console.error("Lỗi lấy danh sách AI sessions:", error);
+        res.status(500).json({ error: "Lỗi máy chủ khi lấy dữ liệu sessions." });
     }
 });
 
