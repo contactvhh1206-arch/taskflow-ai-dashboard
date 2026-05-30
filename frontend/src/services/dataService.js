@@ -6,7 +6,7 @@ export const saveData = async ({ org_unit, entry_type, content, attachments = []
   const date = now.toLocaleDateString('vi-VN');
 
   try {
-    const result = await axiosClient.post('/logs', {
+    const result = await axiosClient.post('/api/logs', {
         org_unit,
         entry_type,
         content,
@@ -27,7 +27,7 @@ export const saveData = async ({ org_unit, entry_type, content, attachments = []
 
 export const fetchHistory = async (filters = {}) => {
   try {
-    const result = await axiosClient.get('/logs');
+    const result = await axiosClient.get('/api/logs');
     if (result.success) {
       let filtered = result.data.map(item => ({
         ...item,
@@ -49,7 +49,7 @@ export const fetchHistory = async (filters = {}) => {
 
 export const fetchAiSessions = async () => {
   try {
-    const result = await axiosClient.get('/ai/sessions');
+    const result = await axiosClient.get('/api/ai/sessions');
     if (result.success) return result.data;
   } catch (error) {
     console.error('Lỗi fetch ai sessions:', error);
@@ -59,7 +59,7 @@ export const fetchAiSessions = async () => {
 
 export const saveAiSession = async (sessionData) => {
   try {
-    await axiosClient.post('/ai/sessions', sessionData);
+    await axiosClient.post('/api/ai/sessions', sessionData);
   } catch (error) {
     console.error('Lỗi save ai session:', error);
   }
@@ -67,7 +67,7 @@ export const saveAiSession = async (sessionData) => {
 
 export const fetchReports = async () => {
   try {
-    const result = await axiosClient.get('/reports');
+    const result = await axiosClient.get('/api/reports');
     if (result.success) return result.data;
   } catch (error) {
     console.error('Lỗi lấy báo cáo doanh thu:', error);
@@ -77,7 +77,7 @@ export const fetchReports = async () => {
 
 export const saveReport = async (reportData) => {
   try {
-    const result = await axiosClient.post('/reports', reportData);
+    const result = await axiosClient.post('/api/reports', reportData);
     return result.success;
   } catch (error) {
     console.error('Lỗi lưu báo cáo doanh thu:', error);

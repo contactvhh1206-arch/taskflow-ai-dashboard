@@ -887,7 +887,7 @@ function MainDashboard() {
     const fetchTasks = async () => {
         isFetchingTasks.current = true;
         try {
-          const res = await axiosClient.get('/tasks');
+          const res = await axiosClient.get('/api/tasks');
           
           if (!res.success) {
              setTasks([]);

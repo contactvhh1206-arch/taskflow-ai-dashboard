@@ -89,7 +89,7 @@ export default function AIAdvisor(props) {
     }
     const loadHistory = async () => {
         try {
-            const data = await axiosClient.get(`/ai/chat-sessions/${activeSessionId}/messages`);
+            const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`);
             
             if (data.success && data.data.length > 0) {
                 setChatLog(data.data.map(m => ({ role: m.role, content: m.content })));
