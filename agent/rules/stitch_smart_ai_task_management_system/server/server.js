@@ -895,11 +895,11 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     
     if (!content) return res.status(400).json({ error: 'Nội dung bình luận không được trống.' });
     
-    const query = 
+    const query = `
       INSERT INTO task_comments (task_id, user_id, content)
-      VALUES (, , )
+      VALUES ($1, $2, $3)
       RETURNING *
-    ;
+    `;
     const { rows } = await pool.query(query, [id, user_id, content]);
     
     // Also update task updated_at to trigger polling refresh
@@ -1011,7 +1011,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   try {
 
-    await pool.query(
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS task_comments (
           id SERIAL PRIMARY KEY,
           task_id INT REFERENCES tasks(id) ON DELETE CASCADE,
@@ -1019,7 +1019,7 @@ app.listen(PORT, async () => {
           content TEXT NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-    );
+    `);
     console.log('[DB] Đã kiểm tra/tạo bảng task_comments');\n
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ai_sessions (
