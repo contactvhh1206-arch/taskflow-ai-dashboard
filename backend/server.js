@@ -2934,80 +2934,24 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 // --- BẮT ĐẦU KHỐI CODE AI CHAT STREAM ---
 console.log("=== BINGO! ROUTE AI STREAM ĐÃ ĐƯỢC LOAD VÀO SERVER ===");
 app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
+  // 1. THIẾT LẬP HEADER CHUẨN SSE
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
+  // 2. ANTI-TIMEOUT: Gửi ngay một comment rỗng để ép Render mở luồng kết nối (Bypass 15s limit)
+  res.write(':\n\n');
+
+  // 3. XỬ LÝ SỰ KIỆN CLIENT NGẮT KẾT NỐI
+  req.on('close', () => {
+    console.log('[SSE] Client đã ngắt kết nối. Dừng stream.');
+    res.end();
+  });
+
   try {
     const { message, session_id } = req.body;
     
-    // 1. DB-FIRST: Lưu ngay tin nhắn User vào Database
-    await pool.query(
-      `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
-      [session_id, 'user', message]
-    );
-
-    // 2. Tải Context (20 tin nhắn gần nhất để AI nhớ bối cảnh)
-    const { rows: history } = await pool.query(
-      `SELECT role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY created_at DESC LIMIT 20`,
-      [session_id]
-    );
-    const context = history.reverse().map(r => ({ role: r.role === 'ai' ? 'assistant' : r.role, content: r.content }));
-
-    const systemPrompt = `Bạn là Trợ lý AI TaskFlow.`; 
-    const finalMessages = [{ role: "system", content: systemPrompt }, ...context];
-
-    // 3. Gọi OpenRouter
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash", // Hoặc model Sếp đang dùng
-        messages: finalMessages,
-        stream: true
-      })
-    });
-
-    // KHÔNG DÙNG getReader() Ở NODE.JS! Dùng Async Iterator:
-    if (!response.ok) {
-        throw new Error(`Lỗi từ OpenRouter: ${response.status}`);
-    }
-
-    let aiFullResponse = "";
-    for await (const chunk of response.body) {
-      // Chunk có thể là Buffer hoặc Uint8Array, cần ép kiểu về String
-      const textChunk = chunk.toString('utf-8');
-      const lines = textChunk.split('\n').filter(line => line.trim() !== '');
-      
-      for (const line of lines) {
-        if (line === 'data: [DONE]') continue;
-        if (line.startsWith('data: ')) {
-          try {
-            const parsed = JSON.parse(line.slice(6));
-            const tokenText = parsed.choices[0]?.delta?.content || "";
-            
-            aiFullResponse += tokenText;
-            res.write(`data: ${JSON.stringify({ text: tokenText })}\n\n`);
-          } catch (e) {
-            console.warn("Parse error:", e);
-          }
-        }
-      }
-    }
-
-    // 5. DB-SAVE: Lưu kết quả của AI vào Database
-    if (aiFullResponse) {
-       await pool.query(
-         `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, $2, $3)`,
-         [session_id, 'assistant', aiFullResponse]
-       );
-    }
-
-    res.write("data: [DONE]\n\n");
-    res.end();
+    // (Khung trống chờ xử lý logic AI/DB)
 
   } catch (error) {
     console.error("Lỗi AI Chat Stream:", error);
