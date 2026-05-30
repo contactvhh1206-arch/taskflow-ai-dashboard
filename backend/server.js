@@ -2953,19 +2953,33 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
    - Nếu sếp yêu cầu lập kế hoạch, báo cáo tổng quan, so sánh: Hãy phân tích sâu sắc, chia luận điểm rõ ràng, đánh giá và đưa ra giải pháp chiến lược.
 3. KHÔNG bị ảnh hưởng bởi văn phong của các phiên chat cũ. Tự quyết định độ dài và giọng điệu dựa trên câu hỏi HIỆN TẠI.\n\n`;
     let hasData = false;
-    const lowerMsg = message.toLowerCase();
+    // Lấy câu nói gần nhất của AI từ lịch sử
+    let previousAiMessage = "";
+    if (formattedHistory.length > 0 && (formattedHistory[formattedHistory.length - 1].role === 'assistant' || formattedHistory[formattedHistory.length - 1].role === 'ai')) {
+        previousAiMessage = formattedHistory[formattedHistory.length - 1].content;
+    }
+    
+    // Gộp cả câu hỏi hiện tại và câu trả lời trước đó để dò từ khóa
+    const contextMsg = (previousAiMessage + " " + message).toLowerCase();
 
     try {
-        // Quét từ khóa Công việc (Tasks)
-        if (lowerMsg.includes('task') || lowerMsg.includes('công việc') || lowerMsg.includes('trễ')) {
-            const { rows } = await pool.query("SELECT status, COUNT(*) as count FROM tasks GROUP BY status");
-            const taskData = rows.map(r => `[${r.status}: ${r.count} task]`).join(', ');
-            systemContext += `- Tình trạng công việc hiện tại: ${taskData}.\n`;
+        // Quét Công việc (Dùng contextMsg)
+        if (contextMsg.includes('task') || contextMsg.includes('công việc') || contextMsg.includes('trễ') || contextMsg.includes('phụ trách') || contextMsg.includes('dự án') || contextMsg.includes('ai làm')) {
+            
+            // Lấy thẳng danh sách 20 task mới nhất thay vì đếm số
+            const { rows } = await pool.query("SELECT * FROM tasks ORDER BY id DESC LIMIT 20");
+            
+            if (rows.length > 0) {
+                const taskData = rows.map(r => `[Task: ${r.title || r.name || 'Không tên'} | Trạng thái: ${r.status} | Phụ trách: ${r.assignee || r.user_id || 'Chưa phân công'}]`).join('\n');
+                systemContext += `- Danh sách công việc chi tiết hiện tại:\n${taskData}\n`;
+            } else {
+                systemContext += `- Công việc: Hệ thống không có dữ liệu task nào.\n`;
+            }
             hasData = true;
         }
         
         // Quét từ khóa Nhân sự / User
-        if (lowerMsg.includes('nhân sự') || lowerMsg.includes('người dùng') || lowerMsg.includes('nhân viên')) {
+        if (contextMsg.includes('nhân sự') || contextMsg.includes('người dùng') || contextMsg.includes('nhân viên')) {
             const { rows } = await pool.query("SELECT COUNT(*) as count FROM users");
             systemContext += `- Tổng số nhân sự hệ thống: ${rows[0].count} người.\n`;
             hasData = true;
@@ -2973,7 +2987,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
         // 1. Quét từ khóa Doanh thu / Tài chính (Regex Cấp Độ 2)
         // Bắt mọi từ lóng: doanh thu, dt, tiền, tổng kết... VÀ cả việc chỉ gọi tên cơ sở
-        const isRevenueIntent = lowerMsg.match(/(doanh thu|tài chính|tiền| dt |bán hàng|tổng kết|báo cáo)/i) || lowerMsg.match(/(db[a-z0-9]+)/i);
+        const isRevenueIntent = contextMsg.match(/(doanh thu|tài chính|tiền| dt |bán hàng|tổng kết|báo cáo)/i) || contextMsg.match(/(db[a-z0-9]+)/i);
 
         if (isRevenueIntent) {
             let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
@@ -2981,7 +2995,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             
             
             // Bắt Tháng (VD: tháng 5, t5, t05)
-            const matchMonth = lowerMsg.match(/tháng (\d+)|t(\d+)/i);
+            const matchMonth = contextMsg.match(/tháng (\d+)|t(\d+)/i);
             let isMonthQuery = false;
             if (matchMonth) {
                 isMonthQuery = true;
@@ -2993,9 +3007,9 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
             // Gài LIMIT Động
             let recordLimit = 7; // Mặc định 1 tuần
-            if (isMonthQuery || lowerMsg.includes('tháng')) recordLimit = 31;
-            if (lowerMsg.includes('quý')) recordLimit = 90;
-            if (lowerMsg.includes('năm')) recordLimit = 365;
+            if (isMonthQuery || contextMsg.includes('tháng')) recordLimit = 31;
+            if (contextMsg.includes('quý')) recordLimit = 90;
+            if (contextMsg.includes('năm')) recordLimit = 365;
 
             queryStr += ` ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT ${recordLimit}`;
             
@@ -3010,7 +3024,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         }
 
         // Quét từ khóa Check-in / Điểm danh
-        if (lowerMsg.includes('check-in') || lowerMsg.includes('checkin') || lowerMsg.includes('điểm danh') || lowerMsg.includes('chấm công')) {
+        if (contextMsg.includes('check-in') || contextMsg.includes('checkin') || contextMsg.includes('điểm danh') || contextMsg.includes('chấm công')) {
             const todayStr = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
             const { rows } = await pool.query(
                 "SELECT org_unit, COUNT(*) as count FROM daily_logs WHERE entry_type = 'Attendance' AND date = $1 GROUP BY org_unit",
@@ -3083,15 +3097,15 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
     // 4. LƯU TIN NHẮN AI & KẾT THÚC RESPONSE
     res.write('data: [DONE]\n\n');
-
-    if (fullAiResponse) {
-      await pool.query(
-        `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'ai', $2)`,
-        [session_id, fullAiResponse]
-      );
-    }
-
     res.end();
+
+    // NGAY SAU KHI STREAM XONG, BẮT BUỘC LƯU VÀO DATABASE:
+    if (fullAiResponse.trim()) {
+        await pool.query(
+            "INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)",
+            [session_id, fullAiResponse]
+        );
+    }
 
   } catch (error) {
     console.error("Lỗi AI Chat Stream:", error);
