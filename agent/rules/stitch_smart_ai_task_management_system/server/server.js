@@ -913,6 +913,7 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
 });
 
 // --- BẮT ĐẦU KHỐI CODE AI CHAT STREAM ---
+console.log("=== BINGO! ROUTE AI STREAM ĐÃ ĐƯỢC LOAD VÀO SERVER ===");
 app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
