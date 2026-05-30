@@ -1,10 +1,9 @@
 {
-  "name": "taskflow-ai-system",
+  "name": "taskflow-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server/server.js",
     "dev": "vite",
     "build": "npx vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
@@ -13,11 +12,6 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "express": "^4.18.2",
-    "pg": "^8.11.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "node-fetch": "^3.3.2",
     "react-markdown": "^9.0.1",
     "axios": "^1.6.8"
   },
