@@ -249,7 +249,12 @@ export default function AIAdvisor(props) {
 
     try {
       const token = localStorage.getItem('taskflow_token');
-      const sessionId = currentSessionIdRef.current;
+      const sessionId = props.activeSessionId; // Lấy từ props
+      
+      if (!sessionId) {
+          setChatLog(prev => [...prev, { role: 'ai', content: '⚠️ Vui lòng chọn hoặc tạo Phiên làm việc (Session) ở bảng bên trái trước khi chat.', isError: true }]);
+          return;
+      }
       
       abortControllerRef.current = new AbortController();
       setIsTyping(true);
@@ -315,8 +320,22 @@ export default function AIAdvisor(props) {
           }
       }
     } catch (err) {
-      console.error("AI Error:", err);
-      setChatLog(prev => [...prev, { role: 'ai', content: `Xin lỗi, đã xảy ra lỗi khi kết nối (${err.message}).` }]);
+      if (err.name === 'AbortError') {
+          console.log("Fetch Stream bị ngắt");
+      } else {
+          console.error("AI Error:", err);
+          // Đảm bảo cập nhật đè lên tin nhắn role: 'ai' cuối cùng thay vì tạo thêm
+          setChatLog(prev => {
+              const newLog = [...prev];
+              const lastIdx = newLog.length - 1;
+              if (lastIdx >= 0 && newLog[lastIdx].role === 'ai') {
+                  newLog[lastIdx] = { ...newLog[lastIdx], content: `Xin lỗi, đã xảy ra lỗi: ${err.message}`, isError: true };
+              } else {
+                  newLog.push({ role: 'ai', content: `Xin lỗi, đã xảy ra lỗi: ${err.message}`, isError: true });
+              }
+              return newLog;
+          });
+      }
       setIsTyping(false);
     }
   };

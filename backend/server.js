@@ -3036,7 +3036,8 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
       }
     }
 
-    res.write(`data: ${JSON.stringify({ error: "Lỗi máy chủ" })}\n\n`);
+    res.write(`data: ${JSON.stringify({ error: error.message || "Lỗi máy chủ" })}\n\n`);
+    res.write('data: [DONE]\n\n');
     res.end();
   }
 });
