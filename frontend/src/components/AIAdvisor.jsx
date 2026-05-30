@@ -95,8 +95,18 @@ export default function AIAdvisor(props) {
         try {
             const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`);
             
-            if (data.success && data.data.length > 0) {
-                setChatLog(data.data.map(m => ({ role: m.role, content: m.content })));
+            if (data.success && data.data) {
+                if (data.data.length > 0) {
+                    setChatLog(data.data.map(m => ({ role: m.role, content: m.content })));
+                } else {
+                    setChatLog(prev => prev.length > 0 ? prev : defaultLog);
+                }
+            } else if (Array.isArray(data)) {
+                if (data.length > 0) {
+                    setChatLog(data.map(m => ({ role: m.role, content: m.content })));
+                } else {
+                    setChatLog(prev => prev.length > 0 ? prev : defaultLog);
+                }
             } else {
                 setChatLog(prev => prev.length > 0 ? prev : defaultLog);
             }

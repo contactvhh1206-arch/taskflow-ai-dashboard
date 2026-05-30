@@ -51,6 +51,7 @@ export const fetchAiSessions = async () => {
   try {
     const result = await axiosClient.get('/api/ai/sessions');
     if (result.success) return result.data;
+    if (Array.isArray(result)) return result;
   } catch (error) {
     console.error('Lỗi fetch ai sessions:', error);
   }

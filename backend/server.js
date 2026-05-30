@@ -2415,7 +2415,10 @@ app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
             "SELECT id, title FROM ai_chat_sessions WHERE user_id = $1 ORDER BY id DESC",
             [req.user.id]
         );
-        res.json({ success: true, data: rows });
+        res.json({
+            success: true,
+            data: rows
+        });
     } catch (error) {
         console.error("Lỗi lấy danh sách AI sessions:", error);
         res.status(500).json({ error: "Lỗi máy chủ khi lấy dữ liệu sessions." });
@@ -2458,7 +2461,10 @@ app.get('/api/ai/chat-sessions/:id/messages', authenticateUser, async (req, res)
             [sessionId]
         );
 
-        res.json({ success: true, data: messages });
+        res.json({
+            success: true,
+            data: messages
+        });
     } catch (error) {
         console.error("Lỗi lấy lịch sử chat:", error);
         res.status(500).json({ error: "Lỗi máy chủ khi lấy dữ liệu chat." });
