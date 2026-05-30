@@ -2412,7 +2412,7 @@ app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
         // Chỉ lấy ID và TITLE. Không JOIN. Không GROUP BY. 
         const { rows } = await pool.query(
-            "SELECT id, title FROM ai_chat_sessions WHERE user_id = $1 ORDER BY id DESC",
+            "SELECT id, title FROM ai_chat_sessions WHERE user_id = $1 ORDER BY timestamp DESC NULLS LAST, id DESC",
             [req.user.id]
         );
         res.json({
@@ -2430,9 +2430,10 @@ app.post('/api/ai/sessions', authenticateUser, async (req, res) => {
         const newId = crypto.randomUUID();
         const user_id = req.user.id;
         
+        const currentTime = Date.now();
         const { rows } = await pool.query(
-            "INSERT INTO ai_chat_sessions (id, user_id, title) VALUES ($1, $2, 'Cuộc trò chuyện mới') RETURNING *",
-            [newId, user_id]
+            "INSERT INTO ai_chat_sessions (id, user_id, title, timestamp) VALUES ($1, $2, 'Cuộc trò chuyện mới', $3) RETURNING *",
+            [newId, user_id, currentTime]
         );
         res.status(201).json({ success: true, data: rows[0] });
     } catch (error) {
@@ -2939,9 +2940,10 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     if (!session_id || session_id === 'null' || String(session_id).startsWith('session_')) {
         // TẠO SESSION CHUẨN XỊN (Dùng crypto.randomUUID để khớp với schema hiện tại)
         const newSessionId = crypto.randomUUID();
+        const currentTime = Date.now();
         const sessionResult = await pool.query(
-            "INSERT INTO ai_chat_sessions (id, user_id, title) VALUES ($1, $2, 'Cuộc trò chuyện mới') RETURNING id",
-            [newSessionId, user_id]
+            "INSERT INTO ai_chat_sessions (id, user_id, title, timestamp) VALUES ($1, $2, 'Cuộc trò chuyện mới', $3) RETURNING id",
+            [newSessionId, user_id, currentTime]
         );
         session_id = sessionResult.rows[0].id;
         console.log("🛠️ Đã tạo Session UUID chuẩn:", session_id);
@@ -2969,6 +2971,13 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
       [session_id, message]
     );
     userMsgId = userMsgResult.rows[0].id;
+
+    // Cập nhật lại thời gian của Session để nó nhảy lên top
+    const updateTime = Date.now();
+    await pool.query(
+        "UPDATE ai_chat_sessions SET timestamp = $1 WHERE id = $2",
+        [updateTime, session_id]
+    );
 
     // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
     let systemContext = `Bạn là Master AI Cố vấn của hệ thống HubDB.
