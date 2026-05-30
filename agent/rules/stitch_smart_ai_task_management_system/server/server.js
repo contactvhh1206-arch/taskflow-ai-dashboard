@@ -998,6 +998,11 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
   }
 });
 
+// 404 Not Found Handler (PHẢI LUÔN Ở CUỐI CÙNG TRƯỚC LÚC START SERVER)
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint không tồn tại trên hệ thống.' });
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 
