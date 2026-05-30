@@ -1021,7 +1021,17 @@ function MainDashboard() {
 
   const handleCreateAISession = async () => {
     try {
-      const res = await axiosClient.post('/api/ai/sessions');
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
+      const token = localStorage.getItem('taskflow_token');
+      const response = await fetch(`${API_BASE_URL}/api/ai/sessions`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + token
+          }
+      });
+      
+      const res = await response.json();
       if (res.success && res.data) {
          const newSession = res.data;
          // Cập nhật State danh sách session để hiển thị session mới lên UI
