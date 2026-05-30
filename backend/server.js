@@ -2967,6 +2967,12 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
         // 3. Quét từ khóa Doanh thu / Tài chính (Dynamic JSONB)
         if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền')) {
+            // Khai báo Limit động
+            let recordLimit = 7; // Mặc định hỏi chung chung thì lấy 7 ngày (1 tuần)
+            if (lowerMsg.includes('tháng')) recordLimit = 31;
+            if (lowerMsg.includes('quý')) recordLimit = 90;
+            if (lowerMsg.includes('năm')) recordLimit = 365;
+
             // Thay vì gọi org_unit, ta gọi date, total_revenue, và cục data JSONB
             let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
             const queryParams = [];
@@ -2987,7 +2993,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
                 queryStr += ` AND (date LIKE $${queryParams.length - 1} OR date LIKE $${queryParams.length})`;
             }
 
-            queryStr += " ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT 5";
+            queryStr += ` ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT ${recordLimit}`;
 
             const { rows } = await pool.query(queryStr, queryParams);
             if (rows.length > 0) {
