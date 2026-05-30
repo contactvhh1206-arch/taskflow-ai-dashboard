@@ -353,7 +353,7 @@ function MainDashboard() {
   const [mentionFilter, setMentionFilter] = useState('');
   const [cursorPosition, setCursorPosition] = useState(0);
 
-  const [aiSessions, setAiSessions] = useState(JSON.parse(localStorage.getItem('taskflow_ai_sessions') || '[]'));
+  const [aiSessions, setAiSessions] = useState([]);
   const [activeAiSessionId, setActiveAiSessionId] = useState(localStorage.getItem('taskflow_active_ai_session_id') || null);
 
   React.useEffect(() => {
@@ -363,6 +363,24 @@ function MainDashboard() {
       localStorage.removeItem('taskflow_active_ai_session_id');
     }
   }, [activeAiSessionId]);
+
+  React.useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        const res = await axiosClient.get('/api/ai/sessions');
+        if (res.success && res.data) {
+           setAiSessions(res.data);
+           // Auto-Select: Nếu chưa có activeSessionId và có data, chọn cái đầu tiên (mới nhất)
+           if (res.data.length > 0 && !activeAiSessionId) {
+               setActiveAiSessionId(res.data[0].id);
+           }
+        }
+      } catch (err) {
+        console.error("Lỗi fetch AI sessions:", err);
+      }
+    };
+    fetchSessions();
+  }, []); // Gọi 1 lần lúc khởi tạo app
   const [tasks, setTasks] = useState([]);
   const [globalFacilityFilter, setGlobalFacilityFilter] = useState(() => {
     return user?.role === 'FACILITY_MANAGER' ? (user?.facility_code || user?.facility_id || '') : 'ALL';
