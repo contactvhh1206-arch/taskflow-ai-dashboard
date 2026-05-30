@@ -3101,10 +3101,16 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
     // NGAY SAU KHI STREAM XONG, BẮT BUỘC LƯU VÀO DATABASE:
     if (fullAiResponse.trim()) {
-        await pool.query(
-            "INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)",
-            [session_id, fullAiResponse]
-        );
+        console.log("Chuỗi AI chuẩn bị lưu:", fullAiResponse);
+        try {
+            await pool.query(
+                "INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)",
+                [session_id, fullAiResponse]
+            );
+            console.log("✅ Đã lưu tin nhắn AI vào DB thành công.");
+        } catch (dbErr) {
+            console.error("❌ Lỗi lưu DB:", dbErr);
+        }
     }
 
   } catch (error) {
