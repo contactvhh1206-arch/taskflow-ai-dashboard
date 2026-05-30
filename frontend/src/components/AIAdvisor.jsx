@@ -18,13 +18,22 @@ export default function AIAdvisor(props) {
   } catch(e) {}
   
   const [query, setQuery] = useState('');
-  const [streamingText, setStreamingText] = useState('');
   const abortControllerRef = useRef(null);
   const currentSessionIdRef = React.useRef(activeSessionId);
   const isInitialMount = React.useRef(true);
 
+  // Memory Leak Control: Cleanup AbortController khi unmount
+  React.useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const messagesEndRef = React.useRef(null);
 
+  // Auto Scroll: Cuộn xuống cuối mỗi khi chatLog thay đổi
   const scrollToBottom = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -243,9 +252,12 @@ export default function AIAdvisor(props) {
       const sessionId = currentSessionIdRef.current;
       
       abortControllerRef.current = new AbortController();
-      setStreamingText("");
       setIsTyping(true);
+      
+      // Thêm một tin nhắn rỗng của AI vào mảng để chuẩn bị nối dồn text (setMessages logic)
+      setChatLog(prev => [...prev, { role: 'ai', content: '' }]);
 
+      // Gọi API Stream
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
       const res = await fetch(`${API_BASE_URL}/api/ai/chat-stream`, {
           method: 'POST',
@@ -258,31 +270,44 @@ export default function AIAdvisor(props) {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
-      let tempStreamingText = "";
+      let buffer = "";
 
+      // Parse Stream mượt mà (Anti-Lag)
       while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n').filter(line => line.trim() !== '');
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Nối dồn các chunk lấy được, tách bằng \n\n (chuẩn SSE)
+          const messages = buffer.split('\n\n');
+          buffer = messages.pop(); // Giữ lại phần bị cắt dở
 
-          for (const line of lines) {
-              if (line.replace(/^data: /, '').trim() === '[DONE]') {
-                  setChatLog(prev => [...prev, { role: 'ai', content: tempStreamingText }]);
-                  setStreamingText("");
+          for (const msg of messages) {
+              if (msg.trim() === 'data: [DONE]') {
                   setIsTyping(false);
                   abortControllerRef.current = null;
                   return;
               }
 
-              if (line.startsWith('data: ')) {
+              if (msg.startsWith('data: ')) {
                   try {
-                      const parsed = JSON.parse(line.slice(6));
+                      const parsed = JSON.parse(msg.slice(6));
                       if (parsed.error) throw new Error(parsed.error);
                       
-                      tempStreamingText += parsed.text || "";
-                      setStreamingText(tempStreamingText); 
+                      const newText = parsed.text || "";
+                      
+                      // Bắt được JSON chunk, trích xuất chuỗi và chỉ gọi cập nhật State
+                      // để nối chuỗi mới vào tin nhắn AI cuối cùng trong mảng.
+                      setChatLog(prev => {
+                          const newLog = [...prev];
+                          const lastIdx = newLog.length - 1;
+                          newLog[lastIdx] = { 
+                              ...newLog[lastIdx], 
+                              content: newLog[lastIdx].content + newText 
+                          };
+                          return newLog;
+                      });
                   } catch (e) {
                       console.warn("Parse stream chunk error", e);
                   }
@@ -348,19 +373,12 @@ export default function AIAdvisor(props) {
             </div>
           </div>
         ))}
-        {isTyping && !streamingText && (
+        {isTyping && chatLog.length > 0 && chatLog[chatLog.length - 1].role === 'ai' && !chatLog[chatLog.length - 1].content && (
           <div className="flex justify-start">
             <div className="bg-surface-container dark:bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-outline-variant dark:border-gray-700 flex gap-2 items-center h-12">
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce"></div>
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce delay-100"></div>
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce delay-200"></div>
-            </div>
-          </div>
-        )}
-        {isTyping && streamingText && (
-          <div className="flex justify-start">
-            <div className="max-w-[80%] p-4 rounded-2xl text-sm bg-surface-container dark:bg-[#2a2a2a] dark:text-white rounded-tl-none border border-outline-variant dark:border-gray-700">
-               <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm">{streamingText}</ReactMarkdown>
             </div>
           </div>
         )}
@@ -443,10 +461,17 @@ export default function AIAdvisor(props) {
                  if (abortControllerRef.current) {
                      abortControllerRef.current.abort();
                      abortControllerRef.current = null;
-                     if (streamingText.trim()) {
-                         setChatLog(prev => [...prev, { role: 'ai', content: streamingText + "\n\n*[ĐÃ NGẮT BỞI NGƯỜI DÙNG]*" }]);
-                         setStreamingText("");
-                     }
+                     
+                     // Đánh dấu tin nhắn đã ngắt
+                     setChatLog(prev => {
+                         const newLog = [...prev];
+                         const lastIdx = newLog.length - 1;
+                         if (newLog[lastIdx].role === 'ai') {
+                             newLog[lastIdx] = { ...newLog[lastIdx], content: newLog[lastIdx].content + "\n\n*[ĐÃ NGẮT BỞI NGƯỜI DÙNG]*" };
+                         }
+                         return newLog;
+                     });
+                     
                      setIsTyping(false);
                  }
              }} className="mr-2 text-xs text-red-500 font-bold border border-red-500 rounded px-2 hover:bg-red-50 dark:hover:bg-red-900/20">DỪNG</button>
