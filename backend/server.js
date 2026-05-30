@@ -2972,6 +2972,9 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
     try {
         const intentData = await parseUserIntent(message);
+        console.log("\n\n=== DEBUG RAG START ===");
+        console.log("1. Intent Data (Từ AI Router):", intentData);
+        console.log("Is Revenue Intent:", intentData.intent === 'revenue');
 
         // Quét từ khóa Công việc (Tasks)
         if (intentData.intent === 'task') {
@@ -3016,8 +3019,13 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
             queryStr += ` ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT ${recordLimit}`;
 
+            console.log("2. SQL queryStr:", queryStr);
+            console.log("2. SQL queryParams:", queryParams);
+
             const { rows } = await pool.query(queryStr, queryParams);
+            console.log("3. DB Rows length:", rows.length);
             if (rows.length > 0) {
+                console.log("3. Dòng dữ liệu đầu tiên (rows[0]):", rows[0]);
                 // Gói toàn bộ cục JSONB của từng ngày đút vào miệng AI để nó tự đọc và phân tích
                 const revenueData = rows.map(r => `[Ngày ${r.date} - Tổng doanh thu: ${Number(r.total_revenue).toLocaleString('vi-VN')} VNĐ | Chi tiết JSON cơ sở: ${JSON.stringify(r.data)}]`).join('\n');
                 systemContext += `- Dữ liệu báo cáo tài chính nội bộ trích xuất được:\n${revenueData}\n`;
@@ -3049,6 +3057,9 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     }
 
     // Build mảng tin nhắn gửi cho OpenRouter
+    console.log("4. System Context cuối cùng gửi cho AI:", systemContext);
+    console.log("5. Mảng Lịch sử Chat (History) đang chứa:", JSON.stringify(formattedHistory, null, 2));
+
     const messagesForAI = hasData 
         ? [{ role: "system", content: systemContext }, ...formattedHistory, { role: "user", content: message }]
         : [...formattedHistory, { role: "user", content: message }];
