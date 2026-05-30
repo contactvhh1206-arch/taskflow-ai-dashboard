@@ -2965,19 +2965,20 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             hasData = true;
         }
 
-        // 3. Quét từ khóa Doanh thu / Tài chính (Dynamic)
+        // 3. Quét từ khóa Doanh thu / Tài chính (Dynamic JSONB)
         if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền')) {
-            let queryStr = "SELECT org_unit, date, SUM(total_revenue) as total FROM daily_financial_reports WHERE 1=1";
+            // Thay vì gọi org_unit, ta gọi date, total_revenue, và cục data JSONB
+            let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
             const queryParams = [];
             
-            // Bắt từ khóa Cơ sở (ví dụ db41, dbace)
+            // Bắt từ khóa Cơ sở (ví dụ db41, dbace) bằng cách ép kiểu data sang text để tìm kiếm
             const matchOrg = lowerMsg.match(/(db[a-z0-9]+)/i);
             if (matchOrg) {
                 queryParams.push(`%${matchOrg[1].toLowerCase()}%`);
-                queryStr += ` AND lower(org_unit) LIKE $${queryParams.length}`;
+                queryStr += ` AND lower(data::text) LIKE $${queryParams.length}`;
             }
             
-            // Bắt từ khóa Tháng (ví dụ tháng 5, tháng 05)
+            // Bắt từ khóa Tháng (tháng 5, tháng 05)
             const matchMonth = lowerMsg.match(/tháng (\d+)/i);
             if (matchMonth) {
                 const monthStr = matchMonth[1].padStart(2, '0');
@@ -2986,14 +2987,15 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
                 queryStr += ` AND (date LIKE $${queryParams.length - 1} OR date LIKE $${queryParams.length})`;
             }
 
-            queryStr += " GROUP BY org_unit, date ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT 15";
+            queryStr += " ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT 5";
 
             const { rows } = await pool.query(queryStr, queryParams);
             if (rows.length > 0) {
-                const revenueData = rows.map(r => `[${r.org_unit} - Ngày ${r.date}: ${Number(r.total).toLocaleString('vi-VN')} VNĐ]`).join(', ');
-                systemContext += `- Dữ liệu doanh thu tìm thấy: ${revenueData}.\n`;
+                // Gói toàn bộ cục JSONB của từng ngày đút vào miệng AI để nó tự đọc và phân tích
+                const revenueData = rows.map(r => `[Ngày ${r.date} - Tổng doanh thu: ${Number(r.total_revenue).toLocaleString('vi-VN')} VNĐ | Chi tiết JSON cơ sở: ${JSON.stringify(r.data)}]`).join('\n');
+                systemContext += `- Dữ liệu báo cáo tài chính nội bộ trích xuất được:\n${revenueData}\n`;
             } else {
-                systemContext += `- Doanh thu: Không tìm thấy dữ liệu khớp với yêu cầu của sếp.\n`;
+                systemContext += `- Doanh thu: Không tìm thấy bất kỳ dữ liệu nào khớp với yêu cầu tìm kiếm.\n`;
             }
             hasData = true;
         }
@@ -3014,7 +3016,9 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             hasData = true;
         }
     } catch (dbErr) {
-        console.error("Lỗi móc dữ liệu RAG (Bỏ qua để không sập AI):", dbErr);
+        console.error("CRITICAL RAG ERROR:", dbErr);
+        systemContext += `- LƯU Ý KỸ THUẬT: Đã xảy ra lỗi khi trích xuất dữ liệu nội bộ (${dbErr.message}). Hãy báo cáo cho sếp biết hệ thống DB đang lỗi.\n`;
+        hasData = true; // Bật cờ này lên để AI chắc chắn nhận được thông báo lỗi
     }
 
     // Build mảng tin nhắn gửi cho OpenRouter
