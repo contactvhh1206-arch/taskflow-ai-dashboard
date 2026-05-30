@@ -249,7 +249,7 @@ export default function AIAdvisor(props) {
 
     try {
       const token = localStorage.getItem('taskflow_token');
-      let sessionId = props.activeSessionId || 'session_' + Date.now();
+      let sessionId = props.activeSessionId || null;
       
       abortControllerRef.current = new AbortController();
       setIsTyping(true);

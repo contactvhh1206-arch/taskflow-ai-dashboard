@@ -2929,19 +2929,16 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     let { message, session_id } = req.body;
     const user_id = req.user.id;
     
-    // Nếu rỗng, tự động gán Session mới
-    if (!session_id || session_id === 'null') {
-        session_id = 'session_' + Date.now();
-    }
-    
-    // Kiểm tra và auto-create Session trong DB để tránh rỗng user_id / mồ côi
-    const checkSession = await pool.query("SELECT id FROM ai_chat_sessions WHERE id = $1", [session_id]);
-    if (checkSession.rowCount === 0) {
-        await pool.query(
-            "INSERT INTO ai_chat_sessions (id, user_id, title) VALUES ($1, $2, 'Cuộc trò chuyện mới')",
-            [session_id, user_id]
+    // Nếu rỗng HOẶC là ID rác do Frontend tự chế (bắt đầu bằng 'session_')
+    if (!session_id || session_id === 'null' || String(session_id).startsWith('session_')) {
+        // TẠO SESSION CHUẨN XỊN (Dùng crypto.randomUUID để khớp với schema hiện tại)
+        const newSessionId = crypto.randomUUID();
+        const sessionResult = await pool.query(
+            "INSERT INTO ai_chat_sessions (id, user_id, title) VALUES ($1, $2, 'Cuộc trò chuyện mới') RETURNING id",
+            [newSessionId, user_id]
         );
-        console.log("🛠️ Đã auto-create Session mới (Backend DB):", session_id);
+        session_id = sessionResult.rows[0].id;
+        console.log("🛠️ Đã tạo Session UUID chuẩn:", session_id);
     }
     
     console.log("=== ĐANG XỬ LÝ CHAT CHO SESSION ID:", session_id, "===");
