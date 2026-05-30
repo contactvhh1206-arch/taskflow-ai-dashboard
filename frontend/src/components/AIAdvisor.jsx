@@ -249,30 +249,7 @@ export default function AIAdvisor(props) {
 
     try {
       const token = localStorage.getItem('taskflow_token');
-      let sessionId = props.activeSessionId; // Lấy từ props
-      
-      if (!sessionId) {
-          // Tạo session ngầm
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
-          try {
-              const sessionRes = await fetch(`${API_BASE_URL}/api/ai/sessions`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
-              });
-              const sessionData = await sessionRes.json();
-              if (sessionData.success && sessionData.data) {
-                  sessionId = sessionData.data.id;
-                  // Cập nhật lên thẻ cha để Sidebar đồng bộ (Auto-Select)
-                  if (props.onSessionCreated) props.onSessionCreated(sessionId);
-              } else {
-                  throw new Error("Lỗi tạo session");
-              }
-          } catch (e) {
-              setChatLog(prev => [...prev, { role: 'ai', content: '⚠️ Vui lòng chọn hoặc tạo Phiên làm việc (Session) ở bảng bên trái trước khi chat.', isError: true }]);
-              setIsTyping(false);
-              return;
-          }
-      }
+      let sessionId = props.activeSessionId || 'session_' + Date.now();
       
       abortControllerRef.current = new AbortController();
       setIsTyping(true);
@@ -317,6 +294,12 @@ export default function AIAdvisor(props) {
                   try {
                       const parsed = JSON.parse(msg.slice(6));
                       if (parsed.error) throw new Error(parsed.error);
+                      
+                      // Cập nhật session_id từ Backend
+                      if (parsed.new_session_id) {
+                          if (props.onSessionCreated) props.onSessionCreated(parsed.new_session_id);
+                          continue;
+                      }
                       
                       const newText = parsed.text || "";
                       
