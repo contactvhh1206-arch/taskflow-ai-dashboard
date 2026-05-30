@@ -392,21 +392,21 @@ export default function AIAdvisor(props) {
           </div>
         )}
         {chatLog.map((msg, idx) => (
-          <div key={idx} className={`flex ${msg.role === 'ai' ? 'justify-start' : 'justify-end'}`}>
-            <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${msg.role === 'ai' ? (msg.isError ? 'bg-red-50 text-red-600 border border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400 rounded-tl-none' : 'bg-surface-container dark:bg-[#2a2a2a] dark:text-white rounded-tl-none border border-outline-variant dark:border-gray-700') : 'bg-primary text-white rounded-tr-none shadow-md'}`}>
-              {msg.attachment && (
+          <div key={idx} className={`flex ${msg?.role === 'ai' ? 'justify-start' : 'justify-end'}`}>
+            <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${msg?.role === 'ai' ? (msg?.isError ? 'bg-red-50 text-red-600 border border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400 rounded-tl-none' : 'bg-surface-container dark:bg-[#2a2a2a] dark:text-white rounded-tl-none border border-outline-variant dark:border-gray-700') : 'bg-primary text-white rounded-tr-none shadow-md'}`}>
+              {msg?.attachment && (
                  <div className="mb-3 max-w-[200px]">
-                   {msg.attachment.type.startsWith('image/') ? (
-                     <img src={msg.attachment.url} alt="attachment" className="w-full h-auto rounded-lg shadow-sm bg-white" />
+                   {msg?.attachment?.type?.startsWith('image/') ? (
+                     <img src={msg?.attachment?.url} alt="attachment" className="w-full h-auto rounded-lg shadow-sm bg-white" />
                    ) : (
                      <div className="flex items-center gap-2 bg-black/20 p-2 rounded-lg text-xs">
                        <span className="material-symbols-outlined text-[16px]">description</span>
-                       <span className="truncate">{msg.attachment.name}</span>
+                       <span className="truncate">{msg?.attachment?.name || "File đính kèm"}</span>
                      </div>
                    )}
                  </div>
               )}
-              <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm">{msg.content}</ReactMarkdown>
+              <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm">{msg?.content || "⚠️ Lỗi hiển thị tin nhắn"}</ReactMarkdown>
             </div>
           </div>
         ))}

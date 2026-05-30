@@ -2448,7 +2448,7 @@ async function getConversationContext(sessionId, userId) {
 app.get('/api/ai/sessions', authenticateUser, async (req, res) => {
     try {
         const { rows } = await pool.query(
-            "SELECT id, title, created_at FROM ai_chat_sessions WHERE user_id = $1 ORDER BY created_at DESC",
+            "SELECT id, title FROM ai_chat_sessions WHERE user_id = $1 ORDER BY id DESC",
             [req.user.id]
         );
         res.json({ success: true, data: rows });
@@ -2996,9 +2996,8 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         
         // Quét từ khóa Nhân sự / User
         if (lowerMsg.includes('nhân sự') || lowerMsg.includes('người dùng') || lowerMsg.includes('nhân viên')) {
-            const { rows } = await pool.query("SELECT role, COUNT(*) as count FROM users GROUP BY role");
-            const userData = rows.map(r => `[${r.role}: ${r.count} người]`).join(', ');
-            systemContext += `- Phân bổ nhân sự: ${userData}.\n`;
+            const { rows } = await pool.query("SELECT COUNT(*) as count FROM users");
+            systemContext += `- Tổng số nhân sự hệ thống: ${rows[0].count} người.\n`;
             hasData = true;
         }
 
@@ -3073,7 +3072,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         if (line.startsWith('data: ')) {
           try {
             const parsed = JSON.parse(line.slice(6));
-            const chunkText = parsed.choices[0]?.delta?.content || "";
+            const chunkText = parsed.choices?.[0]?.delta?.content || "";
             
             if (chunkText) {
               fullAiResponse += chunkText;
