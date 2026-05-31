@@ -90,7 +90,8 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                if (!t) return false;
                const matchCode = String(t.facilityId || '').toLowerCase().includes(facCode);
                const matchName = String(t.facility || '').toLowerCase().includes(facCode);
-               return matchCode || matchName;
+               const matchRawId = String(t.facilityRawId) === String(user?.facility_id);
+               return matchCode || matchName || matchRawId;
             });
 
             const now = new Date();

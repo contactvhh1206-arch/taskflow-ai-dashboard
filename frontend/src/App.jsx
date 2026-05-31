@@ -933,7 +933,7 @@ function MainDashboard() {
                               isAssignedToMe = true;
                           }
                       } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
-                          if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode)) {
+                          if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode) || String(task.facilityRawId) === String(user?.facility_id)) {
                               isAssignedToMe = true;
                           }
                       }

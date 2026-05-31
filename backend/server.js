@@ -629,6 +629,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
              t.needs_support as "needsSupport",
              u.full_name as pic, u.email as "picId",
              f.name as facility, f.code as "facilityId",
+             t.facility_id as "facilityRawId",
              COUNT(tc.id) AS comment_count
       FROM tasks t
       LEFT JOIN users u ON t.pic_id = u.id
@@ -654,7 +655,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
         query += ` AND (t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
     }
 
-    query += ` GROUP BY t.id, u.full_name, u.email, f.name, f.code ORDER BY t.created_at DESC`;
+    query += ` GROUP BY t.id, t.title, t.description, t.status, t.urgency, t.deadline, t.created_at, t.updated_at, t.needs_support, u.full_name, u.email, f.name, f.code, t.facility_id ORDER BY t.created_at DESC`;
 
     // BƯỚC 3: SỬA LẠI KHỐI TRY-CATCH
     try {
