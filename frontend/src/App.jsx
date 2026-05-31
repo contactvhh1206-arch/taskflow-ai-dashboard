@@ -846,22 +846,8 @@ function MainDashboard() {
         throw new Error(data.error || 'Lỗi server');
       }
     } catch (e) {
-      console.error("Fallback offline create task:", e);
-      const fallbackTask = {
-        id: Date.now(),
-        pic: user.name,
-        deadline: new Date().toISOString().split('T')[0],
-        urgent: false,
-        facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
-        creator_role: user.role,
-          desc: (newTask.desc || "") + " <!--cr:" + user.role + "-->",
-        status: 'todo',
-        ...newTask
-      };
-      setTasks(prev => [fallbackTask, ...prev]);
-      const localTasks = JSON.parse(localStorage.getItem('taskflow_tasks') || '[]');
-      localStorage.setItem('taskflow_tasks', JSON.stringify([fallbackTask, ...localTasks]));
-      showToast('Lưu công việc tạm (Offline mode)');
+      console.error("Lỗi API Tạo công việc:", e);
+      showToast('Lỗi Server: Không thể tạo công việc. Vui lòng tải lại trang!', 'error');
     }
   };
 

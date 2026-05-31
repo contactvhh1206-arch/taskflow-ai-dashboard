@@ -642,17 +642,10 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
     if (ALL_ACCESS_ROLES.includes(role) || (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING')) {
         // Nhóm All-Access: Thấy toàn bộ, không add thêm điều kiện WHERE
     } 
-    else if (role === 'FACILITY_MANAGER') {
-        // CƠ SỞ: Bắt buộc lọc theo facility_id
-        if (!facility_id) return res.status(400).json({ success: false, error: "Tài khoản Quản lý thiếu mã Cơ sở." });
+    else if (role === 'DEPARTMENT_HEAD' || role === 'FACILITY_MANAGER') {
+        if (!facility_id) return res.status(400).json({ success: false, error: "Thiếu mã Cơ sở." });
         params.push(facility_id);
         query += ` AND t.facility_id = $${params.length}`;
-    } 
-    else if (role === 'DEPARTMENT_HEAD') {
-        // PHÒNG BAN: Bắt buộc lọc theo department_code
-        if (!department_code) return res.status(400).json({ success: false, error: "Tài khoản Trưởng phòng thiếu mã Phòng ban." });
-        params.push(department_code);
-        query += ` AND t.department_code = $${params.length}`;
     } 
     else {
         // NHÂN VIÊN THƯỜNG (LOCAL): Chỉ thấy task do mình tạo hoặc được gán
@@ -916,12 +909,11 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           let picQuery = 'SELECT id, facility_id, department_code FROM users WHERE (full_name = $1 OR email = $1)';
           let picParams = [pic];
           
-          if (req.user.role === 'FACILITY_MANAGER') {
+          if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FACILITY_MANAGER') {
               picQuery += ' AND facility_id = $2';
               picParams.push(req.user.facility_id);
-          } else if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
-              // Department Head can only assign to people in their own department
-              picQuery += ' AND (department_code = $2 OR department_id = $2)';
+          } else if (req.user.role === 'FINANCE_DEPT') {
+              picQuery += ' AND department_id = $2';
               picParams.push(insert_dept_code);
           }
           
@@ -951,8 +943,8 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
     }
 
     const insertQuery = `
-      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, department_code, priority_stars, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, priority_level, priority_stars, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
       RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
     `;
       const { rows } = await pool.query(insertQuery, [
@@ -964,7 +956,6 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
         pic_id, 
         insert_facility_id, 
         urgent ? 'URGENT' : 'PRIORITY',
-        normalizedDept,
         priorityStars
       ]);
     
