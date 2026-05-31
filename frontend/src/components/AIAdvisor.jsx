@@ -409,8 +409,12 @@ export default function AIAdvisor(props) {
           </div>
         )}
         {chatLog.map((msg, idx) => (
-          <div key={idx} className={`flex ${msg?.role === 'ai' ? 'justify-start' : 'justify-end'}`}>
-            <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${msg?.role === 'ai' ? (msg?.isError ? 'bg-red-50 text-red-600 border border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400 rounded-tl-none' : 'bg-surface-container dark:bg-[#2a2a2a] dark:text-white rounded-tl-none border border-outline-variant dark:border-gray-700') : 'bg-primary text-white rounded-tr-none shadow-md'}`}>
+          <div key={idx} className={`flex w-full mb-4 ${msg?.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
+              msg?.role === 'user' 
+                ? 'bg-blue-600 text-white rounded-br-none shadow-md' 
+                : (msg?.isError ? 'bg-red-50 text-red-600 border border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400 rounded-bl-none' : 'bg-gray-100 text-gray-800 rounded-bl-none border border-gray-200 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700')
+            }`}>
               {msg?.attachment && (
                  <div className="mb-3 max-w-[200px]">
                    {msg?.attachment?.type?.startsWith('image/') ? (
