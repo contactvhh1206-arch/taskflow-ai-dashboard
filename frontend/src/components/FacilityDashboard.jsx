@@ -87,8 +87,10 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                   return true;
                }
                
-               if (!t || !t.facilityId) return false;
-               return String(t.facilityId).toLowerCase().includes(facCode);
+               if (!t) return false;
+               const matchCode = String(t.facilityId || '').toLowerCase().includes(facCode);
+               const matchName = String(t.facility || '').toLowerCase().includes(facCode);
+               return matchCode || matchName;
             });
 
             const now = new Date();

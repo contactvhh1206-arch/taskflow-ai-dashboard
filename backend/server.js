@@ -645,17 +645,8 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
     else if (role === 'DEPARTMENT_HEAD' || role === 'FACILITY_MANAGER') {
         if (!facility_id) return res.status(400).json({ success: false, error: "Lỗi RBAC: Thiếu mã định danh Cơ sở." });
         
-        // KIỂM SOÁT KIỂU DỮ LIỆU KHẮT KHE (Tuyệt đối không dùng parseInt)
-        let strictFacId = Number(facility_id); 
-        if (!isNaN(strictFacId) && strictFacId > 0) {
-            // Trường hợp 1: Token JWT lưu ID chuẩn (Số nguyên int4 giống Database)
-            params.push(strictFacId);
-            query += ` AND t.facility_id = $${params.length}`;
-        } else {
-            // Trường hợp 2: Token JWT lưu chuỗi String (Code hoặc Name)
-            params.push(facility_id);
-            query += ` AND t.facility_id = (SELECT id FROM facilities WHERE code = $${params.length} OR name = $${params.length} LIMIT 1)`;
-        }
+        params.push(facility_id);
+        query += ` AND t.facility_id = $${params.length}`;
     } 
     else {
         // NHÂN VIÊN THƯỜNG (LOCAL): Chỉ thấy task do mình tạo hoặc được gán
