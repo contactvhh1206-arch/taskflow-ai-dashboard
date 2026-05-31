@@ -78,6 +78,8 @@ export default function AIAdvisor(props) {
 
   const [chatLog, setChatLog] = useState(defaultLog);
   const [isTyping, setIsTyping] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [attachment, setAttachment] = useState(null);
   const fileInputRef = React.useRef(null);
@@ -283,8 +285,9 @@ export default function AIAdvisor(props) {
       abortControllerRef.current = new AbortController();
       setIsTyping(true);
       
-      // Thêm một tin nhắn rỗng của AI vào mảng để chuẩn bị nối dồn text (setMessages logic)
-      setChatLog(prev => [...prev, { role: 'ai', content: '' }]);
+      // Kích hoạt kiến trúc Two-State Stream
+      setIsStreaming(true);
+      setStreamingText("");
 
       // Gọi API Stream
       const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
@@ -320,7 +323,15 @@ export default function AIAdvisor(props) {
       // Parse Stream mượt mà (Anti-Lag)
       while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+              if (currentAiMessage) {
+                  setChatLog(prev => [...prev, { role: 'assistant', content: currentAiMessage }]);
+              }
+              setIsStreaming(false);
+              setStreamingText("");
+              setIsTyping(false);
+              break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           
@@ -330,6 +341,9 @@ export default function AIAdvisor(props) {
 
           for (const msg of messages) {
               if (msg.trim() === 'data: [DONE]') {
+                  setChatLog(prev => [...prev, { role: 'assistant', content: currentAiMessage }]);
+                  setIsStreaming(false);
+                  setStreamingText("");
                   setIsTyping(false);
                   abortControllerRef.current = null;
                   return;
@@ -358,20 +372,8 @@ export default function AIAdvisor(props) {
                       const newText = parsed.text || "";
                       currentAiMessage += newText;
                       
-                      // BẮT BUỘC DÙNG DẠNG DEEP COPY ĐỂ ÉP REACT RENDER TỪNG CHỮ:
-                      setChatLog(prev => {
-                          const newLog = [...prev];
-                          const lastIdx = newLog.length - 1;
-                          
-                          if (lastIdx >= 0) {
-                              // TẠO OBJECT MỚI HOÀN TOÀN ĐỂ THAY ĐỔI REFERENCE
-                              newLog[lastIdx] = { 
-                                  ...newLog[lastIdx], 
-                                  content: currentAiMessage 
-                              };
-                          }
-                          return newLog;
-                      });
+                      // CHỈ UPDATE CHUỖI -> REACT RENDER CỰC NHẸ BÉN
+                      setStreamingText(currentAiMessage);
                   } catch (e) {
                       console.warn("Parse stream chunk error", e);
                   }
@@ -383,18 +385,20 @@ export default function AIAdvisor(props) {
           console.log("Fetch Stream bị ngắt");
       } else {
           console.error("AI Error:", err);
-          // Đảm bảo cập nhật đè lên tin nhắn role: 'ai' cuối cùng thay vì tạo thêm
+          // Đảm bảo cập nhật đè lên tin nhắn role: 'assistant' cuối cùng thay vì tạo thêm
           setChatLog(prev => {
               const newLog = [...prev];
               const lastIdx = newLog.length - 1;
-              if (lastIdx >= 0 && newLog[lastIdx].role === 'ai') {
+              if (lastIdx >= 0 && (newLog[lastIdx].role === 'ai' || newLog[lastIdx].role === 'assistant')) {
                   newLog[lastIdx] = { ...newLog[lastIdx], content: `Xin lỗi, đã xảy ra lỗi: ${err.message}`, isError: true };
               } else {
-                  newLog.push({ role: 'ai', content: `Xin lỗi, đã xảy ra lỗi: ${err.message}`, isError: true });
+                  newLog.push({ role: 'assistant', content: `Xin lỗi, đã xảy ra lỗi: ${err.message}`, isError: true });
               }
               return newLog;
           });
       }
+      setIsStreaming(false);
+      setStreamingText("");
       setIsTyping(false);
     }
   };
@@ -455,7 +459,18 @@ export default function AIAdvisor(props) {
             </div>
           </div>
         ))}
-        {isTyping && chatLog.length > 0 && chatLog[chatLog.length - 1].role === 'ai' && !chatLog[chatLog.length - 1].content && (
+        {/* BONG BÓNG STREAMING ĐỘC LẬP TỐI ƯU HIỆU NĂNG */}
+        {isStreaming && (
+          <div className="flex w-full mb-4 justify-start">
+            <div className="max-w-[85%] p-3 rounded-2xl text-sm bg-gray-100 text-gray-800 rounded-bl-none border border-gray-200 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700">
+               <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-invert max-w-none text-sm">
+                   {streamingText || "..."}
+               </ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        {isTyping && !isStreaming && (
           <div className="flex justify-start">
             <div className="bg-surface-container dark:bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-outline-variant dark:border-gray-700 flex gap-2 items-center h-12">
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce"></div>
