@@ -2476,7 +2476,7 @@ app.get('/api/ai/chat-sessions/:id/messages', authenticateUser, async (req, res)
         );
         
         if (checkSession.rowCount === 0) {
-            return res.status(403).json({ error: "Lỗi phân quyền: Phiên làm việc không tồn tại hoặc không thuộc về bạn." });
+            return res.status(404).json({ error: 'Session không tồn tại hoặc đã bị xóa.' });
         }
 
         const { rows: messages } = await pool.query(
