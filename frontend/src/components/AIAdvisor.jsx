@@ -108,7 +108,6 @@ export default function AIAdvisor(props) {
     const loadHistory = async () => {
         // NGĂN CHẶN XUNG ĐỘT KHI TỰ TẠO SESSION:
         if (isSessionCreatedByMeRef.current) {
-            isSessionCreatedByMeRef.current = false;
             return;
         }
 
@@ -248,8 +247,14 @@ export default function AIAdvisor(props) {
 
   
   const handleAsk = async (overrideQuery) => {
+    // 1. CẮM CỜ KHÓA NGAY LẬP TỨC TRƯỚC KHI LÀM BẤT CỨ VIỆC GÌ
+    isSessionCreatedByMeRef.current = true; 
+
     // CHỐT CHẶN BÊ TÔNG ĐÂY:
-    if (isTyping) return; // Đang stream thì cấm gọi tiếp!
+    if (isTyping) {
+        isSessionCreatedByMeRef.current = false;
+        return; // Đang stream thì cấm gọi tiếp!
+    }
 
     let actualQuery = query;
     if (typeof overrideQuery === 'string') {
@@ -257,7 +262,10 @@ export default function AIAdvisor(props) {
     } else if (overrideQuery && overrideQuery.preventDefault) {
         overrideQuery.preventDefault();
     }
-    if (!actualQuery.trim() && !attachment) return;
+    if (!actualQuery.trim() && !attachment) {
+        isSessionCreatedByMeRef.current = false;
+        return;
+    }
     
     // Ghi nhận câu hỏi của user
     const userQuery = actualQuery.trim() || 'Vui lòng phân tích tệp đính kèm này.';
@@ -287,6 +295,7 @@ export default function AIAdvisor(props) {
           } catch {}
           setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
           setIsTyping(false);
+          isSessionCreatedByMeRef.current = false;
           return;
         }
     }
@@ -343,6 +352,7 @@ export default function AIAdvisor(props) {
               setIsStreaming(false);
               setStreamingText("");
               setIsTyping(false);
+              isSessionCreatedByMeRef.current = false;
               break;
           }
 
@@ -358,6 +368,7 @@ export default function AIAdvisor(props) {
                   setIsStreaming(false);
                   setStreamingText("");
                   setIsTyping(false);
+                  isSessionCreatedByMeRef.current = false;
                   abortControllerRef.current = null;
                   return;
               }
@@ -369,7 +380,6 @@ export default function AIAdvisor(props) {
                       
                       // Cập nhật session_id từ Backend
                       if (parsed.new_session_id) {
-                          isSessionCreatedByMeRef.current = true; // Báo cho useEffect biết là TÔI TẠO SESSION
                           if (props.onSessionCreated) props.onSessionCreated(parsed.new_session_id);
                           sessionId = parsed.new_session_id; // Gán cứng cho biến cục bộ của hàm chat hiện tại
                           console.log("🛠️ Frontend đã đồng bộ UUID mới từ Server:", sessionId);
@@ -414,6 +424,7 @@ export default function AIAdvisor(props) {
       setIsStreaming(false);
       setStreamingText("");
       setIsTyping(false);
+      isSessionCreatedByMeRef.current = false;
     }
   };
 
