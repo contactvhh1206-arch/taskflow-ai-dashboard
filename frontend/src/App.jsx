@@ -781,41 +781,50 @@ function MainDashboard() {
   };
 
   const handleAITaskConfirm = async (draftTasks) => {
-    if (draftTasks && draftTasks.length > 0) {
-      const addedTasks = [];
-      for (const draft of draftTasks) {
-        try {
-          const taskPayload = {
-            pic: user.name,
-            deadline: new Date().toISOString().split('T')[0],
-            urgent: false,
-            facility: user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id,
-            creator_role: user.role,
-          ...draft, desc: (draft.desc || "") + " <!--cr:" + user.role + "-->",
-          };
-          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-user-role': user.role,
-              'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
-            },
-            body: JSON.stringify(taskPayload)
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success) {
-              addedTasks.push(data.data);
-            }
-          }
-        } catch (e) { console.error("Lỗi lưu AI task:", e); }
+    if (!draftTasks || draftTasks.length === 0) return;
+
+    const addedTasks = [];
+    let hasFatalError = false; // Cầu dao ngắt mạch (Circuit Breaker)
+
+    // Lặp tuần tự nhưng sẵn sàng ngắt cầu dao
+    for (const draft of draftTasks) {
+      if (hasFatalError) break; // Kích hoạt ngắt mạch nếu có lỗi trước đó
+
+      try {
+        // BỨC TƯỜNG DỮ LIỆU: Ép cứng facility_id nguyên bản từ User
+        const taskPayload = {
+          ...draft,
+          pic: draft.pic || user.name, 
+          deadline: draft.deadline || new Date().toISOString().split('T')[0],
+          urgent: draft.urgent || false,
+          facility_id: user.facility_id, // BẮT BUỘC TRUYỀN RAW ID XUỐNG BACKEND
+          creator_role: user.role,
+          desc: (draft.desc || "") + " <!--cr:" + user.role + "-->",
+        };
+        
+        // DÙNG AXIOS ĐỂ TỰ ĐỘNG BƠM JWT TOKEN - CẤM DÙNG FETCH RAW
+        const res = await axiosClient.post('/api/tasks', taskPayload);
+        
+        if (res.success) {
+          addedTasks.push(res.data);
+        } else {
+          console.error("Server từ chối lưu task:", res.error);
+          hasFatalError = true; // Sập cầu dao!
+          showToast('Lỗi bảo mật/phân quyền: ' + (res.error || 'Từ chối truy cập (403)'));
+        }
+      } catch (e) { 
+        console.error("Lỗi Exception lưu AI task:", e); 
+        hasFatalError = true; // Sập cầu dao!
+        showToast('Lỗi kết nối nghiêm trọng. Đã ngắt tiến trình.');
       }
-      if (addedTasks.length > 0) {
-        setTasks(prev => [...addedTasks, ...prev]);
-        showToast(`Đã tạo và lưu cứng thành công ${addedTasks.length} công việc từ AI.`);
-      } else {
-        showToast(`Có lỗi xảy ra, không thể lưu công việc.`);
-      }
+    }
+    
+    // Cập nhật UI an toàn
+    if (addedTasks.length > 0) {
+      setTasks(prev => [...addedTasks, ...prev]);
+      showToast(`Đã lưu cứng thành công ${addedTasks.length} công việc từ AI.`);
+    } else if (!hasFatalError) {
+      showToast(`AI không tạo ra dữ liệu hợp lệ.`);
     }
   };
 
