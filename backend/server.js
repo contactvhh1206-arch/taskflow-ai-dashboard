@@ -88,7 +88,25 @@ async function sendRealtimeNotification(taskId, type, message, actorId = null) {
     }
 }
 
-app.use(cors());
+// Khai báo danh sách các Domain được phép truy cập (Whitelist)
+const allowedOrigins = [
+  'http://localhost:5173', 
+  'http://localhost:3000', 
+  process.env.APP_URL,     
+  'https://taskflow-ai-dashboard.vercel.app' 
+];
+
+// Cấu hình CORS khóa IP lạ
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS Policy Violation: Truy cập trái phép!'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

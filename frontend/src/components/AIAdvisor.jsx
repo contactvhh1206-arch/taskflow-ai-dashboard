@@ -290,7 +290,17 @@ export default function AIAdvisor(props) {
           signal: abortControllerRef.current.signal
       });
 
-      if (!res.ok) throw new Error("Lỗi máy chủ");
+      // BẪY XỬ LÝ LỖI 401 Ở ĐÂY:
+      if (!res.ok) {
+          if (res.status === 401) {
+              // Token hết hạn -> Xóa rác, báo lỗi và ép văng ra màn Login
+              localStorage.removeItem('taskflow_token');
+              window.location.href = '/login'; 
+              throw new Error("Phiên đăng nhập đã hết hạn. Đang chuyển hướng về trang Đăng Nhập...");
+          }
+          // Bắt các lỗi 500, 404 khác
+          throw new Error(`Lỗi kết nối máy chủ (Mã: ${res.status})`);
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
