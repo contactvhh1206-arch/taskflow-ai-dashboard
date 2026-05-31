@@ -933,15 +933,25 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           }
       }
 
+      // BỨC TƯỜNG ZERO TRUST TỐI HẬU: CẤM FALLBACK MÙ QUÁNG
       if (!insert_facility_id || insert_facility_id === 'ALL') {
-        const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
-        if (hqFac.rows.length > 0) {
-            insert_facility_id = hqFac.rows[0].id;
-        } else {
-            const anyFac = await pool.query("SELECT id FROM facilities LIMIT 1");
-            if (anyFac.rows.length > 0) insert_facility_id = anyFac.rows[0].id;
-        }
-    }
+          // CHỈ NHÓM TOÀN QUYỀN mới được phép mượn kho của HQ làm mặc định
+          if (ALL_ACCESS_ROLES.includes(req.user.role)) {
+              const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
+              if (hqFac.rows.length > 0) {
+                  insert_facility_id = hqFac.rows[0].id;
+              } else {
+                  const anyFac = await pool.query("SELECT id FROM facilities LIMIT 1");
+                  if (anyFac.rows.length > 0) insert_facility_id = anyFac.rows[0].id;
+              }
+          } else {
+              // NHÓM LOCAL: Bắn hạ ngay lập tức! Không có facility_id thì không được phép tồn tại!
+              return res.status(403).json({ 
+                  success: false, 
+                  error: "LỖI ZERO TRUST: Dữ liệu định danh Cơ sở bị hỏng. Vui lòng đăng nhập lại hoặc liên hệ IT!" 
+              });
+          }
+      }
 
     const insertQuery = `
       INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, created_at, updated_at)
