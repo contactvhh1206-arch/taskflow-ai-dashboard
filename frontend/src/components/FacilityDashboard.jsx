@@ -64,6 +64,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
             
             const myTasks = safeTasks.filter(t => {
+               if (!isHighLevel && !isDeptHead) return true;
                if (isHighLevel && globalFacilityFilter === 'ALL') return true;
                if (isHighLevel && globalFacilityFilter !== 'ALL') {
                    const tTitle = (t.title || '').toLowerCase();

@@ -435,6 +435,13 @@ function MainDashboard() {
      const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
      const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING')));
 
+     // 🚨 BỨC TƯỜNG TIN TƯỞNG BACKEND (TRUST THE BACKEND) 🚨
+     // Nhóm Quản lý Cơ sở (FACILITY_MANAGER) và Nhân viên (LOCAL) đã được Backend lọc 100% chuẩn xác.
+     // Bỏ qua toàn bộ mớ bòng bong so sánh chuỗi bên dưới. Trả về TRUE ngay lập tức!
+     if (!isHighLevel && !isDeptHead) {
+         return true; 
+     }
+
      if (isHighLevel && globalFacilityFilter === 'ALL') return true;
      if (isHighLevel && globalFacilityFilter !== 'ALL') {
          const tTitle = String(t.title || '').toLowerCase();
