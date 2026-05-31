@@ -86,6 +86,7 @@ export default function AIAdvisor(props) {
   const [attachment, setAttachment] = useState(null);
   const fileInputRef = React.useRef(null);
   const isSessionCreatedByMeRef = React.useRef(false);
+  const isFetchingHistory = React.useRef(false);
 
   React.useEffect(() => {
       scrollToBottom();
@@ -108,6 +109,8 @@ export default function AIAdvisor(props) {
     if (!activeSessionId) return; 
     
     const loadHistory = async () => {
+        if (isFetchingHistory.current) return;
+        
         // NGĂN CHẶN XUNG ĐỘT KHI TỰ TẠO SESSION:
         if (isSessionCreatedByMeRef.current) {
             return;
@@ -119,6 +122,7 @@ export default function AIAdvisor(props) {
             return;
         }
 
+        isFetchingHistory.current = true;
         try {
             const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`);
             
@@ -144,6 +148,8 @@ export default function AIAdvisor(props) {
                 if (props.onSessionUpdate) props.onSessionUpdate(null);
                 setChatLog(defaultLog);
             }
+        } finally {
+            isFetchingHistory.current = false;
         }
     };
     loadHistory();
