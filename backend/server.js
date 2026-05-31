@@ -3099,6 +3099,32 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         // --- KHỐI QUÉT DOANH THU / TÀI CHÍNH ---
         const isRevenueIntent = contextMsg.match(/(doanh thu|tài chính|tiền| dt |bán hàng|tổng kết|báo cáo)/i);
         if (isRevenueIntent) {
+            // BƯỚC 1: TRUY XUẤT ĐỊNH DANH CƠ SỞ CHUẨN TỪ DATABASE
+            let standardFacilityName = null;
+            let standardFacilityCode = null;
+
+            if (!hasAllAccess) {
+                // Truy vấn bảng facilities để tìm tên và mã chuẩn
+                const facQuery = `
+                    SELECT name, code 
+                    FROM facilities 
+                    WHERE id::text = $1 OR code = $1 OR name = $1 
+                    LIMIT 1
+                `;
+                const facParams = [String(userFacilityId)];
+                
+                const { rows: facRows } = await pool.query(facQuery, facParams);
+
+                if (facRows.length === 0) {
+                    console.warn(`[CẢNH BÁO RBAC] Không tìm thấy thông tin định danh cơ sở chuẩn cho User ID/Facility ID: ${userFacilityId}`);
+                    systemContext += `- Báo cáo tài chính: Doanh thu 0 đ (Lỗi bất đồng bộ định danh nội bộ).\n`;
+                    hasData = true;
+                } else {
+                    standardFacilityName = facRows[0].name;
+                    standardFacilityCode = facRows[0].code;
+                }
+            }
+
             // Khởi tạo câu lệnh gốc (Bỏ total_revenue đi nếu không có full quyền, chỉ lấy data JSONB)
             let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
             const queryParams = [];
@@ -3123,22 +3149,59 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             const { rows: revenueRows } = await pool.query(queryStr, queryParams);
             if (revenueRows.length > 0) {
                 let revDataText = "";
-                revenueRows.forEach(r => {
+                // Use a for loop instead of forEach so we can safely `continue` if Step 1 failed
+                for (let i = 0; i < revenueRows.length; i++) {
+                    const r = revenueRows[i];
+                    
                     if (hasAllAccess) {
                         revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${Number(r.total_revenue).toLocaleString('vi-VN')} đ]\n`;
                     } else {
-                        // Trích xuất doanh thu cục bộ từ JSONB data
+                        // Nếu Bước 1 thất bại (không tìm ra standardFacilityName), bỏ qua dò tìm
+                        if (!standardFacilityName) {
+                            continue;
+                        }
+
+                        // BƯỚC 2: BÓC TÁCH JSONB VÀ FUZZY MATCHING (Case-insensitive)
                         const rData = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || []);
                         let localRev = 0;
+
                         if (Array.isArray(rData)) {
-                            // req.user.facility_id có thể là ID (f1) hoặc Tên (DUBAI PQ)
-                            const facData = rData.find(f => f.id === userFacilityId || f.name === userFacilityId);
-                            if (facData) localRev = facData.revenue || 0;
+                            // Đề phòng giá trị chuẩn bị Null, ép kiểu an toàn và chuẩn hóa chữ thường
+                            const stdName = String(standardFacilityName || '').toLowerCase().trim();
+                            const stdCode = String(standardFacilityCode || '').toLowerCase().trim();
+
+                            const facData = rData.find(f => {
+                                // Rào chắn Null/Undefined cho dữ liệu JSON rác
+                                const fName = String(f.name || '').toLowerCase().trim();
+                                const fId = String(f.id || '').toLowerCase().trim();
+
+                                if (!fName && !fId) return false; // Bỏ qua Object rác không có định danh
+
+                                // Điều kiện 1: Tên chuẩn bao hàm Tên/ID JSON hoặc ngược lại
+                                const isNameMatch = (fName && stdName && (fName.includes(stdName) || stdName.includes(fName))) ||
+                                                    (fId && stdName && (fId.includes(stdName) || stdName.includes(fId)));
+                                                    
+                                // Điều kiện 2: Khớp chính xác với Mã Code chuẩn
+                                const isCodeMatch = (fName && stdCode && fName === stdCode) || 
+                                                    (fId && stdCode && fId === stdCode);
+
+                                return isNameMatch || isCodeMatch;
+                            });
+
+                            if (facData) {
+                                localRev = facData.revenue || 0;
+                            } else {
+                                console.warn(`[CẢNH BÁO JSONB] Đã quét toàn bộ JSON nhưng không thấy dữ liệu của cơ sở: [${standardFacilityName || standardFacilityCode}] trong báo cáo ngày ${r.date}`);
+                                localRev = 0; // Ngắt luồng bằng giá trị 0 có kiểm soát
+                            }
                         }
                         revDataText += `[Ngày: ${r.date} | Doanh thu cơ sở của bạn: ${Number(localRev).toLocaleString('vi-VN')} đ]\n`;
                     }
-                });
-                systemContext += `- Báo cáo tài chính trong phạm vi cho phép:\n${revDataText}\n`;
+                }
+                
+                if (revDataText) {
+                    systemContext += `- Báo cáo tài chính trong phạm vi cho phép:\n${revDataText}\n`;
+                }
             } else {
                 systemContext += `- Doanh thu: Không tìm thấy dữ liệu khớp yêu cầu.\n`;
             }
