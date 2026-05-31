@@ -1043,7 +1043,12 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/checkin/status', authenticateUser, async (req, res) => {
   try {
-    const todayStr = new Date().toLocaleDateString('vi-VN');
+    const todayStr = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    }).format(new Date());
     const { role, facility_id } = req.user;
     
     // Get facilities
@@ -3059,7 +3064,12 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
         // Quét từ khóa Check-in / Điểm danh
         if (contextMsg.includes('check-in') || contextMsg.includes('checkin') || contextMsg.includes('điểm danh') || contextMsg.includes('chấm công')) {
-            const todayStr = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
+            const todayStr = new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Asia/Ho_Chi_Minh',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }).format(new Date()); // DD/MM/YYYY
             const { rows } = await pool.query(
                 "SELECT org_unit, COUNT(*) as count FROM daily_logs WHERE entry_type = 'Attendance' AND date = $1 GROUP BY org_unit",
                 [todayStr]
