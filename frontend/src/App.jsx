@@ -899,7 +899,10 @@ function MainDashboard() {
   };
 
   useEffect(() => {
-    if (!user?.id || isFetchingTasks.current) return;
+    // 1. Cởi trói điều kiện khắt khe: Chỉ cần tồn tại Object user là cho phép chạy
+    if (!user || isFetchingTasks.current) return;
+
+    let isMounted = true; // Khóa an toàn chống Memory Leak khi component bị hủy
 
     const fetchTasks = async () => {
         isFetchingTasks.current = true;
@@ -995,14 +998,26 @@ function MainDashboard() {
         }
     };
 
-    fetchTasks();
+    const executeFetch = async () => {
+        if (!isMounted) return;
+        fetchTasks(); 
+    };
+
+    executeFetch();
+
     const pollInterval = setInterval(() => {
-        if (!isFetchingTasks.current) {
+        if (!isFetchingTasks.current && isMounted) {
             fetchTasks();
         }
     }, 10000);
-    return () => clearInterval(pollInterval);
-  }, [user?.id]);
+
+    // 2. BỨC TƯỜNG DỌN DẸP (CLEANUP): Tiêu chuẩn Vàng của React 18
+    return () => {
+        isMounted = false;
+        isFetchingTasks.current = false; // BẮT BUỘC MỞ KHÓA CHO LẦN MOUNT SAU!
+        clearInterval(pollInterval);
+    };
+  }, [user]); // Bám theo Object user thay vì user?.id mỏng manh
 
   const fetchFacilityStatuses = async () => {
     try {
