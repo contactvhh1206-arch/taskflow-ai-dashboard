@@ -816,7 +816,8 @@ function MainDashboard() {
       } catch (e) { 
         console.error("Lỗi Exception lưu AI task:", e); 
         hasFatalError = true; // Sập cầu dao!
-        showToast('Lỗi kết nối nghiêm trọng. Đã ngắt tiến trình.');
+        const errorMessage = e.response?.data?.message || e.response?.data?.error || 'Lỗi kết nối nghiêm trọng. Đã ngắt tiến trình.';
+        showToast(errorMessage);
       }
     }
     
@@ -949,17 +950,21 @@ function MainDashboard() {
                       const isVP = user?.role === 'VICE_PRESIDENT';
                       const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
                       const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
-                      const rawFac = user?.facility_code || user?.facility_id || '';
-                      const facCode = (Array.isArray(rawFac) ? rawFac.join(',') : String(rawFac)).toLowerCase();
-                      const tFacCode = String(task?.facilityId || task?.facility || '').toLowerCase();
-                      const tFacName = String(task?.facility || '').toLowerCase();
+                      // Chỉ lấy ID số nguyên để so sánh tuyệt đối
+                      const currentUserFacilityId = Number(user?.facility_id);
+                      const targetTaskFacilityId = Number(task?.facilityRawId);
                       
                       if (isDeptHead) {
                           if (filterTaskForDeptHead(task, user, deptId)) {
                               isAssignedToMe = true;
                           }
                       } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
-                          if (String(task.facilityId).toLowerCase().includes(facCode) || String(task.facility).toLowerCase().includes(facCode) || String(task.facilityRawId) === String(user?.facility_id)) {
+                          // CHỐT CHẶN DUY NHẤT: So sánh tuyệt đối ID Số nguyên của User và Task
+                          if (
+                              currentUserFacilityId && 
+                              targetTaskFacilityId && 
+                              currentUserFacilityId === targetTaskFacilityId
+                          ) {
                               isAssignedToMe = true;
                           }
                       }

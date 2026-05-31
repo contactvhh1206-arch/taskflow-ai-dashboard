@@ -924,11 +924,15 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           const picUser = await pool.query(picQuery, picParams);
           
           if (picUser.rows.length === 0) {
-              if (req.user.role === 'FACILITY_MANAGER' || req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
+              const checkExist = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
+              if (checkExist.rows.length > 0) {
+                  if (req.user.role === 'FACILITY_MANAGER' || req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
                   return res.status(403).json({message: "Lá»—i 403: KhÃ´ng Ä‘Æ°á»£c gÃ¡n chÃ©o nhÃ¢n sá»± ngoÃ i tháº©m quyá»n!"});
+                  } else {
+                      pic_id = checkExist.rows[0].id;
+                  }
               } else {
-                   const checkExist = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
-                   if (checkExist.rows.length > 0) pic_id = checkExist.rows[0].id;
+                  pic_id = null;
               }
           } else {
               pic_id = picUser.rows[0].id;
@@ -1047,8 +1051,8 @@ app.post('/api/login', async (req, res) => {
                 const tokenPayload = {
                     id: user.id,
                     role: user.role_name,
-                    facility_id: user.managed_facilities || user.facility_name || 'ALL',
-                    facility_code: user.facility_code || 'ALL',
+                    facility_id: user.facility_id || null,
+                    facility_code: user.facility_code || null,
                     department_id: user.department_id || null,
                     department_code: user.department_code || null
                 };
