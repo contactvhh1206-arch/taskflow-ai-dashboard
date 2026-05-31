@@ -298,6 +298,11 @@ export default function AIAdvisor(props) {
               window.location.href = '/login'; 
               throw new Error("Phiên đăng nhập đã hết hạn. Đang chuyển hướng về trang Đăng Nhập...");
           }
+          if (res.status === 403 || res.status === 404) {
+              // Phiên chat bị mồ côi hoặc xóa -> Dọn State để tạo mới
+              if (props.onSessionUpdate) props.onSessionUpdate(null);
+              throw new Error("Phiên làm việc đã bị vô hiệu hóa do hệ thống Reset. Vui lòng gửi lại tin nhắn để bắt đầu phiên mới.");
+          }
           // Bắt các lỗi 500, 404 khác
           throw new Error(`Lỗi kết nối máy chủ (Mã: ${res.status})`);
       }

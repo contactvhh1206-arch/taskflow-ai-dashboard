@@ -2972,6 +2972,17 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         );
         session_id = sessionResult.rows[0].id;
         console.log("🛠️ Đã tạo Session UUID chuẩn:", session_id);
+    } else {
+        // KIỂM TRA XEM SESSION CÒN TỒN TẠI KHÔNG (CHỐNG MỒ CÔI DO RESET)
+        const checkSession = await pool.query('SELECT id FROM ai_chat_sessions WHERE id = $1', [session_id]);
+        if (checkSession.rowCount === 0) {
+            const currentTime = Date.now();
+            await pool.query(
+                "INSERT INTO ai_chat_sessions (id, user_id, title, timestamp) VALUES ($1, $2, $3, $4)",
+                [session_id, user_id, 'Cuộc trò chuyện mới (Phục hồi)', currentTime]
+            );
+            console.log("🛠️ Đã tạo lại Session bị mồ côi:", session_id);
+        }
     }
     
     console.log("=== ĐANG XỬ LÝ CHAT CHO SESSION ID:", session_id, "===");
