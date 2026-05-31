@@ -2943,8 +2943,10 @@ console.log("=== BINGO! ROUTE AI STREAM ĐĐƯỢC LOAD VÀO SERVER ===");
 app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
   // 1. THIẾT LẬP HEADER CHUẨN SSE
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // TẮT BUFFERING CỦA NGINX TRÊN RENDER
+  res.flushHeaders(); // Ép gửi Header ngay lập tức
 
   // 2. ANTI-TIMEOUT: Gửi ngay một comment rỗng để ép Render mở luồng kết nối (Bypass 15s limit)
   res.write(':\n\n');

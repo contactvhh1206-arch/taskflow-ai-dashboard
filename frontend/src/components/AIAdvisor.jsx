@@ -83,6 +83,7 @@ export default function AIAdvisor(props) {
   const [isRecording, setIsRecording] = useState(false);
   const [attachment, setAttachment] = useState(null);
   const fileInputRef = React.useRef(null);
+  const isSessionCreatedByMeRef = React.useRef(false);
 
   React.useEffect(() => {
       scrollToBottom();
@@ -105,6 +106,12 @@ export default function AIAdvisor(props) {
     if (!activeSessionId) return; 
     
     const loadHistory = async () => {
+        // NGĂN CHẶN XUNG ĐỘT KHI TỰ TẠO SESSION:
+        if (isSessionCreatedByMeRef.current) {
+            isSessionCreatedByMeRef.current = false;
+            return;
+        }
+
         // TUYỆT ĐỐI KHÔNG FETCH KHI ĐANG STREAM / ĐANG GÕ PHÍM 
         if (isTyping || isStreaming) {
             console.warn("Đang stream AI, từ chối fetch lịch sử để bảo vệ UI!");
@@ -362,6 +369,7 @@ export default function AIAdvisor(props) {
                       
                       // Cập nhật session_id từ Backend
                       if (parsed.new_session_id) {
+                          isSessionCreatedByMeRef.current = true; // Báo cho useEffect biết là TÔI TẠO SESSION
                           if (props.onSessionCreated) props.onSessionCreated(parsed.new_session_id);
                           sessionId = parsed.new_session_id; // Gán cứng cho biến cục bộ của hàm chat hiện tại
                           console.log("🛠️ Frontend đã đồng bộ UUID mới từ Server:", sessionId);
