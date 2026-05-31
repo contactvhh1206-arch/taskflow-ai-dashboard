@@ -1233,7 +1233,7 @@ app.post('/api/ai/auto-tasking', authenticateUser, async (req, res) => {
     }
 
     const systemPrompt = `Báº¡n lÃ  má»™t AI Ä‘iá»u phá»‘i CÃ´ng viá»‡c xuáº¥t sáº¯c. Nhiá»‡m vá»¥: Äá»c biÃªn báº£n cuá»™c há»p vÃ  tá»± Ä‘á»™ng trÃ­ch xuáº¥t cÃ¡c cÃ´ng viá»‡c cáº§n lÃ m thÃ nh Ä‘á»‹nh dáº¡ng JSON strict.
-TrÃ­ch xuáº¥t máº£ng "tasks" vá»›i cáº¥u trÃºc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, máº·c Ä‘á»‹nh 17:00 náº¿u khÃ´ng cÃ³ giá»), "target_facility" (TÃªn cÆ¡ sá»Ÿ, vÃ­ dá»¥: CÆ¡ sá»Ÿ 1), "priority_level" (QuÃ©t vÄƒn báº£n: Náº¿u cÃ³ 'kháº©n cáº¥p', 'gáº¥p', 'ngay', 'há»a tá»‘c' -> 'URGENT'. Náº¿u khÃ´ng -> 'PRIORITY').`;
+TrÃ­ch xuáº¥t máº£ng "tasks" vá»›i cáº¥u trÃºc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, máº·c Ä‘á»‹nh 17:00 náº¿u khÃ´ng cÃ³ giá»), "target_facility" (TÃªn cÆ¡ sá»Ÿ, vÃ­ dá»¥: CÆ¡ sá»Ÿ 1), "priority_level" (QuÃ©t vÄƒn báº£n: Náº¿u cÃ³ 'kháº©n cáº¥p', 'gáº¥p', 'ngay', 'há»a tá»‘c' -> 'URGENT'. Náº¿u khÃ´ng -> 'PRIORITY'). \nLƯU Ý TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trách), CHỈ trích xuất khi văn bản NÊU ĐÍCH DANH tên một cá nhân cụ thể. Nếu văn bản chỉ dùng các từ chung chung (như 'nhân viên', 'kỹ thuật viên', 'lễ tân'...) hoặc KHÔNG CÓ tên người, BẮT BUỘC trả về trường 'pic' là một chuỗi rỗng "". Tuyệt đối không được tự bịa ra tên người hoặc dùng lại tên cơ sở.`;
 
     const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
     const aiConfig = configRows.length > 0 ? configRows[0].data : {};

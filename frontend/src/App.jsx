@@ -791,10 +791,11 @@ function MainDashboard() {
       if (hasFatalError) break; // Kích hoạt ngắt mạch nếu có lỗi trước đó
 
       try {
-        // BỨC TƯỜNG DỮ LIỆU: Ép cứng facility_id nguyên bản từ User
+        // BỨC TƯỜNG DỮ LIỆU: Tôn trọng sự thật, không ép kiểu bừa bãi
         const taskPayload = {
           ...draft,
-          pic: draft.pic || user.name, 
+          // Nếu AI trả về rỗng, giữ nguyên chuỗi rỗng để Backend nhận diện và gán pic_id = null
+          pic: draft.pic ? draft.pic.trim() : "", 
           deadline: draft.deadline || new Date().toISOString().split('T')[0],
           urgent: draft.urgent || false,
           facility_id: user.facility_id, // BẮT BUỘC TRUYỀN RAW ID XUỐNG BACKEND
