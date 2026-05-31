@@ -616,9 +616,12 @@ app.delete('/api/users/:id', authenticateUser, checkAdmin, async (req, res) => {
 const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'];
 
 app.get('/api/tasks', authenticateUser, async (req, res) => {
-  try {
-    const { role, facility_id, department_code, department_id, id } = req.user;
-    
+    // BƯỚC 1: XÁC THỰC THAM SỐ ĐẦU VÀO TRÁNH UNDEFINED CRASH
+    const { role, facility_id, department_code, id } = req.user;
+    if (!role || !id) {
+        return res.status(403).json({ success: false, error: "Token không hợp lệ hoặc thiếu định danh cốt lõi." });
+    }
+
     let query = `
       SELECT t.id, t.title, t.description as desc, t.status, t.urgency as urgent, 
              TO_CHAR(t.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
@@ -634,24 +637,39 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
       WHERE 1=1
     `;
     const params = [];
-    const userDept = normalizeDept(department_code || department_id);
 
-    if (ALL_ACCESS_ROLES.includes(role)) {
-        // Nhóm All-Access: Không áp dụng điều kiện lọc bổ sung
-    } else {
-        // Nhóm Local: Áp dụng chung cho FACILITY_MANAGER, LOCAL...
-        params.push(department_code, id, id);
-        query += ` AND (t.department_code = $${params.length - 2} OR t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
+    // BƯỚC 2: BỨC TƯỜNG LỬA RBAC ĐA LỚP
+    if (ALL_ACCESS_ROLES.includes(role) || (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING')) {
+        // Nhóm All-Access: Thấy toàn bộ, không add thêm điều kiện WHERE
+    } 
+    else if (role === 'FACILITY_MANAGER') {
+        // CƠ SỞ: Bắt buộc lọc theo facility_id
+        if (!facility_id) return res.status(400).json({ success: false, error: "Tài khoản Quản lý thiếu mã Cơ sở." });
+        params.push(facility_id);
+        query += ` AND t.facility_id = $${params.length}`;
+    } 
+    else if (role === 'DEPARTMENT_HEAD') {
+        // PHÒNG BAN: Bắt buộc lọc theo department_code
+        if (!department_code) return res.status(400).json({ success: false, error: "Tài khoản Trưởng phòng thiếu mã Phòng ban." });
+        params.push(department_code);
+        query += ` AND t.department_code = $${params.length}`;
+    } 
+    else {
+        // NHÂN VIÊN THƯỜNG (LOCAL): Chỉ thấy task do mình tạo hoặc được gán
+        params.push(id, id);
+        query += ` AND (t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
     }
-      
+
     query += ` GROUP BY t.id, u.full_name, u.email, f.name, f.code ORDER BY t.created_at DESC`;
 
-    const { rows } = await pool.query(query, params);
-    res.json({ success: true, data: rows });
-  } catch (error) {
-    console.error("Lá»—i chi tiáº¿t tá»« DB:", error.message, error.stack);
-    res.status(500).json({ error: 'Lá»—i server.' });
-  }
+    // BƯỚC 3: SỬA LẠI KHỐI TRY-CATCH
+    try {
+        const { rows } = await pool.query(query, params);
+        res.json({ success: true, data: rows });
+    } catch (dbErr) {
+        console.error("[CRITICAL DB ERROR /api/tasks]:", dbErr.message);
+        res.status(500).json({ success: false, error: "Lỗi truy xuất dữ liệu từ hệ thống. Vui lòng liên hệ Admin." });
+    }
 });
 
 app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
