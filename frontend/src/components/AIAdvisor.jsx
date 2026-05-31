@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import axiosClient from '../api/axiosClient';
 import { fetchHistory, fetchAiSessions, saveAiSession, streamAIChat } from '../services/dataService.js';
 
@@ -422,7 +423,7 @@ export default function AIAdvisor(props) {
                    )}
                  </div>
               )}
-              <ReactMarkdown className="prose dark:prose-invert max-w-none text-sm">{msg?.content ?? "⚠️ Lỗi hiển thị tin nhắn"}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-invert max-w-none text-sm">{msg?.content ?? "⚠️ Lỗi hiển thị tin nhắn"}</ReactMarkdown>
             </div>
           </div>
         ))}
@@ -509,13 +510,13 @@ export default function AIAdvisor(props) {
             <span className="material-symbols-outlined text-[20px]">{isRecording ? 'mic' : 'mic_none'}</span>
             {isRecording && <span className="absolute inset-0 rounded-full border border-error animate-ping opacity-50"></span>}
           </button>
-          {isTyping && abortControllerRef.current && (
+          <input type="text" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAsk()} placeholder="Ví dụ: So sánh hiệu suất trực ca của Cơ sở 1 và Cơ sở 2..." className="flex-1 min-w-0 bg-surface-container dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl pl-[5.5rem] pr-4 py-3 outline-none focus:ring-2 focus:ring-secondary text-sm dark:text-white transition-all shadow-inner relative" />
+          
+          {isTyping && abortControllerRef.current ? (
              <button onClick={() => {
                  if (abortControllerRef.current) {
                      abortControllerRef.current.abort();
                      abortControllerRef.current = null;
-                     
-                     // Đánh dấu tin nhắn đã ngắt
                      setChatLog(prev => {
                          const newLog = [...prev];
                          const lastIdx = newLog.length - 1;
@@ -524,15 +525,16 @@ export default function AIAdvisor(props) {
                          }
                          return newLog;
                      });
-                     
                      setIsTyping(false);
                  }
-             }} className="mr-2 text-xs text-red-500 font-bold border border-red-500 rounded px-2 hover:bg-red-50 dark:hover:bg-red-900/20">DỪNG</button>
+             }} className="bg-red-500 hover:bg-red-600 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>stop</span> <span className="hidden sm:inline">Dừng</span>
+             </button>
+          ) : (
+             <button onClick={handleAsk} disabled={(!query.trim() && !attachment) || isTyping} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
+               <span className="material-symbols-outlined">send</span> <span className="hidden sm:inline">Gửi</span>
+             </button>
           )}
-          <input type="text" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAsk()} placeholder="Ví dụ: So sánh hiệu suất trực ca của Cơ sở 1 và Cơ sở 2..." className="flex-1 min-w-0 bg-surface-container dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl pl-[5.5rem] pr-4 py-3 outline-none focus:ring-2 focus:ring-secondary text-sm dark:text-white transition-all shadow-inner relative" />
-          <button onClick={handleAsk} disabled={(!query.trim() && !attachment) || isTyping} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
-            <span className="material-symbols-outlined">send</span> <span className="hidden sm:inline">Gửi</span>
-          </button>
         </div>
       </div>
     </div>
