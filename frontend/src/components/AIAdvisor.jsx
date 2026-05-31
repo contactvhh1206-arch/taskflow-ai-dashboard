@@ -86,6 +86,16 @@ export default function AIAdvisor(props) {
   }, [chatLog]);
 
   React.useEffect(() => {
+    // Cleanup function: Kích hoạt khi Component bị tháo dỡ (Unmount / Đóng Modal)
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log("🛠️ Đã tiêu diệt luồng Stream ngầm do tắt Modal.");
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
     currentSessionIdRef.current = activeSessionId;
     
     // CHẶN NGAY: Nếu không có session hoặc AI ĐANG GÕ THÌ CẤM LOAD LỊCH SỬ ĐÈ LÊN
@@ -217,6 +227,9 @@ export default function AIAdvisor(props) {
 
   
   const handleAsk = async (overrideQuery) => {
+    // CHỐT CHẶN BÊ TÔNG ĐÂY:
+    if (isTyping) return; // Đang stream thì cấm gọi tiếp!
+
     let actualQuery = query;
     if (typeof overrideQuery === 'string') {
         actualQuery = overrideQuery;
