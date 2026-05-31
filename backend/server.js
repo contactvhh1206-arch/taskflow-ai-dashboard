@@ -93,7 +93,9 @@ const allowedOrigins = [
   'http://localhost:5173', 
   'http://localhost:3000', 
   process.env.APP_URL,     
-  'https://taskflow-ai-dashboard.vercel.app' 
+  'https://taskflow-ai-dashboard.vercel.app',
+  'https://hubdb.app',
+  'https://www.hubdb.app'
 ];
 
 // Cấu hình CORS khóa IP lạ
