@@ -101,10 +101,16 @@ export default function AIAdvisor(props) {
   React.useEffect(() => {
     currentSessionIdRef.current = activeSessionId;
     
-    // CHẶN NGAY: Nếu không có session hoặc AI ĐANG GÕ THÌ CẤM LOAD LỊCH SỬ ĐÈ LÊN
-    if (!activeSessionId || isTyping) return; 
+    // KHÓA RACE CONDITION: Nếu không có session, hủy ngay
+    if (!activeSessionId) return; 
     
     const loadHistory = async () => {
+        // TUYỆT ĐỐI KHÔNG FETCH KHI ĐANG STREAM / ĐANG GÕ PHÍM 
+        if (isTyping || isStreaming) {
+            console.warn("Đang stream AI, từ chối fetch lịch sử để bảo vệ UI!");
+            return;
+        }
+
         try {
             const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`);
             
@@ -133,7 +139,7 @@ export default function AIAdvisor(props) {
         }
     };
     loadHistory();
-  }, [activeSessionId, isTyping]);
+  }, [activeSessionId]);
 
 
 
