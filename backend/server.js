@@ -903,10 +903,11 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
       else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
 
-      // 2. KIá»‚M TRA CHÃ‰O PIC (NgÆ°á»i phá»¥ trÃ¡ch)
+      // 2. KIỂM TRA CHÉO PIC (Người phụ trách) VÀ CHẶN GÁN VIỆC NGOÀI CƠ SỞ
       let pic_id = null;
       if (pic) {
-          let picQuery = 'SELECT id, facility_id, department_code FROM users WHERE (full_name = $1 OR email = $1)';
+          // XÓA BỎ department_code KHỎI SELECT. CHỈ LẤY ID LÀ ĐỦ!
+          let picQuery = 'SELECT id FROM users WHERE (full_name = $1 OR email = $1)';
           let picParams = [pic];
           
           if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FACILITY_MANAGER') {
