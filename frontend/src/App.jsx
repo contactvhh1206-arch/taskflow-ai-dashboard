@@ -366,6 +366,7 @@ function MainDashboard() {
 
   React.useEffect(() => {
     const fetchSessions = async () => {
+      console.trace("ĐANG GỌI API SESSIONS");
       try {
         const res = await axiosClient.get('/api/ai/sessions');
         if (res.success && res.data) {
