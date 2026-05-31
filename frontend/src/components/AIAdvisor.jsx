@@ -358,11 +358,17 @@ export default function AIAdvisor(props) {
                       const newText = parsed.text || "";
                       currentAiMessage += newText;
                       
-                      // BẮT BUỘC DÙNG DẠNG NÀY ĐỂ ÉP REACT RENDER TỪNG CHỮ:
+                      // BẮT BUỘC DÙNG DẠNG DEEP COPY ĐỂ ÉP REACT RENDER TỪNG CHỮ:
                       setChatLog(prev => {
                           const newLog = [...prev];
-                          if (newLog.length > 0) {
-                              newLog[newLog.length - 1].content = currentAiMessage;
+                          const lastIdx = newLog.length - 1;
+                          
+                          if (lastIdx >= 0) {
+                              // TẠO OBJECT MỚI HOÀN TOÀN ĐỂ THAY ĐỔI REFERENCE
+                              newLog[lastIdx] = { 
+                                  ...newLog[lastIdx], 
+                                  content: currentAiMessage 
+                              };
                           }
                           return newLog;
                       });
