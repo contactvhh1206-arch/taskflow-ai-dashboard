@@ -335,6 +335,7 @@ const filterTaskForDeptHead = (t, currentUser, deptId) => {
 
 function MainDashboard() {
   const isFetchingTasks = useRef(false);
+  const notifiedTaskIds = useRef(new Set()); // Bức tường chặn Spam Ping
   const { user, logout } = useContext(AuthContext);
   const [viewMode, setViewMode] = useState('kanban');
   const [darkMode, setDarkMode] = useState(false);
@@ -972,15 +973,18 @@ function MainDashboard() {
                   
                   if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
                       if (!prevIds.has(task.id) && task.status === 'todo') {
-                          const newNotif = {
-                              title: 'Công việc mới',
-                              message: 'Bạn được giao công việc: ' + task.title,
-                              time: new Date().toLocaleTimeString('vi-VN')
-                          };
-                          const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
-                          localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
-                          window.dispatchEvent(new Event('taskflow_notify'));
-                          setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
+                          if (!notifiedTaskIds.current.has(`task_${task.id}`)) {
+                              notifiedTaskIds.current.add(`task_${task.id}`);
+                              const newNotif = {
+                                  title: 'Công việc mới',
+                                  message: 'Bạn được giao công việc: ' + task.title,
+                                  time: new Date().toLocaleTimeString('vi-VN')
+                              };
+                              const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+                              localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
+                              window.dispatchEvent(new Event('taskflow_notify'));
+                              setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
+                          }
                       }
                   }
                   
@@ -990,15 +994,18 @@ function MainDashboard() {
                       const lc = task.latest_comment.toLowerCase();
                       const isMentioned = myNames.some(n => lc.includes(n)) || lc.includes('@all') || lc.includes('@tất cả') || (lc.includes('@ban giám đốc') && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role));
                       if (isMentioned && String(task.latest_comment_user_id) !== String(user.id)) {
-                          const newNotif = {
-                              title: 'Nhắc tên (@)',
-                              message: 'Bạn được nhắc đến trong bình luận của công việc: ' + task.title,
-                              time: new Date().toLocaleTimeString('vi-VN')
-                          };
-                          const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
-                          localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
-                          window.dispatchEvent(new Event('taskflow_notify'));
-                          setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
+                          if (!notifiedTaskIds.current.has(`comment_${task.id}_${currC}`)) {
+                              notifiedTaskIds.current.add(`comment_${task.id}_${currC}`);
+                              const newNotif = {
+                                  title: 'Nhắc tên (@)',
+                                  message: 'Bạn được nhắc đến trong bình luận của công việc: ' + task.title,
+                                  time: new Date().toLocaleTimeString('vi-VN')
+                              };
+                              const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+                              localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
+                              window.dispatchEvent(new Event('taskflow_notify'));
+                              setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
+                          }
                       }
                   }
               });
@@ -1032,7 +1039,7 @@ function MainDashboard() {
         isFetchingTasks.current = false; // BẮT BUỘC MỞ KHÓA CHO LẦN MOUNT SAU!
         clearInterval(pollInterval);
     };
-  }, [user]); // Bám theo Object user thay vì user?.id mỏng manh
+  }, [user?.id, user?.role, user?.facility_id]); // BỨC TƯỜNG HIỆU NĂNG: Chỉ bám theo primitive properties để chống re-render vô tận
 
   const fetchFacilityStatuses = async () => {
     try {
