@@ -456,8 +456,14 @@ function MainDashboard() {
      }
      
      if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
-         const tFacCode = String(t?.facilityId || t?.facility || '').toLowerCase();
-         return tFacCode.includes(String(globalFacilityFilter).toLowerCase());
+         const filterLower = String(globalFacilityFilter).toLowerCase();
+         const tFacCode = String(t?.facilityId || '').toLowerCase();
+         const tFacName = String(t?.facility || '').toLowerCase();
+         
+         // BỨC TƯỜNG THÉP: So khớp ID nguyên bản (Tuyệt đối không lệch)
+         const matchRawId = t?.facilityRawId !== undefined && String(t.facilityRawId) === String(user?.facility_id);
+         
+         return tFacCode.includes(filterLower) || tFacName.includes(filterLower) || matchRawId;
      }
 
      return true;
