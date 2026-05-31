@@ -3119,6 +3119,18 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         hasData = true; // Bật cờ này lên để AI chắc chắn nhận được thông báo lỗi
     }
 
+    // Tiêm Ngữ Cảnh RAG Vector DB (Chống Ảo giác)
+    try {
+        const ragResults = await searchKnowledgeBase(message, req.user, 3);
+        if (ragResults && ragResults.length > 0) {
+            const ragContext = ragResults.map(r => r.content).join('\n---\n');
+            systemContext += `\n- Sử dụng nội dung nội bộ sau để trả lời (Data RAG):\n${ragContext}\n`;
+            hasData = true;
+        }
+    } catch (ragErr) {
+        console.error("Lỗi truy vấn Vector DB RAG:", ragErr);
+    }
+
     // Build mảng tin nhắn gửi cho OpenRouter
     console.log("4. System Context cuối cùng gửi cho AI:", systemContext);
     console.log("5. Mảng Lịch sử Chat (History) đang chứa:", JSON.stringify(formattedHistory, null, 2));

@@ -315,6 +315,7 @@ export default function AIAdvisor(props) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let buffer = "";
+      let currentAiMessage = "";
 
       // Parse Stream mượt mà (Anti-Lag)
       while (true) {
@@ -355,17 +356,14 @@ export default function AIAdvisor(props) {
                       }
                       
                       const newText = parsed.text || "";
+                      currentAiMessage += newText;
                       
-                      // Bắt được JSON chunk, trích xuất chuỗi và chỉ gọi cập nhật State
-                      // để nối chuỗi mới vào tin nhắn AI cuối cùng trong mảng.
+                      // BẮT BUỘC DÙNG DẠNG NÀY ĐỂ ÉP REACT RENDER TỪNG CHỮ:
                       setChatLog(prev => {
                           const newLog = [...prev];
-                          const lastIdx = newLog.length - 1;
-                          if (lastIdx < 0 || !newLog[lastIdx]) return newLog;
-                          newLog[lastIdx] = { 
-                              ...newLog[lastIdx], 
-                              content: newLog[lastIdx].content + newText 
-                          };
+                          if (newLog.length > 0) {
+                              newLog[newLog.length - 1].content = currentAiMessage;
+                          }
                           return newLog;
                       });
                   } catch (e) {
