@@ -3149,12 +3149,16 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             const { rows: revenueRows } = await pool.query(queryStr, queryParams);
             if (revenueRows.length > 0) {
                 let revDataText = "";
+                let totalMonthRevenue = 0; // Khởi tạo biến tính tổng Doanh thu
+                
                 // Use a for loop instead of forEach so we can safely `continue` if Step 1 failed
                 for (let i = 0; i < revenueRows.length; i++) {
                     const r = revenueRows[i];
                     
                     if (hasAllAccess) {
-                        revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${Number(r.total_revenue).toLocaleString('vi-VN')} đ]\n`;
+                        const dailySysRev = Number(r.total_revenue) || 0;
+                        totalMonthRevenue += dailySysRev;
+                        revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${dailySysRev.toLocaleString('vi-VN')} đ]\n`;
                     } else {
                         // Nếu Bước 1 thất bại (không tìm ra standardFacilityName), bỏ qua dò tìm
                         if (!standardFacilityName) {
@@ -3189,18 +3193,20 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
                             });
 
                             if (facData) {
-                                localRev = facData.revenue || 0;
+                                localRev = Number(facData.revenue) || 0;
                             } else {
                                 console.warn(`[CẢNH BÁO JSONB] Đã quét toàn bộ JSON nhưng không thấy dữ liệu của cơ sở: [${standardFacilityName || standardFacilityCode}] trong báo cáo ngày ${r.date}`);
                                 localRev = 0; // Ngắt luồng bằng giá trị 0 có kiểm soát
                             }
                         }
-                        revDataText += `[Ngày: ${r.date} | Doanh thu cơ sở của bạn: ${Number(localRev).toLocaleString('vi-VN')} đ]\n`;
+                        totalMonthRevenue += localRev; // Cộng dồn số tiền cục bộ
+                        revDataText += `[Ngày: ${r.date} | Doanh thu cơ sở của bạn: ${localRev.toLocaleString('vi-VN')} đ]\n`;
                     }
                 }
                 
                 if (revDataText) {
                     systemContext += `- Báo cáo tài chính trong phạm vi cho phép:\n${revDataText}\n`;
+                    systemContext += `=> [TỔNG KẾT HỆ THỐNG ĐÃ TÍNH SẴN]: Tổng doanh thu của các ngày trên cộng lại là: ${totalMonthRevenue.toLocaleString('vi-VN')} đ. AI phải sử dụng con số Tổng này khi được hỏi, tuyệt đối không tự cộng nhẩm!\n`;
                 }
             } else {
                 systemContext += `- Doanh thu: Không tìm thấy dữ liệu khớp yêu cầu.\n`;
