@@ -978,10 +978,10 @@ app.delete('/api/system/reset', authenticateUser, async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('TRUNCATE TABLE tasks RESTART IDENTITY CASCADE');
-      await client.query('TRUNCATE TABLE company_knowledge_base RESTART IDENTITY CASCADE');
-      await client.query('TRUNCATE TABLE ai_chat_sessions RESTART IDENTITY CASCADE');
-      await client.query('TRUNCATE TABLE ai_chat_messages RESTART IDENTITY CASCADE');
+      // CÁC LỆNH SQL THỰC THI CHUẨN MỰC:
+      await client.query('TRUNCATE TABLE tasks RESTART IDENTITY CASCADE'); // CASCADE sẽ tự dọn luôn task_comments và notifications
+      await client.query('TRUNCATE TABLE daily_checkins RESTART IDENTITY CASCADE'); // Đã bổ sung dọn rác Check-in
+      await client.query('TRUNCATE TABLE ai_chat_sessions RESTART IDENTITY CASCADE'); // CASCADE sẽ tự dọn luôn ai_chat_messages
       await client.query('DELETE FROM daily_logs WHERE entry_type != $1', ['SYSTEM_CONFIG']);
       await client.query('DELETE FROM daily_financial_reports');
       await client.query('COMMIT');
