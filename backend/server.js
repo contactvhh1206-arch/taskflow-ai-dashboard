@@ -1768,19 +1768,29 @@ app.get('/api/reports', authenticateUser, async (req, res) => {
     let query = 'SELECT * FROM daily_financial_reports WHERE 1=1';
     const params = [];
     
-    if (role === 'FACILITY_MANAGER') {
-        params.push(req.user.facility_id);
-        query += ` AND facility_id = $${params.length}`;
-    }
-    
     query += ' ORDER BY date DESC';
     const { rows } = await pool.query(query, params);
-    const mappedRows = rows.map(r => ({
-      ...r,
-      totalRevenue: Number(r.total_revenue),
-      createdBy: r.created_by,
-      timestamp: Number(r.timestamp)
-    }));
+    
+    const mappedRows = rows.map(r => {
+      let rData = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || []);
+      let totalRev = Number(r.total_revenue);
+
+      // Security: Strip out other facilities' data if not All-Access
+      if (role === 'FACILITY_MANAGER') {
+          const userFacId = req.user.facility_id;
+          rData = rData.filter(f => f.id === userFacId || f.name === userFacId);
+          // Recalculate total_revenue to only be their facility's revenue
+          totalRev = rData.reduce((acc, curr) => acc + (Number(curr.revenue) || 0), 0);
+      }
+
+      return {
+        ...r,
+        data: rData,
+        totalRevenue: totalRev,
+        createdBy: r.created_by,
+        timestamp: Number(r.timestamp)
+      };
+    });
     res.json({ success: true, data: mappedRows });
   } catch (error) {
     console.error('Lá»—i láº¥y bÃ¡o cÃ¡o doanh thu:', error);
@@ -3089,15 +3099,9 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         // --- KHỐI QUÉT DOANH THU / TÀI CHÍNH ---
         const isRevenueIntent = contextMsg.match(/(doanh thu|tài chính|tiền| dt |bán hàng|tổng kết|báo cáo)/i);
         if (isRevenueIntent) {
-            // Khởi tạo câu lệnh gốc
-            let queryStr = "SELECT date, total_revenue FROM daily_financial_reports WHERE 1=1";
+            // Khởi tạo câu lệnh gốc (Bỏ total_revenue đi nếu không có full quyền, chỉ lấy data JSONB)
+            let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
             const queryParams = [];
-
-            // Áp dụng bộ lọc RBAC cứng trước khi kiểm tra điều kiện khác
-            if (!hasAllAccess) {
-                queryParams.push(userFacilityId);
-                queryStr += ` AND facility_id = $${queryParams.length}`; // Giả định cột là facility_id
-            }
 
             // Xử lý lọc tháng sinh động một cách an toàn
             const matchMonth = contextMsg.match(/tháng (\d+)|t(\d+)/i);
@@ -3113,14 +3117,28 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
             let recordLimit = 7;
             if (isMonthQuery || contextMsg.includes('tháng')) recordLimit = 31;
             
-            // Đảm bảo truyền tham số cho LIMIT để tránh SQL Injection động
             queryParams.push(recordLimit);
             queryStr += ` ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT $${queryParams.length}`;
             
             const { rows: revenueRows } = await pool.query(queryStr, queryParams);
             if (revenueRows.length > 0) {
-                const revData = revenueRows.map(r => `[Ngày: ${r.date} | Doanh thu: ${r.total_revenue}]`).join('\n');
-                systemContext += `- Báo cáo tài chính trong phạm vi cho phép:\n${revData}\n`;
+                let revDataText = "";
+                revenueRows.forEach(r => {
+                    if (hasAllAccess) {
+                        revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${Number(r.total_revenue).toLocaleString('vi-VN')} đ]\n`;
+                    } else {
+                        // Trích xuất doanh thu cục bộ từ JSONB data
+                        const rData = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || []);
+                        let localRev = 0;
+                        if (Array.isArray(rData)) {
+                            // req.user.facility_id có thể là ID (f1) hoặc Tên (DUBAI PQ)
+                            const facData = rData.find(f => f.id === userFacilityId || f.name === userFacilityId);
+                            if (facData) localRev = facData.revenue || 0;
+                        }
+                        revDataText += `[Ngày: ${r.date} | Doanh thu cơ sở của bạn: ${Number(localRev).toLocaleString('vi-VN')} đ]\n`;
+                    }
+                });
+                systemContext += `- Báo cáo tài chính trong phạm vi cho phép:\n${revDataText}\n`;
             } else {
                 systemContext += `- Doanh thu: Không tìm thấy dữ liệu khớp yêu cầu.\n`;
             }
