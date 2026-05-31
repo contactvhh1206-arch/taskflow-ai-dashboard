@@ -3034,39 +3034,72 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     // Gộp cả câu hỏi hiện tại và câu trả lời trước đó để dò từ khóa
     const contextMsg = (previousAiMessage + " " + message).toLowerCase();
 
+    // ==========================================
+    // THIẾT QUÂN LUẬT RBAC TẠI TẦNG BACKEND RAG
+    // ==========================================
+
+    // Bước 1: Định nghĩa nhóm All-Access (Toàn quyền)
+    const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
+    const isMarketingHead = req.user.role === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING';
+    const hasAllAccess = ALL_ACCESS_ROLES.includes(req.user.role) || isMarketingHead;
+
+    // Bước 2: Thiết lập cấu trúc lọc theo cơ sở (Tenant Isolation)
+    // Nếu không thuộc nhóm All-Access, BẮT BUỘC phải khóa cứng theo facility_id của User
+    const userFacilityId = req.user.facility_id; 
+
     try {
-        // Quét Công việc (Dùng contextMsg)
-        if (contextMsg.includes('task') || contextMsg.includes('công việc') || contextMsg.includes('trễ') || contextMsg.includes('phụ trách') || contextMsg.includes('dự án') || contextMsg.includes('ai làm')) {
-            
-            // Lấy thẳng danh sách 20 task mới nhất thay vì đếm số
-            const { rows } = await pool.query("SELECT * FROM tasks ORDER BY id DESC LIMIT 20");
-            
-            if (rows.length > 0) {
-                const taskData = rows.map(r => `[Task: ${r.title || r.name || 'Không tên'} | Trạng thái: ${r.status} | Phụ trách: ${r.assignee || r.user_id || 'Chưa phân công'}]`).join('\n');
-                systemContext += `- Danh sách công việc chi tiết hiện tại:\n${taskData}\n`;
+        // --- KHỐI QUÉT CÔNG VIỆC (TASKS) ---
+        if (contextMsg.match(/(task|công việc|trễ|phụ trách|dự án|ai làm)/i)) {
+            let taskQuery = "SELECT id, title, status, pic_id FROM tasks";
+            let taskParams = [];
+
+            if (!hasAllAccess) {
+                // Chặn cứng tại tầng Database! Không cho AI cơ hội nhìn thấy cơ sở khác
+                taskQuery += " WHERE facility_id = $1";
+                taskParams.push(userFacilityId);
+                taskQuery += " ORDER BY id DESC LIMIT 20";
             } else {
-                systemContext += `- Công việc: Hệ thống không có dữ liệu task nào.\n`;
+                taskQuery += " ORDER BY id DESC LIMIT 20";
+            }
+
+            const { rows: taskRows } = await pool.query(taskQuery, taskParams);
+            
+            if (taskRows.length > 0) {
+                const taskData = taskRows.map(r => `[Task ID: ${r.id} | Tiêu đề: ${r.title} | Trạng thái: ${r.status}]`).join('\n');
+                systemContext += `- Danh sách công việc thuộc phạm vi thẩm quyền:\n${taskData}\n`;
+            } else {
+                systemContext += `- Công việc: Không có dữ liệu task nào trong phạm vi quyền hạn.\n`;
             }
             hasData = true;
         }
-        
-        // Quét từ khóa Nhân sự / User
+
+        // --- KHỐI QUÉT NHÂN SỰ ---
         if (contextMsg.includes('nhân sự') || contextMsg.includes('người dùng') || contextMsg.includes('nhân viên')) {
-            const { rows } = await pool.query("SELECT COUNT(*) as count FROM users");
-            systemContext += `- Tổng số nhân sự hệ thống: ${rows[0].count} người.\n`;
+            let userQuery = "SELECT COUNT(*) as count FROM users";
+            let userParams = [];
+            if (!hasAllAccess) {
+                userQuery += " WHERE facility_id = $1";
+                userParams.push(userFacilityId);
+            }
+            const { rows } = await pool.query(userQuery, userParams);
+            systemContext += `- Tổng số nhân sự trong thẩm quyền: ${rows[0].count} người.\n`;
             hasData = true;
         }
 
-        // 1. Quét từ khóa Doanh thu / Tài chính (Regex Cấp Độ 2)
-        // Bắt mọi từ lóng: doanh thu, dt, tiền, tổng kết... VÀ cả việc chỉ gọi tên cơ sở
-        const isRevenueIntent = contextMsg.match(/(doanh thu|tài chính|tiền| dt |bán hàng|tổng kết|báo cáo)/i) || contextMsg.match(/(db[a-z0-9]+)/i);
-
+        // --- KHỐI QUÉT DOANH THU / TÀI CHÍNH ---
+        const isRevenueIntent = contextMsg.match(/(doanh thu|tài chính|tiền| dt |bán hàng|tổng kết|báo cáo)/i);
         if (isRevenueIntent) {
-            let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
+            // Khởi tạo câu lệnh gốc
+            let queryStr = "SELECT date, total_revenue FROM daily_financial_reports WHERE 1=1";
             const queryParams = [];
-            
-            
-            // Bắt Tháng (VD: tháng 5, t5, t05)
+
+            // Áp dụng bộ lọc RBAC cứng trước khi kiểm tra điều kiện khác
+            if (!hasAllAccess) {
+                queryParams.push(userFacilityId);
+                queryStr += ` AND facility_id = $${queryParams.length}`; // Giả định cột là facility_id
+            }
+
+            // Xử lý lọc tháng sinh động một cách an toàn
             const matchMonth = contextMsg.match(/tháng (\d+)|t(\d+)/i);
             let isMonthQuery = false;
             if (matchMonth) {
@@ -3077,38 +3110,43 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
                 queryStr += ` AND (date LIKE $${queryParams.length - 1} OR date LIKE $${queryParams.length})`;
             }
 
-            // Gài LIMIT Động
-            let recordLimit = 7; // Mặc định 1 tuần
+            let recordLimit = 7;
             if (isMonthQuery || contextMsg.includes('tháng')) recordLimit = 31;
-            if (contextMsg.includes('quý')) recordLimit = 90;
-            if (contextMsg.includes('năm')) recordLimit = 365;
-
-            queryStr += ` ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT ${recordLimit}`;
             
-            const { rows } = await pool.query(queryStr, queryParams);
-            if (rows.length > 0) {
-                const revenueData = rows.map(r => `[Ngày ${r.date} - Tổng: ${Number(r.total_revenue).toLocaleString('vi-VN')} VNĐ | JSON: ${JSON.stringify(r.data)}]`).join('\n');
-                systemContext += `- Dữ liệu tài chính nội bộ:\n${revenueData}\n`;
+            // Đảm bảo truyền tham số cho LIMIT để tránh SQL Injection động
+            queryParams.push(recordLimit);
+            queryStr += ` ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT $${queryParams.length}`;
+            
+            const { rows: revenueRows } = await pool.query(queryStr, queryParams);
+            if (revenueRows.length > 0) {
+                const revData = revenueRows.map(r => `[Ngày: ${r.date} | Doanh thu: ${r.total_revenue}]`).join('\n');
+                systemContext += `- Báo cáo tài chính trong phạm vi cho phép:\n${revData}\n`;
             } else {
                 systemContext += `- Doanh thu: Không tìm thấy dữ liệu khớp yêu cầu.\n`;
             }
             hasData = true;
         }
 
-        // Quét từ khóa Check-in / Điểm danh
-        if (contextMsg.includes('check-in') || contextMsg.includes('checkin') || contextMsg.includes('điểm danh') || contextMsg.includes('chấm công')) {
+        // --- KHỐI QUÉT ĐIỂM DANH (CHECK-IN) ---
+        if (contextMsg.match(/(check-in|checkin|điểm danh|chấm công)/i)) {
             const todayStr = new Intl.DateTimeFormat('en-GB', {
-                timeZone: 'Asia/Ho_Chi_Minh',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            }).format(new Date()); // DD/MM/YYYY
-            const { rows } = await pool.query(
-                "SELECT org_unit, COUNT(*) as count FROM daily_logs WHERE entry_type = 'Attendance' AND date = $1 GROUP BY org_unit",
-                [todayStr]
-            );
-            if (rows.length > 0) {
-                const checkinData = rows.map(r => `[${r.org_unit}: ${r.count} lượt]`).join(', ');
+                timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric'
+            }).format(new Date()); 
+            
+            let checkinQuery = "SELECT org_unit, COUNT(*) as count FROM daily_logs WHERE entry_type = 'Attendance' AND date = $1";
+            let checkinParams = [todayStr];
+
+            if (!hasAllAccess) {
+                // Chấm công chỉ được đếm trong cơ sở của Quản lý đó (daily_logs dùng org_unit lưu text nên dùng subquery)
+                checkinQuery += " AND org_unit IN (SELECT code FROM facilities WHERE id = $2 UNION SELECT name FROM facilities WHERE id = $2)";
+                checkinParams.push(userFacilityId);
+            }
+            
+            checkinQuery += " GROUP BY org_unit";
+            const { rows: checkinRows } = await pool.query(checkinQuery, checkinParams);
+            
+            if (checkinRows.length > 0) {
+                const checkinData = checkinRows.map(r => `[${r.org_unit}: ${r.count} lượt]`).join(', ');
                 systemContext += `- Dữ liệu điểm danh hôm nay (${todayStr}): ${checkinData}.\n`;
             } else {
                 systemContext += `- Điểm danh hôm nay (${todayStr}): Chưa có dữ liệu điểm danh nào được báo cáo.\n`;
@@ -3117,8 +3155,8 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         }
     } catch (dbErr) {
         console.error("CRITICAL RAG ERROR:", dbErr);
-        systemContext += `- LƯU Ý KỸ THUẬT: Đã xảy ra lỗi khi trích xuất dữ liệu nội bộ (${dbErr.message}). Hãy báo cáo cho sếp biết hệ thống DB đang lỗi.\n`;
-        hasData = true; // Bật cờ này lên để AI chắc chắn nhận được thông báo lỗi
+        systemContext += `- [Lỗi hệ thống]: Không thể truy xuất dữ liệu an toàn.\n`;
+        hasData = true; // Đảm bảo AI nhận được cảnh báo lỗi
     }
 
     // Tiêm Ngữ Cảnh RAG Vector DB (Chống Ảo giác)
