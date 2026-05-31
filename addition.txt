@@ -1,7 +1,0 @@
-﻿                if (!response2.ok) {
-                    const errorBody = await response2.text();
-                    console.error("OpenRouter Fetch 2 Error:", errorBody);
-                    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "\n\n*Hệ thống: Xin lỗi, AI không thể phân tích kết quả doanh thu lúc này do lỗi kết nối.*" } }] })}\n\n`);
-                    res.write(`data: [DONE]\n\n`);
-                    return res.end();
-                }

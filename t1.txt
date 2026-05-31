@@ -1,5 +1,0 @@
-﻿    // Hàm tiện ích tạo ngày (giả lập hoặc dùng thư viện date)
-    const getDates = (range) => {
-        const today = new Date().toISOString().split('T')[0];
-        // Ở môi trường thực, hãy parse range ('hôm nay', 'tuần này'). Tạm thời lấy current date.
-        return { startDate: today, endDate: today }; 
