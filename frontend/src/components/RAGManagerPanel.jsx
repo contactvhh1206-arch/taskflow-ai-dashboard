@@ -52,17 +52,30 @@ export default function RAGManagerPanel({ showToast }) {
         setIsUploading(true);
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/rag/upload`, {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
+            const response = await fetch(`${API_BASE_URL}/api/rag/upload`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('taskflow_token')}`
-                    // Lưu ý: Tuyệt đối KHÔNG set 'Content-Type': 'multipart/form-data'. Browser sẽ tự sinh boundary.
-                },
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('taskflow_token')}` },
                 body: formData
             });
-            
+
+            // 1. KIỂM TRA LỖI HTTP TRƯỚC
+            if (!response.ok) {
+                const errorText = await response.text(); // Đọc dạng text thô
+                let errorMessage = `Lỗi Server (${response.status})`;
+                try {
+                    // Thử parse xem có phải JSON báo lỗi từ Backend không
+                    const errorJson = JSON.parse(errorText);
+                    errorMessage = errorJson.error || errorMessage;
+                } catch (e) {
+                    // Nếu là HTML vỡ, in ra vài chữ đầu để debug
+                    console.error("HTML Error Response:", errorText.substring(0, 100));
+                }
+                throw new Error(errorMessage);
+            }
+
+            // 2. NẾU THÀNH CÔNG THÌ MỚI PARSE JSON
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error);
             
             alert("Thành công: " + data.message);
             
