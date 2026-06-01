@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axiosClient from '../api/axiosClient.js';
+import TaskHistoryDetailModal from './TaskHistoryDetailModal.jsx';
 
 const TaskHistory = () => {
   // 1. STATE MANAGEMENT CHUẨN MỰC
+  const [selectedTask, setSelectedTask] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1, totalRecords: 0 });
@@ -161,7 +163,11 @@ const TaskHistory = () => {
               {!loading && tasks.length === 0 ? (
                 <tr><td colSpan="4" className="text-center py-16 text-gray-400">Không tìm thấy dữ liệu khớp với bộ lọc</td></tr>
               ) : tasks.map(task => (
-                <tr key={task.id} className="border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <tr 
+                  key={task.id} 
+                  onClick={() => setSelectedTask(task)}
+                  className="border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+                >
                   <td className="px-6 py-4">
                     <div className="font-medium text-on-surface dark:text-white truncate max-w-[300px] md:max-w-md">{task.title}</div>
                     {task.desc && <div className="text-xs text-gray-500 mt-1 line-clamp-1">{task.desc}</div>}
@@ -220,6 +226,20 @@ const TaskHistory = () => {
           </div>
         </div>
       </div>
+
+      {/* KHI CLICK VÀO TASK NÀO THÌ HIỂN THỊ MODAL */}
+      {selectedTask && (
+        <TaskHistoryDetailModal 
+          task={selectedTask} 
+          onClose={() => setSelectedTask(null)} 
+          onRestoreSuccess={(restoredTaskId) => {
+             // Optimistic UI: Dùng filter chém luôn task bị khôi phục khỏi danh sách hiện tại
+             setTasks(prevTasks => prevTasks.filter(t => t.id !== restoredTaskId));
+             // Cập nhật lại số lượng tổng đếm
+             setPagination(prev => ({ ...prev, totalRecords: Math.max(0, prev.totalRecords - 1) }));
+          }}
+        />
+      )}
     </div>
   );
 };
