@@ -100,14 +100,10 @@ const allowedOrigins = [
 
 // Cấu hình CORS khóa IP lạ
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS Policy Violation: Truy cập trái phép!'));
-    }
-  },
-  credentials: true
+  origin: '*', // Trong tương lai sửa thành tên miền của ngài
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
+  exposedHeaders: ['Content-Type', 'Cache-Control', 'Connection'] // SINH TỬ CHO SSE!
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));

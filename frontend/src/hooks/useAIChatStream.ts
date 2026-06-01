@@ -32,17 +32,15 @@ export function useAIChatStream() {
     isStreamingRef.current = true;
     setIsStreaming(true);
 
-    const userMsgId = crypto.randomUUID();
-    const assistantMsgId = crypto.randomUUID();
-
     setMessages((prev) => [
       ...prev, 
-      { id: userMsgId, role: 'user', content },
-      { id: assistantMsgId, role: 'assistant', content: '' } 
+      { id: crypto.randomUUID(), role: 'user', content },
+      { id: crypto.randomUUID(), role: 'assistant', content: '' } 
     ]);
 
     try {
-      const response = await fetch('/api/ai/chat', {
+      const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://taskflow-ai-dashboard.onrender.com';
+      const response = await fetch(`${API_URL}/api/ai/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: content, context: contextPayload }),
