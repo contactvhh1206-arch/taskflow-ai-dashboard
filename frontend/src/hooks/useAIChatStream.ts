@@ -43,16 +43,15 @@ export function useAIChatStream(options?: {
       { id: generateId(), role: 'assistant', content: '' } 
     ]);
 
-    let chatEndpoint = '';
     try {
-      const baseURL = import.meta.env.VITE_API_BASE_URL || 'https://taskflow-ai-dashboard.onrender.com';
-      // Sử dụng class URL để chống Double Protocol Concatenation và tự động chuẩn hóa
-      chatEndpoint = new URL('/api/ai/chat-stream', baseURL).toString();
-    } catch (e) {
-      throw new Error(`Cấu hình API URL không hợp lệ: ${e.message}`);
-    }
+      let chatEndpoint = '';
+      try {
+        const baseURL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+        chatEndpoint = new URL('/api/ai/chat-stream', baseURL).toString();
+      } catch (err) {
+        throw new Error('SYSTEM_ERROR: Mất cấu hình Base URL.');
+      }
 
-    try {
       const response = await fetch(chatEndpoint, {
         method: 'POST',
         headers: { 
