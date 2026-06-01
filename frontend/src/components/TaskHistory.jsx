@@ -35,6 +35,15 @@ const TaskHistory = () => {
   }, [pagination.page, debouncedPicId, filters.date_from, filters.date_to]);
 
   const fetchHistoryTasks = async () => {
+    // [VÁ EDGE CASE 1]: CHẶN LỖ HỔNG THỜI GIAN NGHỊCH LÝ
+    if (filters.date_from && filters.date_to) {
+      if (new Date(filters.date_from) > new Date(filters.date_to)) {
+        alert("Lỗi logic: 'Từ ngày' không thể lớn hơn 'Đến ngày'. Hệ thống đã chặn truy vấn này!");
+        setLoading(false);
+        return; // Khóa van, không cho API chạy xuống dưới
+      }
+    }
+
     // Rút súng bắn hạ request cũ nếu nó chưa chạy xong
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -233,8 +242,17 @@ const TaskHistory = () => {
           task={selectedTask} 
           onClose={() => setSelectedTask(null)} 
           onRestoreSuccess={(restoredTaskId) => {
-             // Optimistic UI: Dùng filter chém luôn task bị khôi phục khỏi danh sách hiện tại
-             setTasks(prevTasks => prevTasks.filter(t => t.id !== restoredTaskId));
+             // [VÁ EDGE CASE 2]: BẪY PHÂN TRANG (Tránh hiển thị bảng trắng trơn)
+             setTasks(prevTasks => {
+               // Nếu màn hình hiện tại đang chót vót ở Trang 2 trở lên, 
+               // mà chỉ còn đúng 1 Record cuối cùng -> Xóa xong sẽ thành trang trắng.
+               // => Ép luồng lùi về trang trước đó ngay lập tức!
+               if (prevTasks.length === 1 && pagination.page > 1) {
+                  setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+               }
+               // Chém bay task bị khôi phục khỏi giao diện
+               return prevTasks.filter(t => t.id !== restoredTaskId);
+             });
              // Cập nhật lại số lượng tổng đếm
              setPagination(prev => ({ ...prev, totalRecords: Math.max(0, prev.totalRecords - 1) }));
           }}
