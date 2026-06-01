@@ -3183,11 +3183,17 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     // =========================================================================
     // 2. MỞ LUỒNG SSE & MÁY CHẾM ABORT CONTROLLER (XÁC THỰC PASS)
     // =========================================================================
-    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders(); 
+    // THIẾT LẬP HEADER CHỐNG BUFFERING TUYỆT ĐỐI DÀNH CHO RENDER/NGINX/CLOUDFLARE
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform, no-store, must-revalidate',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no' // BẮT BUỘC CÓ: Lệnh tắt ngậm luồng của Nginx
+    });
+
+    // LƯU Ý PHỤ: Nếu hệ thống có dùng thư viện nén 'compression', 
+    // bắt buộc gọi thêm res.flushHeaders(); ngay dưới dòng writeHead này!
+    res.flushHeaders();
 
     // Gửi ID mới cho Trình duyệt
     res.write(`data: ${JSON.stringify({ new_session_id: session_id })}\n\n`);
