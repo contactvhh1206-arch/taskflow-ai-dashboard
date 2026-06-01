@@ -15,6 +15,13 @@ axiosClient.interceptors.request.use((config) => {
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // GÀI BỌ TRUY VẾT KHẨN CẤP ĐỂ TÌM THỦ PHẠM GỌI /tasks
+    if (config.url && config.url.includes('/api/tasks')) {
+      console.warn('[TRACE-DDoS] Lệnh gọi API Tasks được kích hoạt từ:');
+      console.trace(); // TỬ HUYỆT BÓC TRẦN CALL STACK! SẼ BIẾT ĐÍCH XÁC FILE NÀO GỌI!
+    }
+    
     return config;
 });
 

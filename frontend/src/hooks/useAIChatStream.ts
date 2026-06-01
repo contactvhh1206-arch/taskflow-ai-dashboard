@@ -6,7 +6,10 @@ export interface Message {
   content: string;
 }
 
-export function useAIChatStream() {
+export function useAIChatStream(options?: {
+  onSessionCreated?: (sessionId: string) => void;
+  onSessionUpdate?: (data: any) => void;
+}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const isStreamingRef = useRef<boolean>(false);
@@ -36,16 +39,24 @@ export function useAIChatStream() {
 
     setMessages((prev) => [
       ...prev, 
-      { id: generateId(), role: 'user', content },
+      { id: generateId(), role: 'user', content, attachment: contextPayload?.attachment },
       { id: generateId(), role: 'assistant', content: '' } 
     ]);
 
     try {
       const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://taskflow-ai-dashboard.onrender.com';
-      const response = await fetch(`${API_URL}/api/ai/chat`, {
+      const response = await fetch(`${API_URL}/api/ai/chat-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, context: contextPayload }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('taskflow_token') || ''}`
+        },
+        body: JSON.stringify({ 
+          message: content, 
+          session_id: contextPayload?.sessionId, 
+          attachment: contextPayload?.attachment,
+          context: contextPayload 
+        }),
         signal: abortController.signal,
       });
 
@@ -78,9 +89,15 @@ export function useAIChatStream() {
             
             try {
               const parsed = JSON.parse(dataPayload);
-              const contentDelta = parsed.choices?.[0]?.delta?.content;
-              if (contentDelta) {
-                chunkTextToAppend += contentDelta;
+              
+              if (parsed.new_session_id && options?.onSessionCreated) {
+                options.onSessionCreated(parsed.new_session_id);
+              }
+              
+              // Gom mọi chuẩn dữ liệu có thể trả về từ OpenRouter/Backend:
+              const content = parsed.content || parsed.text || parsed.choices?.[0]?.delta?.content || "";
+              if (content) {
+                chunkTextToAppend += content;
               }
             } catch (parseError) {
               console.warn('Silent fallback: JSON parse failed on SSE chunk:', dataPayload);

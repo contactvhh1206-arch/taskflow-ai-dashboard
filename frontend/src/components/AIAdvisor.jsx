@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import axiosClient from '../api/axiosClient';
 import { fetchHistory, fetchAiSessions, saveAiSession, streamAIChat } from '../services/dataService.js';
-
+import { useAIChatStream } from '../hooks/useAIChatStream';
 export default function AIAdvisor(props) {
   const { user, tasks, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
   const isFacilityMode = props.isFacilityMode !== undefined ? props.isFacilityMode : (user && !['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role));
@@ -22,15 +22,6 @@ export default function AIAdvisor(props) {
   const abortControllerRef = useRef(null);
   const currentSessionIdRef = React.useRef(activeSessionId);
   const isInitialMount = React.useRef(true);
-
-  // Memory Leak Control: Cleanup AbortController khi unmount
-  React.useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
 
   const messagesEndRef = React.useRef(null);
 
@@ -78,10 +69,23 @@ export default function AIAdvisor(props) {
     }] : [];
   }, [user?.role]);
 
-  const [chatLog, setChatLog] = useState(defaultLog);
-  const [isTyping, setIsTyping] = useState(false);
-  const [streamingText, setStreamingText] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
+  const { messages, isStreaming, sendMessage, stopStream, setMessages } = useAIChatStream({
+    onSessionCreated: (newSessionId) => {
+      isSessionCreatedByMeRef.current = true;
+      if (props.onSessionCreated) props.onSessionCreated(newSessionId);
+      // Đồng bộ Sidebar ngay lập tức
+      fetchAiSessions().then(res => {
+          if (res.success && props.onSessionUpdate) {
+              props.onSessionUpdate(res.data);
+          }
+      }).catch(err => console.error("Lỗi fetch sidebar:", err));
+    }
+  });
+
+  const chatLog = messages.length === 0 ? defaultLog : messages;
+  const lastMsg = messages[messages.length - 1];
+  const isTyping = isStreaming && lastMsg?.role === 'assistant' && !lastMsg?.content;
+
   const [isRecording, setIsRecording] = useState(false);
   const [attachment, setAttachment] = useState(null);
   const fileInputRef = React.useRef(null);
@@ -92,15 +96,7 @@ export default function AIAdvisor(props) {
       scrollToBottom();
   }, [chatLog]);
 
-  React.useEffect(() => {
-    // Cleanup function: Kích hoạt khi Component bị tháo dỡ (Unmount / Đóng Modal)
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        console.log("🛠️ Đã tiêu diệt luồng Stream ngầm do tắt Modal.");
-      }
-    };
-  }, []);
+
 
   React.useEffect(() => {
     currentSessionIdRef.current = activeSessionId;
@@ -128,25 +124,25 @@ export default function AIAdvisor(props) {
             
             if (data.success && data.data) {
                 if (data.data.length > 0) {
-                    setChatLog(data.data.map(m => ({ role: m.role, content: m.content })));
+                    setMessages(data.data.map(m => ({ id: m.id || Math.random().toString(), role: m.role, content: m.content })));
                 } else {
-                    setChatLog(prev => prev.length > 0 ? prev : defaultLog);
+                    setMessages([]);
                 }
             } else if (Array.isArray(data)) {
                 if (data.length > 0) {
-                    setChatLog(data.map(m => ({ role: m.role, content: m.content })));
+                    setMessages(data.map(m => ({ id: m.id || Math.random().toString(), role: m.role, content: m.content })));
                 } else {
-                    setChatLog(prev => prev.length > 0 ? prev : defaultLog);
+                    setMessages([]);
                 }
             } else {
-                setChatLog(prev => prev.length > 0 ? prev : defaultLog);
+                setMessages([]);
             }
         } catch (err) {
             console.error("Lỗi tải lịch sử chat:", err);
             // BẪY LỖI: Tự động dọn rác nếu Phiên chat đã bị xóa ở Backend
             if (err?.response?.status === 403 || err?.response?.status === 404) {
                 if (props.onSessionUpdate) props.onSessionUpdate(null);
-                setChatLog(defaultLog);
+                setMessages([]);
             }
         } finally {
             isFetchingHistory.current = false;
@@ -244,7 +240,6 @@ export default function AIAdvisor(props) {
     recognition.start();
   };
 
-
   // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (externalQueryTrigger) {
@@ -253,15 +248,12 @@ export default function AIAdvisor(props) {
     }
   }, [externalQueryTrigger]);
 
-  
   const handleAsk = async (overrideQuery) => {
-    // 1. CẮM CỜ KHÓA NGAY LẬP TỨC TRƯỚC KHI LÀM BẤT CỨ VIỆC GÌ
     isSessionCreatedByMeRef.current = true; 
 
-    // CHỐT CHẶN BÊ TÔNG ĐÂY:
-    if (isTyping) {
+    if (isStreaming) {
         isSessionCreatedByMeRef.current = false;
-        return; // Đang stream thì cấm gọi tiếp!
+        return;
     }
 
     let actualQuery = query;
@@ -275,14 +267,12 @@ export default function AIAdvisor(props) {
         return;
     }
     
-    // Ghi nhận câu hỏi của user
     const userQuery = actualQuery.trim() || 'Vui lòng phân tích tệp đính kèm này.';
-    setChatLog(prev => [...prev, { role: 'user', content: userQuery, attachment: attachment }]);
     setQuery('');
-    setIsTyping(true);
+    
+    const currentAttachment = attachment;
     setAttachment(null);
 
-    // Chặn nhanh các từ khóa vi phạm ở Frontend (Facility Mode)
     if (isFacilityMode) {
         const forbiddenKeywords = ['cơ sở khác', 'phòng ban', 'chuỗi', 'tất cả cơ sở', 'cơ sở 1', 'cơ sở 2', 'toàn hệ thống'];
         const isForbidden = forbiddenKeywords.some(kw => userQuery.toLowerCase().includes(kw));
@@ -301,142 +291,20 @@ export default function AIAdvisor(props) {
             });
             localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
           } catch {}
-          setChatLog(prev => [...prev, { role: 'ai', content: responseContent }]);
-          setIsTyping(false);
+          
+          setMessages(prev => [
+            ...prev, 
+            { id: Date.now().toString(), role: 'user', content: userQuery, attachment: currentAttachment },
+            { id: (Date.now()+1).toString(), role: 'assistant', content: responseContent }
+          ]);
           isSessionCreatedByMeRef.current = false;
           return;
         }
     }
 
-    try {
-      const token = localStorage.getItem('taskflow_token');
-      let sessionId = props.activeSessionId || null;
-      
-      abortControllerRef.current = new AbortController();
-      setIsTyping(true);
-      
-      // Kích hoạt kiến trúc Two-State Stream
-      setIsStreaming(true);
-      setStreamingText("");
-
-      // Ép React nhả luồng Paint UI trước khi block bởi Fetch/Stream (Chống nghẽn Microtask)
-      await new Promise(r => setTimeout(r, 0));
-
-      // Gọi API Stream
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
-      const res = await fetch(`${API_BASE_URL}/api/ai/chat-stream`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ message: userQuery, session_id: sessionId }),
-          signal: abortControllerRef.current.signal
-      });
-
-      // BẪY XỬ LÝ LỖI 401 Ở ĐÂY:
-      if (!res.ok) {
-          if (res.status === 401) {
-              // Token hết hạn -> Xóa rác, báo lỗi và ép văng ra màn Login
-              localStorage.removeItem('taskflow_token');
-              window.location.href = '/login'; 
-              throw new Error("Phiên đăng nhập đã hết hạn. Đang chuyển hướng về trang Đăng Nhập...");
-          }
-          if (res.status === 403 || res.status === 404) {
-              // Phiên chat bị mồ côi hoặc xóa -> Dọn State để tạo mới
-              if (props.onSessionUpdate) props.onSessionUpdate(null);
-              throw new Error("Phiên làm việc đã bị vô hiệu hóa do hệ thống Reset. Vui lòng gửi lại tin nhắn để bắt đầu phiên mới.");
-          }
-          // Bắt các lỗi 500, 404 khác
-          throw new Error(`Lỗi kết nối máy chủ (Mã: ${res.status})`);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
-      let currentAiMessage = "";
-
-      // Parse Stream mượt mà (Anti-Lag)
-      while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-              if (currentAiMessage) {
-                  setChatLog(prev => [...prev, { role: 'assistant', content: currentAiMessage }]);
-              }
-              setIsStreaming(false);
-              setStreamingText("");
-              setIsTyping(false);
-              isSessionCreatedByMeRef.current = false;
-              break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Nối dồn các chunk lấy được, tách bằng \n\n (chuẩn SSE)
-          const messages = buffer.split('\n\n');
-          buffer = messages.pop(); // Giữ lại phần bị cắt dở
-
-          for (const msg of messages) {
-              if (msg.trim() === 'data: [DONE]') {
-                  setChatLog(prev => [...prev, { role: 'assistant', content: currentAiMessage }]);
-                  setIsStreaming(false);
-                  setStreamingText("");
-                  setIsTyping(false);
-                  isSessionCreatedByMeRef.current = false;
-                  abortControllerRef.current = null;
-                  return;
-              }
-
-              if (msg.startsWith('data: ')) {
-                  try {
-                      const parsed = JSON.parse(msg.slice(6));
-                      if (parsed.error) throw new Error(parsed.error);
-                      
-                      // Cập nhật session_id từ Backend
-                      if (parsed.new_session_id) {
-                          if (props.onSessionCreated) props.onSessionCreated(parsed.new_session_id);
-                          sessionId = parsed.new_session_id; // Gán cứng cho biến cục bộ của hàm chat hiện tại
-                          console.log("🛠️ Frontend đã đồng bộ UUID mới từ Server:", sessionId);
-                          
-                          // Đồng bộ Sidebar ngay lập tức
-                          fetchAiSessions().then(res => {
-                              if (res.success && props.onSessionUpdate) {
-                                  props.onSessionUpdate(res.data);
-                              }
-                          }).catch(err => console.error("Lỗi fetch sidebar:", err));
-                          continue;
-                      }
-                      
-                      const newText = parsed.content || parsed.text || parsed.choices?.[0]?.delta?.content || "";
-                      currentAiMessage += newText;
-                      
-                      // CHỈ UPDATE CHUỖI -> REACT RENDER CỰC NHẸ BÉN
-                      setStreamingText(currentAiMessage);
-                  } catch (e) {
-                      console.warn("Parse stream chunk error", e);
-                  }
-              }
-          }
-      }
-    } catch (err) {
-      if (err.name === 'AbortError') {
-          console.log("Fetch Stream bị ngắt");
-      } else {
-          console.error("AI Error:", err);
-          // Đảm bảo cập nhật đè lên tin nhắn role: 'assistant' cuối cùng thay vì tạo thêm
-          setChatLog(prev => {
-              const newLog = [...prev];
-              const lastIdx = newLog.length - 1;
-              if (lastIdx >= 0 && (newLog[lastIdx].role === 'ai' || newLog[lastIdx].role === 'assistant')) {
-                  newLog[lastIdx] = { ...newLog[lastIdx], content: `Xin lỗi, đã xảy ra lỗi: ${err.message}`, isError: true };
-              } else {
-                  newLog.push({ role: 'assistant', content: `Xin lỗi, đã xảy ra lỗi: ${err.message}`, isError: true });
-              }
-              return newLog;
-          });
-      }
-      setIsStreaming(false);
-      setStreamingText("");
-      setIsTyping(false);
-      isSessionCreatedByMeRef.current = false;
-    }
+    let sessionId = props.activeSessionId || null;
+    sendMessage(userQuery, { sessionId: sessionId, attachment: currentAttachment });
+    isSessionCreatedByMeRef.current = false;
   };
 
   return (
@@ -495,18 +363,7 @@ export default function AIAdvisor(props) {
             </div>
           </div>
         ))}
-        {/* BONG BÓNG STREAMING ĐỘC LẬP TỐI ƯU HIỆU NĂNG */}
-        {isStreaming && (
-          <div className="flex w-full mb-4 justify-start">
-            <div className="max-w-[85%] p-3 rounded-2xl text-sm bg-gray-100 text-gray-800 rounded-bl-none border border-gray-200 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700">
-               <ReactMarkdown remarkPlugins={[remarkGfm]} className="prose dark:prose-invert max-w-none text-sm">
-                   {streamingText || "..."}
-               </ReactMarkdown>
-            </div>
-          </div>
-        )}
-
-        {isTyping && !isStreaming && (
+        {isTyping && (
           <div className="flex justify-start">
             <div className="bg-surface-container dark:bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-outline-variant dark:border-gray-700 flex gap-2 items-center h-12">
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce"></div>
@@ -591,21 +448,9 @@ export default function AIAdvisor(props) {
           </button>
           <input type="text" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAsk()} placeholder="Ví dụ: So sánh hiệu suất trực ca của Cơ sở 1 và Cơ sở 2..." className="flex-1 min-w-0 bg-surface-container dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl pl-[5.5rem] pr-4 py-3 outline-none focus:ring-2 focus:ring-secondary text-sm dark:text-white transition-all shadow-inner relative" />
           
-          {isTyping && abortControllerRef.current ? (
+          {isStreaming ? (
              <button onClick={() => {
-                 if (abortControllerRef.current) {
-                     abortControllerRef.current.abort();
-                     abortControllerRef.current = null;
-                     setChatLog(prev => {
-                         const newLog = [...prev];
-                         const lastIdx = newLog.length - 1;
-                         if (newLog[lastIdx].role === 'ai') {
-                             newLog[lastIdx] = { ...newLog[lastIdx], content: newLog[lastIdx].content + "\n\n*[ĐÃ NGẮT BỞI NGƯỜI DÙNG]*" };
-                         }
-                         return newLog;
-                     });
-                     setIsTyping(false);
-                 }
+                 stopStream();
              }} className="bg-red-500 hover:bg-red-600 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-red-500/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>stop</span> <span className="hidden sm:inline">Dừng</span>
              </button>
