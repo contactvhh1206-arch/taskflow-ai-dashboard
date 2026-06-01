@@ -615,6 +615,110 @@ app.delete('/api/users/:id', authenticateUser, checkAdmin, async (req, res) => {
 
 const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'];
 
+app.get('/api/tasks/history', authenticateUser, async (req, res) => {
+    try {
+        // 1. THIẾT QUÂN LUẬT RBAC (Cô lập Dữ liệu)
+        const { role, facility_id, department_code, id } = req.user;
+        if (!role || !id) {
+            return res.status(403).json({ success: false, error: "Token không hợp lệ hoặc thiếu định danh cốt lõi." });
+        }
+
+        // 2. KHỞI TẠO PARAMETERS (Phân trang & Bộ lọc)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+        
+        const { date_from, date_to, pic_id } = req.query;
+
+        // 3. XÂY DỰNG ĐIỀU KIỆN LỌC (WHERE CLAUSE DYNAMIC)
+        let baseWhere = `t.status = 'done'`;
+        const params = [];
+
+        // 3.1. Rào chắn RBAC 
+        if (ALL_ACCESS_ROLES.includes(role) || (role === 'DEPARTMENT_HEAD' && department_code === 'MARKETING')) {
+            // Nhóm All-Access: Không cản trở
+        } 
+        else if (role === 'DEPARTMENT_HEAD' || role === 'FACILITY_MANAGER') {
+            if (!facility_id) return res.status(400).json({ success: false, error: "Lỗi RBAC: Thiếu định danh Cơ sở." });
+            params.push(facility_id);
+            baseWhere += ` AND t.facility_id = $${params.length}`;
+        } 
+        else {
+            // Nhân viên thường (Local): Của ai nấy thấy
+            params.push(id, id);
+            baseWhere += ` AND (t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
+        }
+
+        // 3.2. Rào chắn Bộ lọc (Query Params)
+        if (pic_id) {
+            params.push(pic_id);
+            baseWhere += ` AND t.pic_id = $${params.length}`;
+        }
+
+        // 3.3. Rào chắn Thời gian & Cắt luồng cất kho (Archival Boundary Flaw FIX)
+        if (date_from && date_to) {
+            params.push(date_from, date_to);
+            baseWhere += ` AND t.updated_at >= $${params.length - 1}::timestamp AND t.updated_at <= $${params.length}::timestamp`;
+        } else {
+            // Tuyệt chiêu ranh giới: Nếu không truyền ngày, chặn cứng Task cập nhật ở tháng hiện tại.
+            // Hàm date_trunc lấy ngày 01/tháng hiện tại của server DB.
+            baseWhere += ` AND t.updated_at < date_trunc('month', CURRENT_DATE)`;
+        }
+
+        // 4. TRUY VẤN COUNT (Cho Meta Pagination)
+        const countQuery = `SELECT COUNT(t.id) as total FROM tasks t WHERE ${baseWhere}`;
+        const countRes = await pool.query(countQuery, params);
+        const totalRecords = parseInt(countRes.rows[0].total);
+        const totalPages = Math.ceil(totalRecords / limit);
+
+        // 5. TRUY VẤN CTE SIÊU TỐC (Tránh SQL Anti-pattern)
+        const dataQuery = `
+            WITH paginated_tasks AS (
+                -- BƯỚC A: Ép DB chỉ lọc và cắt đúng 20 records (LIMIT) trên bảng gốc. Cực kỳ nhẹ!
+                SELECT id, title, description, status, urgency, deadline, created_at, updated_at, needs_support, pic_id, facility_id
+                FROM tasks t
+                WHERE ${baseWhere}
+                ORDER BY t.updated_at DESC
+                LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+            )
+            -- BƯỚC B: Mới đem 20 records đó đi JOIN với các bảng khổng lồ khác.
+            SELECT pt.id, pt.title, pt.description as desc, pt.status, pt.urgency as urgent, 
+                   TO_CHAR(pt.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
+                   pt.created_at as "createdAt", pt.updated_at as "completedAt",
+                   pt.needs_support as "needsSupport",
+                   u.full_name as pic, u.email as "picId",
+                   f.name as facility, f.code as "facilityId",
+                   pt.facility_id as "facilityRawId",
+                   COUNT(tc.id) AS comment_count
+            FROM paginated_tasks pt
+            LEFT JOIN users u ON pt.pic_id = u.id
+            LEFT JOIN facilities f ON pt.facility_id = f.id AND f.is_deleted = false
+            LEFT JOIN task_comments tc ON pt.id = tc.task_id
+            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, u.full_name, u.email, f.name, f.code, pt.facility_id
+            ORDER BY pt.updated_at DESC
+        `;
+        
+        // Truyền Limit và Offset vào tham số cuối cùng
+        const dataParams = [...params, limit, offset];
+        const { rows } = await pool.query(dataQuery, dataParams);
+
+        // 6. TRẢ VỀ CHUẨN JSON DATA & META
+        res.json({ 
+            success: true, 
+            data: rows,
+            meta: {
+                totalRecords,
+                totalPages,
+                currentPage: page
+            }
+        });
+
+    } catch (dbErr) {
+        console.error("[CRITICAL DB ERROR /api/tasks/history]:", dbErr.message);
+        res.status(500).json({ success: false, error: "Lỗi truy xuất dữ liệu lịch sử từ hệ thống. Vui lòng liên hệ Admin." });
+    }
+});
+
 app.get('/api/tasks', authenticateUser, async (req, res) => {
     // BƯỚC 1: XÁC THỰC THAM SỐ ĐẦU VÀO TRÁNH UNDEFINED CRASH
     const { role, facility_id, department_code, id } = req.user;
