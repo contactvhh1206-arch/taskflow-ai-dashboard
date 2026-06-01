@@ -32,10 +32,12 @@ export function useAIChatStream() {
     isStreamingRef.current = true;
     setIsStreaming(true);
 
+    const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random()}`;
+
     setMessages((prev) => [
       ...prev, 
-      { id: crypto.randomUUID(), role: 'user', content },
-      { id: crypto.randomUUID(), role: 'assistant', content: '' } 
+      { id: generateId(), role: 'user', content },
+      { id: generateId(), role: 'assistant', content: '' } 
     ]);
 
     try {

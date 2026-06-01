@@ -11,9 +11,10 @@ export const streamAIChat = async (req: Request, res: Response) => {
   const userId = (req as any).user?.id || 'SYSTEM_USER'; 
 
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform'); // Chặn nén
+  res.setHeader('X-Accel-Buffering', 'no'); // TỬ HUYỆT XUYÊN THỦNG NGINX RENDER!
   res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders(); 
+  res.flushHeaders(); // ÉP XẢ HEADER NGAY LẬP TỨC
   
   let fullAiResponse = '';
   let isSavedToDB = false;
