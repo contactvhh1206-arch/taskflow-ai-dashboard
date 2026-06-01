@@ -14,6 +14,31 @@ const SYSTEM_ROLES = [
 ];
 
 export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskComments, user }) {
+      if (!user) {
+          return (
+              <div className="flex items-center justify-center h-[50vh]">
+                  <div className="flex flex-col items-center gap-4">
+                      <span className="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
+                      <p className="text-gray-500 font-medium">Đang xác thực quyền...</p>
+                  </div>
+              </div>
+          );
+      }
+
+      const safeParseChatLog = (chatLogRaw) => {
+          if (!chatLogRaw) return [];
+          if (Array.isArray(chatLogRaw)) return chatLogRaw;
+          if (typeof chatLogRaw === 'string') {
+              try {
+                  const parsed = JSON.parse(chatLogRaw);
+                  return Array.isArray(parsed) ? parsed : [];
+              } catch (e) {
+                  return [];
+              }
+          }
+          return [];
+      };
+
       const [users, setUsers] = useState([]);
       const [facilities, setFacilities] = useState([]);
       const [aiSessions, setAiSessions] = useState([]);
@@ -124,7 +149,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                        method: 'DELETE',
                        headers: {
                            'Content-Type': 'application/json',
-                           'x-user-role': user.role,
+                           'x-user-role': user?.role,
                            'x-facility-id': localStorage.getItem('facility_id') || 'ALL'
                        }
                    });
@@ -321,7 +346,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
 
       const handleDeleteUser = async () => {
         if (!deletingUser) return;
-        if (deletingUser.id === user.id) {
+        if (deletingUser.id === user?.id) {
            if (showToast) showToast('❌ Lỗi 403 Forbidden: Không thể tự xóa chính mình!');
            setDeletingUser(null);
            return;
@@ -364,7 +389,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       };
 
       const toggleUserActive = async (userId) => {
-        if (userId === user.id) {
+        if (userId === user?.id) {
            if (showToast) showToast('❌ Lỗi 403 Forbidden: Không thể tự khóa chính mình!');
            return;
         }
@@ -387,7 +412,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
             <button onClick={() => setActiveTab('facilities')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'facilities' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Cơ sở</button>
             <button onClick={() => setActiveTab('users')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'users' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Tài khoản</button>
             <button onClick={() => setActiveTab('ai_logs')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'ai_logs' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-surface-variant dark:hover:bg-gray-800'}`}>Quản lý Hội thoại AI</button>
-            {user.role === 'ADMIN' && (
+            {user?.role === 'ADMIN' && (
                <button onClick={() => setActiveTab('maintenance')} className={`px-4 py-2 rounded-lg font-bold transition-all whitespace-nowrap ${activeTab === 'maintenance' ? 'bg-error text-white shadow-md' : 'text-error hover:bg-error/10 border border-transparent dark:hover:bg-red-900/20'}`}>Cấu hình Nâng cao / Bảo trì</button>
             )}
           </div>
@@ -409,7 +434,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                       <label className="block text-xs font-medium text-gray-500 mb-1">Quản lý phụ trách (PIC)</label>
                       <select value={newFacPic} onChange={e => setNewFacPic(e.target.value)} className="w-full pl-3 pr-8 py-2 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-600 rounded-lg text-sm outline-none focus:border-primary dark:text-white transition-colors text-ellipsis overflow-hidden whitespace-nowrap">
                         <option value="">-- Chưa phân công --</option>
-                        {users.filter(u => u.role === 'FACILITY_MANAGER').map(u => (
+                        {(users || []).filter(u => u.role === 'FACILITY_MANAGER').map(u => (
                           <option key={u.id} value={u.username}>{u.name} ({u.username})</option>
                         ))}
                       </select>
@@ -420,9 +445,9 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                   </form>
                 </div>
                 <div>
-                  <h3 className="font-bold mb-3 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-secondary">corporate_fare</span> Danh sách Cơ sở ({facilities.filter(f => !f.is_deleted).length})</h3>
+                  <h3 className="font-bold mb-3 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-secondary">corporate_fare</span> Danh sách Cơ sở ({(facilities || []).filter(f => !f.is_deleted).length})</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {facilities.filter(f => !f.is_deleted).map(f => (
+                    {(facilities || []).filter(f => !f.is_deleted).map(f => (
                       <div key={f.id} className="p-4 rounded-xl border border-outline-variant dark:border-gray-700 bg-white dark:bg-[#1a1a1a] flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow relative group">
                         <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => openEditModal(f)} className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"><span className="material-symbols-outlined text-[16px]">edit</span></button>
@@ -482,7 +507,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                             }} />
                             [Tất cả]
                           </label>
-                          {facilities.map(f => (
+                          {(facilities || []).map(f => (
                             <label key={f.id} className="flex items-center gap-1.5 text-xs font-medium dark:text-white cursor-pointer select-none">
                               <input type="checkbox" className="accent-primary w-3.5 h-3.5" checked={newFinanceFacilities.includes('ALL') || newFinanceFacilities.includes(f.name)} onChange={e => {
                                 if (e.target.checked) {
@@ -502,7 +527,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                         <label className="block text-xs font-medium text-gray-500 mb-1">Cơ sở</label>
                         <select disabled={HIGH_LEVEL_ROLES.includes(newRole)} value={HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId} onChange={e => setNewFacilityId(e.target.value)} className="w-full pl-3 pr-8 py-2 bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-600 rounded-lg text-sm outline-none focus:border-primary dark:text-white transition-colors disabled:opacity-50 text-ellipsis overflow-hidden whitespace-nowrap">
                           <option value="ALL">ALL</option>
-                          {facilities.length === 0 ? <option value="Cơ sở 1">Cơ sở 1</option> : facilities.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
+                          {(facilities || []).length === 0 ? <option value="Cơ sở 1">Cơ sở 1</option> : (facilities || []).map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
                         </select>
                       </div>
                     )}
@@ -512,7 +537,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                   </form>
                 </div>
                 <div>
-                  <h3 className="font-bold mb-3 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-secondary">manage_accounts</span> Danh sách Tài khoản Hệ thống ({users?.filter(u => u && !u.is_deleted)?.length || 0})</h3>
+                  <h3 className="font-bold mb-3 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-secondary">manage_accounts</span> Danh sách Tài khoản Hệ thống ({(users || []).filter(u => u && !u.is_deleted).length})</h3>
                   <div className="overflow-x-auto rounded-xl border border-outline-variant dark:border-gray-700">
                     <ErrorBoundary>
                       <table className="w-full text-sm text-left">
@@ -526,7 +551,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                           </tr>
                         </thead>
                         <tbody>
-                          {users?.filter(u => u && !u.is_deleted)?.map(u => (
+                          {(users || []).filter(u => u && !u.is_deleted).map(u => (
                             <tr key={u.id} className="border-b last:border-b-0 border-outline-variant dark:border-gray-700 bg-white dark:bg-[#1a1a1a] hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                               <td className="px-5 py-4 font-mono text-gray-600 dark:text-gray-300 font-medium">{u?.username}</td>
                               <td className="px-5 py-4">
@@ -541,7 +566,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                               </td>
                               <td className="px-5 py-4 text-right">
                                   <div className="flex items-center justify-end gap-2 ml-auto">
-                                    <button onClick={() => toggleUserActive(u.id)} disabled={u.id === user.id} className={`px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1 border ${u.isActive ? 'bg-error-container text-error border-error/30 hover:bg-red-200 dark:bg-red-900/20 dark:border-red-800/30 dark:hover:bg-red-900/40' : 'bg-success/10 text-success border-success/30 hover:bg-green-200 dark:bg-green-900/20 dark:border-green-800/30 dark:hover:bg-green-900/40'} ${u.id === user.id ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                    <button onClick={() => toggleUserActive(u.id)} disabled={u.id === user?.id} className={`px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1 border ${u.isActive ? 'bg-error-container text-error border-error/30 hover:bg-red-200 dark:bg-red-900/20 dark:border-red-800/30 dark:hover:bg-red-900/40' : 'bg-success/10 text-success border-success/30 hover:bg-green-200 dark:bg-green-900/20 dark:border-green-800/30 dark:hover:bg-green-900/40'} ${u.id === user?.id ? 'opacity-30 cursor-not-allowed' : ''}`}>
                                       {u.isActive ? <><span className="material-symbols-outlined text-[14px]">lock</span> Khóa</> : <><span className="material-symbols-outlined text-[14px]">lock_open</span> Mở khóa</>}
                                     </button>
                                     <button onClick={() => {
@@ -549,12 +574,12 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                                       setEditUserName(u.name);
                                       setEditUserRole(u.role);
                                       setEditUserFacility(u.facility_id);
-                                      setEditFinanceFacilities(Array.isArray(u.facility_id) ? u.facility_id : [u.facility_id || 'ALL']);
+                                      setEditFinanceFacilities(Array.isArray(u?.facility_id) ? u.facility_id : (u?.facility_id ? [u.facility_id] : ['ALL']));
                                       setEditUserPassword('');
                                     }} className="px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center justify-center border bg-blue-100 text-blue-600 border-blue-300 hover:bg-blue-200 dark:bg-blue-900/20 dark:border-blue-800/30 dark:hover:bg-blue-900/40">
                                       <span className="material-symbols-outlined text-[16px]">edit</span>
                                     </button>
-                                    <button onClick={() => setDeletingUser(u)} disabled={u.id === user.id} className={`px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center justify-center border bg-error/10 text-error border-error/30 hover:bg-error-container dark:bg-red-900/20 dark:border-red-800/30 dark:hover:bg-red-900/40 ${u.id === user.id ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                    <button onClick={() => setDeletingUser(u)} disabled={u.id === user?.id} className={`px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center justify-center border bg-error/10 text-error border-error/30 hover:bg-error-container dark:bg-red-900/20 dark:border-red-800/30 dark:hover:bg-red-900/40 ${u.id === user?.id ? 'opacity-30 cursor-not-allowed' : ''}`}>
                                       <span className="material-symbols-outlined text-[16px]">delete</span>
                                     </button>
                                   </div>
@@ -567,7 +592,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                   </div>
                 </div>
               </div>
-            ) : activeTab === 'maintenance' && user.role === 'ADMIN' ? (
+            ) : activeTab === 'maintenance' && user?.role === 'ADMIN' ? (
               <div className="space-y-6">
                 <div className="bg-surface-container-low dark:bg-[#252525] p-5 rounded-xl border border-outline-variant dark:border-gray-700">
                   <h3 className="font-bold mb-4 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-error">warning</span> Go-live Reset (Dọn dẹp hệ thống)</h3>
@@ -597,10 +622,10 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                    <p className="text-sm text-gray-500 mb-6">Đây là nơi hệ thống lưu trữ tất cả các phiên chat của các cơ sở. AI Master sẽ đọc được kho dữ liệu này để ghi nhớ các ngữ cảnh giao tiếp (Global Memory) từ các phiên làm việc trước.</p>
                    
                    <div className="grid grid-cols-1 gap-4">
-                     {aiSessions.length === 0 ? (
+                     {(aiSessions || []).length === 0 ? (
                        <div className="text-center text-gray-500 py-8 border border-dashed rounded-xl">Chưa có dữ liệu hội thoại AI nào.</div>
                      ) : (
-                       aiSessions.map(session => (
+                       (aiSessions || []).map(session => (
                          <div key={session.id} className="p-4 rounded-xl border border-outline-variant dark:border-gray-700 bg-white dark:bg-[#1a1a1a] shadow-sm">
                             <div className="flex justify-between items-start mb-2">
                                <h4 className="font-bold text-primary dark:text-blue-400">{session.title || 'Không có tiêu đề'}</h4>
@@ -621,7 +646,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                                <span className="bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">person</span> {session.user_id}</span>
                             </div>
                             <div className="bg-surface-container dark:bg-[#252525] p-3 rounded-lg max-h-40 overflow-y-auto text-sm space-y-3 custom-scrollbar">
-                               {(typeof session.chat_log === 'string' ? JSON.parse(session.chat_log) : (session.chat_log || [])).map((msg, idx) => (
+                               {safeParseChatLog(session.chat_log).map((msg, idx) => (
                                  <div key={idx} className={`flex flex-col ${msg.role === 'ai' ? 'text-gray-700 dark:text-gray-300' : 'text-primary dark:text-blue-400 font-medium'}`}>
                                     <span className="text-[10px] uppercase opacity-70 mb-0.5">{msg.role === 'ai' ? 'AI Advisor' : 'User'}</span>
                                     <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -791,7 +816,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                             }} disabled={editingUser.username === 'admin'} />
                             [Tất cả cơ sở]
                           </label>
-                          {facilities.map(f => (
+                          {(facilities || []).map(f => (
                             <label key={f.id} className="flex items-center gap-1.5 text-sm font-medium dark:text-white cursor-pointer select-none">
                               <input type="checkbox" className="accent-primary w-4 h-4" checked={editFinanceFacilities.includes('ALL') || editFinanceFacilities.includes(f.name)} onChange={e => {
                                 if (e.target.checked) {
@@ -819,7 +844,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                           <option value="HQ">HQ</option>
                           <option value="Cơ sở 1">Cơ sở 1</option>
                           <option value="Cơ sở 2">Cơ sở 2</option>
-                          {facilities.map(f => (
+                          {(facilities || []).map(f => (
                             <option key={f.id} value={f.name}>{f.name}</option>
                           ))}
                         </select>
