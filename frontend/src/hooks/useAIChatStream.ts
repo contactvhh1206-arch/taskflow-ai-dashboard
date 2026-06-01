@@ -68,17 +68,21 @@ export function useAIChatStream(options?: {
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
+      // KIẾN TRÚC LUỒNG UI STREAM THÉP - BẢN VÁ TỪ HUBDB 555
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
         
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-        
-        let chunkTextToAppend = '';
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+        }
 
+        // 1. DIỆT BẪY CRLF: Phân tách chunk chấp nhận cả \n\n và \r\n\r\n
+        const lines = buffer.split(/\r?\n\r?\n/);
+        buffer = lines.pop() || ''; // Giữ lại phần chưa nguyên vẹn
+
+        let chunkTextToAppend = '';
+        
         for (const line of lines) {
           const trimmedLine = line.trim();
           if (!trimmedLine) continue;
@@ -90,17 +94,19 @@ export function useAIChatStream(options?: {
             try {
               const parsed = JSON.parse(dataPayload);
               
+              // 2. CHỐNG RACE CONDITION TRẠNG THÁI (REACT STATE)
+              // Chỉ kích hoạt callback nếu session thực sự thay đổi
               if (parsed.new_session_id && options?.onSessionCreated) {
-                options.onSessionCreated(parsed.new_session_id);
+                // Đẩy tác vụ này ra khỏi Microtask queue hiện tại để tránh chặn Render Stream
+                setTimeout(() => options.onSessionCreated(parsed.new_session_id), 0);
               }
               
-              // Gom mọi chuẩn dữ liệu có thể trả về từ OpenRouter/Backend:
               const content = parsed.content || parsed.text || parsed.choices?.[0]?.delta?.content || "";
               if (content) {
                 chunkTextToAppend += content;
               }
             } catch (parseError) {
-              console.warn('Silent fallback: JSON parse failed on SSE chunk:', dataPayload);
+              console.warn('[Luồng Thép] Bỏ qua chunk vỡ ngầm:', dataPayload);
             }
           }
         }
@@ -109,12 +115,39 @@ export function useAIChatStream(options?: {
           setMessages((prev) => {
             const newMessages = [...prev];
             const lastIndex = newMessages.length - 1;
-            newMessages[lastIndex] = {
-              ...newMessages[lastIndex],
-              content: newMessages[lastIndex].content + chunkTextToAppend
-            };
+            
+            // 3. RÀO CHẮN OUT OF BOUNDS (-1 CRASH)
+            if (lastIndex >= 0) {
+              newMessages[lastIndex] = {
+                ...newMessages[lastIndex],
+                content: (newMessages[lastIndex].content || '') + chunkTextToAppend
+              };
+            }
             return newMessages;
           });
+        }
+
+        // 4. CHỐNG THẤT THOÁT BUFFER CUỐI CÙNG
+        if (done) {
+           if (buffer.trim().startsWith('data: ') && !buffer.includes('[DONE]')) {
+              try {
+                  const finalPayload = buffer.trim().replace(/^data:\s*/, '');
+                  const finalParsed = JSON.parse(finalPayload);
+                  const finalContent = finalParsed.content || finalParsed.text || finalParsed.choices?.[0]?.delta?.content || "";
+                  if (finalContent) {
+                      setMessages((prev) => {
+                          const newMsgs = [...prev];
+                          if (newMsgs.length > 0) {
+                              newMsgs[newMsgs.length - 1].content += finalContent;
+                          }
+                          return newMsgs;
+                      });
+                  }
+              } catch (e) {
+                  // Buffer cuối là rác, bỏ qua an toàn
+              }
+           }
+           break; // Kết thúc an toàn
         }
       }
     } catch (error: any) {
