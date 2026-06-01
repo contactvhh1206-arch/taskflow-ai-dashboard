@@ -3001,6 +3001,7 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 messagesPayload.push({
                     role: "assistant",
                     content: aiReplyContent || "",
+{
                     tool_calls: mappedToolCallsForHistory
                 });
                 for (const tc of mappedToolCallsForHistory) {
@@ -3134,31 +3135,37 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
 
 console.log("=== BINGO! ROUTE AI STREAM ĐĐƯỢC LOAD VÀO SERVER ===");
 app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
-  // 1. THIẾT LẬP HEADER CHUẨN SSE
-  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // TẮT BUFFERING CỦA NGINX TRÊN RENDER
-  res.flushHeaders(); // Ép gửi Header ngay lập tức
-
-  // 2. ANTI-TIMEOUT: Gửi ngay một comment rỗng để ép Render mở luồng kết nối (Bypass 15s limit)
-  res.write(':\n\n');
-
-  // 3. XỬ LÝ SỰ KIỆN CLIENT NGẮT KẾT NỐI
-  req.on('close', () => {
-    console.log('[SSE] Client đã ngắt kết nối. Dừng stream.');
-    res.end();
-  });
-
-  let userMsgId = null; // Khai báo ngoài try-catch để rollback trong catch
+  let { message, session_id } = req.body;
+  const user_id = req.user.id;
+  const facilityId = req.user.facility_id;
+  
+  if (!message) {
+      return res.status(400).json({ error: "Thiếu message" });
+  }
 
   try {
-    let { message, session_id } = req.body;
-    const user_id = req.user.id;
-    
-    // Nếu rỗng HOẶC là ID rác do Frontend tự chế (bắt đầu bằng 'session_')
-    if (!session_id || session_id === 'null' || String(session_id).startsWith('session_')) {
-        // TẠO SESSION CHUẨN XỊN (Dùng crypto.randomUUID để khớp với schema hiện tại)
+    // =========================================================================
+    // 1. HOISTING RBAC GUARD & DATABASE FETCH (CHẠY TRƯỚC TIÊN)
+    // =========================================================================
+    if (session_id && String(session_id) !== 'null' && !String(session_id).startsWith('session_')) {
+        // CHỐT CHẶN BÊ TÔNG SỐ 1: Bắt lỗi IDOR
+        const sessionCheck = await pool.query(
+            `SELECT id FROM ai_chat_sessions WHERE id = $1 AND user_id = $2`,
+            [session_id, user_id]
+        );
+        
+        if (sessionCheck.rows.length === 0) {
+            return res.status(403).json({ error: "Lỗi 403: Truy cập trái phép (IDOR Detected)." });
+        }
+        
+        // Cập nhật lại thời gian của Session để nó nhảy lên top
+        const updateTime = Date.now();
+        await pool.query(
+            "UPDATE ai_chat_sessions SET timestamp = $1 WHERE id = $2",
+            [updateTime, session_id]
+        );
+    } else {
+        // Tạo SESSION CHUẨN XỊN
         const newSessionId = crypto.randomUUID();
         const currentTime = Date.now();
         const sessionResult = await pool.query(
@@ -3167,50 +3174,38 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         );
         session_id = sessionResult.rows[0].id;
         console.log("🛠️ Đã tạo Session UUID chuẩn:", session_id);
-    } else {
-        // KIỂM TRA XEM SESSION CÒN TỒN TẠI KHÔNG (CHỐNG MỒ CÔI DO RESET)
-        const checkSession = await pool.query('SELECT id FROM ai_chat_sessions WHERE id = $1', [session_id]);
-        if (checkSession.rowCount === 0) {
-            const currentTime = Date.now();
-            await pool.query(
-                "INSERT INTO ai_chat_sessions (id, user_id, title, timestamp) VALUES ($1, $2, $3, $4)",
-                [session_id, user_id, 'Cuộc trò chuyện mới (Phục hồi)', currentTime]
-            );
-            console.log("🛠️ Đã tạo lại Session bị mồ côi:", session_id);
-        }
-    }
-    
-    console.log("=== ĐANG XỬ LÝ CHAT CHO SESSION ID:", session_id, "===");
-    
-    // Bắn session_id về cho Frontend đồng bộ State
-    res.write(`data: ${JSON.stringify({ new_session_id: session_id })}\n\n`);
-    
-    if (!message) {
-        throw new Error("Thiếu message");
     }
 
-    // 1. LẤY LỊCH SỬ CHAT
+    // LẤY LỊCH SỬ CHAT
     const { rows: historyRows } = await pool.query(
       `SELECT role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY created_at ASC`,
       [session_id]
     );
-    const formattedHistory = historyRows.map(r => ({ role: r.role, content: r.content }));
+    // Cắt history theo Sliding Window
+    const formattedHistory = historyRows.map(r => ({ role: r.role === 'assistant' ? 'assistant' : 'user', content: r.content })).slice(-15);
 
-    // 2. LƯU TIN NHẮN USER & GIỮ LẠI ID ĐỂ ROLLBACK
-    const userMsgResult = await pool.query(
-      `INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'user', $2) RETURNING id`,
-      [session_id, message]
-    );
-    userMsgId = userMsgResult.rows[0].id;
+    // =========================================================================
+    // 2. MỞ LUỒNG SSE & MÁY CHẾM ABORT CONTROLLER (XÁC THỰC PASS)
+    // =========================================================================
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders(); 
 
-    // Cập nhật lại thời gian của Session để nó nhảy lên top
-    const updateTime = Date.now();
-    await pool.query(
-        "UPDATE ai_chat_sessions SET timestamp = $1 WHERE id = $2",
-        [updateTime, session_id]
-    );
+    // Gửi ID mới cho Trình duyệt
+    res.write(`data: ${JSON.stringify({ new_session_id: session_id })}\n\n`);
 
+    // Cắm máy chém Abort
+    const controller = new AbortController();
+    req.on('close', () => {
+        console.warn(`[SSE Warning] Client ngắt kết nối. Cắt luồng OpenRouter!`);
+        controller.abort();
+    });
+
+    // =========================================================================
     // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
+    // =========================================================================
     let systemContext = `Bạn là Master AI Cố vấn của hệ thống HubDB.
 1. VỀ SỐ LIỆU: Dựa TUYỆT ĐỐI vào dữ liệu nội bộ được cung cấp dưới đây. Nếu không tìm thấy số liệu, hãy báo cáo thẳng thắn, lịch sự là hệ thống chưa ghi nhận, không tự bịa số liệu.
 2. VỀ PHONG CÁCH: Hãy linh hoạt đọc vị yêu cầu của sếp:
@@ -3220,7 +3215,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 
     const strictRolePrompt = `
 [CHỈ THỊ TỐI CAO TỪ BAN GIÁM ĐỐC]:
-Bạn là "Cố vấn AI Vận Hành" ĐỘC QUYỀN của hệ thống TaskFlow. Vai trò của bạn là 100% chuyên nghiệp, kỷ luật và nghiêm túc.
+Bạn là "Cố vấn Vận hành AI" ĐỘC QUYỀN của hệ thống TaskFlow. Vai trò của bạn là 100% chuyên nghiệp, kỷ luật và nghiêm túc.
 Sứ mệnh của bạn CHỈ xoay quanh: Quản lý Công việc, Báo cáo Tài chính, Nhân sự, và Vận hành Cơ sở.
 
 NGUYÊN TẮC THÉP (CẤM VI PHẠM):
@@ -3229,30 +3224,20 @@ Tuyệt đối không đưa ra lời khuyên cá nhân.
 Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi là Cố vấn Vận hành AI. Tôi chỉ có quyền hạn hỗ trợ các vấn đề về Công việc, Tài chính và Hệ thống của cơ sở. Ngài cần xem báo cáo nào ạ?"
 `;
 
-    // Nối chuỗi này vào trước khi nạp data DB để khóa chặt ngữ cảnh
     systemContext = strictRolePrompt + systemContext;
 
     let hasData = false;
-    // Lấy câu nói gần nhất của AI từ lịch sử
     let previousAiMessage = "";
-    if (formattedHistory.length > 0 && (formattedHistory[formattedHistory.length - 1].role === 'assistant' || formattedHistory[formattedHistory.length - 1].role === 'ai')) {
+    if (formattedHistory.length > 0 && formattedHistory[formattedHistory.length - 1].role === 'assistant') {
         previousAiMessage = formattedHistory[formattedHistory.length - 1].content;
     }
     
-    // Gộp cả câu hỏi hiện tại và câu trả lời trước đó để dò từ khóa
     const contextMsg = (previousAiMessage + " " + message).toLowerCase();
-
-    // ==========================================
-    // THIẾT QUÂN LUẬT RBAC TẠI TẦNG BACKEND RAG
-    // ==========================================
 
     // Bước 1: Định nghĩa nhóm All-Access (Toàn quyền)
     const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
     const isMarketingHead = req.user.role === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING';
     const hasAllAccess = ALL_ACCESS_ROLES.includes(req.user.role) || isMarketingHead;
-
-    // Bước 2: Thiết lập cấu trúc lọc theo cơ sở (Tenant Isolation)
-    // Nếu không thuộc nhóm All-Access, BẮT BUỘC phải khóa cứng theo facility_id của User
     const userFacilityId = req.user.facility_id; 
 
     try {
@@ -3262,7 +3247,6 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
             let taskParams = [];
 
             if (!hasAllAccess) {
-                // Chặn cứng tại tầng Database! Không cho AI cơ hội nhìn thấy cơ sở khác
                 taskQuery += " WHERE facility_id = $1";
                 taskParams.push(userFacilityId);
                 taskQuery += " ORDER BY id DESC LIMIT 20";
@@ -3271,38 +3255,21 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
             }
 
             const { rows: taskRows } = await pool.query(taskQuery, taskParams);
-            
             if (taskRows.length > 0) {
-                const taskData = taskRows.map(r => `[Task ID: ${r.id} | Tiêu đề: ${r.title} | Trạng thái: ${r.status}]`).join('\n');
-                systemContext += `- Danh sách công việc thuộc phạm vi thẩm quyền:\n${taskData}\n`;
+                const taskData = taskRows.map(r => `[ID ${r.id}: ${r.title} | Status: ${r.status} | PIC: ${r.pic_id}]`).join('\n');
+                systemContext += `- Danh sách Công việc (Tasks):\n${taskData}\n`;
             } else {
-                systemContext += `- Công việc: Không có dữ liệu task nào trong phạm vi quyền hạn.\n`;
+                systemContext += `- Công việc: Không tìm thấy task nào khớp yêu cầu.\n`;
             }
             hasData = true;
         }
 
-        // --- KHỐI QUÉT NHÂN SỰ ---
-        if (contextMsg.includes('nhân sự') || contextMsg.includes('người dùng') || contextMsg.includes('nhân viên')) {
-            let userQuery = "SELECT COUNT(*) as count FROM users";
-            let userParams = [];
-            if (!hasAllAccess) {
-                userQuery += " WHERE facility_id = $1";
-                userParams.push(userFacilityId);
-            }
-            const { rows } = await pool.query(userQuery, userParams);
-            systemContext += `- Tổng số nhân sự trong thẩm quyền: ${rows[0].count} người.\n`;
-            hasData = true;
-        }
-
-        // --- KHỐI QUÉT DOANH THU / TÀI CHÍNH ---
-        const isRevenueIntent = contextMsg.match(/(doanh thu|tài chính|tiền| dt |bán hàng|tổng kết|báo cáo)/i);
-        if (isRevenueIntent) {
-            // BƯỚC 1: TRUY XUẤT ĐỊNH DANH CƠ SỞ CHUẨN TỪ DATABASE
+        // --- KHỐI QUÉT TÀI CHÍNH (FINANCE) ---
+        if (contextMsg.match(/(doanh thu|tài chính|dt|thu|tiền|báo cáo|tháng|ngày)/i)) {
             let standardFacilityName = null;
             let standardFacilityCode = null;
 
             if (!hasAllAccess) {
-                // Truy vấn bảng facilities để tìm tên và mã chuẩn
                 const facQuery = `
                     SELECT name, code 
                     FROM facilities 
@@ -3313,21 +3280,15 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
                 
                 const { rows: facRows } = await pool.query(facQuery, facParams);
 
-                if (facRows.length === 0) {
-                    console.warn(`[CẢNH BÁO RBAC] Không tìm thấy thông tin định danh cơ sở chuẩn cho User ID/Facility ID: ${userFacilityId}`);
-                    systemContext += `- Báo cáo tài chính: Doanh thu 0 đ (Lỗi bất đồng bộ định danh nội bộ).\n`;
-                    hasData = true;
-                } else {
+                if (facRows.length > 0) {
                     standardFacilityName = facRows[0].name;
                     standardFacilityCode = facRows[0].code;
                 }
             }
 
-            // Khởi tạo câu lệnh gốc (Bỏ total_revenue đi nếu không có full quyền, chỉ lấy data JSONB)
             let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
             const queryParams = [];
 
-            // Xử lý lọc tháng sinh động một cách an toàn
             const matchMonth = contextMsg.match(/tháng (\d+)|t(\d+)/i);
             let isMonthQuery = false;
             if (matchMonth) {
@@ -3338,18 +3299,15 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
                 queryStr += ` AND (date LIKE $${queryParams.length - 1} OR date LIKE $${queryParams.length})`;
             }
 
-            let recordLimit = 7;
-            if (isMonthQuery || contextMsg.includes('tháng')) recordLimit = 31;
-            
+            let recordLimit = isMonthQuery ? 31 : 7;
             queryParams.push(recordLimit);
             queryStr += ` ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT $${queryParams.length}`;
             
             const { rows: revenueRows } = await pool.query(queryStr, queryParams);
             if (revenueRows.length > 0) {
                 let revDataText = "";
-                let totalMonthRevenue = 0; // Khởi tạo biến tính tổng Doanh thu
+                let totalMonthRevenue = 0; 
                 
-                // Use a for loop instead of forEach so we can safely `continue` if Step 1 failed
                 for (let i = 0; i < revenueRows.length; i++) {
                     const r = revenueRows[i];
                     
@@ -3358,32 +3316,21 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
                         totalMonthRevenue += dailySysRev;
                         revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${dailySysRev.toLocaleString('vi-VN')} đ]\n`;
                     } else {
-                        // Nếu Bước 1 thất bại (không tìm ra standardFacilityName), bỏ qua dò tìm
-                        if (!standardFacilityName) {
-                            continue;
-                        }
+                        if (!standardFacilityName) continue;
 
-                        // BƯỚC 2: BÓC TÁCH JSONB VÀ FUZZY MATCHING (Case-insensitive)
                         const rData = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || []);
                         let localRev = 0;
 
                         if (Array.isArray(rData)) {
-                            // Đề phòng giá trị chuẩn bị Null, ép kiểu an toàn và chuẩn hóa chữ thường
                             const stdName = String(standardFacilityName || '').toLowerCase().trim();
                             const stdCode = String(standardFacilityCode || '').toLowerCase().trim();
 
                             const facData = rData.find(f => {
-                                // Rào chắn Null/Undefined cho dữ liệu JSON rác
                                 const fName = String(f.name || '').toLowerCase().trim();
                                 const fId = String(f.id || '').toLowerCase().trim();
-
-                                if (!fName && !fId) return false; // Bỏ qua Object rác không có định danh
-
-                                // Điều kiện 1: Tên chuẩn bao hàm Tên/ID JSON hoặc ngược lại
+                                if (!fName && !fId) return false; 
                                 const isNameMatch = (fName && stdName && (fName.includes(stdName) || stdName.includes(fName))) ||
                                                     (fId && stdName && (fId.includes(stdName) || stdName.includes(fId)));
-                                                    
-                                // Điều kiện 2: Khớp chính xác với Mã Code chuẩn
                                 const isCodeMatch = (fName && stdCode && fName === stdCode) || 
                                                     (fId && stdCode && fId === stdCode);
 
