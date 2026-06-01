@@ -1,12 +1,8 @@
 import React, { useState, useRef, useEffect, FormEvent, UIEvent } from 'react';
-import { Message } from '../hooks/useAIChatStream';
+import { useAIChatStream } from '../hooks/useAIChatStream';
 
-export const AIChatBox: React.FC<{
-  messages: Message[], 
-  isStreaming: boolean, 
-  sendMessage: (msg: string, ctx: any) => void, 
-  stopStream: () => void 
-}> = ({ messages, isStreaming, sendMessage, stopStream }) => {
+export const AIChatBox: React.FC = () => {
+  const { messages, isStreaming, sendMessage, stopStream } = useAIChatStream();
   const [inputValue, setInputValue] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);

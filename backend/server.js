@@ -100,7 +100,7 @@ const allowedOrigins = [
 
 // Cấu hình CORS khóa IP lạ
 app.use(cors({
-  origin: '*', // Trong tương lai sửa thành tên miền của ngài
+  origin: ['https://hubdb.app', 'https://www.hubdb.app', 'http://localhost:5173'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
   exposedHeaders: ['Content-Type', 'Cache-Control', 'Connection'] // SINH TỬ CHO SSE!
