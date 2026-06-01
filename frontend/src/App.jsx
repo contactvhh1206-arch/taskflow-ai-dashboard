@@ -17,6 +17,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import RevenueLog from './components/RevenueLog.jsx';
 import KPISettings from './components/KPISettings.jsx';
 import ArchivedFacilitiesDashboard from './components/ArchivedFacilitiesDashboard.jsx';
+import TaskHistory from './components/TaskHistory.jsx';
 
 // --- GLOBAL FETCH INTERCEPTOR (VÁ BỞI HUBDB 333) ---
 // File: src/App.jsx
@@ -478,7 +479,6 @@ function MainDashboard() {
   });
 
   const activeTasks = filteredTasks.filter(t => !isOldDoneTask(t));
-  const historyTasks = filteredTasks.filter(t => isOldDoneTask(t));
 
   const [facilityStatuses, setFacilityStatuses] = useState([]);
   const [isCheckinCompleted, setIsCheckinCompleted] = useState(false);
@@ -1427,46 +1427,7 @@ function MainDashboard() {
             ) : activeTab === 'task-history' ? (
               <ErrorBoundary>
                 <div className="flex flex-col h-full w-full max-w-5xl mx-auto py-2">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                    <div>
-                      <h2 className="text-2xl font-bold text-on-surface dark:text-white">Lịch sử công việc hoàn thành</h2>
-                      <p className="text-sm text-on-surface-variant dark:text-gray-400 mt-1">Lưu trữ các công việc đã hoàn thành từ các tháng trước.</p>
-                    </div>
-                  </div>
-                  <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden flex-1 shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400 border-b border-outline-variant dark:border-gray-700">
-                          <tr>
-                            <th className="px-6 py-4 font-semibold">Công việc</th>
-                            <th className="px-6 py-4 font-semibold">Người phụ trách</th>
-                            <th className="px-6 py-4 font-semibold">Deadline</th>
-                            <th className="px-6 py-4 font-semibold text-right">Ngày hoàn thành</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {historyTasks.length === 0 ? (
-                            <tr><td colSpan="4" className="text-center py-12 text-gray-500">Chưa có công việc nào trong lịch sử</td></tr>
-                          ) : historyTasks.sort((a,b) => new Date(b.completedAt) - new Date(a.completedAt)).map(task => (
-                            <tr key={task.id} className="border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                              <td className="px-6 py-4">
-                                <div className="font-medium text-on-surface dark:text-white">{task.title}</div>
-                                {task.desc && <div className="text-xs text-gray-500 mt-1 line-clamp-2">{task.desc}</div>}
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold uppercase">{task.pic.charAt(0)}</div>
-                                  <span>{task.pic}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{task.deadline}</td>
-                              <td className="px-6 py-4 text-right text-gray-500 dark:text-gray-400 font-medium">{task.completedAt}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  <TaskHistory />
                 </div>
               </ErrorBoundary>
             ) : activeTab === 'daily-reports' && ['FINANCE_DEPT'].includes(user.role) ? (
