@@ -404,7 +404,7 @@ export default function AIAdvisor(props) {
                           continue;
                       }
                       
-                      const newText = parsed.text || "";
+                      const newText = parsed.text || parsed.choices?.[0]?.delta?.content || "";
                       currentAiMessage += newText;
                       
                       // CHỈ UPDATE CHUỖI -> REACT RENDER CỰC NHẸ BÉN
