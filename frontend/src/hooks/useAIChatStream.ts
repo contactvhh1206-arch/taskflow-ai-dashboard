@@ -46,10 +46,21 @@ export function useAIChatStream(options?: {
     try {
       let chatEndpoint = '';
       try {
-        const baseURL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+        let rawBase = import.meta.env.VITE_API_BASE_URL;
+        
+        // BỌC THÉP THỰC SỰ: Nếu có biến môi trường nhưng người cấu hình quên nhập https://
+        // Hệ thống tự động vứt bỏ biến đó và fallback về origin hiện tại của trình duyệt.
+        if (rawBase && !rawBase.startsWith('http')) {
+            console.warn('[CẢNH BÁO MÔI TRƯỜNG] VITE_API_BASE_URL thiếu https://. Đang dùng Fallback Origin.');
+            rawBase = ''; 
+        }
+
+        const baseURL = rawBase || window.location.origin;
         chatEndpoint = new URL('/api/ai/chat-stream', baseURL).toString();
+
       } catch (err) {
-        throw new Error('SYSTEM_ERROR: Mất cấu hình Base URL.');
+        // Lỗi này giờ đây chỉ xảy ra nếu trình duyệt quá cũ không hỗ trợ URL API
+        throw new Error('SYSTEM_ERROR: Trình duyệt không thể phân giải đường dẫn mạng.');
       }
 
       const response = await fetch(chatEndpoint, {
