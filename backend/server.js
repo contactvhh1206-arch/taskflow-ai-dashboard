@@ -3192,11 +3192,12 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     // Gửi ID mới cho Trình duyệt
     res.write(`data: ${JSON.stringify({ new_session_id: session_id })}\n\n`);
 
-    // Cắm máy chém Abort
+    // Cắm máy chém Abort (Lệnh #1 - Đóng kết nối an toàn)
     const controller = new AbortController();
     req.on('close', () => {
         console.warn(`[SSE Warning] Client ngắt kết nối. Cắt luồng OpenRouter!`);
         controller.abort();
+        res.end(); // Lệnh #1: Ngăn Node.js tiếp tục giữ connection khi Client đã chết
     });
 
     // =========================================================================
@@ -3418,25 +3419,33 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
         model: "google/gemini-2.5-flash",
         stream: true,
         messages: messagesForAI
-      })
+      }),
+      signal: controller.signal // Lệnh #1: Kế thừa AbortController
     });
 
     if (!openRouterResponse.ok) {
       throw new Error(`Lỗi từ OpenRouter: ${openRouterResponse.status}`);
     }
 
-    // 3. STREAM & GOM TEXT
+    // 3. STREAM & GOM TEXT (Đã vá Lệnh RCA)
     let fullAiResponse = "";
+    let buffer = "";
+    const decoder = new TextDecoder("utf-8");
     
     for await (const chunk of openRouterResponse.body) {
-      const textChunk = chunk.toString('utf-8');
-      const lines = textChunk.split('\n').filter(line => line.trim() !== '');
+      const textChunk = decoder.decode(chunk, { stream: true });
+      buffer += textChunk;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ""; // Giữ lại phần chưa hoàn chỉnh
       
       for (const line of lines) {
-        if (line === 'data: [DONE]') continue;
-        if (line.startsWith('data: ')) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+        if (trimmedLine === 'data: [DONE]') continue;
+        
+        if (trimmedLine.startsWith('data: ')) {
           try {
-            const parsed = JSON.parse(line.slice(6));
+            const parsed = JSON.parse(trimmedLine.slice(6));
             const chunkText = parsed.choices?.[0]?.delta?.content || "";
             
             if (chunkText) {
@@ -3450,43 +3459,61 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
       }
     }
 
-    // 4. LƯU TIN NHẮN AI & KẾT THÚC RESPONSE
-    res.write('data: [DONE]\n\n');
-    res.end();
-
-    // NGAY SAU KHI STREAM XONG, BẮT BUỘC LƯU VÀO DATABASE:
-    if (fullAiResponse.trim()) {
-        console.log("Chuỗi AI chuẩn bị lưu:", fullAiResponse);
+    // Lệnh #4: Dọn dẹp Buffer Cuối Chu kỳ
+    if (buffer.trim().startsWith('data: ') && buffer.trim() !== 'data: [DONE]') {
         try {
-            await pool.query(
-                "INSERT INTO ai_chat_messages (session_id, role, content) VALUES ($1, 'assistant', $2)",
-                [session_id, fullAiResponse]
-            );
-            console.log("✅ Đã lưu tin nhắn AI vào DB thành công.");
-        } catch (dbErr) {
-            console.error("❌ Lỗi lưu DB:", dbErr);
+            const parsed = JSON.parse(buffer.trim().slice(6));
+            const chunkText = parsed.choices?.[0]?.delta?.content || "";
+            if (chunkText) {
+                fullAiResponse += chunkText;
+                res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+            }
+        } catch (e) {
+            console.warn("Parse error in trailing buffer:", e);
         }
     }
 
+    // 4. LƯU TIN NHẮN AI & KẾT THÚC RESPONSE
+    if (!res.writableEnded) {
+        res.write('data: [DONE]\n\n');
+        res.end();
+    }
+
+    // NGAY SAU KHI STREAM XONG, BẮT BUỘC LƯU VÀO DATABASE:
+    if (fullAiResponse.trim()) {
+        try {
+            await pool.query(
+                "INSERT INTO ai_chat_messages (session_id, role, content, facility_id) VALUES ($1, 'assistant', $2, $3)",
+                [session_id, fullAiResponse, facilityId]
+            );
+            console.log(`✅ [STREAM SUCCESS] Đã lưu tin nhắn AI (Session: ${session_id})`); // Đã cắt bỏ việc in toàn bộ fullAiResponse
+        } catch (dbErr) {
+            console.error(`❌ [DB ERROR] Lỗi lưu DB ai_chat_messages (Session: ${session_id}):`, dbErr);
+        }
+    }
   } catch (error) {
-    console.error("Lỗi AI Chat Stream:", error);
+    console.error("Lỗi AI Chat Stream:", error.message);
     
     // XỬ LÝ NGOẠI LỆ (ROLLBACK): Đánh dấu lỗi nếu có ID tin nhắn User
-    if (userMsgId) {
+    if (typeof userMsgId !== 'undefined' && userMsgId) {
       try {
         await pool.query(
           `DELETE FROM ai_chat_messages WHERE id = $1`,
           [userMsgId]
         );
-        console.log(`Đã rollback (xóa) tin nhắn User ID: ${userMsgId}`);
+        console.log(`⚠️ Đã rollback (xóa) tin nhắn User ID: ${userMsgId}`);
       } catch (dbError) {
-        console.error("Lỗi khi update is_error:", dbError);
+        console.error("❌ Lỗi khi rollback tin nhắn:", dbError);
       }
     }
-
-    res.write(`data: ${JSON.stringify({ error: error.message || "Lỗi máy chủ" })}\n\n`);
-    res.write('data: [DONE]\n\n');
-    res.end();
+    
+    // NGĂN CHẶN LỖI WRITE AFTER END
+    if (!res.writableEnded) {
+        // Đảm bảo client không bị treo UI khi lỗi
+        res.write(`data: ${JSON.stringify({ error: error.message || "Lỗi máy chủ trong quá trình Stream" })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+    }
   }
 });
 
