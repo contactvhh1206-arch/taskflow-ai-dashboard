@@ -209,6 +209,26 @@ const initDB = async () => {
         )
     `);
     
+    // DDL CHO RAG DOCUMENTS 
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS rag_documents (
+            id SERIAL PRIMARY KEY,
+            file_name VARCHAR(255) NOT NULL,
+            file_size INTEGER NOT NULL,
+            chunk_count INTEGER DEFAULT 0,
+            uploader_id INTEGER,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    `);
+
+    // ALTER TABLE ĐỂ THÊM KHOÁ NGOẠI CHO VECTOR
+    try {
+        await pool.query(`
+            ALTER TABLE company_knowledge_base 
+            ADD COLUMN IF NOT EXISTS document_id INTEGER REFERENCES rag_documents(id) ON DELETE CASCADE
+        `);
+    } catch (e) {}
+    
     await pool.query(`
         CREATE INDEX IF NOT EXISTS company_knowledge_vector_idx 
         ON company_knowledge_base USING hnsw (embedding vector_cosine_ops)
