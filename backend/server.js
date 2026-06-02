@@ -11,6 +11,7 @@ import bcrypt from 'bcryptjs';
 import multer from 'multer';
 
 dotenv.config();
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 const normalizeDept = (code) => {
     if (!code) return '';
