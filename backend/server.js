@@ -1292,17 +1292,20 @@ app.get('/api/checkin/status', authenticateUser, async (req, res) => {
 // 2. AUTO-TASKING AI (TÃCH Há»¢P OPENROUTER)
 // ==============================================================================
 
+// 1. Quản lý Cache cấu hình AI (Singleton Pattern)
 let aiConfigCache = null;
 let lastCacheTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 phút
+const CACHE_TTL = 5 * 60 * 1000; // Bộ nhớ đệm tự hủy sau 5 phút
 
 async function getSystemAIConfig() {
     const now = Date.now();
-    // Tự động vô hiệu hóa Cache nếu quá 5 phút
+    
+    // Cache Hit: Trả về kết quả từ RAM ngay lập tức, triệt tiêu 100% I/O DB
     if (aiConfigCache && (now - lastCacheTime < CACHE_TTL)) {
         return aiConfigCache;
     }
     
+    // Cache Miss hoặc Hết hạn TTL: Nạp lại cấu hình từ Database
     try {
         const { rows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
         const configData = rows.length > 0 ? rows[0].data : {};
@@ -1316,16 +1319,46 @@ async function getSystemAIConfig() {
 
         aiConfigCache = {
             apiKey: parsedData.apiKey || process.env.OPENROUTER_API_KEY,
-            aiModel: parsedData.aiModel || "google/gemini-2.5-pro"
+            aiModel: parsedData.model || "google/gemini-2.5-flash"
         };
         lastCacheTime = now;
         return aiConfigCache;
     } catch (err) {
-        console.error("Lỗi lấy cấu hình AI từ DB, dùng fallback env:", err);
+        console.error("[CACHE_FALLBACK] Lỗi nạp cấu hình AI từ DB, dùng Fallback:", err.message);
         return {
             apiKey: process.env.OPENROUTER_API_KEY,
-            aiModel: "google/gemini-2.5-pro"
+            aiModel: "google/gemini-2.5-flash"
         };
+    }
+}
+
+// 2. Hàm Telemetry: Ghi log sử dụng AI ngầm (Asynchronous Logging)
+async function logAiUsageNgam(userId, userRole, facilityId, aiModel, usage) {
+    if (!usage || (!usage.prompt_tokens && !usage.completion_tokens)) return;
+    
+    try {
+        const query = `
+            INSERT INTO ai_token_usage_logs 
+            (user_id, role, facility_id, model, prompt_tokens, completion_tokens, total_tokens, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `;
+        const pTokens = usage.prompt_tokens || 0;
+        const cTokens = usage.completion_tokens || 0;
+        
+        const values = [
+            userId, 
+            userRole, 
+            facilityId || null, 
+            aiModel, 
+            pTokens, 
+            cTokens, 
+            pTokens + cTokens
+        ];
+        
+        // Khối lệnh này chạy trong Background. Chậm/nghẽn DB cũng không sao.
+        await pool.query(query, values);
+    } catch (dbErr) {
+        console.error('[TOKEN_LOG_FAILED] Lỗi ghi log tài nguyên AI ngầm:', dbErr.message);
     }
 }
 
@@ -1547,64 +1580,126 @@ app.post('/api/internal/extract-revenue', express.json({limit: '50mb'}), async (
 });
 
 app.post('/api/internal/extract-revenue-text', authenticateUser, async (req, res) => {
+  const { prompt, content } = req.body;
+  if (!prompt || !content) {
+    return res.status(400).json({ error: 'Thiếu dữ liệu prompt hoặc nội dung.' });
+  }
+
+  // 1. DATA SANITIZATION
+  let parsedContent = [];
   try {
-    const { prompt, content } = req.body;
-    
-    if (!prompt || !content) {
-      return res.status(400).json({ error: 'Thiáº¿u dá»¯ liá»‡u prompt hoáº·c ná»™i dung.' });
-    }
+      parsedContent = JSON.parse(content);
+  } catch (e) {
+      return res.status(400).json({ error: 'Nội dung đầu vào không phải JSON hợp lệ.' });
+  }
+  if (!Array.isArray(parsedContent)) parsedContent = [parsedContent]; 
 
-    const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
-    const aiConfig = configRows.length > 0 ? configRows[0].data : {};
-    const aiModel = aiConfig.model || "google/gemini-2.5-flash";
+  const sanitizedContent = parsedContent
+      .map(row => {
+          if (!Array.isArray(row)) return row;
+          return row.filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
+      })
+      .filter(row => Array.isArray(row) && row.length > 0);
+  const optimizedContentStr = JSON.stringify(sanitizedContent);
 
-    const payload = {
-      model: aiModel,
-      messages: [
-        { role: "system", content: prompt },
-        { role: "user", content: content }
-      ],
-      response_format: { type: "json_object" }
-    };
+  // 2. STRICT PROMPTING & PAYLOAD BUILD
+  const strictSystemInstruction = `
+[SYSTEM OVERRIDE INSTRUCTION]
+You are a strict data extraction API. You MUST return ONLY a valid JSON object matching the requested schema.
+DO NOT wrap the response in markdown block ticks (\`\`\`json).
+DO NOT output any conversational text, greetings, or explanations.
+Your entire response must be parseable by JSON.parse() immediately.
+`;
+  const finalPrompt = prompt + "\n" + strictSystemInstruction;
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { 
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`, 
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://taskflow-ai-dashboard.onrender.com",
-        "X-Title": "Stitch Smart AI"
-      },
-      body: JSON.stringify(payload)
-    });
+  // [SỬ DỤNG CACHE] - Gọi hàm Singleton thay vì await pool.query trực tiếp chặn luồng
+  const aiConfig = await getSystemAIConfig();
+  
+  const payload = {
+    model: aiConfig.aiModel,
+    messages: [
+      { role: "system", content: finalPrompt },
+      { role: "user", content: optimizedContentStr }
+    ],
+    response_format: { type: "json_object" }
+  };
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("OpenRouter Response Error:", errText);
-      return res.status(response.status).json({ error: 'Lá»—i tá»« OpenRouter API.' });
-    }
+  let rawAiTextForLog = "";
 
-    const aiData = await response.json();
-    let parsedData = [];
-    
-    if (aiData.choices && aiData.choices.length > 0) {
-      const aiText = aiData.choices[0].message.content;
-      const jsonMatch = aiText.match(/\[[\s\S]*\]/) || aiText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedData = JSON.parse(jsonMatch[0]);
+  // 3. ROUTE-LEVEL ERROR HANDLING
+  try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 40000);
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { 
+          "Authorization": `Bearer ${aiConfig.apiKey}`, 
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://taskflow-ai-dashboard.onrender.com",
+          "X-Title": "Stitch Smart AI"
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // Mapping Lỗi Upstream
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[OPENROUTER_UPSTREAM_ERROR] Status: ${response.status} - Body: ${errText}`);
+        if (response.status >= 500) {
+            return res.status(502).json({ error: 'Dịch vụ AI đang gián đoạn (Bad Gateway), vui lòng thử lại sau.' });
+        } else if (response.status === 402 || response.status === 429) {
+            return res.status(503).json({ error: 'Dịch vụ AI đang quá tải hoặc hết Quota, vui lòng thử lại sau.' });
+        }
+        return res.status(502).json({ error: 'Lỗi từ kết nối OpenRouter API.' });
+      }
+
+      const aiData = await response.json();
+      let parsedData = [];
+      
+      if (aiData.choices && aiData.choices.length > 0) {
+        rawAiTextForLog = aiData.choices[0].message.content;
+        const jsonMatch = rawAiTextForLog.match(/\[[\s\S]*\]/) || rawAiTextForLog.match(/\{[\s\S]*\}/);
+        const textToParse = jsonMatch ? jsonMatch[0] : rawAiTextForLog;
+        
+        parsedData = JSON.parse(textToParse); // Ngoại lệ Syntax Error sẽ văng xuống nhánh 2 của Catch
+        
         if (parsedData.data) parsedData = parsedData.data;
         if (!Array.isArray(parsedData)) parsedData = [parsedData];
-      } else {
-         return res.status(500).json({ error: 'AI khÃ´ng tráº£ vá»  JSON há»£p lá»‡.' });
       }
-    }
 
-    // Tráº£ vá»  usage token Ä‘á»ƒ frontend log
-    res.json({ success: true, data: parsedData, usage: aiData.usage });
+      // =========================================================================
+      // 4. FIRE AND FORGET & FAST RESPONSE (CẮT ĐỨT LATENCY CHO USER)
+      // =========================================================================
+      // TRẢ VỀ KẾT QUẢ NGAY LẬP TỨC: Frontend ngắt kết nối và hiển thị kết quả
+      res.json({ success: true, data: parsedData, usage: aiData?.usage });
+
+      // TELEMETRY: Background Logging (Node.js tiếp tục chạy ngầm phía sau)
+      // Dữ liệu định danh được truyền vào để phục vụ Module Tài Chính (FinOps)
+      if (aiData && aiData.usage) {
+          logAiUsageNgam(
+              req.user.id,
+              req.user.role,
+              req.user.facility_id,
+              aiConfig.aiModel,
+              aiData.usage
+          ).catch(err => console.error("[FIRE_AND_FORGET_CRASH]", err));
+      }
 
   } catch (error) {
-    console.error('Lá»—i khi gá» i AI Extract API (Text):', error);
-    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™ khi gá» i AI API.' });
+      if (error.name === 'AbortError') {
+          console.error('[AI_NETWORK_TIMEOUT] Kết nối đến OpenRouter vượt quá thời gian chờ.');
+          return res.status(504).json({ error: 'Dịch vụ AI đang quá tải (Gateway Timeout), vui lòng thử lại sau.' });
+      }
+      if (error instanceof SyntaxError && rawAiTextForLog) {
+          console.error('[AI_PARSE_ERROR] DỮ LIỆU BỊ LỆCH CHUẨN CÚ PHÁP:\n', rawAiTextForLog);
+          return res.status(422).json({ error: 'Dữ liệu AI trả về bị lệch chuẩn, vui lòng thử lại.' });
+      }
+      console.error('[AI_UNKNOWN_ERROR] Lỗi không xác định khi gọi AI:', error);
+      return res.status(500).json({ error: 'Lỗi máy chủ nội bộ bất ngờ, vui lòng liên hệ Admin.' });
   }
 });
 
