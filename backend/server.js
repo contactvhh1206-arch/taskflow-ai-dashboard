@@ -2115,8 +2115,9 @@ app.get('/api/config', authenticateUser, checkAdmin, async (req, res) => {
 app.post('/api/config', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user || {};
-    if (role !== 'SUPER_ADMIN') {
-       return res.status(403).json({ error: 'Không có quyền lưu cấu hình hệ thống. Yêu cầu quyền SUPER_ADMIN.' });
+    // SỬA ĐỔI THIẾT QUÂN LUẬT: Chấp nhận ADMIN hệ thống
+    if (role !== 'ADMIN') {
+        return res.status(403).json({ error: "403 Forbidden: Chỉ ADMIN mới có quyền ghi đè cấu hình lõi." });
     }
     
     const { ai_config, system_prompts } = req.body;
