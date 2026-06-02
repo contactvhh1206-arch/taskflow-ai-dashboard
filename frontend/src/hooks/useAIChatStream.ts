@@ -48,11 +48,10 @@ export function useAIChatStream(options?: {
       try {
         let rawBase = import.meta.env.VITE_API_BASE_URL;
         
-        // BỌC THÉP THỰC SỰ: Nếu có biến môi trường nhưng người cấu hình quên nhập https://
-        // Hệ thống tự động vứt bỏ biến đó và fallback về origin hiện tại của trình duyệt.
+        // AUTO-CORRECTION BỌC THÉP
         if (rawBase && !rawBase.startsWith('http')) {
-            console.warn('[CẢNH BÁO MÔI TRƯỜNG] VITE_API_BASE_URL thiếu https://. Đang dùng Fallback Origin.');
-            rawBase = ''; 
+            console.warn('[CẢNH BÁO MÔI TRƯỜNG] VITE_API_BASE_URL thiếu Protocol. Hệ thống tự động gắn https://');
+            rawBase = 'https://' + rawBase; 
         }
 
         const baseURL = rawBase || window.location.origin;
