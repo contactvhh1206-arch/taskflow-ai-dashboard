@@ -3041,7 +3041,6 @@ app.post('/api/ai/chat', authenticateUser, async (req, res) => {
                 messagesPayload.push({
                     role: "assistant",
                     content: aiReplyContent || "",
-{
                     tool_calls: mappedToolCallsForHistory
                 });
                 for (const tc of mappedToolCallsForHistory) {
