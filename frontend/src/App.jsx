@@ -404,7 +404,7 @@ function MainDashboard() {
   }, []);
   
   const isVPGlobal = user?.role === 'VICE_PRESIDENT';
-  const isDeptHeadGlobal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role);
+  const isDeptHeadGlobal = ['DEPARTMENT_HEAD'].includes(user?.role);
   const deptIdGlobal = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVPGlobal ? 'BGD' : 'MARKETING'));
   const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== deptIdGlobal;
 
