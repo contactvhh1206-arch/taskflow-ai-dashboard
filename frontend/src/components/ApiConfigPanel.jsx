@@ -64,7 +64,7 @@ export default function ApiConfigPanel({ showToast }) {
       useEffect(() => {
         const fetchConfig = async () => {
             try {
-                let rawBase = import.meta.env.VITE_API_BASE_URL?.trim() || '';
+                let rawBase = import.meta.env.VITE_API_BASE_URL?.replace(/^["']|["']$/g, '').trim() || '';
                 if (rawBase && !rawBase.startsWith('http')) rawBase = 'https://' + rawBase;
                 const baseURL = rawBase || window.location.origin;
                 
@@ -107,7 +107,7 @@ export default function ApiConfigPanel({ showToast }) {
         setPrompts(finalPrompts);
 
         try {
-            let rawBase = import.meta.env.VITE_API_BASE_URL?.trim() || '';
+            let rawBase = import.meta.env.VITE_API_BASE_URL?.replace(/^["']|["']$/g, '').trim() || '';
             if (rawBase && !rawBase.startsWith('http')) rawBase = 'https://' + rawBase;
             const baseURL = rawBase || window.location.origin;
 
