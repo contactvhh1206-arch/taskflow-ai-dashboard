@@ -1115,7 +1115,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
               picQuery += ' AND facility_id = $2';
               picParams.push(req.user.facility_id);
           } else if (req.user.role === 'FINANCE_DEPT') {
-              picQuery += ' AND department_id = $2';
+              picQuery += ' AND department_code = $2';
               picParams.push(insert_dept_code);
           }
           
@@ -1159,8 +1159,8 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       }
 
     const insertQuery = `
-      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, department_code, priority_level, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
       RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
     `;
       const { rows } = await pool.query(insertQuery, [
@@ -1170,7 +1170,10 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
         urgent || false, 
         deadline, 
         pic_id, 
-        insert_facility_id
+        insert_facility_id,
+        insert_dept_code,
+        priorityStars,
+        req.user.id
       ]);
     
     const newTask = {
