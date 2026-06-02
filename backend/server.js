@@ -1821,10 +1821,38 @@ app.get('/api/ai/audit-logs', authenticateUser, async (req, res) => {
         const userRole = req.user?.role || 'USER';
         const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'];
         
-        // Giả lập trả về dữ liệu rỗng (hoặc gắn DB service thực tế sau)
-        res.json({ success: true, data: [] });
+        // RBAC: Nếu không thuộc All Access Roles, chỉ được xem log của cơ sở mình
+        let queryParams = [];
+        let queryCondition = "";
+        
+        if (!ALL_ACCESS_ROLES.includes(userRole)) {
+            queryCondition = "WHERE t.facility_id = $1";
+            queryParams.push(req.user?.facility_id);
+        }
+
+        const query = `
+            SELECT 
+                t.message_id,
+                t.task_type,
+                t.total_tokens,
+                t.status,
+                t.user_id,
+                t.facility_id,
+                t.department_code,
+                c.created_at,
+                c.is_violation
+            FROM ai_token_usage_logs t
+            JOIN ai_chat_messages c ON t.message_id = c.id
+            ${queryCondition}
+            ORDER BY c.created_at DESC
+            LIMIT 100;
+        `;
+        
+        const { rows } = await pool.query(query, queryParams);
+        res.json({ success: true, data: rows });
     } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        console.error('[Audit Route Error]:', e);
+        res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
 });
 
