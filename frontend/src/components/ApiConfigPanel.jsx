@@ -66,9 +66,9 @@ export default function ApiConfigPanel({ showToast }) {
       useEffect(() => {
         const fetchConfig = async () => {
             try {
-                let rawBase = import.meta.env.VITE_API_BASE_URL?.replace(/^["']|["']$/g, '').trim() || '';
+                let rawBase = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace(/^["']|["']$/g, '').trim() || '';
                 if (rawBase && !rawBase.startsWith('http')) rawBase = 'https://' + rawBase;
-                const baseURL = rawBase || window.location.origin;
+                const baseURL = rawBase || 'https://taskflow-ai-dashboard.onrender.com';
                 const configEndpoint = new URL('/api/config', baseURL).toString();
                 
                 const response = await fetch(configEndpoint, {

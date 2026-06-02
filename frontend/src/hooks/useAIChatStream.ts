@@ -54,7 +54,7 @@ export function useAIChatStream(options?: {
             rawBase = 'https://' + rawBase; 
         }
 
-        const baseURL = rawBase || (window.location.hostname.includes('hubdb.app') ? 'https://taskflow-backend.onrender.com' : window.location.origin);
+        const baseURL = rawBase || 'https://taskflow-ai-dashboard.onrender.com';
         chatEndpoint = new URL('/api/ai/chat-stream', baseURL).toString();
 
       } catch (err) {
