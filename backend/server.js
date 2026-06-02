@@ -320,7 +320,39 @@ const initDB = async () => {
     }
     
     // FIX: Tẩy xóa facility_id bị gán nhầm cho các thẻ thuộc về phòng ban
-    await pool.query(`UPDATE tasks SET facility_id = NULL WHERE facility_id IS NOT NULL AND department_code IN ('FINANCE', 'MARKETING')`);
+    await pool.query(`
+      UPDATE tasks 
+      SET facility_id = NULL 
+      WHERE facility_id IS NOT NULL 
+      AND created_by IN (
+          SELECT u.id FROM users u 
+          JOIN roles r ON u.role_id = r.id 
+          WHERE r.name IN ('FINANCE_DEPT', 'DEPARTMENT_HEAD')
+      )
+    `);
+
+    // FIX: Điền department_code cho các task bị thiếu (do AI tạo)
+    await pool.query(`
+      UPDATE tasks 
+      SET department_code = 'FINANCE' 
+      WHERE (department_code = '' OR department_code IS NULL)
+      AND created_by IN (
+          SELECT u.id FROM users u 
+          JOIN roles r ON u.role_id = r.id 
+          WHERE r.name = 'FINANCE_DEPT'
+      )
+    `);
+    
+    await pool.query(`
+      UPDATE tasks 
+      SET department_code = 'MARKETING' 
+      WHERE (department_code = '' OR department_code IS NULL)
+      AND created_by IN (
+          SELECT u.id FROM users u 
+          JOIN roles r ON u.role_id = r.id 
+          WHERE r.name = 'DEPARTMENT_HEAD'
+      )
+    `);
     console.log('[DB] Initialization complete.');
   } catch (error) {
     console.error('[DB] Initialization error:', error.message);
