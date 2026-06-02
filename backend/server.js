@@ -461,6 +461,11 @@ const authenticateUser = async (req, res, next) => {
             facilityRaw = payload.facility_id;
             departmentId = payload.department_id;
             departmentCode = payload.department_code;
+            if (!departmentCode) {
+                if (userRole === 'FINANCE_DEPT') departmentCode = 'FINANCE';
+                else if (userRole === 'DEPARTMENT_HEAD') departmentCode = 'MARKETING';
+                else if (userRole === 'VICE_PRESIDENT') departmentCode = 'BGD';
+            }
             facilityCode = payload.facility_code;
         } catch (jwtErr) {
             console.error('[Auth Middleware] Lỗi giải mã Token:', jwtErr.message);
