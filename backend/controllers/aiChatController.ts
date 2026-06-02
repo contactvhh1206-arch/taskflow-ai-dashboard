@@ -1,8 +1,5 @@
 import { Request, Response } from 'express';
-
-const saveChatToDatabase = async (userId: string, facilityId: string, userMessage: string, aiMessage: string) => {
-    console.log(`[DB SUCCESS] Saved ${aiMessage.length} clean text chars for User ${userId} at Facility ${facilityId}.`);
-};
+import { AiAuditService } from '../services/aiAuditService';
 
 export const streamAIChat = async (req: Request, res: Response) => {
   const message = req.body.message;
@@ -28,9 +25,22 @@ export const streamAIChat = async (req: Request, res: Response) => {
       isSavedToDB = true;
       if (fullAiResponse.trim()) {
         try {
-          await saveChatToDatabase(userId, facilityId, message, fullAiResponse);
-        } catch (dbError) {
-          console.error('[DB FATAL ON CLOSE]', dbError);
+          const payload = {
+            user_id: userId,
+            facility_id: facilityId,
+            department_code: (req as any).user?.department_code || 'UNKNOWN',
+            task_type: req.body.task_type || 'Advisor',
+            status: 'Lỗi', // Đóng sớm
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+            chat_prompt: message,
+            chat_response: fullAiResponse,
+            is_violation: false
+          };
+          AiAuditService.executeGhostAudit(payload);
+        } catch (payloadError: any) {
+          console.error('[Controller Hook Error]: Xây dựng Payload thất bại:', payloadError.message);
         }
       }
     }
@@ -94,18 +104,34 @@ export const streamAIChat = async (req: Request, res: Response) => {
     }
     
     res.write('data: [DONE]\n\n');
+    res.end();
     
     if (!isSavedToDB) {
       isSavedToDB = true;
       if (fullAiResponse.trim()) {
         try {
-          await saveChatToDatabase(userId, facilityId, message, fullAiResponse);
-        } catch (dbError) {
-          console.error('[DB FATAL ON SUCCESS]', dbError);
+          const targetFacility = req.body.target_facility || null;
+          const isViolation = targetFacility && facilityId !== targetFacility;
+
+          const payload = {
+            user_id: userId,
+            facility_id: facilityId,
+            department_code: (req as any).user?.department_code || 'UNKNOWN',
+            task_type: req.body.task_type || 'Advisor',
+            status: 'OK', 
+            prompt_tokens: 0, 
+            completion_tokens: 0,
+            total_tokens: 0,
+            chat_prompt: message,
+            chat_response: fullAiResponse,
+            is_violation: !!isViolation
+          };
+          AiAuditService.executeGhostAudit(payload);
+        } catch (payloadError: any) {
+          console.error('[Controller Hook Error]: Xây dựng Payload thất bại:', payloadError.message);
         }
       }
     }
-    res.end();
     
   } catch (error: any) {
     if (error.name === 'AbortError') {
