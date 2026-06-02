@@ -66,7 +66,7 @@ export default function ApiConfigPanel({ showToast }) {
             try {
                 let rawBase = import.meta.env.VITE_API_BASE_URL?.replace(/^["']|["']$/g, '').trim() || '';
                 if (rawBase && !rawBase.startsWith('http')) rawBase = 'https://' + rawBase;
-                const baseURL = rawBase || window.location.origin;
+                const baseURL = rawBase || (window.location.hostname.includes('hubdb.app') ? 'https://taskflow-backend.onrender.com' : window.location.origin);
                 
                 const response = await fetch(`${baseURL}/api/config`, {
                     headers: { 'Authorization': `Bearer ${localStorage.getItem('taskflow_token') || ''}` }
@@ -109,7 +109,7 @@ export default function ApiConfigPanel({ showToast }) {
         try {
             let rawBase = import.meta.env.VITE_API_BASE_URL?.replace(/^["']|["']$/g, '').trim() || '';
             if (rawBase && !rawBase.startsWith('http')) rawBase = 'https://' + rawBase;
-            const baseURL = rawBase || window.location.origin;
+            const baseURL = rawBase || (window.location.hostname.includes('hubdb.app') ? 'https://taskflow-backend.onrender.com' : window.location.origin);
 
             const response = await fetch(`${baseURL}/api/config`, {
               method: 'POST',
