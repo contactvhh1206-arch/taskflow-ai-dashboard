@@ -1028,17 +1028,13 @@ function MainDashboard() {
 
     executeFetch();
 
-    const pollInterval = setInterval(() => {
-        if (!isFetchingTasks.current && isMounted) {
-            fetchTasks();
-        }
-    }, 10000);
+    
 
     // 2. BỨC TƯỜNG DỌN DẸP (CLEANUP): Tiêu chuẩn Vàng của React 18
     return () => {
         isMounted = false;
         isFetchingTasks.current = false; // BẮT BUỘC MỞ KHÓA CHO LẦN MOUNT SAU!
-        clearInterval(pollInterval);
+        
     };
   }, [user?.id]); // BỨC TƯỜNG HIỆU NĂNG: Chỉ bám theo primitive properties để chống re-render vô tận
 
