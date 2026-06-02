@@ -109,7 +109,7 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'x-user-role', 'x-facility-id'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'x-user-role', 'x-facility-id', 'x-user-id'],
   exposedHeaders: ['Content-Type', 'Cache-Control', 'Connection'] // SINH TỬ CHO SSE!
 }));
 app.use(express.json({ limit: '50mb' }));
