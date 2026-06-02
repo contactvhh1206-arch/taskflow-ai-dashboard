@@ -24,7 +24,9 @@ export default function ApiConfigPanel({ showToast }) {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${apiKey.trim()}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'HTTP-Referer': window.location.origin,
+              'X-Title': 'Hub Dubai AI'
             },
             body: JSON.stringify({
               model: aiModel.trim(),
@@ -154,7 +156,7 @@ export default function ApiConfigPanel({ showToast }) {
           <form onSubmit={handleSave} className="p-8 space-y-6 flex-1 max-w-4xl mx-auto w-full">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">OpenRouter API Key *</label>
-              <input required type="password" placeholder="sk-or-v1-..." value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full px-4 py-3 bg-surface-container dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary dark:text-white transition-colors" />
+              <input required type="text" autoComplete="off" placeholder="sk-or-v1-..." value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full px-4 py-3 bg-surface-container dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary dark:text-white transition-colors" />
               <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">lock</span> Khóa API được mã hóa và lưu trữ cục bộ an toàn.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
