@@ -1758,6 +1758,37 @@ app.post('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) =>
 });
 
 // API: KÃ­ch hoáº¡t AI Ping Ä‘Ã´n Ä‘á»‘c cÃ´ng viá»‡c
+app.post('/api/ai/test-key', authenticateUser, async (req, res) => {
+  try {
+    const { apiKey, model } = req.body;
+    if (!apiKey || !apiKey.trim().startsWith('sk-or-v1-')) {
+      return res.status(400).json({ success: false, message: 'Invalid API Key format' });
+    }
+    
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey.trim()}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://hubdb.app',
+        'X-Title': 'Hub Dubai AI'
+      },
+      body: JSON.stringify({
+        model: model || 'google/gemini-1.5-pro',
+        messages: [{ role: 'user', content: 'Ping' }]
+      })
+    });
+    
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ success: false, message: `OpenRouter error: ${err}` });
+    }
+    return res.json({ success: true, message: 'OK' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.post('/api/ai/ping', authenticateUser, async (req, res) => {
   try {
     const { taskId } = req.body;

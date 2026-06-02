@@ -25,31 +25,25 @@ export default function ApiConfigPanel({ showToast }) {
 
         setIsTesting(true);
         try {
-          const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          const rawBase = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL?.replace(/^["']|["']$/g, '').trim() || '';
+          const baseURL = rawBase || 'https://taskflow-ai-dashboard.onrender.com';
+          
+          const response = await fetch(`${baseURL}/api/ai/test-key`, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${apiKey.trim()}`,
-              'Content-Type': 'application/json',
-              'HTTP-Referer': window.location.origin,
-              'X-Title': 'Hub Dubai AI'
+              'Authorization': `Bearer ${localStorage.getItem('taskflow_token') || ''}`,
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: aiModel.trim(),
-              messages: [{ role: 'user', content: 'Ping' }]
+              apiKey: apiKey.trim(),
+              model: aiModel.trim()
             })
           });
 
           if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
-            const errDetails = errData?.error?.message || response.statusText || 'Unknown error';
-            
-            if (response.status === 401) {
-              if (showToast) showToast(`❌ Lỗi 401 từ OpenRouter: ${errDetails}`);
-            } else if (response.status === 404) {
-              if (showToast) showToast(`❌ Lỗi 404: Model ID không tồn tại (${errDetails})`);
-            } else {
-              if (showToast) showToast(`❌ Lỗi API (${response.status}): ${errDetails}`);
-            }
+            const errDetails = errData?.message || response.statusText || 'Unknown error';
+            if (showToast) showToast(`❌ ${errDetails}`);
           } else {
             if (showToast) showToast('✅ Kết nối API thành công!');
           }
