@@ -152,6 +152,7 @@ const initDB = async () => {
     // =========================================
     try {
       await pool.query(`ALTER TABLE ai_chat_sessions ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;`);
+      await pool.query(`ALTER TABLE ai_chat_messages ADD COLUMN IF NOT EXISTS tool_calls JSONB DEFAULT NULL;`);
       await pool.query(`
         CREATE TABLE IF NOT EXISTS ai_chat_messages (
           id SERIAL PRIMARY KEY,
