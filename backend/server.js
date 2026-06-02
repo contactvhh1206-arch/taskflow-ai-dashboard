@@ -832,7 +832,8 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
     }
     if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
         const userDept = normalizeDept(req.user.department_code || req.user.department_id);
-        if (task.department_code !== userDept) {
+        const taskDept = normalizeDept(task.department_code);
+        if (taskDept && taskDept !== userDept) {
             return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
         }
     }
@@ -872,7 +873,8 @@ app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
     }
     if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
         const userDept = normalizeDept(req.user.department_code || req.user.department_id);
-        if (task.department_code !== userDept) {
+        const taskDept = normalizeDept(task.department_code);
+        if (taskDept && taskDept !== userDept) {
             return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
         }
     }
@@ -986,7 +988,8 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     }
     if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
         const userDept = normalizeDept(req.user.department_code || req.user.department_id);
-        if (task.department_code !== userDept) {
+        const taskDept = normalizeDept(task.department_code);
+        if (taskDept && taskDept !== userDept) {
             return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
         }
     }
