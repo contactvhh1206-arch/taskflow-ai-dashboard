@@ -1815,6 +1815,19 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
 
 
 // API: LÆ°u vÃ  láº¥y danh sÃ¡ch vi pháº¡m AI
+// 🛡️ BẮT BUỘC: authMiddleware (authenticateUser) đứng canh cổng cho Ghost Audit.
+app.get('/api/ai/audit-logs', authenticateUser, async (req, res) => {
+    try {
+        const userRole = req.user?.role || 'USER';
+        const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'];
+        
+        // Giả lập trả về dữ liệu rỗng (hoặc gắn DB service thực tế sau)
+        res.json({ success: true, data: [] });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 app.get('/api/ai/violations', authenticateUser, checkAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT data FROM system_config WHERE key = $1', ['ai_violations']);

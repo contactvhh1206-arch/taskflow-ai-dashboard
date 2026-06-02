@@ -17,14 +17,46 @@ export default function AIUsageLogs() {
         
         const getName = (id, fallback) => uMap[id] || fallback;
 
-        const mockLogs = [
-          { id: 1, timestamp: new Date(Date.now() - 15 * 60000).toISOString(), userId: getName('u5', 'Sếp Phó (seppho)'), taskType: 'Auto-Tasking', tokens: 1250, status: 'Success' },
-          { id: 2, timestamp: new Date(Date.now() - 45 * 60000).toISOString(), userId: getName('u3', 'Phòng Kế Toán (ketoan)'), taskType: 'Advisor', tokens: 3420, status: 'Success' },
-          { id: 3, timestamp: new Date(Date.now() - 120 * 60000).toISOString(), userId: getName('u2', 'Quản lý Cơ sở 1 (manager1)'), taskType: 'Ping', tokens: 85, status: 'Success' },
-          { id: 4, timestamp: new Date(Date.now() - 150 * 60000).toISOString(), userId: getName('u4', 'Phòng Marketing (marketing)'), taskType: 'Auto-Tasking', tokens: 0, status: 'Error' },
-          { id: 5, timestamp: new Date(Date.now() - 200 * 60000).toISOString(), userId: getName('u1', 'Sếp Tổng (admin)'), taskType: 'Advisor', tokens: 4100, status: 'Success' }
-        ];
-        setLogs(mockLogs);
+        // 🛡️ BẮT BUỘC: Khởi tạo AbortController chống Race Condition
+        const abortController = new AbortController();
+
+        const fetchAuditLogs = async () => {
+          try {
+            const token = localStorage.getItem('token') || '';
+            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/ai/audit-logs', {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              },
+              signal: abortController.signal
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data?.success && Array.isArray(data.data)) {
+                // Map dữ liệu API về cấu trúc hiển thị của giao diện
+                const mappedLogs = data.data.map(log => ({
+                  id: log.message_id || Math.random().toString(),
+                  timestamp: log.created_at,
+                  userId: getName(log.user_id, log.user_id),
+                  taskType: log.task_type || 'Unknown',
+                  tokens: log.total_tokens || 0,
+                  status: log.status === 'OK' ? 'Success' : 'Error',
+                  isViolation: log.is_violation
+                }));
+                setLogs(mappedLogs);
+              } else {
+                setLogs([]);
+              }
+            }
+          } catch (error) {
+            if (error.name === 'AbortError') {
+              console.warn('[Network Shield]: Hủy fetch API bảo vệ khỏi Race Condition.');
+            } else {
+              console.error('Lỗi API Get Logs:', error);
+            }
+          }
+        };
+
+        fetchAuditLogs();
 
         const fetchViolations = async () => {
           try {
@@ -52,6 +84,11 @@ export default function AIUsageLogs() {
           } catch {}
         };
         fetchViolations();
+
+        // 🛡️ BẮT BUỘC: Cleanup Function để bóp chết Request khi Unmount
+        return () => {
+          abortController.abort();
+        };
       }, []);
 
       const getMappedName = (id, fallback) => usersMap[id] || fallback;
