@@ -39,11 +39,11 @@ export default function ApiConfigPanel({ showToast }) {
             const errDetails = errData?.error?.message || response.statusText || 'Unknown error';
             
             if (response.status === 401) {
-              if (showToast) showToast('❌ Lỗi xác thực: API Key không hợp lệ');
+              if (showToast) showToast(`❌ Lỗi 401 từ OpenRouter: ${errDetails}`);
             } else if (response.status === 404) {
-              if (showToast) showToast('❌ Lỗi: Model ID không tồn tại');
+              if (showToast) showToast(`❌ Lỗi 404: Model ID không tồn tại (${errDetails})`);
             } else {
-              if (showToast) showToast(`❌ Lỗi kết nối: ${errDetails}`);
+              if (showToast) showToast(`❌ Lỗi API (${response.status}): ${errDetails}`);
             }
           } else {
             if (showToast) showToast('✅ Kết nối API thành công!');
