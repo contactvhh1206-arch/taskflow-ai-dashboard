@@ -62,13 +62,33 @@ export default function ApiConfigPanel({ showToast }) {
       const [prompts, setPrompts] = useState(DEFAULT_PROMPTS);
 
       useEffect(() => {
-        const config = JSON.parse(localStorage.getItem('taskflow_ai_config') || '{}');
-        if (config.apiKey) setApiKey(config.apiKey);
-        if (config.aiModel) setAiModel(config.aiModel);
-        if (config.webhookUrl) setWebhookUrl(config.webhookUrl);
-
-        const savedPrompts = JSON.parse(localStorage.getItem('taskflow_system_prompts') || 'null');
-        if (savedPrompts) setPrompts({ ...DEFAULT_PROMPTS, ...savedPrompts });
+        const fetchConfig = async () => {
+            try {
+                let rawBase = import.meta.env.VITE_API_BASE_URL?.trim() || '';
+                if (rawBase && !rawBase.startsWith('http')) rawBase = 'https://' + rawBase;
+                const baseURL = rawBase || window.location.origin;
+                
+                const response = await fetch(`${baseURL}/api/config`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('taskflow_token') || ''}` }
+                });
+                
+                if (response.ok) {
+                    const resData = await response.json();
+                    if (resData.success && resData.data) {
+                        const aiConfig = resData.data.taskflow_ai_config ? JSON.parse(resData.data.taskflow_ai_config) : {};
+                        const sysPrompts = resData.data.taskflow_system_prompts ? JSON.parse(resData.data.taskflow_system_prompts) : null;
+                        
+                        if (aiConfig.apiKey) setApiKey(aiConfig.apiKey);
+                        if (aiConfig.aiModel) setAiModel(aiConfig.aiModel);
+                        if (aiConfig.webhookUrl) setWebhookUrl(aiConfig.webhookUrl);
+                        if (sysPrompts) setPrompts({ ...DEFAULT_PROMPTS, ...sysPrompts });
+                    }
+                }
+            } catch (err) {
+                console.error("Lỗi tải cấu hình từ server:", err);
+            }
+        };
+        fetchConfig();
       }, []);
 
       const handleSave = async (e) => {
@@ -77,8 +97,7 @@ export default function ApiConfigPanel({ showToast }) {
         const cleanModel = aiModel.trim();
         setAiModel(cleanModel);
         
-        const aiConfigPayload = { apiKey, aiModel: cleanModel, webhookUrl };
-        localStorage.setItem('taskflow_ai_config', JSON.stringify(aiConfigPayload));
+        const aiConfigPayload = { apiKey: apiKey.trim(), aiModel: cleanModel, webhookUrl };
 
         const finalPrompts = {
           autoTask: prompts.autoTask?.trim() || DEFAULT_PROMPTS.autoTask,
@@ -86,22 +105,33 @@ export default function ApiConfigPanel({ showToast }) {
           advisorReport: prompts.advisorReport?.trim() || DEFAULT_PROMPTS.advisorReport
         };
         setPrompts(finalPrompts);
-        localStorage.setItem('taskflow_system_prompts', JSON.stringify(finalPrompts));
 
         try {
-           await fetch('https://taskflow-ai-dashboard.onrender.com/api/logs', {
+            let rawBase = import.meta.env.VITE_API_BASE_URL?.trim() || '';
+            if (rawBase && !rawBase.startsWith('http')) rawBase = 'https://' + rawBase;
+            const baseURL = rawBase || window.location.origin;
+
+            const response = await fetch(`${baseURL}/api/config`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('taskflow_token') || ''}`
+              },
               body: JSON.stringify({ 
-                org_unit: 'SYSTEM',
-                entry_type: 'SYSTEM_CONFIG',
-                date: new Date().toISOString().split('T')[0],
-                display_time: new Date().toLocaleTimeString('vi-VN'),
-                content: { ai_config: aiConfigPayload, system_prompts: finalPrompts } 
+                ai_config: aiConfigPayload, 
+                system_prompts: finalPrompts 
               })
-           });
+            });
+            
+            if (!response.ok) {
+                const errData = await response.json().catch(()=>({}));
+                throw new Error(errData.error || 'Lỗi lưu cấu hình');
+            }
         } catch (err) {
            console.error("Lỗi đồng bộ cấu hình AI:", err);
+           if (showToast) showToast(`❌ Lỗi đồng bộ: ${err.message}`);
+           setIsSaving(false);
+           return;
         }
 
         setIsSaving(false);

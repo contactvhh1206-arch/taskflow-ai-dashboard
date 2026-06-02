@@ -46,7 +46,7 @@ export function useAIChatStream(options?: {
     try {
       let chatEndpoint = '';
       try {
-        let rawBase = import.meta.env.VITE_API_BASE_URL;
+        let rawBase = import.meta.env.VITE_API_BASE_URL?.trim();
         
         // AUTO-CORRECTION BỌC THÉP
         if (rawBase && !rawBase.startsWith('http')) {

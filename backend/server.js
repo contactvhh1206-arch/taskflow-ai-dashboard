@@ -1285,10 +1285,42 @@ app.get('/api/checkin/status', authenticateUser, async (req, res) => {
 // 2. AUTO-TASKING AI (TÃCH Há»¢P OPENROUTER)
 // ==============================================================================
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-xxxxxxxxxxxx'; 
+let aiConfigCache = null;
+let lastCacheTime = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 phút
 
+async function getSystemAIConfig() {
+    const now = Date.now();
+    // Tự động vô hiệu hóa Cache nếu quá 5 phút
+    if (aiConfigCache && (now - lastCacheTime < CACHE_TTL)) {
+        return aiConfigCache;
+    }
+    
+    try {
+        const { rows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
+        const configData = rows.length > 0 ? rows[0].data : {};
+        
+        let parsedData = {};
+        if (typeof configData === 'string') {
+            try { parsedData = JSON.parse(configData); } catch (e) { parsedData = {}; }
+        } else {
+            parsedData = configData || {};
+        }
 
-
+        aiConfigCache = {
+            apiKey: parsedData.apiKey || process.env.OPENROUTER_API_KEY,
+            aiModel: parsedData.aiModel || "google/gemini-2.5-pro"
+        };
+        lastCacheTime = now;
+        return aiConfigCache;
+    } catch (err) {
+        console.error("Lỗi lấy cấu hình AI từ DB, dùng fallback env:", err);
+        return {
+            apiKey: process.env.OPENROUTER_API_KEY,
+            aiModel: "google/gemini-2.5-pro"
+        };
+    }
+}
 
 const upload = multer({ 
     storage: multer.memoryStorage(),
@@ -2083,8 +2115,8 @@ app.get('/api/config', authenticateUser, checkAdmin, async (req, res) => {
 app.post('/api/config', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user || {};
-    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
-       return res.status(403).json({ error: 'KhÃ´ng cÃ³ quyá»n lÆ°u cáº¥u hÃ¬nh há»‡ thá»‘ng.' });
+    if (role !== 'SUPER_ADMIN') {
+       return res.status(403).json({ error: 'Không có quyền lưu cấu hình hệ thống. Yêu cầu quyền SUPER_ADMIN.' });
     }
     
     const { ai_config, system_prompts } = req.body;
@@ -2103,6 +2135,11 @@ app.post('/api/config', authenticateUser, async (req, res) => {
         VALUES ($1, $2, NOW()) 
         ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
       `, ['taskflow_system_prompts', JSON.stringify(system_prompts)]);
+    }
+    
+    // Auto-expire In-Memory Cache for all processes (Note: for true multi-process, we'd need Redis, but this triggers update for the current process immediately)
+    if (typeof aiConfigCache !== 'undefined') {
+        aiConfigCache = null;
     }
     
     res.json({ success: true });
@@ -3415,14 +3452,16 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
         : [...formattedHistory, { role: "user", content: message }];
 
     // 4. GỌI API OPENROUTER (KÈM CONTEXT & STREAM)
+    const activeAiConfig = await getSystemAIConfig();
+    
     const openRouterResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Authorization": `Bearer ${activeAiConfig.apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: activeAiConfig.aiModel || "google/gemini-2.5-flash",
         stream: true,
         messages: messagesForAI
       }),
