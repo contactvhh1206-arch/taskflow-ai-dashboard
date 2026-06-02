@@ -3246,6 +3246,9 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
         console.log("🛠️ Đã tạo Session UUID chuẩn:", session_id);
     }
 
+    // LƯU TIN NHẮN USER VÀO LỊCH SỬ
+    await saveChatMessage({ sessionId: session_id, role: 'user', content: message });
+
     // LẤY LỊCH SỬ CHAT
     const { rows: historyRows } = await pool.query(
       `SELECT role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY created_at ASC`,
@@ -3564,10 +3567,7 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
     // NGAY SAU KHI STREAM XONG, BẮT BUỘC LƯU VÀO DATABASE:
     if (fullAiResponse.trim()) {
         try {
-            await pool.query(
-                "INSERT INTO ai_chat_messages (session_id, role, content, facility_id) VALUES ($1, 'assistant', $2, $3)",
-                [session_id, fullAiResponse, facilityId]
-            );
+            await saveChatMessage({ sessionId: session_id, role: 'assistant', content: fullAiResponse });
             console.log(`✅ [STREAM SUCCESS] Đã lưu tin nhắn AI (Session: ${session_id})`); // Đã cắt bỏ việc in toàn bộ fullAiResponse
         } catch (dbErr) {
             console.error(`❌ [DB ERROR] Lỗi lưu DB ai_chat_messages (Session: ${session_id}):`, dbErr);
