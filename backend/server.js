@@ -1114,9 +1114,6 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FACILITY_MANAGER') {
               picQuery += ' AND facility_id = $2';
               picParams.push(req.user.facility_id);
-          } else if (req.user.role === 'FINANCE_DEPT') {
-              picQuery += ' AND department_code = $2';
-              picParams.push(insert_dept_code);
           }
           
           picQuery += ' LIMIT 1';
