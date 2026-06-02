@@ -1827,7 +1827,7 @@ app.get('/api/ai/audit-logs', authenticateUser, async (req, res) => {
         
         if (!ALL_ACCESS_ROLES.includes(userRole)) {
             queryCondition = "WHERE t.facility_id = $1";
-            queryParams.push(req.user?.facility_id);
+            queryParams.push(req.user?.facility_id || null);
         }
 
         const query = `
@@ -1852,7 +1852,7 @@ app.get('/api/ai/audit-logs', authenticateUser, async (req, res) => {
         res.json({ success: true, data: rows });
     } catch (e) {
         console.error('[Audit Route Error]:', e);
-        res.status(500).json({ success: false, error: 'Internal Server Error' });
+        res.status(500).json({ success: false, error: 'Internal Server Error', details: e.message });
     }
 });
 
