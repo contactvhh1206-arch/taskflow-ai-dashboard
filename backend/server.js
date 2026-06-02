@@ -1496,7 +1496,7 @@ const ragController = {
             }
             await client.query("UPDATE rag_documents SET chunk_count = $1 WHERE id = $2", [successCount, documentId]);
             await client.query('COMMIT');
-            res.json({ success: true, message: "Đã nhúng thành công " + successCount + " chunks.", document_id: documentId });
+            res.json({ success: true, message: "Đã nhúng thành công " + successCount + " chunks.", document_id: documentId, chunks_processed: successCount });
         } catch (error) {
             await client.query('ROLLBACK');
             res.status(500).json({ success: false, error: "Dịch vụ AI gián đoạn." });
