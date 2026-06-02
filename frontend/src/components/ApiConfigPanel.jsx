@@ -77,8 +77,12 @@ export default function ApiConfigPanel({ showToast }) {
                 if (response.ok) {
                     const resData = await response.json();
                     if (resData.success && resData.data) {
-                        const aiConfig = resData.data.taskflow_ai_config ? JSON.parse(resData.data.taskflow_ai_config) : {};
-                        const sysPrompts = resData.data.taskflow_system_prompts ? JSON.parse(resData.data.taskflow_system_prompts) : null;
+                        const aiConfig = typeof resData.data.taskflow_ai_config === 'string' 
+                            ? JSON.parse(resData.data.taskflow_ai_config) 
+                            : (resData.data.taskflow_ai_config || {});
+                        const sysPrompts = typeof resData.data.taskflow_system_prompts === 'string' 
+                            ? JSON.parse(resData.data.taskflow_system_prompts) 
+                            : (resData.data.taskflow_system_prompts || null);
                         
                         if (aiConfig.apiKey) setApiKey(aiConfig.apiKey);
                         if (aiConfig.aiModel) setAiModel(aiConfig.aiModel);
