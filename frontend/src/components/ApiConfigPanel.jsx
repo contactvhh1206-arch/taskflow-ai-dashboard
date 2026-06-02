@@ -18,6 +18,11 @@ export default function ApiConfigPanel({ showToast }) {
           return;
         }
 
+        if (!apiKey.trim().startsWith('sk-or-v1-')) {
+          if (showToast) showToast(`❌ Lỗi: Key không hợp lệ! (Bạn đang gửi: "${apiKey.trim().substring(0, 15)}..."). Vui lòng copy đúng key từ OpenRouter.`);
+          return;
+        }
+
         setIsTesting(true);
         try {
           const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
