@@ -318,6 +318,9 @@ const initDB = async () => {
     for (const role of roles) {
       await pool.query(`INSERT INTO roles (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`, [role]);
     }
+    
+    // FIX: Tẩy xóa facility_id bị gán nhầm cho các thẻ thuộc về phòng ban
+    await pool.query(`UPDATE tasks SET facility_id = NULL WHERE facility_id IS NOT NULL AND department_code IN ('FINANCE', 'MARKETING')`);
     console.log('[DB] Initialization complete.');
   } catch (error) {
     console.error('[DB] Initialization error:', error.message);
@@ -739,14 +742,14 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
                    pt.created_at as "createdAt", pt.updated_at as "completedAt",
                    pt.needs_support as "needsSupport",
                    u.full_name as pic, u.email as "picId",
-                   f.name as facility, f.code as "facilityId",
+                   COALESCE(f.name, pt.department_code, 'HQ') as facility, f.code as "facilityId",
                    pt.facility_id as "facilityRawId",
                    COUNT(tc.id) AS comment_count
             FROM paginated_tasks pt
             LEFT JOIN users u ON pt.pic_id = u.id
             LEFT JOIN facilities f ON pt.facility_id = f.id AND f.is_deleted = false
             LEFT JOIN task_comments tc ON pt.id = tc.task_id
-            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, u.full_name, u.email, f.name, f.code, pt.facility_id
+            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, u.full_name, u.email, f.name, pt.department_code, f.code, pt.facility_id
             ORDER BY pt.updated_at DESC
         `;
         
@@ -1172,13 +1175,8 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       if (!insert_facility_id || insert_facility_id === 'ALL') {
           // CHỈ NHÓM TOÀN QUYỀN mới được phép mượn kho của HQ làm mặc định
           if (ALL_ACCESS_ROLES.includes(req.user.role)) {
-              const hqFac = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name = 'HQ' LIMIT 1");
-              if (hqFac.rows.length > 0) {
-                  insert_facility_id = hqFac.rows[0].id;
-              } else {
-                  const anyFac = await pool.query("SELECT id FROM facilities LIMIT 1");
-                  if (anyFac.rows.length > 0) insert_facility_id = anyFac.rows[0].id;
-              }
+              // CHẤP NHẬN BỎ TRỐNG CƠ SỞ ĐỐI VỚI PHÒNG BAN CHUYÊN TRÁCH ĐỂ THỂ HIỆN LÀ TASK CHUNG
+              insert_facility_id = null;
           } else {
               // NHÓM LOCAL: Bắn hạ ngay lập tức! Không có facility_id thì không được phép tồn tại!
               return res.status(403).json({ 
