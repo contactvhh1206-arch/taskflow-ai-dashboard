@@ -1,0 +1,6 @@
+const checkAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+        return res.status(403).json({ error: "403 Forbidden: Quyá»n lá»±c nÃ y chá»‰ dÃ nh cho Káº» GÃ¡c Äá»n (ADMIN)!" });
+    }
+    next();
+};

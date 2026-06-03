@@ -1,0 +1,51 @@
+const authenticateUser = async (req, res, next) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Unauthorized: Missing or invalid Authorization header' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        let userId = null;
+        let userRole = null;
+        let facilityRaw = null;
+        let departmentId = null;
+        let departmentCode = null;
+        let facilityCode = null;
+
+        try {
+            const payload = jwt.verify(token, SECRET_KEY);
+            userId = payload.id;
+            userRole = payload.role;
+            facilityRaw = payload.facility_id;
+            departmentId = payload.department_id;
+            departmentCode = payload.department_code;
+            facilityCode = payload.facility_code;
+        } catch (jwtErr) {
+            console.error('[Auth Middleware] Lỗi giải mã Token:', jwtErr.message);
+            return res.status(401).json({ success: false, message: 'Invalid or Expired Token' });
+        }
+        
+        let facilityId = parseInt(facilityRaw, 10);
+        
+        if (!userRole) return res.status(401).json({ error: 'Unauthorized' });
+
+        if (isNaN(facilityId) && facilityRaw && facilityRaw !== 'ALL') {
+            const facRes = await pool.query('SELECT id FROM facilities WHERE code ILIKE $1 OR name ILIKE $1 LIMIT 1', [facilityRaw]);
+            if (facRes.rows.length > 0) {
+                facilityId = facRes.rows[0].id;
+            } else {
+                facilityId = null;
+            }
+        } else if (facilityRaw === 'ALL') {
+            facilityId = 'ALL';
+        }
+      
+        req.user = { id: userId, role: userRole, facility_id: facilityId, department_id: departmentId, department_code: departmentCode, facility_code: facilityCode };
+        next();
+    } catch (err) {
+        console.error("Auth middleware error:", err);
+        return res.status(500).json({ error: 'Lá»—i xÃ¡c thá»±c ná»™i bá»™.' });
+    }
+};
