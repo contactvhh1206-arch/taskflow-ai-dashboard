@@ -1183,6 +1183,20 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
       else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
 
+      // =====================================================================
+      // FALLBACK BẢO VỆ DATABASE CONSTRAINT (Chống lỗi NOT NULL facility_id)
+      // =====================================================================
+      if (!insert_facility_id) {
+          const hqCheck = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name ILIKE '%HQ%' OR name ILIKE '%Giám đốc%' LIMIT 1");
+          if (hqCheck.rows.length > 0) {
+              insert_facility_id = hqCheck.rows[0].id;
+          } else {
+              const firstFac = await pool.query("SELECT id FROM facilities ORDER BY id ASC LIMIT 1");
+              if (firstFac.rows.length > 0) insert_facility_id = firstFac.rows[0].id;
+              else insert_facility_id = 1; // Last resort hardcode
+          }
+      }
+
       const insertQuery = `
         INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, department_code, priority_level, created_by, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
