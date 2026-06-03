@@ -6,15 +6,18 @@ const TaskHistory = () => {
   // 1. STATE MANAGEMENT CHUẨN MỰC
   const [selectedTask, setSelectedTask] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1, totalRecords: 0 });
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0); // Added for UI display
   const [filters, setFilters] = useState({ date_from: '', date_to: '', pic_id: '' });
   
   // Debounce State: Cứu tinh của DB, tránh Spam truy vấn
   const [debouncedPicId, setDebouncedPicId] = useState('');
 
-  // 2. LÕI HỦY REQUEST (Ngăn Race Condition & Memory Leak)
+  // 2. LÕI HỦY REQUEST VÀ KHÓA LUỒNG (Ngăn Race Condition)
   const abortControllerRef = useRef(null);
+  const isFetchingRef = useRef(false);
 
   // 3. LOGIC DEBOUNCE 500ms CHO INPUT TEXT
   useEffect(() => {
@@ -32,7 +35,7 @@ const TaskHistory = () => {
     return () => {
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [pagination.page, debouncedPicId, filters.date_from, filters.date_to]);
+  }, [currentPage, debouncedPicId, filters.date_from, filters.date_to]);
 
   const fetchHistoryTasks = async () => {
     // [VÁ EDGE CASE 1]: CHẶN LỖ HỔNG THỜI GIAN NGHỊCH LÝ
@@ -44,17 +47,21 @@ const TaskHistory = () => {
       }
     }
 
+    if (isFetchingRef.current) return;
+    
     // Rút súng bắn hạ request cũ nếu nó chưa chạy xong
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
 
+    isFetchingRef.current = true;
+    setIsHistoryLoading(true);
+
     try {
-      setLoading(true);
       const params = {
-        page: pagination.page,
-        limit: pagination.limit,
+        page: currentPage,
+        limit: 50,
         ...(debouncedPicId && { pic_id: debouncedPicId }),
         ...(filters.date_from && { date_from: filters.date_from }),
         ...(filters.date_to && { date_to: filters.date_to })
@@ -67,11 +74,10 @@ const TaskHistory = () => {
 
       if (res.data.success) {
         setTasks(res.data.data);
-        setPagination(prev => ({
-          ...prev,
-          totalPages: res.data.meta.totalPages,
-          totalRecords: res.data.meta.totalRecords
-        }));
+        if (res.data.pagination) {
+          setTotalPages(res.data.pagination.total_pages);
+          setTotalRecords(res.data.pagination.total_records);
+        }
       }
     } catch (error) {
       // Bắt lỗi do Chủ động Hủy (Canceled) -> Cấm văng console.error làm rác log
@@ -83,7 +89,8 @@ const TaskHistory = () => {
     } finally {
       // Chỉ tắt Loading Overlay nếu đây là request cuối cùng (không bị hủy ngang)
       if (abortControllerRef.current?.signal?.aborted === false) {
-        setLoading(false);
+        isFetchingRef.current = false;
+        setIsHistoryLoading(false);
       }
     }
   };
@@ -93,12 +100,12 @@ const TaskHistory = () => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
     // Cực kỳ quan trọng: Lọc lại từ đầu thì phải về trang 1
-    setPagination(prev => ({ ...prev, page: 1 })); 
+    setCurrentPage(1); 
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination(prev => ({ ...prev, page: newPage }));
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
     }
   };
 
@@ -152,7 +159,7 @@ const TaskHistory = () => {
 
       {/* TABLE UI */}
       <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden flex-1 shadow-sm flex flex-col relative min-h-[400px]">
-        {loading && (
+        {isHistoryLoading && (
           <div className="absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-10 flex items-center justify-center transition-all duration-200">
             <span className="material-symbols-outlined animate-spin text-4xl text-primary">autorenew</span>
           </div>
@@ -169,7 +176,7 @@ const TaskHistory = () => {
               </tr>
             </thead>
             <tbody>
-              {!loading && tasks.length === 0 ? (
+              {!isHistoryLoading && tasks.length === 0 ? (
                 <tr><td colSpan="4" className="text-center py-16 text-gray-400">Không tìm thấy dữ liệu khớp với bộ lọc</td></tr>
               ) : tasks.map(task => (
                 <tr 
@@ -210,23 +217,23 @@ const TaskHistory = () => {
         {/* PAGINATION UI */}
         <div className="px-6 py-4 border-t border-outline-variant dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <span className="text-sm text-gray-500 dark:text-gray-400">
-            Tổng số: <strong className="text-gray-900 dark:text-white">{pagination.totalRecords}</strong> bản ghi
+            Tổng số: <strong className="text-gray-900 dark:text-white">{totalRecords}</strong> bản ghi
           </span>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600 dark:text-gray-300">
-              Trang <strong className="dark:text-white">{pagination.page}</strong> / {pagination.totalPages || 1}
+              Trang <strong className="dark:text-white">{currentPage}</strong> / {totalPages || 1}
             </span>
             <div className="flex gap-2">
               <button 
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page <= 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1 || isHistoryLoading}
                 className="p-1.5 rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600 transition"
               >
                 <span className="material-symbols-outlined text-[20px]">chevron_left</span>
               </button>
               <button 
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page >= pagination.totalPages}
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages || isHistoryLoading}
                 className="p-1.5 rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-600 transition"
               >
                 <span className="material-symbols-outlined text-[20px]">chevron_right</span>
@@ -247,14 +254,14 @@ const TaskHistory = () => {
                // Nếu màn hình hiện tại đang chót vót ở Trang 2 trở lên, 
                // mà chỉ còn đúng 1 Record cuối cùng -> Xóa xong sẽ thành trang trắng.
                // => Ép luồng lùi về trang trước đó ngay lập tức!
-               if (prevTasks.length === 1 && pagination.page > 1) {
-                  setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+               if (prevTasks.length === 1 && currentPage > 1) {
+                  setCurrentPage(prev => prev - 1);
                }
                // Chém bay task bị khôi phục khỏi giao diện
                return prevTasks.filter(t => t.id !== restoredTaskId);
              });
              // Cập nhật lại số lượng tổng đếm
-             setPagination(prev => ({ ...prev, totalRecords: Math.max(0, prev.totalRecords - 1) }));
+             setTotalRecords(prev => Math.max(0, prev - 1));
           }}
         />
       )}

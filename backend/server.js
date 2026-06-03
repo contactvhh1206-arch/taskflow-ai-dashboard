@@ -711,8 +711,8 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
         }
 
         // 2. KHỞI TẠO PARAMETERS (Phân trang & Bộ lọc)
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 50;
         const offset = (page - 1) * limit;
         
         const { date_from, date_to, pic_id } = req.query;
@@ -742,61 +742,60 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
             baseWhere += ` AND t.pic_id = $${params.length}`;
         }
 
-        // 3.3. Rào chắn Thời gian & Cắt luồng cất kho (Archival Boundary Flaw FIX)
+        // 3.3. Rào chắn Thời gian (Archival Boundary Mở Khóa Kho Lịch Sử)
         if (date_from && date_to) {
             params.push(date_from, date_to);
             baseWhere += ` AND t.updated_at >= $${params.length - 1}::timestamp AND t.updated_at <= $${params.length}::timestamp`;
-        } else {
-            // Tuyệt chiêu ranh giới: Nếu không truyền ngày, chặn cứng Task cập nhật ở tháng hiện tại.
-            // Hàm date_trunc lấy ngày 01/tháng hiện tại của server DB.
-            baseWhere += ` AND t.updated_at < date_trunc('month', CURRENT_DATE)`;
         }
 
-        // 4. TRUY VẤN COUNT (Cho Meta Pagination)
+        // 4. TRUY VẤN COUNT (Cho Meta Pagination) - ĐẾM TOÀN BỘ TRƯỚC
         const countQuery = `SELECT COUNT(t.id) as total FROM tasks t WHERE ${baseWhere}`;
         const countRes = await pool.query(countQuery, params);
-        const totalRecords = parseInt(countRes.rows[0].total);
-        const totalPages = Math.ceil(totalRecords / limit);
+        const total_records = parseInt(countRes.rows[0].total, 10);
+        const total_pages = Math.ceil(total_records / limit);
 
-        // 5. TRUY VẤN CTE SIÊU TỐC (Tránh SQL Anti-pattern)
+        // 5. TRUY VẤN CTE SIÊU TỐC VỚI PHÂN TRANG (Tránh SQL Anti-pattern)
+        // LÚC NÀY mới push limit và offset vào mảng tham số
+        params.push(limit, offset);
+        
         const dataQuery = `
             WITH paginated_tasks AS (
-                -- BƯỚC A: Ép DB chỉ lọc và cắt đúng 20 records (LIMIT) trên bảng gốc. Cực kỳ nhẹ!
+                -- BƯỚC A: Ép DB chỉ lọc và cắt đúng records (LIMIT/OFFSET) trên bảng gốc. Cực kỳ nhẹ!
                 SELECT id, title, description, status, urgency, deadline, created_at, updated_at, needs_support, pic_id, facility_id
                 FROM tasks t
                 WHERE ${baseWhere}
                 ORDER BY t.updated_at DESC
-                LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+                LIMIT $${params.length - 1} OFFSET $${params.length}
             )
-            -- BƯỚC B: Mới đem 20 records đó đi JOIN với các bảng khổng lồ khác.
+            -- BƯỚC B: Mới đem các records đó đi JOIN với các bảng khổng lồ khác.
             SELECT pt.id, pt.title, pt.description as desc, pt.status, pt.urgency as urgent, 
                    TO_CHAR(pt.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
                    pt.created_at as "createdAt", pt.updated_at as "completedAt",
                    pt.needs_support as "needsSupport",
                    u.full_name as pic, u.email as "picId",
-                   COALESCE(f.name, pt.department_code, 'HQ') as facility, f.code as "facilityId",
+                   f.name as facility, f.code as "facilityId",
                    pt.facility_id as "facilityRawId",
                    COUNT(tc.id) AS comment_count
             FROM paginated_tasks pt
             LEFT JOIN users u ON pt.pic_id = u.id
             LEFT JOIN facilities f ON pt.facility_id = f.id AND f.is_deleted = false
             LEFT JOIN task_comments tc ON pt.id = tc.task_id
-            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, u.full_name, u.email, f.name, pt.department_code, f.code, pt.facility_id
+            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, u.full_name, u.email, f.name, f.code, pt.facility_id
             ORDER BY pt.updated_at DESC
         `;
         
-        // Truyền Limit và Offset vào tham số cuối cùng
-        const dataParams = [...params, limit, offset];
-        const { rows } = await pool.query(dataQuery, dataParams);
+        // Dùng mảng params đã được push phân trang ở trên
+        const { rows } = await pool.query(dataQuery, params);
 
-        // 6. TRẢ VỀ CHUẨN JSON DATA & META
+        // 6. TRẢ VỀ CHUẨN JSON DATA & PAGINATION
         res.json({ 
             success: true, 
             data: rows,
-            meta: {
-                totalRecords,
-                totalPages,
-                currentPage: page
+            pagination: {
+                total_records,
+                total_pages,
+                current_page: page,
+                limit
             }
         });
 
@@ -826,7 +825,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
       LEFT JOIN users u ON t.pic_id = u.id
       LEFT JOIN facilities f ON t.facility_id = f.id AND f.is_deleted = false
       LEFT JOIN task_comments tc ON t.id = tc.task_id
-      WHERE 1=1
+      WHERE (t.status != 'done' OR (t.status = 'done' AND t.updated_at >= date_trunc('month', CURRENT_DATE)))
     `;
     const params = [];
 

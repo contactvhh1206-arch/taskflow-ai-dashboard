@@ -409,28 +409,6 @@ function MainDashboard() {
   const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== deptIdGlobal && deptIdGlobal !== 'MARKETING';
 
   // Derived state for filtering tasks
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-
-  const isOldDoneTask = (task) => {
-    if (task.status !== 'done') return false;
-    if (!task.completedAt) return false;
-    try {
-      let compDate;
-      if (task.completedAt.includes('/')) {
-        const [datePart] = task.completedAt.split(' ');
-        const [day, month, year] = datePart.split('/');
-        compDate = new Date(`${year}-${month}-${day}`);
-      } else {
-        compDate = new Date(task.completedAt);
-      }
-      if (isNaN(compDate.getTime())) return false;
-      return compDate.getFullYear() !== currentYear || compDate.getMonth() !== currentMonth;
-    } catch {
-      return false;
-    }
-  };
 
   const filteredTasks = tasks.filter(t => {
      const isHighLevel = user?.role !== 'DEPARTMENT_HEAD' && (user?.facility_id === 'ALL' || (Array.isArray(user?.facility_id) && user?.facility_id.includes('ALL')) || ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user?.role));
@@ -479,7 +457,7 @@ function MainDashboard() {
      return true;
   });
 
-  const activeTasks = filteredTasks.filter(t => !isOldDoneTask(t));
+
 
   const [facilityStatuses, setFacilityStatuses] = useState([]);
   const [isCheckinCompleted, setIsCheckinCompleted] = useState(false);
@@ -1526,14 +1504,14 @@ function MainDashboard() {
 
                 {viewMode === 'kanban' ? (
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Cần làm" status="todo" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} readOnly={isReadOnlyView} />
-                    <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} readOnly={isReadOnlyView} />
-                    <KanbanColumn title="Nghiệm thu" status="review" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} readOnly={isReadOnlyView} />
-                    <KanbanColumn title="Hoàn thành" status="done" tasks={activeTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Cần làm" status="todo" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Nghiệm thu" status="review" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Hoàn thành" status="done" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} readOnly={isReadOnlyView} />
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden"><div className="overflow-x-auto custom-scrollbar"><table className="w-full text-sm text-left"><thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400"><tr><th className="px-6 py-4">Task</th><th className="px-6 py-4">PIC</th><th className="px-6 py-4">Deadline</th><th className="px-6 py-4">Trạng thái</th></tr></thead><tbody>
-                        {activeTasks.map(task => (
+                        {filteredTasks.map(task => (
                           <tr key={task.id} onClick={() => setSelectedTask(task)} className="cursor-pointer border-b border-outline-variant dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                             <td className="px-6 py-4">
                               <div className="font-medium text-on-surface dark:text-white flex items-center gap-2">
