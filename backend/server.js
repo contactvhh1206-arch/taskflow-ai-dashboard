@@ -1141,20 +1141,11 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       // 3. KIỂM TRA CHÉO PIC BẰNG USER_ID
       // =====================================================================
       let final_pic_id = null;
-      const input_pic_id = pic_id || pic;
+      const input_pic_id = pic_id || pic; 
+      
       if (input_pic_id) { 
-          // Cho phép tìm pic theo name (String) nếu pic_id truyền lên là String tên người
-          let picCheck;
-          if (isNaN(parseInt(input_pic_id))) {
-              picCheck = await pool.query('SELECT id, facility_id, department_code FROM users WHERE full_name = $1 OR username = $1 OR name = $1 LIMIT 1', [input_pic_id]);
-          } else {
-              picCheck = await pool.query('SELECT id, facility_id, department_code FROM users WHERE id = $1 LIMIT 1', [input_pic_id]);
-          }
-          
-          if (picCheck.rows.length === 0) {
-              // Thử tìm bằng email
-              picCheck = await pool.query('SELECT id, facility_id, department_code FROM users WHERE email = $1 LIMIT 1', [input_pic_id]);
-          }
+          // Truy vấn tàn bạo, duy nhất bằng Khóa chính (ID), chặn đứng Text Search Anti-Pattern
+          const picCheck = await pool.query('SELECT * FROM users WHERE id = $1 LIMIT 1', [input_pic_id]);
           
           if (picCheck.rows.length === 0) {
               return res.status(404).json({ success: false, error: "Lỗi: Người phụ trách (PIC) không tồn tại!" });
@@ -1163,15 +1154,20 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           const foundPic = picCheck.rows[0];
           final_pic_id = foundPic.id;
           
+          // QUY TẮC BAO TRÙM (UNIVERSAL RBAC)
           if (!['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(req.user.role)) {
+              const userDept = req.user.department_code || req.user.department_id || '';
+              
               if (req.user.facility_id) {
                   if (String(foundPic.facility_id) !== String(req.user.facility_id)) {
                       return res.status(403).json({ success: false, error: "Lỗi 403: Không được phép gán việc cho nhân sự ngoài cơ sở!" });
                   }
               } 
-              else if (req.user.department_code) {
+              else if (userDept) {
                   const normalizeDept = d => d ? String(d).toUpperCase() : '';
-                  if (normalizeDept(foundPic.department_code) !== normalizeDept(req.user.department_code)) {
+                  const picDept = foundPic.department_code || foundPic.department_id || '';
+                  
+                  if (normalizeDept(picDept) !== normalizeDept(userDept)) {
                       return res.status(403).json({ success: false, error: "Lỗi 403: Không được phép gán việc cho nhân sự ngoài phòng ban!" });
                   }
               }
