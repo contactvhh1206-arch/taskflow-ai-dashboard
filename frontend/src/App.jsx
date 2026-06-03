@@ -103,6 +103,7 @@ const AI_INSIGHTS = [
 ];
 
 function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
+  const isLocalLocked = ['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(user.role);
   const activeFacilities = JSON.parse(localStorage.getItem("taskflow_facilities") || "[]").filter(f => f.is_active !== false);
   const [formData, setFormData] = useState({
     title: '',
@@ -170,25 +171,23 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
         });
         
         let filtered = [];
-        if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+        if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
           filtered = allUsers;
+        } else if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(user.role)) {
+          filtered = allUsers.filter(u => u.department_code === user.department_code || u.department_id === user.department_id);
         } else {
-          filtered = allUsers.filter(u => 
-            (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
-            (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
-          );
+          filtered = allUsers.filter(u => u.facility_id === user.facility_id);
         }
         setPicOptions(filtered);
       } catch(e) {
         const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
         let filtered = [];
-        if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+        if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
           filtered = allUsers;
+        } else if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(user.role)) {
+          filtered = allUsers.filter(u => u.department_code === user.department_code || u.department_id === user.department_id);
         } else {
-          filtered = allUsers.filter(u => 
-            (u.facility_id && user.facility_id && u.facility_id === user.facility_id) || 
-            (u.facility_name && user.facility_name && u.facility_name === user.facility_name)
-          );
+          filtered = allUsers.filter(u => u.facility_id === user.facility_id);
         }
         setPicOptions(filtered);
       }
@@ -258,12 +257,20 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
                 <select name="facility" value={formData.facility} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
                   <option value="">-- Tự động --</option>
-                  {(filteredFacilities || []).map(f => (
-                    <option key={f.id || f.name} value={f.name}>{f.name}</option>
-                  ))}
-                  {availableDepts.includes('HQ') && <option value="HQ">Ban Giám đốc (HQ)</option>}
-                  {availableDepts.includes('MARKETING') && <option value="MARKETING">Phòng Truyền thông</option>}
-                  {availableDepts.includes('FINANCE') && <option value="FINANCE">Phòng Kế toán</option>}
+                  {isLocalLocked ? (
+                    <option value={user.facility_id || user.department_code || user.department_id}>
+                      {user.facility_name || user.department_code || user.department_id || "Khu vực của bạn"}
+                    </option>
+                  ) : (
+                    <>
+                      {(filteredFacilities || []).map(f => (
+                        <option key={f.id || f.name} value={f.name}>{f.name}</option>
+                      ))}
+                      {availableDepts.includes('HQ') && <option value="HQ">Ban Giám đốc (HQ)</option>}
+                      {availableDepts.includes('MARKETING') && <option value="MARKETING">Phòng Truyền thông</option>}
+                      {availableDepts.includes('FINANCE') && <option value="FINANCE">Phòng Kế toán</option>}
+                    </>
+                  )}
                 </select>
               </div>
             </div>

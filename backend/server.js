@@ -862,72 +862,49 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
     const { id } = req.params;
     const { status, evidence } = req.body;
 
-    // TÆ°á»ng lá»­a chá»‘ng IDOR
     const taskCheck = await pool.query('SELECT facility_id, department_code, pic_id FROM tasks WHERE id = $1', [id]);
-    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
     const task = taskCheck.rows[0];
-    
-    // NẾU LÀ NGƯỜI ĐƯỢC GIAO VIỆC THÌ ĐƯỢC ĐẶC CÁCH VƯỢT TƯỜNG LỬA IDOR
-    if (String(task.pic_id) === String(req.user.id)) {
-        task.facility_id = req.user.facility_id;
-        task.department_code = req.user.department_code || req.user.department_id;
-    }
-    
-    if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
-        return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a cÆ¡ sá»Ÿ khÃ¡c!' });
-    }
-    if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
-        const userDept = normalizeDept(req.user.department_code || req.user.department_id);
-        const taskDept = normalizeDept(task.department_code);
-        if (taskDept && taskDept !== userDept) {
-            return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
+
+    const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
+    const isGlobalInteraction = ALL_ACCESS_ROLES.includes(req.user.role) || (req.user.role === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING');
+
+    if (!isGlobalInteraction) {
+        if (String(task.pic_id) !== String(req.user.id)) {
+            return res.status(403).json({ error: '403 Forbidden: Bạn chỉ có quyền tương tác với công việc được giao cho chính mình.' });
         }
     }
 
-    
     const updateQuery = `
       UPDATE tasks 
       SET status = $1, 
-          updated_at = NOW() 
-      WHERE id = $2 
-      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
+          evidence = COALESCE($2, evidence), 
+          updated_at = NOW(),
+          completed_at = CASE WHEN $1 = 'done' THEN NOW() ELSE completed_at END
+      WHERE id = $3 
+      RETURNING *
     `;
-    const { rows } = await pool.query(updateQuery, [status, id]);
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
-    }
-    
+    const { rows } = await pool.query(updateQuery, [status, evidence || null, id]);
     res.json({ success: true, data: rows[0] });
   } catch (error) {
-    console.error("Lá»—i cáº­p nháº­t tráº¡ng thÃ¡i:", error);
-    res.status(500).json({ error: 'Lá»—i server khi cáº­p nháº­t tráº¡ng thÃ¡i.' });
+    console.error("Lỗi cập nhật trạng thái:", error);
+    res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
   }
 });
-
 app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // TÆ°á»ng lá»­a chá»‘ng IDOR
     const taskCheck = await pool.query('SELECT facility_id, department_code, pic_id FROM tasks WHERE id = $1', [id]);
-    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
     const task = taskCheck.rows[0];
-    
-    // NẾU LÀ NGƯỜI ĐƯỢC GIAO VIỆC THÌ ĐƯỢC ĐẶC CÁCH VƯỢT TƯỜNG LỬA IDOR
-    if (String(task.pic_id) === String(req.user.id)) {
-        task.facility_id = req.user.facility_id;
-        task.department_code = req.user.department_code || req.user.department_id;
-    }
-    
-    if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
-        return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a cÆ¡ sá»Ÿ khÃ¡c!' });
-    }
-    if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
-        const userDept = normalizeDept(req.user.department_code || req.user.department_id);
-        const taskDept = normalizeDept(task.department_code);
-        if (taskDept && taskDept !== userDept) {
-            return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
+
+    const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
+    const isGlobalInteraction = ALL_ACCESS_ROLES.includes(req.user.role) || (req.user.role === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING');
+
+    if (!isGlobalInteraction) {
+        if (String(task.pic_id) !== String(req.user.id)) {
+            return res.status(403).json({ error: '403 Forbidden: Bạn chỉ có quyền tương tác với công việc được giao cho chính mình.' });
         }
     }
 
@@ -939,46 +916,38 @@ app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
       RETURNING id, title, needs_support as "needsSupport"
     `;
     const { rows } = await pool.query(updateQuery, [id]);
-    
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
-    }
-
-    res.json({ success: true, message: 'ÄÃ£ gá»­i yÃªu cáº§u há»— trá»£ Ä‘áº¿n Ban GiÃ¡m Äá»‘c', data: rows[0] });
+    res.json({ success: true, message: 'Đã gửi yêu cầu hỗ trợ', data: rows[0] });
   } catch (error) {
-    console.error("Lá»—i server khi yÃªu cáº§u há»— trá»£:", error);
-    res.status(500).json({ error: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™' });
+    console.error("Lỗi server khi yêu cầu hỗ trợ:", error);
+    res.status(500).json({ error: 'Lỗi máy chủ nội bộ' });
   }
 });
-
-// --- BƯỚC 4: ROUTE KHÔI PHỤC TASK TỪ LỊCH SỬ ---
 app.patch('/api/tasks/:id/restore', authenticateUser, async (req, res) => {
     try {
         const taskId = req.params.id;
         const { deadline } = req.body;
-        const userFacilityId = req.user.facility_id;
-        const userRole = req.user.role;
-
+        
         if (!deadline) {
             return res.status(400).json({ success: false, error: 'Bắt buộc phải có Deadline mới để khôi phục công việc.' });
         }
 
-        const checkQuery = `SELECT facility_id, status FROM tasks WHERE id = $1`;
+        const checkQuery = `SELECT facility_id, status, pic_id FROM tasks WHERE id = $1`;
         const { rows: checkRows } = await pool.query(checkQuery, [taskId]);
         
         if (checkRows.length === 0) {
             return res.status(404).json({ success: false, error: 'Không tìm thấy công việc.' });
         }
-
         const task = checkRows[0];
-        
         if (task.status !== 'done') {
             return res.status(400).json({ success: false, error: 'Chỉ có thể khôi phục công việc đã nằm trong kho (done).' });
         }
 
-        if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(userRole)) {
-            if (task.facility_id !== userFacilityId) {
-                return res.status(403).json({ success: false, error: 'Lỗi Phân quyền: Không có quyền khôi phục công việc của cơ sở khác.' });
+        const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
+        const isGlobalInteraction = ALL_ACCESS_ROLES.includes(req.user.role) || (req.user.role === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING');
+
+        if (!isGlobalInteraction) {
+            if (String(task.pic_id) !== String(req.user.id)) {
+                return res.status(403).json({ success: false, error: 'Lỗi Phân quyền: Bạn chỉ có quyền khôi phục công việc được giao cho chính mình.' });
             }
         }
 
@@ -999,14 +968,11 @@ app.patch('/api/tasks/:id/restore', authenticateUser, async (req, res) => {
         );
 
         res.json({ success: true, data: updatedRows[0] });
-
     } catch (err) {
         console.error('[CRITICAL DB ERROR /api/tasks/restore]:', err.message);
         res.status(500).json({ success: false, error: 'Lỗi máy chủ khi khôi phục công việc.' });
     }
 });
-
-
 app.get('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1030,45 +996,31 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
     const { id } = req.params;
     const comment = req.body.comment || req.body.content;
 
-    // TÆ°á»ng lá»­a chá»‘ng IDOR
     const taskCheck = await pool.query('SELECT facility_id, department_code, pic_id FROM tasks WHERE id = $1', [id]);
-    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
+    if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy công việc.' });
     const task = taskCheck.rows[0];
-    
-    // NẾU LÀ NGƯỜI ĐƯỢC GIAO VIỆC THÌ ĐƯỢC ĐẶC CÁCH VƯỢT TƯỜNG LỬA IDOR
-    if (String(task.pic_id) === String(req.user.id)) {
-        task.facility_id = req.user.facility_id;
-        task.department_code = req.user.department_code || req.user.department_id;
-    }
-    
-    if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
-        return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a cÆ¡ sá»Ÿ khÃ¡c!' });
-    }
-    if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
-        const userDept = normalizeDept(req.user.department_code || req.user.department_id);
-        const taskDept = normalizeDept(task.department_code);
-        if (taskDept && taskDept !== userDept) {
-            return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a phÃ²ng ban khÃ¡c!' });
+
+    const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
+    const isGlobalInteraction = ALL_ACCESS_ROLES.includes(req.user.role) || (req.user.role === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING');
+
+    if (!isGlobalInteraction) {
+        if (String(task.pic_id) !== String(req.user.id)) {
+            return res.status(403).json({ error: '403 Forbidden: Bạn chỉ có quyền tương tác với công việc được giao cho chính mình.' });
         }
     }
 
-    if (!comment) return res.status(400).json({ error: 'Ná»™i dung bÃ¬nh luáº­n trá»‘ng' });
+    if (!comment) return res.status(400).json({ error: 'Nội dung bình luận trống' });
 
-    // 1. LẤY USER_ID TỪ TOKEN, KHÔNG CHÂM CHƯỚC
     if (!req.user || !req.user.id) {
         return res.status(401).json({ error: '401 Unauthorized: Không thể xác định danh tính. Vui lòng đăng nhập lại!' });
     }
     const realUserId = req.user.id;
 
-    // 2. THỰC THI INSERT (LÃºc nÃ y realUserId Ä‘Ã£ Ä‘Æ°á»£c Ä‘áº£m báº£o 100% lÃ  an toÃ n)
     const { rows } = await pool.query(`
       INSERT INTO task_comments (task_id, user_id, content)
       VALUES ($1, $2, $3) RETURNING *
     `, [id, realUserId, comment]);
     
-
-
-        // 4. KHá»žI Táº O BIáº¾N TRáº¢ Vá»€ Tá»ª CÆ  Sá»ž Dá»® LIá»†U
     const newCommentId = (rows && rows.length > 0) ? rows[0].id : null;
     
     if (newCommentId) {
@@ -1082,29 +1034,12 @@ app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
         const fullComment = await pool.query(getCommentSql, [newCommentId]);
         return res.json({ success: true, data: fullComment.rows[0] });
     } else {
-        return res.status(500).json({ success: false, error: 'KhÃ´ng thá»ƒ táº¡o bÃ¬nh luáº­n' });
+        return res.status(500).json({ success: false, error: 'Không thể tạo bình luận' });
     }
   } catch (error) {
-    if (error.code === '23503') {
-        console.warn(`[API Comment] Cá»‘ gáº¯ng bÃ¬nh luáº­n vÃ o Task khÃ´ng tá»“n táº¡i: task_id=${req.params.id}`);
-        return res.status(404).json({ 
-            success: false, 
-            message: 'Task nÃ y khÃ´ng cÃ²n tá»“n táº¡i hoáº·c Ä‘Ã£ bá»‹ xÃ³a. Vui lÃ²ng lÃ m má»›i trang.' 
-        });
-    }
-
-    console.error('[API Comment] Lá»—i 500:', error);
-    return res.status(500).json({ 
-        success: false, 
-        message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™. Vui lÃ²ng thá»­ láº¡i sau.' 
-    });
+    res.status(500).json({ error: 'Lỗi server khi tạo bình luận.' });
   }
 });
-
-
-// ==========================================
-// NOTIFICATIONS API
-// ==========================================
 app.get('/api/notifications', authenticateUser, async (req, res) => {
     try {
         const { rows } = await pool.query(
@@ -1145,24 +1080,100 @@ app.put('/api/notifications/:id/read', authenticateUser, async (req, res) => {
 
 app.post('/api/tasks', authenticateUser, async (req, res) => {
     try {
-      const { title, desc, pic, deadline, status, urgent, facility, department_code } = req.body;
+      const { title, desc, pic_id, deadline, status, urgent, pic, facility } = req.body;
       
-      let insert_dept_code = normalizeDept(department_code || facility);
-      let insert_facility_id = null;
+      // =====================================================================
+      // 1. HỨNG PAYLOAD VÀ SANITIZE (DỌN RÁC CHUỖI RỖNG)
+      // =====================================================================
+      let insert_facility_id = req.body.facility_id || req.body.facility || facility;
+      let insert_dept_code = req.body.department_code;
 
-      // 1. CHỐNG PAYLOAD SPOOFING: ÉP CỨNG ĐỊNH DANH THEO ROLE
-      if (!ALL_ACCESS_ROLES.includes(req.user.role)) {
-          // Nhóm Local (VD: FACILITY_MANAGER)
-          insert_dept_code = req.user.department_code;
+      if (insert_facility_id === "" || insert_facility_id === undefined) insert_facility_id = null;
+      if (insert_dept_code === "" || insert_dept_code === undefined) insert_dept_code = null;
+
+      const GLOBAL_DEPTS = ['MARKETING', 'FINANCE', 'HQ', 'IT', 'HR', 'BGD'];
+
+      // =====================================================================
+      // 2. FORCE OVERRIDE & BẢO TOÀN QUYỀN ADMIN (PHÂN QUYỀN ZERO-TRUST)
+      // =====================================================================
+      if (req.user.role === 'FACILITY_MANAGER') {
           insert_facility_id = req.user.facility_id;
-      } else {
-          // Nhóm All-Access
-          if (facility && facility !== 'HQ' && facility !== 'ALL') {
-              let parsedFac = parseInt(facility, 10);
-              if (!isNaN(parsedFac)) insert_facility_id = parsedFac;
-              else {
-                  const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [facility]);
-                  if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
+          insert_dept_code = null;
+      } 
+      else if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(req.user.role)) {
+          insert_facility_id = null;
+          insert_dept_code = req.user.department_code;
+      }
+      else if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(req.user.role)) {
+          // LÃNH ĐẠO CẤP CAO: Phân loại chuỗi để chống Crash
+          if (insert_facility_id) {
+              const upperFacility = String(insert_facility_id).toUpperCase();
+              if (GLOBAL_DEPTS.includes(upperFacility)) {
+                  insert_dept_code = upperFacility;
+                  insert_facility_id = null;
+              } else if (insert_facility_id !== 'ALL' && insert_facility_id !== 'HQ') {
+                  let parsedFac = parseInt(insert_facility_id, 10);
+                  if (!isNaN(parsedFac)) {
+                      insert_facility_id = parsedFac;
+                  } else {
+                      const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [insert_facility_id]);
+                      if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
+                      else insert_facility_id = null; 
+                  }
+              }
+          }
+          if (insert_facility_id === 'ALL' || insert_facility_id === 'HQ') insert_facility_id = null;
+      }
+      else {
+          if (req.user.facility_id) {
+              insert_facility_id = req.user.facility_id;
+              insert_dept_code = null;
+          } else if (req.user.department_code) {
+              insert_facility_id = null;
+              insert_dept_code = req.user.department_code;
+          } else {
+              insert_facility_id = null;
+              insert_dept_code = null;
+          }
+      }
+
+      // =====================================================================
+      // 3. KIỂM TRA CHÉO PIC BẰNG USER_ID
+      // =====================================================================
+      let final_pic_id = null;
+      const input_pic_id = pic_id || pic;
+      if (input_pic_id) { 
+          // Cho phép tìm pic theo name (String) nếu pic_id truyền lên là String tên người
+          let picCheck;
+          if (isNaN(parseInt(input_pic_id))) {
+              picCheck = await pool.query('SELECT id, facility_id, department_code FROM users WHERE full_name = $1 OR username = $1 OR name = $1 LIMIT 1', [input_pic_id]);
+          } else {
+              picCheck = await pool.query('SELECT id, facility_id, department_code FROM users WHERE id = $1 LIMIT 1', [input_pic_id]);
+          }
+          
+          if (picCheck.rows.length === 0) {
+              // Thử tìm bằng email
+              picCheck = await pool.query('SELECT id, facility_id, department_code FROM users WHERE email = $1 LIMIT 1', [input_pic_id]);
+          }
+          
+          if (picCheck.rows.length === 0) {
+              return res.status(404).json({ success: false, error: "Lỗi: Người phụ trách (PIC) không tồn tại!" });
+          }
+          
+          const foundPic = picCheck.rows[0];
+          final_pic_id = foundPic.id;
+          
+          if (!['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(req.user.role)) {
+              if (req.user.facility_id) {
+                  if (String(foundPic.facility_id) !== String(req.user.facility_id)) {
+                      return res.status(403).json({ success: false, error: "Lỗi 403: Không được phép gán việc cho nhân sự ngoài cơ sở!" });
+                  }
+              } 
+              else if (req.user.department_code) {
+                  const normalizeDept = d => d ? String(d).toUpperCase() : '';
+                  if (normalizeDept(foundPic.department_code) !== normalizeDept(req.user.department_code)) {
+                      return res.status(403).json({ success: false, error: "Lỗi 403: Không được phép gán việc cho nhân sự ngoài phòng ban!" });
+                  }
               }
           }
       }
@@ -1171,87 +1182,38 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
       else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
 
-      // 2. KIỂM TRA CHÉO PIC (Người phụ trách) VÀ CHẶN GÁN VIỆC NGOÀI CƠ SỞ
-      let pic_id = null;
-      if (pic) {
-          // XÓA BỎ department_code KHỎI SELECT. CHỈ LẤY ID LÀ ĐỦ!
-          let picQuery = 'SELECT id FROM users WHERE (full_name = $1 OR email = $1)';
-          let picParams = [pic];
-          
-          if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FACILITY_MANAGER') {
-              picQuery += ' AND facility_id = $2';
-              picParams.push(req.user.facility_id);
-          }
-          
-          picQuery += ' LIMIT 1';
-          const picUser = await pool.query(picQuery, picParams);
-          
-          if (picUser.rows.length === 0) {
-              const checkExist = await pool.query('SELECT id FROM users WHERE full_name = $1 OR email = $1 LIMIT 1', [pic]);
-              if (checkExist.rows.length > 0) {
-                  if (req.user.role === 'FACILITY_MANAGER' || req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
-                  return res.status(403).json({message: "Lá»—i 403: KhÃ´ng Ä‘Æ°á»£c gÃ¡n chÃ©o nhÃ¢n sá»± ngoÃ i tháº©m quyá»n!"});
-                  } else {
-                      pic_id = checkExist.rows[0].id;
-                  }
-              } else {
-                  pic_id = null;
-              }
-          } else {
-              pic_id = picUser.rows[0].id;
-          }
-      }
-
-      // BỨC TƯỜNG ZERO TRUST TỐI HẬU: CẤM FALLBACK MÙ QUÁNG
-      if (!insert_facility_id || insert_facility_id === 'ALL') {
-          // CHỈ NHÓM TOÀN QUYỀN mới được phép mượn kho của HQ làm mặc định
-          if (ALL_ACCESS_ROLES.includes(req.user.role)) {
-              // CHẤP NHẬN BỎ TRỐNG CƠ SỞ ĐỐI VỚI PHÒNG BAN CHUYÊN TRÁCH ĐỂ THỂ HIỆN LÀ TASK CHUNG
-              insert_facility_id = null;
-          } else {
-              // NHÓM LOCAL: Bắn hạ ngay lập tức! Không có facility_id thì không được phép tồn tại!
-              return res.status(403).json({ 
-                  success: false, 
-                  error: "LỖI ZERO TRUST: Dữ liệu định danh Cơ sở bị hỏng. Vui lòng đăng nhập lại hoặc liên hệ IT!" 
-              });
-          }
-      }
-
-    const insertQuery = `
-      INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, department_code, priority_level, created_by, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
-      RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
-    `;
+      const insertQuery = `
+        INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, department_code, priority_level, created_by, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+        RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
+      `;
       const { rows } = await pool.query(insertQuery, [
         title, 
         desc || '', 
         status || 'todo', 
         urgent || false, 
         deadline, 
-        pic_id, 
+        final_pic_id, 
         insert_facility_id,
         insert_dept_code,
         priorityStars,
         req.user.id
       ]);
-    
-    const newTask = {
-      ...rows[0],
-      pic: pic || 'ChÆ°a gÃ¡n',
-      picId: pic || 'unassigned',
-      facility: facility || 'HQ',
-      facilityId: facility || 'HQ'
-    };
 
+      const newTask = {
+        ...rows[0],
+        pic: pic || 'Chưa gán',
+        picId: pic || 'unassigned',
+        facility: facility || 'HQ',
+        facilityId: facility || 'HQ'
+      };
 
       res.json({ success: true, data: newTask });
-  } catch (error) {
-    console.error("Lá»—i chi tiáº¿t tá»« DB:", error.message, error.stack);
-    res.status(500).json({ error: 'Lá»—i server khi lÆ°u cÃ´ng viá»‡c.' });
-  }
+    } catch (error) {
+      console.error("Lỗi chi tiết từ DB:", error.message, error.stack);
+      res.status(500).json({ error: 'Lỗi server khi lưu công việc.' });
+    }
 });
-
-// API ÄÄƒng nháº­p giáº£ láº­p
 app.delete('/api/system/reset', authenticateUser, async (req, res) => {
   try {
     const { role } = req.user;
@@ -1956,7 +1918,7 @@ app.post('/api/rag/learn-from-chat', authenticateUser, async (req, res) => {
 app.get('/api/ai/audit-logs', authenticateUser, async (req, res) => {
     try {
         const userRole = req.user?.role || 'USER';
-        const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'];
+        const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
         
         // RBAC: Nếu không thuộc All Access Roles, chỉ được xem log của cơ sở mình
         let queryParams = [];
