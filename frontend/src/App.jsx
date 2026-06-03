@@ -810,15 +810,28 @@ function MainDashboard() {
 
     const addedTasks = [];
     let hasFatalError = false; // Cầu dao ngắt mạch (Circuit Breaker)
+    const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
 
     // Lặp tuần tự nhưng sẵn sàng ngắt cầu dao
     for (const draft of draftTasks) {
       if (hasFatalError) break; // Kích hoạt ngắt mạch nếu có lỗi trước đó
 
       try {
+        let resolvedPicId = user.id;
+        if (draft.pic) {
+          const searchName = draft.pic.toLowerCase().trim();
+          const foundUser = allUsers.find(u => 
+            (u.full_name && u.full_name.toLowerCase().includes(searchName)) || 
+            (u.email && u.email.toLowerCase().includes(searchName)) ||
+            (u.username && u.username.toLowerCase().includes(searchName))
+          );
+          if (foundUser) resolvedPicId = foundUser.id;
+        }
+
         // BỨC TƯỜNG DỮ LIỆU: Tôn trọng sự thật, không ép kiểu bừa bãi
         const taskPayload = {
           ...draft,
+          pic_id: resolvedPicId,
           // Nếu AI trả về rỗng, giữ nguyên chuỗi rỗng để Backend nhận diện và gán pic_id = null
           pic: draft.pic ? draft.pic.trim() : "", 
           deadline: draft.deadline || new Date().toISOString().split('T')[0],
