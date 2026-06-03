@@ -255,14 +255,36 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 text-truncate truncate">Cơ sở / Phòng ban</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
-                <select name="facility" value={formData.facility} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
-                  <option value="">-- Tự động --</option>
+                <select 
+                  name="facility" 
+                  value={formData.facility} 
+                  onChange={handleChange} 
+                  disabled={isLocalLocked}
+                  className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate disabled:opacity-70 disabled:bg-gray-200 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+                >
                   {isLocalLocked ? (
                     <option value={user.facility_id || user.department_code || user.department_id}>
-                      {user.facility_name || user.department_code || user.department_id || "Khu vực của bạn"}
+                      {user.role === 'FACILITY_MANAGER' 
+                        ? (
+                            user.facility_name || 
+                            activeFacilities.find(f => String(f.id) === String(user.facility_id) || f.code === user.facility_id)?.name || 
+                            user.facility_id
+                          )
+                        : (
+                            {
+                              'MARKETING': 'Phòng Truyền thông', 
+                              'FINANCE': 'Phòng Kế toán', 
+                              'IT': 'Phòng IT', 
+                              'HR': 'Phòng Nhân sự', 
+                              'BGD': 'Ban Giám đốc', 
+                              'HQ': 'Ban Giám đốc (HQ)'
+                            }[user.department_code || user.department_id] || (user.department_code || user.department_id)
+                          )
+                      }
                     </option>
                   ) : (
                     <>
+                      <option value="">-- Tự động --</option>
                       {(filteredFacilities || []).map(f => (
                         <option key={f.id || f.name} value={f.name}>{f.name}</option>
                       ))}
