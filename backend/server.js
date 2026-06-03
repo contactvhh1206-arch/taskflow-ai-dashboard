@@ -128,6 +128,7 @@ const initDB = async () => {
         await pool.query(`ALTER TABLE tasks ALTER COLUMN facility_id DROP NOT NULL`).catch(e => console.log('Drop NOT NULL facility_id skipped:', e.message));
         await pool.query(`UPDATE tasks SET facility_id = NULL WHERE facility_id IN (SELECT id FROM facilities WHERE code = 'HQ')`);
         await pool.query(`DELETE FROM facilities WHERE code = 'HQ'`);
+        await pool.query(`UPDATE users SET department_id = 'BGD', department_code = 'BGD' WHERE department_id = 'HQ' OR department_code = 'HQ'`);
 
         console.log('[DB] Running initialization checks...');
     // Add missing columns to users if not exists
@@ -1095,6 +1096,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
 
       if (insert_facility_id === "" || insert_facility_id === undefined) insert_facility_id = null;
       if (insert_dept_code === "" || insert_dept_code === undefined) insert_dept_code = null;
+      if (insert_dept_code === 'HQ') insert_dept_code = 'BGD';
 
       const GLOBAL_DEPTS = ['MARKETING', 'FINANCE', 'HQ', 'IT', 'HR', 'BGD'];
 
@@ -1114,7 +1116,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           if (insert_facility_id) {
               const upperFacility = String(insert_facility_id).toUpperCase();
               if (GLOBAL_DEPTS.includes(upperFacility)) {
-                  insert_dept_code = upperFacility;
+                  insert_dept_code = upperFacility === 'HQ' ? 'BGD' : upperFacility;
                   insert_facility_id = null;
               } else if (insert_facility_id !== 'ALL' && insert_facility_id !== 'HQ') {
                   let parsedFac = parseInt(insert_facility_id, 10);
