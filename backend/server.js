@@ -897,6 +897,29 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
     res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
   }
 });
+
+app.delete('/api/tasks/:id', authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: '403 Forbidden: Chỉ SUPER_ADMIN mới có quyền xóa vĩnh viễn công việc.' });
+    }
+
+    await pool.query('DELETE FROM task_comments WHERE task_id = $1', [id]);
+    const { rowCount } = await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
+    
+    if (rowCount === 0) {
+      return res.status(404).json({ success: false, error: 'Không tìm thấy công việc.' });
+    }
+
+    res.json({ success: true, message: 'Đã xóa công việc vĩnh viễn.' });
+  } catch (error) {
+    console.error("Lỗi xóa công việc:", error);
+    res.status(500).json({ success: false, error: 'Lỗi server khi xóa công việc.' });
+  }
+});
+
 app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;

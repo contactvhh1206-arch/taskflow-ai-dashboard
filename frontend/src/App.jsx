@@ -955,6 +955,31 @@ function MainDashboard() {
     }
   };
 
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa vĩnh viễn task này không? Hành động này không thể hoàn tác!')) return;
+    try {
+      const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
+      });
+      
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTasks(tasks.filter(t => t.id !== taskId));
+        setSelectedTask(null);
+        showToast('Đã xóa task vĩnh viễn', 'success');
+      } else {
+        throw new Error(data.error || 'Lỗi server');
+      }
+    } catch (e) {
+      console.error("Delete task error:", e);
+      showToast(e.message || 'Lỗi Server: Không thể xóa task', 'error');
+    }
+  };
+
   useEffect(() => {
     // 1. Cởi trói điều kiện khắt khe: Chỉ cần tồn tại Object user là cho phép chạy
     if (!user || isFetchingTasks.current) return;
@@ -1687,6 +1712,14 @@ function MainDashboard() {
                     <div className="bg-success/10 text-success p-4 rounded-xl flex items-center gap-3 border border-success/20">
                       <span className="material-symbols-outlined text-2xl">verified</span>
                       <div><p className="font-bold text-sm">Đã đóng thành công</p><p className="text-xs opacity-80">{selectedTask.evidence ? `Có đính kèm: ${selectedTask.evidence}` : 'Không có bằng chứng đính kèm'}</p></div>
+                    </div>
+                  )}
+                  
+                  {user && user.role === 'SUPER_ADMIN' && (
+                    <div className="mt-4 pt-4 border-t border-error/20 dark:border-red-900/30">
+                      <button onClick={() => handleDeleteTask(selectedTask.id)} className="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm">
+                        <span className="material-symbols-outlined text-[18px]">delete_forever</span> Xóa vĩnh viễn
+                      </button>
                     </div>
                   )}
                 </div>
