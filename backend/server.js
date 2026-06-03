@@ -1196,9 +1196,9 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           if (hqCheck.rows.length > 0) {
               insert_facility_id = hqCheck.rows[0].id;
           } else {
-              const firstFac = await pool.query("SELECT id FROM facilities ORDER BY id ASC LIMIT 1");
-              if (firstFac.rows.length > 0) insert_facility_id = firstFac.rows[0].id;
-              else insert_facility_id = 1; // Last resort hardcode
+              // BẤT TỬ HÓA TRỤ SỞ: Tự động tạo cơ sở HQ nếu chưa có để tránh việc gán nhầm sang DB41
+              const newHq = await pool.query("INSERT INTO facilities (name, code, is_deleted, created_at, updated_at) VALUES ('Trụ sở chính (HQ)', 'HQ', false, NOW(), NOW()) RETURNING id");
+              insert_facility_id = newHq.rows[0].id;
           }
       }
 
