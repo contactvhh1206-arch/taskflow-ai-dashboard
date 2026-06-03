@@ -299,8 +299,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
                                 'FINANCE': 'Phòng Kế toán', 
                                 'IT': 'Phòng IT', 
                                 'HR': 'Phòng Nhân sự', 
-                                'BGD': 'Ban Giám đốc', 
-                                'HQ': 'Ban Giám đốc (HQ)'
+                                'BGD': 'Ban Giám đốc'
                               }[resolvedDept] || resolvedDept
                             )
                         }
@@ -312,7 +311,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
                       {(filteredFacilities || []).map(f => (
                         <option key={f.id || f.name} value={f.name}>{f.name}</option>
                       ))}
-                      {availableDepts.includes('HQ') && <option value="HQ">Ban Giám đốc (HQ)</option>}
+                      {availableDepts.includes('BGD') && <option value="BGD">Ban Giám đốc</option>}
                       {availableDepts.includes('MARKETING') && <option value="MARKETING">Phòng Truyền thông</option>}
                       {availableDepts.includes('FINANCE') && <option value="FINANCE">Phòng Kế toán</option>}
                     </>
