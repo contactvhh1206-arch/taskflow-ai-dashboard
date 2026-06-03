@@ -1153,7 +1153,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           final_pic_id = foundPic.id;
           
           // QUY TẮC BAO TRÙM (UNIVERSAL RBAC)
-          if (!['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(req.user.role)) {
+          if (foundPic.id !== req.user.id && !['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(req.user.role)) {
               const userDept = req.user.department_code || req.user.department_id || '';
               
               if (req.user.facility_id) {
@@ -1163,7 +1163,14 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
               } 
               else if (userDept) {
                   const normalizeDept = d => d ? String(d).toUpperCase() : '';
-                  const picDept = foundPic.department_code || foundPic.department_id || '';
+                  
+                  // Chuẩn hóa picDept hệt như Middleware nếu DB thiếu dữ liệu
+                  let picDept = foundPic.department_code || foundPic.department_id || '';
+                  if (!picDept) {
+                      if (foundPic.role === 'FINANCE_DEPT') picDept = 'FINANCE';
+                      else if (foundPic.role === 'DEPARTMENT_HEAD') picDept = 'MARKETING';
+                      else if (foundPic.role === 'VICE_PRESIDENT') picDept = 'BGD';
+                  }
                   
                   if (normalizeDept(picDept) !== normalizeDept(userDept)) {
                       return res.status(403).json({ success: false, error: "Lỗi 403: Không được phép gán việc cho nhân sự ngoài phòng ban!" });
