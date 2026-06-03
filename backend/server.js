@@ -1279,6 +1279,7 @@ app.post('/api/login', async (req, res) => {
                     success: true,
                     token: jwt.sign(tokenPayload, SECRET_KEY, { expiresIn: '7d' }),
                     user: { 
+                        id: user.id,
                         name: user.full_name, 
                         role: user.role_name, 
                         facility_id: tokenPayload.facility_id,
