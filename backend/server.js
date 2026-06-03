@@ -781,7 +781,7 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
             LEFT JOIN users u ON pt.pic_id = u.id
             LEFT JOIN facilities f ON pt.facility_id = f.id AND f.is_deleted = false
             LEFT JOIN task_comments tc ON pt.id = tc.task_id
-            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, u.full_name, u.email, f.name, f.code, pt.facility_id
+            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, u.full_name, u.email, f.name, f.code, pt.facility_id, pt.department_code
             ORDER BY pt.updated_at DESC
         `;
         
