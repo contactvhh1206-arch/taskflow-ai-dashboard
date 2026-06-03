@@ -1202,7 +1202,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       const insertQuery = `
         INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, department_code, priority_level, created_by, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
-        RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt"
+        RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt", department_code as "department_tag", facility_id as "facilityRawId"
       `;
       const { rows } = await pool.query(insertQuery, [
         title, 
