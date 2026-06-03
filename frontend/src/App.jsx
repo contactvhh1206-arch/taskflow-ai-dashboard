@@ -880,7 +880,7 @@ function MainDashboard() {
       const isVP = user?.role === 'VICE_PRESIDENT';
       const isDeptHeadLocal = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
       const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
-      const taskFacility = user?.role === 'SUPER_ADMIN' ? 'HQ' : (isDeptHeadLocal ? deptId : user?.facility_id);
+      const taskFacility = user?.role === 'SUPER_ADMIN' ? 'BGD' : (isDeptHeadLocal ? deptId : user?.facility_id);
       const safeFacility = Array.isArray(taskFacility) ? taskFacility[0] : taskFacility;
       
       const taskPayload = {
@@ -2039,8 +2039,8 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
         {columnTasks.map(task => (
           <div key={task.id} onClick={() => setSelectedTask(task)} className="bg-white dark:bg-[#252525] p-4 rounded-xl shadow-sm border border-outline-variant dark:border-gray-700 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all group">
             <div className="mb-2 flex items-center justify-between">
-              {task.facility ? (
-                <span className="text-[10px] font-bold tracking-wider uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-md">{task.facility}</span>
+              {(task.facility || task.department_tag) ? (
+                <span className="text-[10px] font-bold tracking-wider uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-md">{task.facility || task.department_tag}</span>
               ) : <div />}
               <div className="flex">
                 {task.priority_stars === 3 && (
