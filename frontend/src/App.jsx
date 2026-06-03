@@ -1642,11 +1642,11 @@ function MainDashboard() {
                   <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">Chuyển trạng thái Task</h3>
                   {selectedTask.status !== 'done' ? (
                     <div className="bg-surface-container dark:bg-[#252525] p-4 rounded-xl border border-dashed border-outline-variant dark:border-gray-700">
-                      {user && (user.name === selectedTask.pic || !selectedTask.pic || ['FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'ADMIN', 'SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) ? (
+                      {user && (user.name === selectedTask.pic) ? (
                         !showClosureConfirm ? (
                           <>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                              {user.name === selectedTask.pic ? 'Bạn là PIC của công việc này.' : 'Bạn có quyền quản lý công việc này.'}
+                              Bạn là PIC của công việc này.
                             </p>
                             
                             {selectedTask.status === 'todo' && (
