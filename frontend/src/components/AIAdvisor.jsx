@@ -141,7 +141,7 @@ export default function AIAdvisor(props) {
             console.error("Lỗi tải lịch sử chat:", err);
             // BẪY LỖI: Tự động dọn rác nếu Phiên chat đã bị xóa ở Backend
             if (err?.response?.status === 403 || err?.response?.status === 404) {
-                if (props.onSessionUpdate) props.onSessionUpdate(null);
+                if (props.onSessionCreated) props.onSessionCreated(null);
                 setMessages([]);
             }
         } finally {

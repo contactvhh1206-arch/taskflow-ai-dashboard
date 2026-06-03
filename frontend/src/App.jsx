@@ -1235,7 +1235,7 @@ function MainDashboard() {
                    </button>
                 </div>
                 <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
-                   {aiSessions.length === 0 ? (
+                   {(!aiSessions || aiSessions.length === 0) ? (
                       <div className="text-xs text-gray-400 dark:text-gray-600 italic px-2">Chưa có lịch sử...</div>
                    ) : (
                       aiSessions.map(session => (
