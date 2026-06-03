@@ -761,7 +761,7 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
         const dataQuery = `
             WITH paginated_tasks AS (
                 -- BƯỚC A: Ép DB chỉ lọc và cắt đúng records (LIMIT/OFFSET) trên bảng gốc. Cực kỳ nhẹ!
-                SELECT id, title, description, status, urgency, deadline, created_at, updated_at, needs_support, pic_id, facility_id
+                SELECT id, title, description, status, urgency, deadline, created_at, updated_at, needs_support, pic_id, facility_id, department_code
                 FROM tasks t
                 WHERE ${baseWhere}
                 ORDER BY t.updated_at DESC
@@ -775,6 +775,7 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
                    u.full_name as pic, u.email as "picId",
                    f.name as facility, f.code as "facilityId",
                    pt.facility_id as "facilityRawId",
+                   pt.department_code as "department_tag",
                    COUNT(tc.id) AS comment_count
             FROM paginated_tasks pt
             LEFT JOIN users u ON pt.pic_id = u.id
@@ -820,6 +821,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
              u.full_name as pic, u.email as "picId",
              f.name as facility, f.code as "facilityId",
              t.facility_id as "facilityRawId",
+             t.department_code as "department_tag",
              COUNT(tc.id) AS comment_count
       FROM tasks t
       LEFT JOIN users u ON t.pic_id = u.id
@@ -845,7 +847,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
         query += ` AND (t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
     }
 
-    query += ` GROUP BY t.id, t.title, t.description, t.status, t.urgency, t.deadline, t.created_at, t.updated_at, t.needs_support, u.full_name, u.email, f.name, f.code, t.facility_id ORDER BY t.created_at DESC`;
+    query += ` GROUP BY t.id, t.title, t.description, t.status, t.urgency, t.deadline, t.created_at, t.updated_at, t.needs_support, u.full_name, u.email, f.name, f.code, t.facility_id, t.department_code ORDER BY t.created_at DESC`;
 
     // BƯỚC 3: SỬA LẠI KHỐI TRY-CATCH
     try {
