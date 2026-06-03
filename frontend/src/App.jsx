@@ -2069,3 +2069,5 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
 
 
 
+
+
