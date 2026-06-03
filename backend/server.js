@@ -1124,7 +1124,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
           }
           if (!insert_facility_id || insert_facility_id === 'ALL' || insert_facility_id === 'HQ') {
               insert_facility_id = null;
-              if (!insert_dept_code) insert_dept_code = req.user.role === 'VICE_PRESIDENT' ? 'BGD' : 'HQ';
+              if (!insert_dept_code) insert_dept_code = (req.user.role === 'VICE_PRESIDENT' || req.user.role === 'SUPER_ADMIN') ? 'BGD' : 'HQ';
           }
       }
       else {
