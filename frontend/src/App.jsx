@@ -136,7 +136,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   // Compute available facilities and departments based on selected PIC
   const { filteredFacilities, availableDepts } = React.useMemo(() => {
     let facs = activeFacilities;
-    let depts = ['HQ', 'MARKETING', 'FINANCE'];
+    let depts = ['BGD', 'MARKETING', 'FINANCE'];
     
     if (formData.pic) {
       const selectedPic = picOptions.find(u => String(u.id) === String(formData.pic_id) || u.name === formData.pic);
@@ -149,7 +149,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
         );
         
         depts = [];
-        if (selectedPic.department_id === 'BGD' || selectedPic.role === 'VICE_PRESIDENT') depts.push('HQ');
+        if (selectedPic.department_id === 'BGD' || selectedPic.role === 'VICE_PRESIDENT') depts.push('BGD');
         if (selectedPic.department_id === 'MARKETING') depts.push('MARKETING');
         if (selectedPic.department_id === 'FINANCE' || selectedPic.role === 'FINANCE_DEPT') depts.push('FINANCE');
       }
