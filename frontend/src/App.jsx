@@ -187,23 +187,19 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
         });
         
         let filtered = [];
-        if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
+        if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
           filtered = allUsers;
-        } else if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(user.role)) {
-          filtered = allUsers.filter(u => u.department_code === user.department_code || u.department_id === user.department_id);
         } else {
-          filtered = allUsers.filter(u => u.facility_id === user.facility_id);
+          filtered = allUsers.filter(u => String(u.id) === String(user.id) || u.name === user.name);
         }
         setPicOptions(filtered);
       } catch(e) {
         const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
         let filtered = [];
-        if (['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role)) {
+        if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
           filtered = allUsers;
-        } else if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(user.role)) {
-          filtered = allUsers.filter(u => u.department_code === user.department_code || u.department_id === user.department_id);
         } else {
-          filtered = allUsers.filter(u => u.facility_id === user.facility_id);
+          filtered = allUsers.filter(u => String(u.id) === String(user.id) || u.name === user.name);
         }
         setPicOptions(filtered);
       }
