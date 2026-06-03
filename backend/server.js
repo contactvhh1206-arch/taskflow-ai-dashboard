@@ -878,13 +878,11 @@ app.put('/api/tasks/:id/status', authenticateUser, async (req, res) => {
     const updateQuery = `
       UPDATE tasks 
       SET status = $1, 
-          evidence = COALESCE($2, evidence), 
-          updated_at = NOW(),
-          completed_at = CASE WHEN $1 = 'done' THEN NOW() ELSE completed_at END
-      WHERE id = $3 
+          updated_at = NOW()
+      WHERE id = $2 
       RETURNING *
     `;
-    const { rows } = await pool.query(updateQuery, [status, evidence || null, id]);
+    const { rows } = await pool.query(updateQuery, [status, id]);
     res.json({ success: true, data: rows[0] });
   } catch (error) {
     console.error("Lỗi cập nhật trạng thái:", error);
