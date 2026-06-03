@@ -108,6 +108,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   const [formData, setFormData] = useState({
     title: '',
     desc: '',
+    pic_id: user.id || '',
     pic: user.name,
     facility: '',
     deadline: new Date().toISOString().slice(0, 16),
@@ -117,13 +118,28 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
   
   const [picOptions, setPicOptions] = useState([]);
 
+  // Auto-fill facility based on selected PIC's facility OR department
+  useEffect(() => {
+    if (!formData.pic_id && !formData.pic) return;
+    
+    // Tìm người dùng theo pic_id (ID số) hoặc tên
+    const selectedPic = picOptions.find(u => String(u.id) === String(formData.pic_id) || u.name === formData.pic);
+    if (selectedPic) {
+      setFormData(prev => ({
+        ...prev,
+        pic: selectedPic.name,
+        facility: selectedPic.facility_id ? String(selectedPic.facility_id) : prev.facility
+      }));
+    }
+  }, [formData.pic_id, picOptions]);
+
   // Compute available facilities and departments based on selected PIC
   const { filteredFacilities, availableDepts } = React.useMemo(() => {
     let facs = activeFacilities;
     let depts = ['HQ', 'MARKETING', 'FINANCE'];
     
     if (formData.pic) {
-      const selectedPic = picOptions.find(u => u.name === formData.pic);
+      const selectedPic = picOptions.find(u => String(u.id) === String(formData.pic_id) || u.name === formData.pic);
       if (selectedPic && !['SUPER_ADMIN', 'ADMIN', 'VICE_PRESIDENT'].includes(selectedPic.role)) {
         const rawFac = selectedPic.facility_code || selectedPic.facility_id || selectedPic.facility_name || '';
         const facCodes = Array.isArray(rawFac) ? rawFac.map(s => String(s).toLowerCase()) : String(rawFac).toLowerCase().split(',').map(s => s.trim());
@@ -139,7 +155,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
       }
     }
     return { filteredFacilities: facs, availableDepts: depts };
-  }, [formData.pic, picOptions]);
+  }, [formData.pic, formData.pic_id, picOptions]);
   
   // Auto-select if there is only 1 option
   React.useEffect(() => {
@@ -239,14 +255,14 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 text-truncate truncate">Người phụ trách (PIC)</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">person</span>
-                <select required name="pic" value={formData.pic} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
+                <select required name="pic_id" value={formData.pic_id || ''} onChange={handleChange} className="w-full pl-9 pr-4 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white truncate">
                   <option value="">-- Chọn PIC --</option>
                   {picOptions.map(u => (
-                    <option key={u.username} value={u.name}>{u.name} {u.role === 'FACILITY_MANAGER' ? '(QL)' : ''}</option>
+                    <option key={u.id || u.username} value={u.id}>{u.name} {u.role === 'FACILITY_MANAGER' ? '(QL)' : ''}</option>
                   ))}
                   {/* Fallback option if user's own name is not in the list but they want to assign to themselves */}
-                  {!picOptions.find(u => u.name === user.name) && (
-                    <option value={user.name}>{user.name} (Bạn)</option>
+                  {!picOptions.find(u => u.id === user.id || u.name === user.name) && (
+                    <option value={user.id || user.name}>{user.name} (Bạn)</option>
                   )}
                 </select>
               </div>
@@ -445,7 +461,7 @@ function MainDashboard() {
      const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
      const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING')));
 
-     // 🚨 BỨC TƯỜNG TIN TƯỞNG BACKEND (TRUST THE BACKEND) 🚨
+     // 🚨 BỨC TƯỜNG TIN TƯỜNG BACKEND (TRUST THE BACKEND) 🚨
      // Nhóm Quản lý Cơ sở (FACILITY_MANAGER) và Nhân viên (LOCAL) đã được Backend lọc 100% chuẩn xác.
      // Bỏ qua toàn bộ mớ bòng bong so sánh chuỗi bên dưới. Trả về TRUE ngay lập tức!
      if (!isHighLevel && !isDeptHead) {
@@ -848,6 +864,7 @@ function MainDashboard() {
       const safeFacility = Array.isArray(taskFacility) ? taskFacility[0] : taskFacility;
       
       const taskPayload = {
+        pic_id: user.id,
         pic: user.name,
         deadline: new Date().toISOString().split('T')[0],
         urgent: false,
