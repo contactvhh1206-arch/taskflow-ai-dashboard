@@ -124,7 +124,12 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Initialize Database Schema Updates & Roles
 const initDB = async () => {
   try {
-    console.log('[DB] Running initialization checks...');
+        // BẢN VÁ: Cho phép facility_id được NULL để các Task chung của Sếp Tổng không bị ép vào DB41
+        await pool.query(`ALTER TABLE tasks ALTER COLUMN facility_id DROP NOT NULL`).catch(e => console.log('Drop NOT NULL facility_id skipped:', e.message));
+        await pool.query(`UPDATE tasks SET facility_id = NULL WHERE facility_id IN (SELECT id FROM facilities WHERE code = 'HQ')`);
+        await pool.query(`DELETE FROM facilities WHERE code = 'HQ'`);
+
+        console.log('[DB] Running initialization checks...');
     // Add missing columns to users if not exists
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS managed_facilities JSONB`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'ACTIVE'`);
@@ -1188,19 +1193,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
       else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
 
-      // =====================================================================
-      // FALLBACK BẢO VỆ DATABASE CONSTRAINT (Chống lỗi NOT NULL facility_id)
-      // =====================================================================
-      if (!insert_facility_id) {
-          const hqCheck = await pool.query("SELECT id FROM facilities WHERE code = 'HQ' OR name ILIKE '%HQ%' OR name ILIKE '%Giám đốc%' LIMIT 1");
-          if (hqCheck.rows.length > 0) {
-              insert_facility_id = hqCheck.rows[0].id;
-          } else {
-              // BẤT TỬ HÓA TRỤ SỞ: Tự động tạo cơ sở HQ nếu chưa có để tránh việc gán nhầm sang DB41
-              const newHq = await pool.query("INSERT INTO facilities (name, code, status) VALUES ('Trụ sở chính (HQ)', 'HQ', 'ACTIVE') RETURNING id");
-              insert_facility_id = newHq.rows[0].id;
-          }
-      }
+      // (Removed fallback constraint as facility_id can now be NULL)
 
       const insertQuery = `
         INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, department_code, priority_level, created_by, created_at, updated_at)
