@@ -3808,7 +3808,7 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: { "Authorization": `Bearer ${activeAiConfig.apiKey}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ model: activeAiConfig.aiModel || "google/gemini-2.5-flash", stream: true, messages: messagesForAI, tools: tools }),
+                body: JSON.stringify({ model: activeAiConfig.aiModel || "google/gemini-2.5-flash", stream: true, messages: messagesForAI }),
                 signal: controller.signal
             });
             
