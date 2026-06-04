@@ -509,7 +509,7 @@ app.delete('/api/facilities/:id', async (req, res) => {
 });
 
 
-const authenticateUser = async (req, res, next) => {
+async function authenticateUser(req, res, next) {
     try {
         const authHeader = req.headers['authorization'];
         
