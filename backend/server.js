@@ -2801,9 +2801,9 @@ async function executeGetRevenueTool(args, user) {
                  AND EXISTS (
                      SELECT 1 FROM unnest(string_to_array($3::text, ',')) AS t(val)
                      WHERE TRIM(t.val) != '' AND (
-                         REPLACE(REPLACE(UPPER(item->>'name'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', 'DB'), ' ', '')
-                         OR REPLACE(REPLACE(UPPER(item->>'facilityCode'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', 'DB'), ' ', '')
-                         OR REPLACE(REPLACE(UPPER(item->>'facilityName'), 'DUBAI', 'DB'), ' ', '') = REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', 'DB'), ' ', '')
+                         TRIM(REPLACE(REPLACE(UPPER(item->>'name'), 'DUBAI', ''), 'DB', '')) = TRIM(REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', ''), 'DB', ''))
+                         OR TRIM(REPLACE(REPLACE(UPPER(item->>'facilityCode'), 'DUBAI', ''), 'DB', '')) = TRIM(REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', ''), 'DB', ''))
+                         OR TRIM(REPLACE(REPLACE(UPPER(item->>'facilityName'), 'DUBAI', ''), 'DB', '')) = TRIM(REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', ''), 'DB', ''))
                      )
                  )
                GROUP BY report_date
