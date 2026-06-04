@@ -825,14 +825,20 @@ function MainDashboard() {
 
       try {
         let resolvedPicId = user.id;
-        if (draft.pic) {
+        if (draft.pic && draft.pic !== user.name) {
           const searchName = draft.pic.toLowerCase().trim();
           const foundUser = allUsers.find(u => 
             (u.full_name && u.full_name.toLowerCase().includes(searchName)) || 
             (u.email && u.email.toLowerCase().includes(searchName)) ||
             (u.username && u.username.toLowerCase().includes(searchName))
           );
-          if (foundUser) resolvedPicId = foundUser.id;
+          if (foundUser) {
+            resolvedPicId = foundUser.id;
+          } else {
+            hasFatalError = true;
+            setToastMessage(`Lỗi AI: Không tìm thấy nhân sự "${draft.pic}" trong Database! Ngắt giao việc để bảo toàn dữ liệu.`);
+            break; // Cầu dao ngắt mạch
+          }
         }
 
         let resolvedFacilityId;
