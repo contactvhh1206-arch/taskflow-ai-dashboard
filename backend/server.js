@@ -1217,8 +1217,8 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       }
 
       let priorityStars = 0;
-      if (req.user.role === 'SUPER_ADMIN') priorityStars = 5;
-      else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 3;
+      if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
+      else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
 
       // (Removed fallback constraint as facility_id can now be NULL)
 
@@ -2694,8 +2694,8 @@ async function executeCreateTaskTool(args, user) {
     }
 
     let priorityLevel = priority || 'MEDIUM';
-    if (user.role === 'SUPER_ADMIN') priorityLevel = '5';
-    else if (user.role === 'VICE_PRESIDENT') priorityLevel = '3';
+    if (user.role === 'SUPER_ADMIN') priorityLevel = '3';
+    else if (user.role === 'VICE_PRESIDENT') priorityLevel = '2';
 
     // 4. Thá»±c thi Database Insert
     const insertQuery = `
