@@ -1299,7 +1299,7 @@ function MainDashboard() {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative transition-colors">
-        <header className="h-16 border-b border-outline-variant dark:border-gray-800 bg-white/80 dark:bg-[#121212]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 sticky top-0 z-10 transition-colors">
+        <header className="shrink-0 h-16 border-b border-outline-variant dark:border-gray-800 bg-white/80 dark:bg-[#121212]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 sticky top-0 z-10 transition-colors">
           <div className="flex items-center gap-2 md:gap-4 flex-1">
             <button 
               onClick={() => setIsSidebarOpen(true)}
