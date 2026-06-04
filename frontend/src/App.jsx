@@ -831,11 +831,29 @@ function MainDashboard() {
     // ------------------------------------------------------------------
     // NÂNG CẤP BẢO MẬT ZERO-TRUST CẤP 2 (CHỐNG LƯỜNG GẠT XUYÊN QUYỀN)
     // ------------------------------------------------------------------
-    // Ép AI tra cứu nhân sự bằng danh sách ĐÃ ĐƯỢC PHÂN QUYỀN RBAC (picOptions)
-    // Nhân viên quèn lừa AI gán việc cho Sếp -> picOptions không có -> Ngắt mạch ngay!
-    // Trị dứt điểm độ trễ Cache (Vercel Sync Delay) vì đọc trực tiếp từ RAM của React.
-    const localUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
-    const allUsers = (picOptions && picOptions.length > 0) ? picOptions : localUsers;
+    // Lấy danh bạ trực tiếp từ API để đảm bảo luồng AI hoạt động độc lập
+    // Không phụ thuộc vào bộ nhớ đệm LocalStorage hay State của UI khác.
+    let allUsers = [];
+    try {
+      const token = localStorage.getItem('taskflow_token');
+      const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'x-user-role': user?.role || '',
+          'x-facility-id': user?.facility_id || 'ALL'
+        }
+      });
+      const data = await res.json();
+      allUsers = data.success ? data.data : [];
+    } catch(e) {
+      console.warn("Lỗi fetch users cho AI, dùng fallback:", e);
+      allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+    }
+
+    // BỌC GIÁP RBAC: Nhân viên quèn lừa AI gán việc cho Sếp -> Ngắt mạch ngay!
+    if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
+      allUsers = allUsers.filter(u => String(u.id) === String(user.id) || u.name === user.name);
+    }
 
     const isAllAccess = ALL_ACCESS_ROLES.includes(user.role);
 
