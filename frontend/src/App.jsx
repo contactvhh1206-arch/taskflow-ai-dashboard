@@ -1170,7 +1170,7 @@ function MainDashboard() {
   };
 
   return (
-    <div className={`flex h-screen w-full font-sans overflow-hidden ${darkMode ? 'dark bg-[#121212] text-white' : 'bg-surface text-on-surface'}`}>
+    <div className={`flex h-[100dvh] w-full font-sans overflow-hidden ${darkMode ? 'dark bg-[#121212] text-white' : 'bg-surface text-on-surface'}`}>
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
