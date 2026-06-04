@@ -3704,7 +3704,8 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 - [THÔNG TIN HỆ THỐNG]: Hôm nay là ngày ${currentDate}. Mọi từ khóa thời gian tương đối ('hôm nay', 'tháng trước', 'hôm qua', 'quý trước'...) BẮT BUỘC phải tính toán nội suy từ mốc thời gian này để truyền vào Tool, tuyệt đối không được hỏi lại để xác nhận ngày.
 - BẠN LÀ MỘT CỐ VẤN THỰC CHIẾN, KHÔNG PHẢI CHATBOT HỎI ĐÁP. Bạn phải có năng lực TỰ NỘI SUY ngữ cảnh.
 - Tuyệt đối KHÔNG sinh ra các đoạn text vặn vẹo, dư thừa như "Sếp muốn xem khía cạnh nào?", "Đúng không ạ?", "Vui lòng chờ một chút...". Những câu hỏi này LÀM GIÁN ĐOẠN luồng công việc của Sếp.
-- Nếu thông tin Sếp đưa ra hơi mờ nhạt (ví dụ chỉ nói "xuất báo cáo 6 cơ sở"), hãy TỰ ĐỘNG ngầm định Sếp đang cần Báo cáo Doanh thu và LẬP TỨC GỌI TOOL để tra cứu với các tham số bạn thu thập được (hoặc bỏ trống tham số nếu thiếu). CHỈ ĐƯỢC CHAT KHI ĐÃ CÓ KẾT QUẢ TỪ TOOL.
+- Nếu thông tin Sếp đưa ra hơi mờ nhạt (ví dụ chỉ nói "xuất báo cáo 6 cơ sở"), hãy TỰ ĐỘNG ngầm định Sếp đang cần Báo cáo Doanh thu và LẬP TỨC GỌI TOOL get_revenue_report. 
+- Nếu Sếp hỏi bất cứ điều gì liên quan đến Công việc, Tiến độ, Task, Dự án, Phòng ban (ví dụ: "cập nhật tiến độ phòng ban", "tổng quan phòng marketing"), BẠN BẮT BUỘC PHẢI LẬP TỨC GỌI TOOL get_tasks. KHÔNG ĐƯỢC CHAT HAY HỎI LẠI TRƯỚC KHI GỌI TOOL. CHỈ ĐƯỢC CHAT KHI ĐÃ CÓ KẾT QUẢ TỪ TOOL.
 - LỆNH BẢO MẬT (ANTI-COT): TUYỆT ĐỐI KHÔNG xuất ra màn hình quá trình suy nghĩ, phân tích, lập luận (Chain of Thought), hoặc mô tả bạn đang gọi công cụ nào. Trả lời ngay vào trọng tâm sau khi có dữ liệu.
 
 HƯỚNG DẪN VỚI CÂU HỎI NGOÀI LỀ:
@@ -3824,7 +3825,7 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                 type: "function",
                 function: {
                     name: "get_tasks",
-                    description: "Lấy danh sách các công việc (tasks). Sử dụng khi người dùng hỏi về tiến độ, trạng thái, hoặc danh sách công việc của cơ sở/phòng ban.",
+                    description: "[QUÂN LỆNH BẮT BUỘC]: Lấy danh sách các công việc (tasks). KÍCH HOẠT TOOL NÀY NGAY LẬP TỨC khi sếp hỏi về tiến độ, trạng thái, dự án, hoặc danh sách công việc của bất kỳ cơ sở/phòng ban nào (ví dụ: 'tổng quan phòng marketing', 'tiến độ công việc'). NGHIÊM CẤM đặt câu hỏi xác nhận lại với sếp trước khi gọi tool. Tự động nội suy các tham số (ví dụ: 'marketing' -> department_code: 'MARKETING') và gọi Tool ngay.",
                     parameters: {
                         type: "object",
                         properties: {
