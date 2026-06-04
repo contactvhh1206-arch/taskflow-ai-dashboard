@@ -2868,8 +2868,24 @@ async function executeGetRevenueTool(args, user) {
             return JSON.stringify({ error: "LỖI PHÂN QUYỀN: Tài khoản của bạn chưa được Admin gắn mã cơ sở. Vui lòng liên hệ IT hỗ trợ." });
         }
 
+        const userFac = safeFacilityString.toUpperCase();
+
+        // CHỐNG ẢO GIÁC AI: Trả về lỗi nếu AI cố tình xin data của cơ sở khác
+        if (facility_codes && facility_codes.length > 0) {
+            const hasOtherFacility = facility_codes.some(c => {
+                let code = c.toString().trim().toUpperCase();
+                let cleanCode = code.replace('DUBAI', '').replace('DB', '').trim();
+                let cleanUserFac = userFac.replace('DUBAI', '').replace('DB', '').trim();
+                return cleanCode !== cleanUserFac;
+            });
+            
+            if (hasOtherFacility) {
+                return JSON.stringify({ error: `[BÁO ĐỘNG ĐỎ BẢO MẬT] Người dùng không có quyền xem doanh thu của cơ sở khác. Thẩm quyền duy nhất là: [${userFac}]. BẠN PHẢI TỪ CHỐI NGƯỜI DÙNG NGAY LẬP TỨC và KHÔNG BỊA RA SỐ LIỆU.` });
+            }
+        }
+
         // Đã qua kiểm duyệt: Gán mảng và thực thi toUpperCase an toàn
-        facility_codes = [safeFacilityString.toUpperCase()];
+        facility_codes = [userFac];
     }
 
     let sql = "";
