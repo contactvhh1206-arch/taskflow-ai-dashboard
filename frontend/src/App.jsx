@@ -183,6 +183,18 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
         const data = await res.json();
         let allUsers = data.success ? data.data : JSON.parse(localStorage.getItem('taskflow_users') || '[]');
         
+        // -------------------------------------------------------------
+        // KHIÊN BẢO VỆ ZERO-TRUST: KIỂM DỊCH & BỌC GIÁP LOCAL STORAGE
+        // -------------------------------------------------------------
+        if (data.success && Array.isArray(data.data)) {
+          try {
+            localStorage.setItem('taskflow_users', JSON.stringify(data.data));
+          } catch (storageError) {
+            console.warn("Cảnh báo: Không thể ghi danh bạ vào LocalStorage (Vượt Quota hoặc Trình duyệt ẩn danh).", storageError);
+          }
+        }
+        // -------------------------------------------------------------
+        
         allUsers = allUsers.map(u => {
           let updated = { ...u };
           return updated;
