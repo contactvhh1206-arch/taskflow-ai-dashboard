@@ -3668,7 +3668,13 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
                     if (hasAllAccess) {
                         const dailySysRev = Number(r.total_revenue) || 0;
                         totalMonthRevenue += dailySysRev;
-                        revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${dailySysRev.toLocaleString('vi-VN')} đ]\n`;
+                        let detailText = "";
+                        const rData = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || []);
+                        if (Array.isArray(rData)) {
+                            const details = rData.map(f => `${f.name || f.id}: ${Number(f.revenue || 0).toLocaleString('vi-VN')}đ`).join(', ');
+                            detailText = `(Chi tiết từng cơ sở: ${details})`;
+                        }
+                        revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${dailySysRev.toLocaleString('vi-VN')} đ] ${detailText}\n`;
                     } else {
                         if (!standardFacilityName) continue;
 
