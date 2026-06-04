@@ -1445,7 +1445,6 @@ function MainDashboard() {
                   onCheckinSuccess={() => {
                     setIsCheckinCompleted(true);
                     fetchFacilityStatuses();
-                    setActiveTab('tasks');
                   }} 
                 />
               </ErrorBoundary>
