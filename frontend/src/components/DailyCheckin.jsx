@@ -9,6 +9,11 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   };
   const today = getFormattedDate(new Date());
   
+  const getLocalISODate = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+  };
+  
   const [loading, setLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedTime, setSubmittedTime] = useState(null);
@@ -45,11 +50,11 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     cleaning_done: false
   });
   
-  const [logFilterDate, setLogFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [logFilterDate, setLogFilterDate] = useState(getLocalISODate());
   const [logFilterSearch, setLogFilterSearch] = useState('');
   const [logFilterHasImage, setLogFilterHasImage] = useState(false);
 
-  const [historyFilterDate, setHistoryFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [historyFilterDate, setHistoryFilterDate] = useState(getLocalISODate());
   const [historyFilterSearch, setHistoryFilterSearch] = useState('');
   const [historyFilterHasImage, setHistoryFilterHasImage] = useState(false);
 
@@ -546,9 +551,9 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         </div>
 
         {/* Timeline */}
-        {logs.filter(l => l.facility_id === user.facility_id && l.date === today).length > 0 && (
+        {logs.filter(l => l.date === today).length > 0 && (
           <div className="flex flex-col gap-4 mt-2 border-t border-gray-100 dark:border-gray-800 pt-5">
-            {logs.filter(l => l.facility_id === user.facility_id && l.date === today).map((log, i, arr) => (
+            {logs.filter(l => l.date === today).map((log, i, arr) => (
               <div key={log.id} className="flex gap-4 items-start relative">
                 {i !== arr.length - 1 && (
                   <div className="absolute left-2 top-8 bottom-[-20px] w-[2px] bg-gray-200 dark:bg-gray-700"></div>
