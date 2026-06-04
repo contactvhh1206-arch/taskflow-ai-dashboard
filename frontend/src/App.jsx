@@ -827,7 +827,15 @@ function MainDashboard() {
 
     const addedTasks = [];
     let hasFatalError = false; // Cầu dao ngắt mạch (Circuit Breaker)
-    const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+    
+    // ------------------------------------------------------------------
+    // NÂNG CẤP BẢO MẬT ZERO-TRUST CẤP 2 (CHỐNG LƯỜNG GẠT XUYÊN QUYỀN)
+    // ------------------------------------------------------------------
+    // Ép AI tra cứu nhân sự bằng danh sách ĐÃ ĐƯỢC PHÂN QUYỀN RBAC (picOptions)
+    // Nhân viên quèn lừa AI gán việc cho Sếp -> picOptions không có -> Ngắt mạch ngay!
+    // Trị dứt điểm độ trễ Cache (Vercel Sync Delay) vì đọc trực tiếp từ RAM của React.
+    const localUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
+    const allUsers = (picOptions && picOptions.length > 0) ? picOptions : localUsers;
 
     const isAllAccess = ALL_ACCESS_ROLES.includes(user.role);
 
