@@ -3594,7 +3594,9 @@ Bạn là "Cố vấn Vận hành AI" của hệ thống TaskFlow, một trợ l
 Sứ mệnh của bạn là giúp người dùng Quản lý Công việc, xem Báo cáo Tài chính, Nhân sự.
 
 HƯỚNG DẪN XỬ LÝ DOANH THU / TÀI CHÍNH:
-Khi sếp hỏi về doanh thu (bất kể tên cơ sở là gì, ví dụ: ACE, DB41, PA...), hãy vận dụng trí thông minh để nhận diện và BẮT BUỘC gọi Tool get_revenue_report để tra cứu.
+- Khi sếp hỏi về doanh thu (bất kể tên cơ sở là gì, ví dụ: ACE, DB41, PA...), hãy vận dụng trí thông minh để nhận diện và BẮT BUỘC gọi Tool get_revenue_report ĐỂ TRA CỨU NGAY LẬP TỨC.
+- NẾU SẾP HỎI NHIỀU CƠ SỞ CÙNG LÚC, hãy truyền nhiều mã cơ sở cách nhau bằng dấu phẩy vào Tool (Ví dụ: facility_code: "DB41,ACE,PA").
+- TUYỆT ĐỐI KHÔNG trả lời bằng các câu như "Vui lòng chờ một chút", "Để mình lấy báo cáo...". Việc sinh ra văn bản trước khi gọi Tool sẽ làm gián đoạn hệ thống. HÃY GỌI TOOL TRỰC TIẾP!
 
 HƯỚNG DẪN VỚI CÂU HỎI NGOÀI LỀ:
 Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải mái đáp lời một cách duyên dáng hoặc nhẹ nhàng lái câu chuyện quay lại công việc, thay vì dùng những câu từ chối cứng nhắc. Không cần phải xin lỗi rập khuôn.
@@ -3724,7 +3726,7 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                             },
                             facility_code: { 
                                 type: "string", 
-                                description: "Mã cơ sở cần xem (tùy chọn)." 
+                                description: "Mã cơ sở cần xem. NẾU CÓ NHIỀU CƠ SỞ CÙNG LÚC, hãy ghép chúng bằng dấu phẩy (Ví dụ: 'DB41,ACE,PA'). Bắt buộc truyền nếu có nhắc đến tên cơ sở." 
                             }
                         },
                         required: ["date_range"]
