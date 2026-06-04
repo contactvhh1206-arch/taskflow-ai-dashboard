@@ -1200,6 +1200,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       // 3. KIỂM TRA CHÉO PIC BẰNG USER_ID
       // =====================================================================
       let final_pic_id = null;
+      let foundPic = null;
       const input_pic_id = pic_id || pic; 
       
       if (input_pic_id) { 
@@ -2817,7 +2818,11 @@ async function executeGetTasksTool(args, user) {
         let paramCount = 1;
 
         if (targetFacility && targetFacility !== 'all') {
-            sql += ` AND t.facility_id = $${paramCount}`;
+            if (String(targetFacility).match(/^\d+$/)) {
+                sql += ` AND t.facility_id = $${paramCount}`;
+            } else {
+                sql += ` AND t.facility_id = (SELECT id FROM facilities WHERE code = $${paramCount} OR name = $${paramCount} LIMIT 1)`;
+            }
             params.push(targetFacility);
             paramCount++;
         }
