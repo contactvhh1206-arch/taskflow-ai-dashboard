@@ -53,6 +53,8 @@ export default function AITaskModal({ onClose, onConfirm, user }) {
         status: 'todo', // Gán mặc định status: "Cần làm"
         urgent: task.priority_level === 'URGENT' || task.priority === 'Cao',
         facility: task.facility_id || localStorage.getItem('facility_id') || (user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id),
+        // MỞ ỐNG NƯỚC: HỨNG DỮ LIỆU ĐỊNH TUYẾN PHÒNG BAN TỪ BACKEND
+        department_code: task.department_code || null,
         createdAt: new Date().toISOString().split('T')[0]
       }));
 

@@ -1628,15 +1628,32 @@ TrÃ­ch xuáº¥t máº£ng "tasks" vá»›i cáº¥u trÃºc: "task_title", "
         extractedTasks = JSON.parse(aiData.choices[0].message.content);
         if (extractedTasks.tasks) extractedTasks = extractedTasks.tasks;
         if (Array.isArray(extractedTasks)) {
+            // BỘ LỌC TỪ ĐIỂN: Danh sách các mã Phòng ban hợp pháp (Whitelist)
+            const VALID_DEPTS = ['MARKETING', 'FINANCE', 'HR', 'IT', 'BGD'];
+
             for (let t of extractedTasks) {
-               let mappedFacilityId = facilityId;
-               if (t.target_facility) {
-                   const { rows } = await pool.query('SELECT id FROM facilities WHERE name ILIKE $1 LIMIT 1', [`%${t.target_facility}%`]);
+               let mappedFacilityId = facilityId; // Fallback mặc định
+               let mappedDeptCode = null;
+
+               // KHIÊN 1 (SAFE TYPE CASTING): Ép về chuỗi In Hoa, cắt khoảng trắng
+               const safeDeptFromAI = String(t.target_department_code ?? "").toUpperCase().trim();
+               const safeFacFromAI = String(t.target_facility ?? "").trim();
+
+               // CHỐT KIỂM DỊCH (DATA VALIDATION)
+               if (safeDeptFromAI !== "" && VALID_DEPTS.includes(safeDeptFromAI)) {
+                   // NHÁNH 1 (PHÒNG BAN HỢP LỆ): Chỉ gán khi mã AI nhả ra nằm trong Whitelist
+                   mappedDeptCode = safeDeptFromAI;
+               } 
+               else if (safeFacFromAI !== "") {
+                   // NHÁNH 2 (CƠ SỞ / HOẶC BỊ ĐÁ VĂNG TỪ NHÁNH 1):
+                   const { rows } = await pool.query('SELECT id FROM facilities WHERE name ILIKE $1 LIMIT 1', [`%${safeFacFromAI}%`]);
                    if (rows.length > 0) {
                        mappedFacilityId = rows[0].id;
                    }
                }
+
                t.facility_id = mappedFacilityId;
+               t.department_code = mappedDeptCode;
                t.priority_level = t.priority_level === 'URGENT' ? 'URGENT' : 'PRIORITY';
                t.created_by_role = req.user.role;
             }

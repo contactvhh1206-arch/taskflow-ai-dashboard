@@ -836,11 +836,20 @@ function MainDashboard() {
         }
 
         let resolvedFacilityId;
+        let resolvedDeptCode = null; // KHIÊN 2: Mặc định khóa chặt bằng null
+        
         if (isAllAccess) {
+          // Xử lý Cơ sở
           const safeFacilityFromAI = String(draft.facility ?? "").trim();
           resolvedFacilityId = safeFacilityFromAI ? safeFacilityFromAI : user.facility_id;
+          
+          // Xử lý Phòng ban (Khiên 2 dành riêng cho All-Access)
+          const safeDeptFromAI = String(draft.department_code ?? "").trim();
+          resolvedDeptCode = safeDeptFromAI ? safeDeptFromAI : null;
         } else {
+          // Rào chắn Local Role: Khóa chết, phớt lờ mọi dữ liệu định tuyến của AI
           resolvedFacilityId = user.facility_id;
+          resolvedDeptCode = null; // Triệt tiêu nguy cơ mượn tay AI vượt quyền lên phòng ban
         }
 
         const taskPayload = {
@@ -850,6 +859,7 @@ function MainDashboard() {
           deadline: draft.deadline || new Date().toISOString().split('T')[0],
           urgent: draft.urgent || false,
           facility_id: resolvedFacilityId,
+          department_code: resolvedDeptCode, // <--- ĐÃ ÁP DỤNG BIẾN THANH LỌC ZERO-TRUST
           creator_role: user.role,
           desc: (draft.desc || "") + " <!--cr:" + user.role + "-->",
         };
