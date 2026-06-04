@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import axiosClient from './api/axiosClient.js';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
@@ -409,7 +409,8 @@ function MainDashboard() {
     
     if (user.role === 'ADMIN') return 'admin';
     if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD'].includes(user.role)) return 'ai-advisor';
-    if (['FINANCE_DEPT', 'FACILITY_MANAGER'].includes(user.role)) return 'dashboard';
+    if (user.role === 'FINANCE_DEPT') return 'dashboard';
+    if (user.role === 'FACILITY_MANAGER') return 'checkin';
     return 'tasks';
   });
   const [chatInput, setChatInput] = useState('');
