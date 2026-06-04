@@ -714,7 +714,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
 
       </form>
 
-        <div className="p-6 border-t border-outline-variant dark:border-gray-800 bg-surface-container-low dark:bg-[#1a1a1a] flex flex-col items-end gap-3 shrink-0 rounded-b-2xl">
+        <div className="sticky bottom-0 z-20 shadow-[0_-4px_15px_-3px_rgba(0,0,0,0.1)] border-t border-outline-variant dark:border-gray-800 bg-surface-container-low dark:bg-[#1a1a1a] flex flex-col items-end gap-3 shrink-0 rounded-none md:rounded-b-2xl px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           {!isFormValid && ((formData.manual_unauth > 0 && (!formData.manual_unauth_note || !formData.manual_unauth_note.trim())) || (formData.manual_auth > 0 && (!formData.manual_auth_note || !formData.manual_auth_note.trim()))) && !isSubmitted && (
             <div className="w-full text-right text-xs text-error font-medium">
               Bạn đã nhập nhân sự nghỉ, hệ thống bắt buộc phải ghi chú phương án/lý do cho nhân sự tương ứng.
