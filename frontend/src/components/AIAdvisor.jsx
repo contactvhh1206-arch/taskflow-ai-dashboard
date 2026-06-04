@@ -18,8 +18,8 @@ export default function AIAdvisor(props) {
      }
   } catch(e) {}
   
-  const [query, setQuery] = useState('');
-  const abortControllerRef = useRef(null);
+  const inputRef = React.useRef(null);
+  const abortControllerRef = React.useRef(null);
   const currentSessionIdRef = React.useRef(activeSessionId);
   const isInitialMount = React.useRef(true);
 
@@ -69,17 +69,25 @@ export default function AIAdvisor(props) {
     }] : [];
   }, [user?.role]);
 
-  const { messages, isStreaming, sendMessage, stopStream, setMessages } = useAIChatStream({
+  const handleStreamComplete = () => {
+    setTimeout(() => {
+        if (inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, 0);
+  };
+
+  const { messages, isStreaming, isThinking, sendMessage, stopStream, setMessages } = useAIChatStream({
     onSessionCreated: (newSessionId) => {
       isSessionCreatedByMeRef.current = true;
       if (props.onSessionCreated) props.onSessionCreated(newSessionId);
-      // Đồng bộ Sidebar ngay lập tức
       fetchAiSessions().then(res => {
           if (res.success && props.onSessionUpdate) {
               props.onSessionUpdate(res.data);
           }
       }).catch(err => console.error("Lỗi fetch sidebar:", err));
-    }
+    },
+    onStreamComplete: handleStreamComplete
   });
 
   const chatLog = messages.length === 0 ? defaultLog : messages;
@@ -229,7 +237,9 @@ export default function AIAdvisor(props) {
     recognition.onstart = () => setIsRecording(true);
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
-      setQuery(prev => prev ? prev + ' ' + transcript : transcript);
+      if (inputRef.current) {
+          inputRef.current.value = inputRef.current.value ? inputRef.current.value + ' ' + transcript : transcript;
+      }
     };
     recognition.onerror = (event) => {
       if (window.showToast) window.showToast('Lỗi nhận diện giọng nói: ' + event.error, 'error');
@@ -251,24 +261,33 @@ export default function AIAdvisor(props) {
   const handleAsk = async (overrideQuery) => {
     isSessionCreatedByMeRef.current = true; 
 
-    if (isStreaming) {
+    if (isStreaming || isThinking) {
         isSessionCreatedByMeRef.current = false;
         return;
     }
 
-    let actualQuery = query;
+    let actualQuery = '';
     if (typeof overrideQuery === 'string') {
         actualQuery = overrideQuery;
-    } else if (overrideQuery && overrideQuery.preventDefault) {
-        overrideQuery.preventDefault();
+    } else {
+        if (overrideQuery && overrideQuery.preventDefault) {
+            overrideQuery.preventDefault();
+        }
+        if (inputRef.current) {
+            actualQuery = inputRef.current.value.trim();
+        }
     }
-    if (!actualQuery.trim() && !attachment) {
+
+    if (!actualQuery && !attachment) {
         isSessionCreatedByMeRef.current = false;
         return;
     }
     
-    const userQuery = actualQuery.trim() || 'Vui lòng phân tích tệp đính kèm này.';
-    setQuery('');
+    const userQuery = actualQuery || 'Vui lòng phân tích tệp đính kèm này.';
+    
+    if (inputRef.current) {
+        inputRef.current.value = '';
+    }
     
     const currentAttachment = attachment;
     setAttachment(null);
@@ -363,7 +382,15 @@ export default function AIAdvisor(props) {
             </div>
           </div>
         ))}
-        {isTyping && (
+        {isThinking && (
+          <div className="flex justify-start">
+            <div className="bg-surface-container dark:bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-outline-variant dark:border-gray-700 flex gap-2 items-center text-gray-500 text-sm">
+              <span className="material-symbols-outlined text-sm animate-pulse text-secondary">memory</span> 
+              Cố vấn đang phân tích dữ liệu hệ thống...
+            </div>
+          </div>
+        )}
+        {isTyping && !isThinking && (
           <div className="flex justify-start">
             <div className="bg-surface-container dark:bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-outline-variant dark:border-gray-700 flex gap-2 items-center h-12">
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce"></div>
@@ -446,7 +473,7 @@ export default function AIAdvisor(props) {
             <span className="material-symbols-outlined text-[20px]">{isRecording ? 'mic' : 'mic_none'}</span>
             {isRecording && <span className="absolute inset-0 rounded-full border border-error animate-ping opacity-50"></span>}
           </button>
-          <input type="text" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAsk()} placeholder="Ví dụ: So sánh hiệu suất trực ca của Cơ sở 1 và Cơ sở 2..." className="flex-1 min-w-0 bg-surface-container dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl pl-[5.5rem] pr-4 py-3 outline-none focus:ring-2 focus:ring-secondary text-sm dark:text-white transition-all shadow-inner relative" />
+          <input type="text" ref={inputRef} disabled={isStreaming || isThinking} onKeyDown={(e) => { if (e.key === 'Enter' && !(isStreaming || isThinking)) { e.preventDefault(); handleAsk(e); } }} placeholder="Ví dụ: So sánh hiệu suất trực ca của Cơ sở 1 và Cơ sở 2..." className="flex-1 min-w-0 bg-surface-container dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl pl-[5.5rem] pr-4 py-3 outline-none focus:ring-2 focus:ring-secondary text-sm dark:text-white transition-all shadow-inner relative" />
           
           {isStreaming ? (
              <button onClick={() => {
@@ -455,7 +482,7 @@ export default function AIAdvisor(props) {
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>stop</span> <span className="hidden sm:inline">Dừng</span>
              </button>
           ) : (
-             <button onClick={handleAsk} disabled={(!query.trim() && !attachment) || isTyping} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
+             <button onClick={handleAsk} disabled={isStreaming || isThinking} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
                <span className="material-symbols-outlined">send</span> <span className="hidden sm:inline">Gửi</span>
              </button>
           )}

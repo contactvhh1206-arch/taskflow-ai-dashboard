@@ -2719,46 +2719,54 @@ async function executeCreateTaskTool(args, user) {
 
 
 async function executeGetRevenueTool(args, user) {
-    const { date_range, facility_code } = args;
+    let { date_range, facility_codes } = args;
     
-    // 1. Áp dụng Hàm Trung Tâm Phân Quyền
-    const perms = getAiPermissions(user);
+    // 1. Tường Lửa Bơm Thời Gian Thực & Fallback Dữ Kiện Thiếu
+    const formatVNTime = (dateObj) => {
+        return new Intl.DateTimeFormat('en-CA', { 
+            timeZone: 'Asia/Ho_Chi_Minh', 
+            year: 'numeric', month: '2-digit', day: '2-digit' 
+        }).format(dateObj);
+    };
+
+    const now = new Date();
     
-    // 2. GHI ĐÈ QUYỀN TUYỆT ĐỐI (RBAC OVERRIDE)
-    const targetFacility = perms.isGlobal ? (facility_code ? String(facility_code) : null) : perms.facilityCode;
-
-    // ==============================================================
-    // FALLBACK DATE LOGIC
-    // ==============================================================
-    let startDate, endDate;
-
-    if (date_range && typeof date_range === 'object' && date_range.startDate && date_range.endDate) {
-        startDate = date_range.startDate;
-        endDate = date_range.endDate;
-    } else if (typeof date_range === 'string' && date_range.includes('-')) {
-        const parts = date_range.split('-');
-        startDate = parts[0]?.trim();
-        endDate = parts[1]?.trim() || startDate; 
-    } else {
-        const today = new Date();
-        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    if (!date_range || !date_range.startDate || !date_range.endDate) {
+        const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
         
-        const formatToISO = (d) => {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+        date_range = {
+            startDate: formatVNTime(firstDayLastMonth),
+            endDate: formatVNTime(lastDayLastMonth)
         };
+    }
 
-        startDate = formatToISO(firstDay);
-        endDate = formatToISO(today);
+    if (!facility_codes || !Array.isArray(facility_codes)) {
+        facility_codes = []; 
+    } else {
+        facility_codes = facility_codes.map(c => c.toString().trim().toUpperCase()).filter(c => c !== '');
+    }
+
+    // 2. Tường Lửa RBAC
+    const userRole = user.role;
+    const userFacilityId = user.facility_id || user.facilityCode;
+
+    if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(userRole)) {
+        // Nhóm All-Access: Không filter ở Tầng API, đẩy thẳng mảng AI gửi xuống SQL.
+        // Mã rác sẽ tự động bị loại vì không tồn tại trong DB.
+    } else {
+        // Nhóm Local (FACILITY_MANAGER): Phủ quyết tàn bạo, ghi đè mảng
+        if (!userFacilityId) {
+            return JSON.stringify({ error: "LỖI PHÂN QUYỀN: Tài khoản của bạn chưa được Admin gắn mã cơ sở (facility_id). Vui lòng liên hệ IT hỗ trợ." });
+        }
+        facility_codes = [userFacilityId.toUpperCase()];
     }
 
     let sql = "";
     let params = [];
 
-    // TỐI ƯU SQL: Trả về Time-series (Từng ngày), chống ảo giác AI.
-    if (!targetFacility) {
+    // 3. TỐI ƯU SQL TIME-SERIES VỚI JSONB ARRAY & PARAMETERIZED QUERY
+    if (facility_codes.length === 0) {
         sql = `SELECT 
                   CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END AS report_date,
                   SUM(COALESCE(
@@ -2779,7 +2787,7 @@ async function executeGetRevenueTool(args, user) {
                GROUP BY report_date
                ORDER BY report_date ASC
                LIMIT 100`;
-        params = [startDate || null, endDate || null];
+        params = [date_range.startDate, date_range.endDate];
     } else {
         sql = `SELECT 
                   CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END AS report_date,
@@ -2799,7 +2807,7 @@ async function executeGetRevenueTool(args, user) {
                WHERE (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) >= $1::date
                  AND (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) <= $2::date
                  AND EXISTS (
-                     SELECT 1 FROM unnest(string_to_array($3::text, ',')) AS t(val)
+                     SELECT 1 FROM unnest($3::text[]) AS t(val)
                      WHERE TRIM(t.val) != '' AND (
                          TRIM(REPLACE(REPLACE(UPPER(item->>'name'), 'DUBAI', ''), 'DB', '')) = TRIM(REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', ''), 'DB', ''))
                          OR TRIM(REPLACE(REPLACE(UPPER(item->>'facilityCode'), 'DUBAI', ''), 'DB', '')) = TRIM(REPLACE(REPLACE(UPPER(TRIM(t.val)), 'DUBAI', ''), 'DB', ''))
@@ -2809,7 +2817,7 @@ async function executeGetRevenueTool(args, user) {
                GROUP BY report_date
                ORDER BY report_date ASC
                LIMIT 100`;
-        params = [startDate || null, endDate || null, targetFacility || null];
+        params = [date_range.startDate, date_range.endDate, facility_codes];
     }
     
     try {
@@ -2824,7 +2832,7 @@ async function executeGetRevenueTool(args, user) {
             status: "success",
             total_revenue_in_range: totalRevenue,
             data: rows,
-            facility_code: targetFacility || "Toàn hệ thống",
+            facility_code: facility_codes.length > 0 ? facility_codes.join(', ') : "Toàn hệ thống",
             _system_note: "Dữ liệu đã được lọc theo thẩm quyền. BẮT BUỘC sử dụng con số 'total_revenue_in_range' để báo cáo tổng doanh thu, KHÔNG TỰ CỘNG TỔNG các ngày để tránh sai sót. Các số liệu trong 'data' chỉ dùng để báo cáo chi tiết."
         };
     } catch (error) {
@@ -3581,8 +3589,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
     // =========================================================================
     const currentDate = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'full' }).format(new Date());
-    let systemContext = `Hôm nay là ${currentDate}.
-1. VỀ SỐ LIỆU: BẮT BUỘC gọi hàm get_revenue_report khi hỏi doanh thu. Với các yêu cầu khác, dựa vào dữ liệu nội bộ được cung cấp. Nếu không có dữ liệu, hãy nói thật là hệ thống chưa ghi nhận, không tự bịa số liệu.
+    let systemContext = `1. VỀ SỐ LIỆU: BẮT BUỘC gọi hàm get_revenue_report khi hỏi doanh thu. Với các yêu cầu khác, dựa vào dữ liệu nội bộ được cung cấp. Nếu không có dữ liệu, hãy nói thật là hệ thống chưa ghi nhận, không tự bịa số liệu.
 2. VỀ PHONG CÁCH:
    - Giao tiếp thân thiện, tự nhiên, thông minh và linh hoạt như một trợ lý con người. Tránh tuyệt đối cách nói chuyện máy móc, rập khuôn (ví dụ: không lặp lại "Thưa Quản lý...").
    - Nếu sếp hỏi nhanh số liệu: Trả lời thẳng vào trọng tâm, súc tích, dễ đọc.
@@ -3590,13 +3597,11 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 3. TỰ CHỦ: Bạn có toàn quyền quyết định cách xưng hô và văn phong sao cho tự nhiên nhất dựa trên câu hỏi của sếp.\n\n`;
 
     const strictRolePrompt = `
-Bạn là "Cố vấn Vận hành AI" của hệ thống TaskFlow, một trợ lý đắc lực, thông minh và thân thiện.
-Sứ mệnh của bạn là giúp người dùng Quản lý Công việc, xem Báo cáo Tài chính, Nhân sự.
-
-HƯỚNG DẪN XỬ LÝ DOANH THU / TÀI CHÍNH:
-- Khi sếp hỏi về doanh thu (bất kể tên cơ sở là gì, ví dụ: ACE, DB41, PA...), hãy vận dụng trí thông minh để nhận diện và BẮT BUỘC gọi Tool get_revenue_report ĐỂ TRA CỨU NGAY LẬP TỨC.
-- NẾU SẾP HỎI NHIỀU CƠ SỞ CÙNG LÚC, hãy truyền nhiều mã cơ sở cách nhau bằng dấu phẩy vào Tool (Ví dụ: facility_code: "DB41,ACE,PA").
-- TUYỆT ĐỐI KHÔNG trả lời bằng các câu như "Vui lòng chờ một chút", "Để mình lấy báo cáo...". Việc sinh ra văn bản trước khi gọi Tool sẽ làm gián đoạn hệ thống. HÃY GỌI TOOL TRỰC TIẾP!
+HƯỚNG DẪN TƯ DUY (BIAS FOR ACTION):
+- [THÔNG TIN HỆ THỐNG]: Hôm nay là ngày ${currentDate}. Mọi từ khóa thời gian tương đối ('hôm nay', 'tháng trước', 'hôm qua', 'quý trước'...) BẮT BUỘC phải tính toán nội suy từ mốc thời gian này để truyền vào Tool, tuyệt đối không được hỏi lại để xác nhận ngày.
+- BẠN LÀ MỘT CỐ VẤN THỰC CHIẾN, KHÔNG PHẢI CHATBOT HỎI ĐÁP. Bạn phải có năng lực TỰ NỘI SUY ngữ cảnh.
+- Tuyệt đối KHÔNG sinh ra các đoạn text vặn vẹo, dư thừa như "Sếp muốn xem khía cạnh nào?", "Đúng không ạ?", "Vui lòng chờ một chút...". Những câu hỏi này LÀM GIÁN ĐOẠN luồng công việc của Sếp.
+- Nếu thông tin Sếp đưa ra hơi mờ nhạt (ví dụ chỉ nói "xuất báo cáo 6 cơ sở"), hãy TỰ ĐỘNG ngầm định Sếp đang cần Báo cáo Doanh thu và LẬP TỨC GỌI TOOL để tra cứu với các tham số bạn thu thập được (hoặc bỏ trống tham số nếu thiếu). CHỈ ĐƯỢC CHAT KHI ĐÃ CÓ KẾT QUẢ TỪ TOOL.
 
 HƯỚNG DẪN VỚI CÂU HỎI NGOÀI LỀ:
 Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải mái đáp lời một cách duyên dáng hoặc nhẹ nhàng lái câu chuyện quay lại công việc, thay vì dùng những câu từ chối cứng nhắc. Không cần phải xin lỗi rập khuôn.
@@ -3712,24 +3717,24 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                 type: "function",
                 function: {
                     name: "get_revenue_report",
-                    description: "Lấy báo cáo doanh thu của cơ sở/phòng ban theo thời gian. Dùng tool này BẮT BUỘC KHI NGƯỜI DÙNG HỎI DOANH THU.",
+                    description: "[QUÂN LỆNH BẮT BUỘC]: Lấy báo cáo doanh thu. Khi sếp yêu cầu 'báo cáo tổng quan', 'số liệu hoạt động' hoặc 'trích xuất báo cáo' nhưng KHÔNG NÓI RÕ LÀ BÁO CÁO GÌ, MẶC ĐỊNH hiểu đó là yêu cầu báo cáo doanh thu (revenue). KÍCH HOẠT TOOL NÀY NGAY LẬP TỨC. NGHIÊM CẤM đặt câu hỏi xác nhận lại với sếp. Nếu sếp không chỉ định thời gian, CỨ ĐỂ TRỐNG tham số date_range và gọi Tool ngay, hệ thống sẽ tự động xử lý mặc định.",
                     parameters: {
                         type: "object",
                         properties: {
                             date_range: { 
                                 type: "object", 
-                                description: "Khoảng thời gian cần xem (quan trọng: dùng startDate và endDate định dạng YYYY-MM-DD)",
+                                description: "Khoảng thời gian cần xem. Dùng startDate và endDate định dạng YYYY-MM-DD. Tuyệt đối không tự đoán mò thời gian nếu sếp không cung cấp. Nếu thiếu dữ kiện thời gian, hãy bỏ trống hoàn toàn tham số này.",
                                 properties: {
                                     startDate: { type: "string" },
                                     endDate: { type: "string" }
                                 }
                             },
-                            facility_code: { 
-                                type: "string", 
-                                description: "Mã cơ sở cần xem. NẾU CÓ NHIỀU CƠ SỞ CÙNG LÚC, hãy ghép chúng bằng dấu phẩy (Ví dụ: 'DB41,ACE,PA'). Bắt buộc truyền nếu có nhắc đến tên cơ sở." 
+                            facility_codes: { 
+                                type: "array",
+                                items: { type: "string" }, 
+                                description: "Danh sách các mã cơ sở cần xem (Ví dụ: [\"DB41\", \"ACE\", \"PA\"]). Bắt buộc truyền nếu có nhắc đến tên cơ sở." 
                             }
-                        },
-                        required: ["date_range"]
+                        }
                     }
                 }
             }

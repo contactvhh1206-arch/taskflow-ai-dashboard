@@ -9,9 +9,11 @@ export interface Message {
 export function useAIChatStream(options?: {
   onSessionCreated?: (sessionId: string) => void;
   onSessionUpdate?: (data: any) => void;
+  onStreamComplete?: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const [isThinking, setIsThinking] = useState<boolean>(false);
   const isStreamingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -33,7 +35,8 @@ export function useAIChatStream(options?: {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     isStreamingRef.current = true;
-    setIsStreaming(true);
+    setIsThinking(true);
+    setIsStreaming(false);
 
     const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random()}`;
 
@@ -86,9 +89,18 @@ export function useAIChatStream(options?: {
       let buffer = '';
 
       // KIẾN TRÚC LUỒNG UI STREAM THÉP - BẢN VÁ TỪ HUBDB 555
+      let isFirstChunk = true;
       while (true) {
         const { done, value } = await reader.read();
         
+        if (done) break;
+
+        if (isFirstChunk) {
+            setIsThinking(false);
+            setIsStreaming(true);
+            isFirstChunk = false;
+        }
+
         if (value) {
           const chunk = decoder.decode(value, { stream: true });
           buffer += chunk;
@@ -164,7 +176,7 @@ export function useAIChatStream(options?: {
                   // Buffer cuối là rác, bỏ qua an toàn
               }
            }
-           break; // Kết thúc an toàn
+           }
         }
       }
     } catch (error: any) {
@@ -186,6 +198,8 @@ export function useAIChatStream(options?: {
       if (abortControllerRef.current === abortController) {
         isStreamingRef.current = false;
         setIsStreaming(false);
+        setIsThinking(false);
+        if (options?.onStreamComplete) options.onStreamComplete();
         abortControllerRef.current = null;
       }
     }
@@ -194,10 +208,12 @@ export function useAIChatStream(options?: {
   const stopStream = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      abortControllerRef.current = null;
       isStreamingRef.current = false;
       setIsStreaming(false);
+      setIsThinking(false);
     }
   }, []);
 
-  return { messages, isStreaming, sendMessage, stopStream, setMessages };
+  return { messages, isStreaming, isThinking, sendMessage, stopStream, setMessages };
 }
