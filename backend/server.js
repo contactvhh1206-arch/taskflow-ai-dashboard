@@ -1240,12 +1240,20 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
         req.user.id
       ]);
 
+      // Truy xuất tên Facility thật từ Database để trả về Frontend ngay lập tức
+      // Tránh lỗi hiển thị UI rác (như chữ 'ALL') trước khi user bấm F5
+      let finalFacilityName = null;
+      if (insert_facility_id) {
+          const facCheck = await pool.query('SELECT name FROM facilities WHERE id = $1', [insert_facility_id]);
+          if (facCheck.rows.length > 0) finalFacilityName = facCheck.rows[0].name;
+      }
+
       const newTask = {
         ...rows[0],
-        pic: pic || 'Chưa gán',
-        picId: pic || 'unassigned',
-        facility: facility || 'HQ',
-        facilityId: facility || 'HQ'
+        pic: foundPic ? (foundPic.full_name || foundPic.name) : (pic || 'Chưa gán'),
+        picId: foundPic ? (foundPic.email || foundPic.username) : (pic || 'unassigned'),
+        facility: finalFacilityName,
+        facilityId: insert_facility_id
       };
 
       res.json({ success: true, data: newTask });
