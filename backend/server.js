@@ -2761,8 +2761,11 @@ async function executeGetRevenueTool(args, user) {
     if (!targetFacility) {
         sql = `SELECT 
                   CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END AS report_date,
-                  COALESCE(SUM((NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric), 0) + 
-                  COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS daily_revenue
+                  SUM(COALESCE(
+                      (NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric,
+                      (NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric,
+                      0
+                  )) AS daily_revenue
                FROM daily_financial_reports
                CROSS JOIN LATERAL jsonb_array_elements(
                    CASE 
@@ -2780,8 +2783,11 @@ async function executeGetRevenueTool(args, user) {
     } else {
         sql = `SELECT 
                   CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END AS report_date,
-                  COALESCE(SUM((NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric), 0) + 
-                  COALESCE(SUM((NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric), 0) AS daily_revenue
+                  SUM(COALESCE(
+                      (NULLIF(regexp_replace(item->>'revenue', '[^0-9]', '', 'g'), ''))::numeric,
+                      (NULLIF(regexp_replace(item->>'totalRevenue', '[^0-9]', '', 'g'), ''))::numeric,
+                      0
+                  )) AS daily_revenue
                FROM daily_financial_reports
                CROSS JOIN LATERAL jsonb_array_elements(
                    CASE 
@@ -2808,11 +2814,18 @@ async function executeGetRevenueTool(args, user) {
     
     try {
         const { rows } = await pool.query(sql, params);
+        
+        let totalRevenue = 0;
+        for (let r of rows) {
+            totalRevenue += Number(r.daily_revenue || 0);
+        }
+
         return {
             status: "success",
+            total_revenue_in_range: totalRevenue,
             data: rows,
             facility_code: targetFacility || "Toàn hệ thống",
-            _system_note: "Dữ liệu đã được hệ thống tự động lọc theo đúng thẩm quyền của user."
+            _system_note: "Dữ liệu đã được lọc theo thẩm quyền. BẮT BUỘC sử dụng con số 'total_revenue_in_range' để báo cáo tổng doanh thu, KHÔNG TỰ CỘNG TỔNG các ngày để tránh sai sót. Các số liệu trong 'data' chỉ dùng để báo cáo chi tiết."
         };
     } catch (error) {
         console.error("[CRITICAL TOOL ERROR] Lỗi khi thực thi Tool Doanh Thu:", error.message);
