@@ -3,7 +3,7 @@ import axiosClient from '../api/axiosClient';
 export const saveData = async ({ org_unit, entry_type, content, attachments = [], aiVectorData = '' }) => {
   const now = new Date();
   const displayTime = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  const date = now.toLocaleDateString('vi-VN');
+  const date = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
 
   try {
     const result = await axiosClient.post('/api/logs', {

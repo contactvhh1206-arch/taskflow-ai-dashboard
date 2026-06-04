@@ -653,12 +653,12 @@ function MainDashboard() {
     let localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
     if (localFacs.length === 0) {
       localFacs = [
-        { id: 'f1', name: 'DUBAI 41', is_active: true },
-        { id: 'f2', name: 'DUBAI ACE', is_active: true },
-        { id: 'f3', name: 'DUBAI PA', is_active: true },
-        { id: 'f4', name: 'DUBAI PAK', is_active: true },
-        { id: 'f5', name: 'DUBAI PAV', is_active: true },
-        { id: 'f6', name: 'DUBAI PQ', is_active: true }
+        { id: '1', name: 'DUBAI 41', is_active: true },
+        { id: '2', name: 'DUBAI ACE', is_active: true },
+        { id: '3', name: 'DUBAI PA', is_active: true },
+        { id: '4', name: 'DUBAI PAK', is_active: true },
+        { id: '5', name: 'DUBAI PAV', is_active: true },
+        { id: '6', name: 'DUBAI PQ', is_active: true }
       ];
       localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
     }

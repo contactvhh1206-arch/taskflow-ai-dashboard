@@ -4,7 +4,10 @@ import { saveData, fetchHistory } from '../services/dataService.js';
 
 export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const { user } = useContext(AuthContext);
-  const today = new Date().toLocaleDateString('vi-VN');
+  const getFormattedDate = (dateObj) => {
+    return `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
+  };
+  const today = getFormattedDate(new Date());
   
   const [loading, setLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -55,7 +58,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       const attendanceData = await fetchHistory({ entry_type: 'Attendance' });
       setCheckins(attendanceData.map(item => ({
         id: item.id,
-        facility_id: item.org_unit,
+        org_unit: item.org_unit,
         date: item.date,
         shift: item.content.shift,
         timestamp: item.displayTime,
@@ -66,7 +69,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       const logsData = await fetchHistory({ entry_type: 'Operation_Log' });
       setLogs(logsData.map(item => ({
         id: item.id,
-        facility_id: item.org_unit,
+        org_unit: item.org_unit,
         date: item.date,
         timestamp: item.displayTime,
         content: typeof item.content === 'object' ? '' : item.content,
@@ -218,7 +221,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   };
 
   useEffect(() => {
-    const submitted = checkins.find(c => c.facility_id === user.facility_id && c.date === today && c.shift === selectedShift);
+    const submitted = checkins.find(c => Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === selectedShift);
     if (submitted) {
       setFormData(submitted.formData);
       setIsSubmitted(true);
@@ -328,7 +331,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
           aiVectorData
         };
         
-        const filtered = checkins.filter(c => !(c.facility_id === user.facility_id && c.date === today && c.shift === selectedShift));
+        const filtered = checkins.filter(c => !(Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === selectedShift));
         const newHistory = [...filtered, newCheckin];
         setCheckins(newHistory);
         
@@ -412,9 +415,9 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     );
   };
 
-  const ca1Status = checkins.find(c => c.facility_id === user.facility_id && c.date === today && c.shift === 'Ca 1');
-  const caLoStatus = checkins.find(c => c.facility_id === user.facility_id && c.date === today && c.shift === 'Ca Lỡ');
-  const ca2Status = checkins.find(c => c.facility_id === user.facility_id && c.date === today && c.shift === 'Ca 2');
+  const ca1Status = checkins.find(c => Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === 'Ca 1');
+  const caLoStatus = checkins.find(c => Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === 'Ca Lỡ');
+  const ca2Status = checkins.find(c => Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === 'Ca 2');
 
   const countAuthAbsence = formData.manual_auth || 0;
   const countUnauthAbsence = formData.manual_unauth || 0;
@@ -788,10 +791,13 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
           
           <div className="p-6 overflow-y-auto max-h-[600px] custom-scrollbar">
             {(() => {
-              const filterDateObj = new Date(historyFilterDate);
-              const formattedFilterDate = isNaN(filterDateObj.getTime()) ? today : filterDateObj.toLocaleDateString('vi-VN');
+              let formattedFilterDate = today;
+              if (historyFilterDate && historyFilterDate.includes('-')) {
+                  const [year, month, day] = historyFilterDate.split('-');
+                  formattedFilterDate = `${day}/${month}/${year}`;
+              }
               
-              const filteredCheckins = checkins.filter(c => c.facility_id === user.facility_id)
+              const filteredCheckins = checkins
                 .filter(c => c.date === formattedFilterDate)
                 .filter(c => historyFilterSearch ? JSON.stringify(c.formData).toLowerCase().includes(historyFilterSearch.toLowerCase()) : true)
                 .sort((a,b) => b.id - a.id);
@@ -926,15 +932,17 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
           
           <div className="p-6 overflow-y-auto max-h-[600px] custom-scrollbar">
             {(() => {
-              const filterDateObj = new Date(logFilterDate);
-              const formattedFilterDate = isNaN(filterDateObj.getTime()) ? today : filterDateObj.toLocaleDateString('vi-VN');
+              let formattedFilterDate = today;
+              if (logFilterDate && logFilterDate.includes('-')) {
+                  const [year, month, day] = logFilterDate.split('-');
+                  formattedFilterDate = `${day}/${month}/${year}`;
+              }
               
-              const filteredLogs = logs.filter(l => l.facility_id === user.facility_id)
-                .filter(l => l.date === formattedFilterDate)
+              const filteredLogs = logs.filter(l => l.date === formattedFilterDate)
                 .filter(l => logFilterSearch ? l.content.toLowerCase().includes(logFilterSearch.toLowerCase()) : true)
                 .filter(l => logFilterHasImage ? !!l.image : true);
               
-              const checkinsForDate = checkins.filter(c => c.facility_id === user.facility_id && c.date === formattedFilterDate);
+              const checkinsForDate = checkins.filter(c => c.date === formattedFilterDate);
               
               if (filteredLogs.length === 0) {
                 return (

@@ -375,21 +375,45 @@ initDB();
 // ==============================================================================
 // DAILY LOGS API
 // ==============================================================================
-app.get('/api/logs', async (req, res) => {
+app.get('/api/logs', authenticateUser, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM daily_logs ORDER BY id DESC');
+    let rows;
+    const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'];
+    if (ALL_ACCESS_ROLES.includes(req.user.role)) {
+        const result = await pool.query('SELECT * FROM daily_logs ORDER BY id DESC');
+        rows = result.rows;
+    } else {
+        if (!req.user.facility_id) {
+            return res.status(403).json({ success: false, error: 'Lỗi RBAC: Thiếu định danh Cơ sở.' });
+        }
+        const result = await pool.query('SELECT * FROM daily_logs WHERE org_unit = $1 ORDER BY id DESC', [String(req.user.facility_id)]);
+        rows = result.rows;
+    }
     res.json({ success: true, data: rows });
   } catch (error) {
     res.status(500).json({ error: `Lá»—i server: ${error.message}` });
   }
 });
 
-app.post('/api/logs', async (req, res) => {
+app.post('/api/logs', authenticateUser, async (req, res) => {
   try {
-    const { org_unit, entry_type, content, attachments, ai_vector_data, date, display_time } = req.body;
+    const { entry_type, content, attachments, ai_vector_data, date, display_time } = req.body;
+    let final_org_unit;
+    const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'];
+
+    if (ALL_ACCESS_ROLES.includes(req.user.role)) {
+        final_org_unit = req.body.org_unit;
+    } else {
+        final_org_unit = req.user.facility_id;
+    }
+
+    if (!final_org_unit) {
+        return res.status(400).json({ success: false, error: 'Thiếu định danh cơ sở (org_unit).' });
+    }
+
     const { rows } = await pool.query(
       'INSERT INTO daily_logs (org_unit, entry_type, content, attachments, ai_vector_data, date, display_time) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [org_unit, entry_type, JSON.stringify(content || {}), JSON.stringify(attachments || []), ai_vector_data, date, display_time]
+      [final_org_unit, entry_type, JSON.stringify(content || {}), JSON.stringify(attachments || []), ai_vector_data, date, display_time]
     );
     res.json({ success: true, data: rows[0] });
   } catch (error) {
@@ -1324,6 +1348,7 @@ app.post('/api/login', async (req, res) => {
                     role: user.role_name,
                     facility_id: user.facility_id || null,
                     facility_code: user.facility_code || null,
+                    facility_name: user.facility_name || null,
                     department_id: user.department_id || null,
                     department_code: user.department_code || null
                 };
@@ -1352,7 +1377,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 // ==============================================================================
-// 1.5. API DAILY CHECK-IN (BÃO CÃO Äáº¦U GIá»œ)
+// 1.5. API DAILY CHECK-IN (BÃ O CÃ O Ä áº¦U GIá»œ)
 // ==============================================================================
 
 // POST /api/checkin was removed because it is now handled by POST /api/logs
@@ -1370,21 +1395,22 @@ app.get('/api/checkin/status', authenticateUser, async (req, res) => {
     // Get facilities
     let targetFacilities = [];
     if (role === 'FACILITY_MANAGER') {
-       targetFacilities = [facility_id];
+       const facRes = await pool.query("SELECT id, name FROM facilities WHERE id = $1", [facility_id]);
+       targetFacilities = facRes.rows;
     } else {
-       const facRes = await pool.query("SELECT name FROM facilities WHERE status = 'ACTIVE'");
-       targetFacilities = facRes.rows.map(r => r.name);
+       const facRes = await pool.query("SELECT id, name FROM facilities WHERE status = 'ACTIVE' AND is_deleted = false");
+       targetFacilities = facRes.rows;
     }
     
     const { rows } = await pool.query('SELECT * FROM daily_logs WHERE entry_type = $1 AND date = $2', ['Attendance', todayStr]);
     
     const statusList = targetFacilities.map(fac => {
-      const checkins = rows.filter(c => c.org_unit === fac);
+      const checkins = rows.filter(c => Number(c.org_unit) === Number(fac.id));
       const ca1 = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca 1'));
       const calo = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca Lá»¡'));
       const ca2 = checkins.find(c => c.content && c.content.shift && c.content.shift.includes('Ca 2'));
       return {
-        facility_id: fac,
+        facility_id: fac.name,
         ca1: ca1 ? `ÄÃ£ bÃ¡o cÃ¡o lÃºc ${ca1.display_time}` : 'ChÆ°a bÃ¡o cÃ¡o',
         calo: calo ? `ÄÃ£ bÃ¡o cÃ¡o lÃºc ${calo.display_time}` : 'ChÆ°a bÃ¡o cÃ¡o',
         ca2: ca2 ? `ÄÃ£ bÃ¡o cÃ¡o lÃºc ${ca2.display_time}` : 'ChÆ°a bÃ¡o cÃ¡o',
