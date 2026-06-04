@@ -3787,7 +3787,7 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
         }
         
         if (finalArgs && mainToolName === "get_revenue_report") {
-            res.write(`data: ${JSON.stringify({ text: "\\n\\n⏳ *Hệ thống đang truy xuất dữ liệu doanh thu chính xác từ kho lưu trữ, vui lòng đợi...*\\n\\n" })}\\n\\n`);
+            res.write(`data: ${JSON.stringify({ text: "\n\n⏳ *Hệ thống đang truy xuất dữ liệu doanh thu chính xác từ kho lưu trữ, vui lòng đợi...*\n\n" })}\n\n`);
             
             let result = await executeGetRevenueTool(finalArgs, req.user);
             let toolResultStr = typeof result === 'string' ? result : JSON.stringify(result);
@@ -3816,7 +3816,7 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
                 for await (const chunk of response2.body) {
                     const textChunk = decoder.decode(chunk, { stream: true });
                     buffer += textChunk;
-                    const lines = buffer.split('\\n');
+                    const lines = buffer.split('\n');
                     buffer = lines.pop() || "";
                     for (const line of lines) {
                         const trimmed = line.trim();
@@ -3827,7 +3827,7 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
                                 const chunkText = parsed.choices?.[0]?.delta?.content || "";
                                 if (chunkText) {
                                     fullAiResponse += chunkText;
-                                    res.write(`data: ${JSON.stringify({ text: chunkText })}\\n\\n`);
+                                    res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
                                 }
                             } catch(e) {}
                         }
