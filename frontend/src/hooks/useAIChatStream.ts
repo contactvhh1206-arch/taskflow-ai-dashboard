@@ -176,7 +176,7 @@ export function useAIChatStream(options?: {
                   // Buffer cuối là rác, bỏ qua an toàn
               }
            }
-           }
+           break;
         }
       }
     } catch (error: any) {

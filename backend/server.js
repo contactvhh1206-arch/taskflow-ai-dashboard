@@ -128,7 +128,7 @@ const initDB = async () => {
         await pool.query(`ALTER TABLE tasks ALTER COLUMN facility_id DROP NOT NULL`).catch(e => console.log('Drop NOT NULL facility_id skipped:', e.message));
         await pool.query(`UPDATE tasks SET facility_id = NULL WHERE facility_id IN (SELECT id FROM facilities WHERE code = 'HQ')`);
         await pool.query(`DELETE FROM facilities WHERE code = 'HQ'`);
-        await pool.query(`UPDATE users SET department_id = 'BGD', department_code = 'BGD' WHERE department_id = 'HQ' OR department_code = 'HQ'`);
+        await pool.query(`UPDATE users SET department_id = 'BGD', department_code = 'BGD' WHERE department_id = 'HQ' OR department_code = 'HQ'`).catch(e => console.log('Update users department skipped:', e.message));
 
         console.log('[DB] Running initialization checks...');
     // Add missing columns to users if not exists
