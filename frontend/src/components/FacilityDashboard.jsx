@@ -490,9 +490,11 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                           <div>
                             <p className="font-semibold text-gray-800 dark:text-white flex items-center gap-2">
                               {t.title}
-                              {t.is_boss_assigned && (
-                                <span className="relative group/star flex items-center justify-center" title="Nhiệm vụ chỉ đạo trực tiếp từ Sếp Tổng">
-                                  <span className="material-symbols-outlined text-yellow-400 text-[16px] drop-shadow-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                              {t.priority_stars > 0 && (
+                                <span className="relative group/star flex items-center justify-center">
+                                  {Array.from({ length: t.priority_stars }).map((_, i) => (
+                                    <span key={i} className="material-symbols-outlined text-yellow-400 text-[16px] drop-shadow-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                                  ))}
                                 </span>
                               )}
                               {t.needsSupport && (

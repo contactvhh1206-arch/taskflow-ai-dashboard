@@ -767,7 +767,7 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
         const dataQuery = `
             WITH paginated_tasks AS (
                 -- BƯỚC A: Ép DB chỉ lọc và cắt đúng records (LIMIT/OFFSET) trên bảng gốc. Cực kỳ nhẹ!
-                SELECT id, title, description, status, urgency, deadline, created_at, updated_at, needs_support, pic_id, facility_id, department_code
+                SELECT id, title, description, status, urgency, deadline, created_at, updated_at, needs_support, priority_level, pic_id, facility_id, department_code
                 FROM tasks t
                 WHERE ${baseWhere}
                 ORDER BY t.updated_at DESC
@@ -778,6 +778,7 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
                    TO_CHAR(pt.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
                    pt.created_at as "createdAt", pt.updated_at as "completedAt",
                    pt.needs_support as "needsSupport",
+                   CASE WHEN pt.priority_level = '5' OR pt.priority_level = '3' THEN 5 WHEN pt.priority_level = '2' THEN 3 ELSE 0 END as priority_stars,
                    u.full_name as pic, u.email as "picId",
                    f.name as facility, f.code as "facilityId",
                    pt.facility_id as "facilityRawId",
@@ -787,7 +788,7 @@ app.get('/api/tasks/history', authenticateUser, async (req, res) => {
             LEFT JOIN users u ON pt.pic_id = u.id
             LEFT JOIN facilities f ON pt.facility_id = f.id AND f.is_deleted = false
             LEFT JOIN task_comments tc ON pt.id = tc.task_id
-            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, u.full_name, u.email, f.name, f.code, pt.facility_id, pt.department_code
+            GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, pt.priority_level, u.full_name, u.email, f.name, f.code, pt.facility_id, pt.department_code
             ORDER BY pt.updated_at DESC
         `;
         
@@ -824,6 +825,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
              TO_CHAR(t.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
              t.created_at as "createdAt", t.updated_at as "completedAt",
              t.needs_support as "needsSupport",
+             CASE WHEN t.priority_level = '5' OR t.priority_level = '3' THEN 5 WHEN t.priority_level = '2' THEN 3 ELSE 0 END as priority_stars,
              u.full_name as pic, u.email as "picId",
              f.name as facility, f.code as "facilityId",
              t.facility_id as "facilityRawId",
@@ -853,7 +855,7 @@ app.get('/api/tasks', authenticateUser, async (req, res) => {
         query += ` AND (t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
     }
 
-    query += ` GROUP BY t.id, t.title, t.description, t.status, t.urgency, t.deadline, t.created_at, t.updated_at, t.needs_support, u.full_name, u.email, f.name, f.code, t.facility_id, t.department_code ORDER BY t.created_at DESC`;
+    query += ` GROUP BY t.id, t.title, t.description, t.status, t.urgency, t.deadline, t.created_at, t.updated_at, t.needs_support, t.priority_level, u.full_name, u.email, f.name, f.code, t.facility_id, t.department_code ORDER BY t.created_at DESC`;
 
     // BƯỚC 3: SỬA LẠI KHỐI TRY-CATCH
     try {
@@ -1215,15 +1217,15 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
       }
 
       let priorityStars = 0;
-      if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
-      else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 2;
+      if (req.user.role === 'SUPER_ADMIN') priorityStars = 5;
+      else if (req.user.role === 'VICE_PRESIDENT') priorityStars = 3;
 
       // (Removed fallback constraint as facility_id can now be NULL)
 
       const insertQuery = `
         INSERT INTO tasks (title, description, status, urgency, deadline, pic_id, facility_id, department_code, priority_level, created_by, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
-        RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt", department_code as "department_tag", facility_id as "facilityRawId"
+        RETURNING id, title, description as desc, status, urgency as urgent, TO_CHAR(deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, created_at as "createdAt", department_code as "department_tag", facility_id as "facilityRawId", CASE WHEN priority_level = '5' OR priority_level = '3' THEN 5 WHEN priority_level = '2' THEN 3 ELSE 0 END as priority_stars
       `;
       const { rows } = await pool.query(insertQuery, [
         title, 
@@ -2691,7 +2693,9 @@ async function executeCreateTaskTool(args, user) {
         }
     }
 
-    const priorityLevel = priority || 'MEDIUM';
+    let priorityLevel = priority || 'MEDIUM';
+    if (user.role === 'SUPER_ADMIN') priorityLevel = '5';
+    else if (user.role === 'VICE_PRESIDENT') priorityLevel = '3';
 
     // 4. Thá»±c thi Database Insert
     const insertQuery = `

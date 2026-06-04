@@ -890,21 +890,8 @@ function MainDashboard() {
         ...(deptId && isDeptHeadLocal ? { department_tag: deptId } : {})
       };
       
-      const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/tasks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-role': user.role,
-          'x-facility-id': safeFacility || 'ALL'
-        },
-        body: JSON.stringify(taskPayload)
-      });
+      const data = await axiosClient.post('/api/tasks', taskPayload);
       
-      if (res.status === 500 || !res.ok) {
-         throw new Error('Lỗi máy chủ');
-      }
-      
-      const data = await res.json();
       if (data.success) {
         setTasks(prev => [data.data, ...prev]);
         showToast('Tạo công việc thành công');
@@ -2052,18 +2039,10 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
                 <span className="text-[10px] font-bold tracking-wider uppercase bg-primary/10 text-primary px-2 py-0.5 rounded-md">{task.facility || task.department_tag}</span>
               ) : <div />}
               <div className="flex">
-                {task.priority_stars === 3 && (
-                  <>
-                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                  </>
-                )}
-                {task.priority_stars === 2 && (
-                  <>
-                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                    <span className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                  </>
+                {task.priority_stars > 0 && (
+                  Array.from({ length: task.priority_stars }).map((_, i) => (
+                    <span key={i} className="material-symbols-outlined text-[14px] text-yellow-400" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  ))
                 )}
               </div>
             </div>
