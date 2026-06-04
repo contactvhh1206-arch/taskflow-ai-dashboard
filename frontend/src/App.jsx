@@ -827,11 +827,17 @@ function MainDashboard() {
         let resolvedPicId = user.id;
         if (draft.pic && draft.pic !== user.name) {
           const searchName = draft.pic.toLowerCase().trim();
-          const foundUser = allUsers.find(u => 
-            (u.full_name && u.full_name.toLowerCase().includes(searchName)) || 
-            (u.email && u.email.toLowerCase().includes(searchName)) ||
-            (u.username && u.username.toLowerCase().includes(searchName))
-          );
+          const normalizeString = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+          const normalizedSearch = normalizeString(draft.pic);
+          
+          const foundUser = allUsers.find(u => {
+            const nameStr = u.name || u.full_name || '';
+            const emailStr = u.email || u.username || '';
+            return normalizeString(nameStr).includes(normalizedSearch) || 
+                   normalizeString(emailStr).includes(normalizedSearch) ||
+                   nameStr.toLowerCase().includes(searchName) ||
+                   emailStr.toLowerCase().includes(searchName);
+          });
           if (foundUser) {
             resolvedPicId = foundUser.id;
           } else {
