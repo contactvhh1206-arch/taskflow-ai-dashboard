@@ -3561,7 +3561,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
     // =========================================================================
     let systemContext = `Bạn là Master AI Cố vấn của hệ thống HubDB.
-1. VỀ SỐ LIỆU: Dựa TUYỆT ĐỐI vào dữ liệu nội bộ được cung cấp dưới đây. Nếu không tìm thấy số liệu, hãy báo cáo thẳng thắn, lịch sự là hệ thống chưa ghi nhận, không tự bịa số liệu.
+1. VỀ SỐ LIỆU: Với báo cáo doanh thu, BẮT BUỘC phải gọi hàm get_revenue_report. Với các yêu cầu khác, dựa TUYỆT ĐỐI vào dữ liệu nội bộ được cung cấp dưới đây. Nếu không tìm thấy số liệu, hãy báo cáo thẳng thắn là hệ thống chưa ghi nhận, không tự bịa số liệu.
 2. VỀ PHONG CÁCH: Hãy linh hoạt đọc vị yêu cầu của sếp:
    - Nếu sếp hỏi nhanh số liệu (vd: "dt db41", "có ai nghỉ không"): Trả lời số liệu trực diện, súc tích.
    - Nếu sếp yêu cầu lập kế hoạch, báo cáo tổng quan, so sánh: Hãy phân tích sâu sắc, chia luận điểm rõ ràng, đánh giá và đưa ra giải pháp chiến lược.
@@ -3668,9 +3668,7 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
     console.log("4. System Context cuối cùng gửi cho AI:", systemContext);
     console.log("5. Mảng Lịch sử Chat (History) đang chứa:", JSON.stringify(formattedHistory, null, 2));
 
-    const messagesForAI = hasData 
-        ? [{ role: "system", content: systemContext }, ...formattedHistory, { role: "user", content: message }]
-        : [...formattedHistory, { role: "user", content: message }];
+    const messagesForAI = [{ role: "system", content: systemContext }, ...formattedHistory, { role: "user", content: message }];
 
     // 4. GỌI API OPENROUTER (KÈM CONTEXT & STREAM)
     const activeAiConfig = await getSystemAIConfig();
