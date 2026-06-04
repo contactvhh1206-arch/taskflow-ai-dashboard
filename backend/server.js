@@ -3661,6 +3661,7 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
             if (revenueRows.length > 0) {
                 let revDataText = "";
                 let totalMonthRevenue = 0; 
+                let facilityTotals = {};
                 
                 for (let i = 0; i < revenueRows.length; i++) {
                     const r = revenueRows[i];
@@ -3671,7 +3672,12 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
                         let detailText = "";
                         const rData = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || []);
                         if (Array.isArray(rData)) {
-                            const details = rData.map(f => `${f.name || f.id}: ${Number(f.revenue || 0).toLocaleString('vi-VN')}đ`).join(', ');
+                            const details = rData.map(f => {
+                                const fName = f.name || f.id || 'Unknown';
+                                const fRev = Number(f.revenue || 0);
+                                facilityTotals[fName] = (facilityTotals[fName] || 0) + fRev;
+                                return `${fName}: ${fRev.toLocaleString('vi-VN')}đ`;
+                            }).join(', ');
                             detailText = `(Chi tiết từng cơ sở: ${details})`;
                         }
                         revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${dailySysRev.toLocaleString('vi-VN')} đ] ${detailText}\n`;
@@ -3711,6 +3717,10 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
                 
                 if (revDataText) {
                     systemContext += `- Báo cáo tài chính trong phạm vi cho phép:\n${revDataText}\n`;
+                    if (hasAllAccess && Object.keys(facilityTotals).length > 0) {
+                        const totalsText = Object.entries(facilityTotals).map(([k, v]) => `${k}: ${v.toLocaleString('vi-VN')} đ`).join(', ');
+                        systemContext += `=> [TỔNG DOANH THU TỪNG CƠ SỞ ĐÃ TÍNH SẴN]: ${totalsText}.\n`;
+                    }
                     systemContext += `=> [TỔNG KẾT HỆ THỐNG ĐÃ TÍNH SẴN]: Tổng doanh thu của các ngày trên cộng lại là: ${totalMonthRevenue.toLocaleString('vi-VN')} đ. AI phải sử dụng con số Tổng này khi được hỏi, tuyệt đối không tự cộng nhẩm!\n`;
                 }
             } else {
