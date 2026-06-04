@@ -2718,6 +2718,109 @@ async function executeCreateTaskTool(args, user) {
 }
 
 
+async function executeGetTasksTool(args, user) {
+    let { status, department_code, facility_id, time_range, priority_level, search_term } = args;
+
+    try {
+        const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
+        const isMarketingHead = user.role === 'DEPARTMENT_HEAD' && user.department_code === 'MARKETING';
+        const hasAllAccess = ALL_ACCESS_ROLES.includes(user.role) || isMarketingHead;
+        
+        let targetFacility = facility_id;
+        let targetDepartment = department_code;
+
+        if (!hasAllAccess) {
+            if (facility_id && facility_id !== 'all' && String(facility_id) !== String(user.facility_id)) {
+                console.warn('[SECURITY ALERT] AI Agent attempted RBAC breach (Facility)!');
+                return JSON.stringify({ error: "Lỗi phân quyền 403: Bạn không có quyền truy cập Tasks của cơ sở này." });
+            }
+            if (user.role === 'DEPARTMENT_HEAD' && user.department_code && department_code && department_code !== 'all' && String(department_code) !== String(user.department_code)) {
+                console.warn('[SECURITY ALERT] AI Agent attempted RBAC breach (Department)!');
+                return JSON.stringify({ error: "Lỗi phân quyền 403: Bạn không có quyền truy cập Tasks của phòng ban này." });
+            }
+
+            if (user.facility_id) {
+                targetFacility = user.facility_id;
+            }
+            if (user.role === 'DEPARTMENT_HEAD' && user.department_code) {
+                 targetDepartment = user.department_code;
+            }
+        }
+
+        let sql = `
+            SELECT 
+                t.id, t.title, t.status, t.deadline, 
+                t.department_code, t.facility_id, 
+                u.full_name AS assignee_name, t.priority_level
+            FROM tasks t
+            LEFT JOIN users u ON t.pic_id = u.id
+            WHERE 1=1
+        `;
+        let params = [];
+        let paramCount = 1;
+
+        if (targetFacility && targetFacility !== 'all') {
+            sql += ` AND t.facility_id = $${paramCount}`;
+            params.push(targetFacility);
+            paramCount++;
+        }
+
+        if (targetDepartment && targetDepartment !== 'all') {
+            sql += ` AND t.department_code = $${paramCount}`;
+            params.push(targetDepartment);
+            paramCount++;
+        }
+
+        if (priority_level && priority_level !== 'all') {
+            sql += ` AND t.priority_level = $${paramCount}`;
+            params.push(priority_level);
+            paramCount++;
+        }
+
+        if (search_term) {
+            sql += ` AND t.title ILIKE $${paramCount}`;
+            params.push(`%${search_term}%`);
+            paramCount++;
+        }
+
+        if (status === 'overdue') {
+            sql += ` AND t.status NOT IN ('completed', 'cancelled') AND t.deadline < NOW()`;
+        } else if (status && status !== 'all') {
+            sql += ` AND t.status = $${paramCount}`;
+            params.push(status);
+            paramCount++;
+        }
+
+        if (time_range === 'today') {
+            sql += ` AND (t.deadline AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`;
+        } else if (time_range === 'this_week') {
+            sql += ` AND (t.deadline AT TIME ZONE 'Asia/Ho_Chi_Minh') >= date_trunc('week', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')) 
+                     AND (t.deadline AT TIME ZONE 'Asia/Ho_Chi_Minh') < date_trunc('week', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')) + interval '1 week'`;
+        } else if (time_range === 'this_month') {
+            sql += ` AND (t.deadline AT TIME ZONE 'Asia/Ho_Chi_Minh') >= date_trunc('month', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')) 
+                     AND (t.deadline AT TIME ZONE 'Asia/Ho_Chi_Minh') < date_trunc('month', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')) + interval '1 month'`;
+        } else if (time_range === 'last_month') {
+            sql += ` AND (t.deadline AT TIME ZONE 'Asia/Ho_Chi_Minh') >= date_trunc('month', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh') - interval '1 month') 
+                     AND (t.deadline AT TIME ZONE 'Asia/Ho_Chi_Minh') < date_trunc('month', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh'))`;
+        }
+
+        sql += ` ORDER BY t.deadline ASC NULLS LAST, t.id DESC LIMIT 15`;
+
+        const { rows } = await pool.query(sql, params);
+        
+        if (rows.length === 0) {
+            return JSON.stringify({ message: "Không có công việc nào khớp với điều kiện tìm kiếm." });
+        }
+        return JSON.stringify(rows);
+
+    } catch (error) {
+        console.error("[CRITICAL TOOL ERROR] Lỗi khi thực thi Tool get_tasks:", error.message);
+        return JSON.stringify({ 
+            error: "Lỗi nội bộ khi truy xuất công việc." 
+        });
+    }
+}
+
 async function executeGetRevenueTool(args, user) {
     let { date_range, facility_codes } = args;
     
@@ -3589,7 +3692,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
     // 3. ĐÁNH CHẶN RAG - CẤY NÃO SỐ LIỆU THỰC TẾ
     // =========================================================================
     const currentDate = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'full' }).format(new Date());
-    let systemContext = `1. VỀ SỐ LIỆU: BẮT BUỘC gọi hàm get_revenue_report khi hỏi doanh thu. Với các yêu cầu khác, dựa vào dữ liệu nội bộ được cung cấp. Nếu không có dữ liệu, hãy nói thật là hệ thống chưa ghi nhận, không tự bịa số liệu.
+    let systemContext = `1. VỀ SỐ LIỆU: BẮT BUỘC gọi hàm get_revenue_report khi hỏi doanh thu. BẮT BUỘC gọi hàm get_tasks khi hỏi về công việc (tasks, dự án, tiến độ). Với các yêu cầu khác, dựa vào dữ liệu nội bộ được cung cấp. Nếu không có dữ liệu, hãy nói thật là hệ thống chưa ghi nhận, không tự bịa số liệu.
 2. VỀ PHONG CÁCH:
    - Giao tiếp thân thiện, tự nhiên, thông minh và linh hoạt như một trợ lý con người. Tránh tuyệt đối cách nói chuyện máy móc, rập khuôn (ví dụ: không lặp lại "Thưa Quản lý...").
    - Nếu sếp hỏi nhanh số liệu: Trả lời thẳng vào trọng tâm, súc tích, dễ đọc.
@@ -3624,29 +3727,7 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
     const userFacilityId = req.user.facility_id; 
 
     try {
-        // --- KHỐI QUÉT CÔNG VIỆC (TASKS) ---
-        if (contextMsg.match(/(task|công việc|trễ|phụ trách|dự án|ai làm)/i)) {
-            let taskQuery = "SELECT id, title, status, pic_id FROM tasks";
-            let taskParams = [];
-
-            if (!hasAllAccess) {
-                taskQuery += " WHERE facility_id = $1";
-                taskParams.push(userFacilityId);
-                taskQuery += " ORDER BY id DESC LIMIT 20";
-            } else {
-                taskQuery += " ORDER BY id DESC LIMIT 20";
-            }
-
-            const { rows: taskRows } = await pool.query(taskQuery, taskParams);
-            if (taskRows.length > 0) {
-                const taskData = taskRows.map(r => `[ID ${r.id}: ${r.title} | Status: ${r.status} | PIC: ${r.pic_id}]`).join('\n');
-                systemContext += `- Danh sách Công việc (Tasks):\n${taskData}\n`;
-            } else {
-                systemContext += `- Công việc: Không tìm thấy task nào khớp yêu cầu.\n`;
-            }
-            hasData = true;
-        }
-
+        // --- KHỐI QUÉT CÔNG VIỆC (TASKS) ĐÃ ĐƯỢC CHUYỂN SANG TOOL CALLING ---
         // --- KHỐI QUÉT TÀI CHÍNH (FINANCE) ĐÃ ĐƯỢC CHUYỂN SANG TOOL CALLING ---
 
         // --- KHỐI QUÉT ĐIỂM DANH (CHECK-IN) ---
@@ -3737,6 +3818,47 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                         }
                     }
                 }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "get_tasks",
+                    description: "Lấy danh sách các công việc (tasks). Sử dụng khi người dùng hỏi về tiến độ, trạng thái, hoặc danh sách công việc của cơ sở/phòng ban.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            status: {
+                                type: "string",
+                                enum: ["all", "pending", "in_progress", "completed", "overdue", "cancelled"],
+                                description: "Trạng thái công việc. Mặc định là 'all'."
+                            },
+                            department_code: {
+                                type: "string",
+                                enum: ["all", "MARKETING", "FINANCE", "TECHNICAL", "HR", "BGD"],
+                                description: "Mã phòng ban cần tra cứu. Mặc định là 'all'."
+                            },
+                            facility_id: {
+                                type: "string",
+                                description: "Mã cơ sở cần tra cứu (VD: DB41, DBPQ...). Mặc định là 'all' hoặc rỗng."
+                            },
+                            time_range: {
+                                type: "string",
+                                enum: ["all", "today", "this_week", "this_month", "last_month"],
+                                description: "Khoảng thời gian tra cứu. Mặc định là 'all'."
+                            },
+                            priority_level: {
+                                type: "string",
+                                enum: ["all", "URGENT", "PRIORITY", "NORMAL"],
+                                description: "Mức độ ưu tiên của công việc."
+                            },
+                            search_term: {
+                                type: "string",
+                                description: "Từ khóa tìm kiếm tự do trong tiêu đề công việc (nếu người dùng nhắc đến tên dự án, tên task cụ thể)."
+                            }
+                        },
+                        required: []
+                    }
+                }
             }
         ]
       }),
@@ -3819,15 +3941,24 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                 }
             }
             
-            if (mainToolName !== "get_revenue_report") {
+            if (mainToolName !== "get_revenue_report" && mainToolName !== "get_tasks") {
                 throw new Error(`Tool không hợp lệ hoặc không được hỗ trợ: ${mainToolName}`);
             }
 
-            res.write(`data: ${JSON.stringify({ text: "\n\n⏳ *Hệ thống đang truy xuất dữ liệu doanh thu chính xác từ kho lưu trữ, vui lòng đợi...*\n\n" })}\n\n`);
+            if (mainToolName === "get_revenue_report") {
+                res.write(`data: ${JSON.stringify({ text: "\n\n⏳ *Hệ thống đang truy xuất báo cáo doanh thu từ kho lưu trữ, vui lòng đợi...*\n\n" })}\n\n`);
+            } else if (mainToolName === "get_tasks") {
+                res.write(`data: ${JSON.stringify({ text: "\n\n⏳ *Hệ thống đang rà soát dữ liệu công việc (Tasks), vui lòng đợi...*\n\n" })}\n\n`);
+            }
             
             if (isClientDisconnected) return; 
 
-            let result = await executeGetRevenueTool(finalArgs, req.user);
+            let result = null;
+            if (mainToolName === "get_revenue_report") {
+                result = await executeGetRevenueTool(finalArgs, req.user);
+            } else if (mainToolName === "get_tasks") {
+                result = await executeGetTasksTool(finalArgs, req.user);
+            }
             let toolResultStr = typeof result === 'string' ? result : JSON.stringify(result);
             
             messagesForAI.push({
