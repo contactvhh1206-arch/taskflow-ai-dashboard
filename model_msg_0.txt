@@ -1,0 +1,80 @@
+Created At: 2026-06-03T04:14:40Z
+Completed At: 2026-06-03T04:14:40Z
+File Path: `file:///c:/Users/Hoang/Desktop/hub-dubai/temp_read.js`
+Total Lines: 151
+Total Bytes: 7118
+Showing lines 1 to 151
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1:     res.json({ success: true, data: rows[0] });
+2:   } catch (error) {
+3:     console.error("Lá»—i cáº­p nháº­t tráº¡ng thÃ¡i:", error);
+4:     res.status(500).json({ error: 'Lá»—i server khi cáº­p nháº­t tráº¡ng thÃ¡i.' });
+5:   }
+6: });
+7: 
+8: app.put('/api/tasks/:id/support', authenticateUser, async (req, res) => {
+9:   try {
+10:     const { id } = req.params;
+11: 
+12:     // TÆ°á»ng lá»­a chá»‘ng IDOR
+13:     const taskCheck = await pool.query('SELECT facility_id, department_code, pic_id FROM tasks WHERE id = $1', [id]);
+14:     if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
+15:     const task = taskCheck.rows[0];
+16:     
+17:     // NẾU LÀ NGƯỜI ĐƯỢC GIAO VIỆC THÌ ĐƯỢC ĐẶC CÁCH VƯỢT TƯỜNG LỬA IDOR
+18:     if (String(task.pic_id) === String(req.user.id)) {
+19:         task.facility_id = req.user.facility_id;
+20:         task.department_code = req.user.department_code || req.user.department_id;
+21:     }
+22:     
+23:     if (req.user.role === 'FACILITY_MANAGER' && task.facility_id !== req.user.facility_id) {
+24:         return res.status(403).json({ error: '403 Forbidden: KhÃ´ng cÃ³ quyá»n sá»­a tháº» cÃ´ng viá»‡c cá»§a cÆ¡ sá»Ÿ khÃ¡c!' });
+25:     }
+26:     if (req.user.role === 'DEPARTMENT_HEAD' || req.user.role === 'FINANCE_DEPT') {
+27:         const userDept = normalizeDept(req.user.department_code || req.user.department_id);
+28:         const taskDept = normalizeDept(task.dep
+<truncated 4187 bytes>
+ success: true, data: updatedRows[0] });
+110: 
+111:     } catch (err) {
+112:         console.error('[CRITICAL DB ERROR /api/tasks/restore]:', err.message);
+113:         res.status(500).json({ success: false, error: 'Lỗi máy chủ khi khôi phục công việc.' });
+114:     }
+115: });
+116: 
+117: 
+118: app.get('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
+119:   try {
+120:     const { id } = req.params;
+121:     const { rows } = await pool.query(`
+122:       SELECT c.*, u.full_name as user_name, r.name as user_role 
+123:       FROM task_comments c 
+124:       LEFT JOIN users u ON c.user_id = u.id 
+125:       LEFT JOIN roles r ON u.role_id = r.id
+126:       WHERE c.task_id = $1 
+127:       ORDER BY c.created_at ASC
+128:     `, [id]);
+129:     res.json({ success: true, data: rows });
+130:   } catch (err) {
+131:     console.error("[API GET Comment] Lá»—i 500:", err);
+132:     res.status(500).json({ success: false, error: 'Lá»—i táº£i bÃ¬nh luáº­n: ' + err.message });
+133:   }
+134: });
+135: 
+136: app.post('/api/tasks/:id/comments', authenticateUser, async (req, res) => {
+137:   try {
+138:     const { id } = req.params;
+139:     const comment = req.body.comment || req.body.content;
+140: 
+141:     // TÆ°á»ng lá»­a chá»‘ng IDOR
+142:     const taskCheck = await pool.query('SELECT facility_id, department_code, pic_id FROM tasks WHERE id = $1', [id]);
+143:     if (taskCheck.rows.length === 0) return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y cÃ´ng viá»‡c.' });
+144:     const task = taskCheck.rows[0];
+145:     
+146:     // NẾU LÀ NGƯỜI ĐƯỢC GIAO VIỆC THÌ ĐƯỢC ĐẶC CÁCH VƯỢT TƯỜNG LỬA IDOR
+147:     if (String(task.pic_id) === String(req.user.id)) {
+148:         task.facility_id = req.user.facility_id;
+149:         task.department_code = req.user.department_code || req.user.department_id;
+150:     }
+151: 
+The above content shows the entire, complete file contents of the requested file.

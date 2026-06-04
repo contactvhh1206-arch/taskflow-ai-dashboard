@@ -1,0 +1,14 @@
+Created At: 2026-06-03T04:15:05Z
+Completed At: 2026-06-03T04:15:06Z
+
+				The command failed with exit code: 1
+				Output:
+				grep : The term 'grep' is not recognized as the name of a cmdlet, function, script file, or operable program. Check 
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:1
++ grep -n -C 5 "Snippet 3" C:\Users\Hoang\.gemini\antigravity\brain\386 ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (grep:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+
