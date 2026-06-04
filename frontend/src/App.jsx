@@ -89,6 +89,8 @@ const getStatusConfig = (status) => {
 // 1. Khởi tạo Auth Context
 import { AuthContext } from './contexts/AuthContext.jsx';
 
+const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'];
+
 const INITIAL_TASKS = [
   { id: 1, title: 'Bảo trì máy lạnh cơ sở 1', status: 'todo', facility: 'Cơ sở 1', pic: 'Quản lý Cơ sở 1', deadline: '2026-05-14', urgent: true, createdAt: '2026-05-13' },
   { id: 2, title: 'Lên chiến dịch Flash Sale', status: 'in_progress', facility: 'Toàn hệ thống', pic: 'Trần Thị B', deadline: '2026-05-16', urgent: false, createdAt: '2026-05-14' },
@@ -815,6 +817,8 @@ function MainDashboard() {
     let hasFatalError = false; // Cầu dao ngắt mạch (Circuit Breaker)
     const allUsers = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
 
+    const isAllAccess = ALL_ACCESS_ROLES.includes(user.role);
+
     // Lặp tuần tự nhưng sẵn sàng ngắt cầu dao
     for (const draft of draftTasks) {
       if (hasFatalError) break; // Kích hoạt ngắt mạch nếu có lỗi trước đó
@@ -831,15 +835,21 @@ function MainDashboard() {
           if (foundUser) resolvedPicId = foundUser.id;
         }
 
-        // BỨC TƯỜNG DỮ LIỆU: Tôn trọng sự thật, không ép kiểu bừa bãi
+        let resolvedFacilityId;
+        if (isAllAccess) {
+          const safeFacilityFromAI = String(draft.facility ?? "").trim();
+          resolvedFacilityId = safeFacilityFromAI ? safeFacilityFromAI : user.facility_id;
+        } else {
+          resolvedFacilityId = user.facility_id;
+        }
+
         const taskPayload = {
           ...draft,
           pic_id: resolvedPicId,
-          // Nếu AI trả về rỗng, giữ nguyên chuỗi rỗng để Backend nhận diện và gán pic_id = null
           pic: draft.pic ? draft.pic.trim() : "", 
           deadline: draft.deadline || new Date().toISOString().split('T')[0],
           urgent: draft.urgent || false,
-          facility_id: user.facility_id, // BẮT BUỘC TRUYỀN RAW ID XUỐNG BACKEND
+          facility_id: resolvedFacilityId,
           creator_role: user.role,
           desc: (draft.desc || "") + " <!--cr:" + user.role + "-->",
         };
