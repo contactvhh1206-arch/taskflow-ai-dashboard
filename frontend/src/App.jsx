@@ -1871,26 +1871,6 @@ function MainDashboard() {
           </div>
         )}
 
-        {/* Floating AI Chat Toggle */}
-        <button 
-          onClick={() => setIsChatOpen(!isChatOpen)}
-          className="fixed bottom-6 left-6 bg-blue-600 text-white p-4 rounded-full shadow-2xl hover:bg-blue-700 transition-colors z-50 flex items-center justify-center"
-        >
-          <span className="material-symbols-outlined">{isChatOpen ? 'close' : 'smart_toy'}</span>
-        </button>
-
-        {/* AI Chat Box (Render Cứng - Đóng băng State) */}
-        <div className={`fixed bottom-24 left-6 z-50 transition-all duration-300 ${isChatOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-10 pointer-events-none'}`}>
-          <div className="w-[450px] bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
-            <div className="bg-blue-600 p-4 text-white font-bold flex items-center gap-2">
-              <span className="material-symbols-outlined">smart_toy</span>
-              AI Assistant
-            </div>
-            <div className="h-[500px]">
-              <AIChatBox />
-            </div>
-          </div>
-        </div>
       </main>
 
       {/* Right Sidebar Disabled */}
