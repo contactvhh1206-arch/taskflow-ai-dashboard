@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
+﻿import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
 import axiosClient from './api/axiosClient.js';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
@@ -1452,7 +1452,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <div className="flex flex-col h-full w-full max-w-5xl mx-auto py-2">
                   <div className="bg-white dark:bg-[#1e1e1e] shadow-md rounded-2xl overflow-hidden border border-outline-variant dark:border-gray-700 h-[60vh] flex flex-col shrink-0 mb-6">
-                    <AIAdvisor user={user} tasks={tasks} activeSessionId={activeAiSessionId} onSessionUpdate={setAiSessions} onSessionCreated={setActiveAiSessionId} />
+                    <AIAdvisor user={user} tasks={tasks} activeSessionId={activeAiSessionId} onSessionUpdate={setAiSessions} onSessionCreated={setActiveAiSessionId} onAITaskConfirm={handleAITaskConfirm} />
                   </div>
                   <div className="mt-4 mb-12">
                     <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 flex items-center gap-2">
@@ -1535,7 +1535,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <div className="flex flex-col h-full w-full max-w-5xl mx-auto py-2">
                   <div className="bg-white dark:bg-[#1e1e1e] shadow-md rounded-2xl overflow-hidden border border-outline-variant dark:border-gray-700 h-[calc(100vh-120px)] flex flex-col shrink-0">
-                    <AIAdvisor user={user} tasks={tasks} activeSessionId={activeAiSessionId} onSessionUpdate={setAiSessions} onSessionCreated={setActiveAiSessionId} />
+                    <AIAdvisor user={user} tasks={tasks} activeSessionId={activeAiSessionId} onSessionUpdate={setAiSessions} onSessionCreated={setActiveAiSessionId} onAITaskConfirm={handleAITaskConfirm} />
                   </div>
                 </div>
               </ErrorBoundary>

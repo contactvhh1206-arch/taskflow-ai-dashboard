@@ -4,9 +4,14 @@ import remarkGfm from 'remark-gfm';
 import axiosClient from '../api/axiosClient';
 import { fetchHistory, fetchAiSessions, saveAiSession, streamAIChat } from '../services/dataService.js';
 import { useAIChatStream } from '../hooks/useAIChatStream';
+import AITaskModal from './AITaskModal';
 export default function AIAdvisor(props) {
-  const { user, tasks, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated } = props;
+  const { user, tasks, externalQueryTrigger, onExternalQueryHandled, activeSessionId, onSessionUpdate, onSessionCreated, onAITaskConfirm } = props;
   const isFacilityMode = props.isFacilityMode !== undefined ? props.isFacilityMode : (user && !['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role));
+  
+  const [showAITaskModal, setShowAITaskModal] = useState(false);
+  const [aiTaskTranscript, setAiTaskTranscript] = useState('');
+  
   let facilityName = props.facilityName || (isFacilityMode ? (localStorage.getItem('facility_name') || user?.facilityName || user?.facility_id || '') : '');
   
   try {
@@ -482,12 +487,41 @@ export default function AIAdvisor(props) {
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>stop</span> <span className="hidden sm:inline">Dừng</span>
              </button>
           ) : (
-             <button onClick={handleAsk} disabled={isStreaming || isThinking} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
-               <span className="material-symbols-outlined">send</span> <span className="hidden sm:inline">Gửi</span>
-             </button>
+             <>
+               <button onClick={handleAsk} disabled={isStreaming || isThinking} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
+                 <span className="material-symbols-outlined">send</span> <span className="hidden sm:inline">Gửi</span>
+               </button>
+               {user && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) && (
+                 <button 
+                   onClick={() => {
+                     const transcript = chatLog.map(msg => `${msg.role === 'user' ? 'Lãnh đạo' : 'AI'}: ${msg.content}`).join('\n\n');
+                     if (!transcript.trim()) return;
+                     setAiTaskTranscript(transcript);
+                     setShowAITaskModal(true);
+                   }}
+                   disabled={chatLog.length === 0}
+                   title="Phân tích & Giao việc từ đoạn chat này"
+                   className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-3 shrink-0 rounded-xl shadow-md shadow-amber-500/20 transition-all flex items-center justify-center font-bold"
+                 >
+                   <span className="material-symbols-outlined">bolt</span>
+                 </button>
+               )}
+             </>
           )}
         </div>
       </div>
+      
+      {showAITaskModal && (
+        <AITaskModal 
+          onClose={() => setShowAITaskModal(false)} 
+          onConfirm={(tasks) => {
+            if (onAITaskConfirm) onAITaskConfirm(tasks);
+            setShowAITaskModal(false);
+          }} 
+          user={user} 
+          initialText={aiTaskTranscript}
+        />
+      )}
     </div>
   );
 }

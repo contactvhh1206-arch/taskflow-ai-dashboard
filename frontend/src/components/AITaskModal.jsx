@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
-export default function AITaskModal({ onClose, onConfirm, user }) {
-  const [text, setText] = useState('');
+export default function AITaskModal({ onClose, onConfirm, user, initialText = '' }) {
+  const [text, setText] = useState(initialText);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [draftTasks, setDraftTasks] = useState(null);
 
