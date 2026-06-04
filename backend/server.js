@@ -3618,116 +3618,7 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
             hasData = true;
         }
 
-        // --- KHỐI QUÉT TÀI CHÍNH (FINANCE) ---
-        if (contextMsg.match(/(doanh thu|tài chính|dt|thu|tiền|báo cáo|tháng|ngày)/i)) {
-            let standardFacilityName = null;
-            let standardFacilityCode = null;
-
-            if (!hasAllAccess) {
-                const facQuery = `
-                    SELECT name, code 
-                    FROM facilities 
-                    WHERE id::text = $1 OR code = $1 OR name = $1 
-                    LIMIT 1
-                `;
-                const facParams = [String(userFacilityId)];
-                
-                const { rows: facRows } = await pool.query(facQuery, facParams);
-
-                if (facRows.length > 0) {
-                    standardFacilityName = facRows[0].name;
-                    standardFacilityCode = facRows[0].code;
-                }
-            }
-
-            let queryStr = "SELECT date, total_revenue, data FROM daily_financial_reports WHERE 1=1";
-            const queryParams = [];
-
-            const matchMonth = contextMsg.match(/tháng (\d+)|t(\d+)/i);
-            let isMonthQuery = false;
-            if (matchMonth) {
-                isMonthQuery = true;
-                const monthStr = (matchMonth[1] || matchMonth[2]).padStart(2, '0');
-                queryParams.push(`%/${monthStr}/%`);
-                queryParams.push(`%-${monthStr}-%`);
-                queryStr += ` AND (date LIKE $${queryParams.length - 1} OR date LIKE $${queryParams.length})`;
-            }
-
-            let recordLimit = isMonthQuery ? 31 : 7;
-            queryParams.push(recordLimit);
-            queryStr += ` ORDER BY (CASE WHEN date LIKE '%-%' THEN date::date ELSE to_date(date, 'DD/MM/YYYY') END) DESC LIMIT $${queryParams.length}`;
-            
-            const { rows: revenueRows } = await pool.query(queryStr, queryParams);
-            if (revenueRows.length > 0) {
-                let revDataText = "";
-                let totalMonthRevenue = 0; 
-                let facilityTotals = {};
-                
-                for (let i = 0; i < revenueRows.length; i++) {
-                    const r = revenueRows[i];
-                    
-                    if (hasAllAccess) {
-                        const dailySysRev = Number(r.total_revenue) || 0;
-                        totalMonthRevenue += dailySysRev;
-                        let detailText = "";
-                        const rData = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || []);
-                        if (Array.isArray(rData)) {
-                            const details = rData.map(f => {
-                                const fName = f.name || f.id || 'Unknown';
-                                const fRev = Number(f.revenue || 0);
-                                facilityTotals[fName] = (facilityTotals[fName] || 0) + fRev;
-                                return `${fName}: ${fRev.toLocaleString('vi-VN')}đ`;
-                            }).join(', ');
-                            detailText = `(Chi tiết từng cơ sở: ${details})`;
-                        }
-                        revDataText += `[Ngày: ${r.date} | Tổng Doanh thu Hệ thống: ${dailySysRev.toLocaleString('vi-VN')} đ] ${detailText}\n`;
-                    } else {
-                        if (!standardFacilityName) continue;
-
-                        const rData = typeof r.data === 'string' ? JSON.parse(r.data) : (r.data || []);
-                        let localRev = 0;
-
-                        if (Array.isArray(rData)) {
-                            const stdName = String(standardFacilityName || '').toLowerCase().trim();
-                            const stdCode = String(standardFacilityCode || '').toLowerCase().trim();
-
-                            const facData = rData.find(f => {
-                                const fName = String(f.name || '').toLowerCase().trim();
-                                const fId = String(f.id || '').toLowerCase().trim();
-                                if (!fName && !fId) return false; 
-                                const isNameMatch = (fName && stdName && (fName.includes(stdName) || stdName.includes(fName))) ||
-                                                    (fId && stdName && (fId.includes(stdName) || stdName.includes(fId)));
-                                const isCodeMatch = (fName && stdCode && fName === stdCode) || 
-                                                    (fId && stdCode && fId === stdCode);
-
-                                return isNameMatch || isCodeMatch;
-                            });
-
-                            if (facData) {
-                                localRev = Number(facData.revenue) || 0;
-                            } else {
-                                console.warn(`[CẢNH BÁO JSONB] Đã quét toàn bộ JSON nhưng không thấy dữ liệu của cơ sở: [${standardFacilityName || standardFacilityCode}] trong báo cáo ngày ${r.date}`);
-                                localRev = 0; // Ngắt luồng bằng giá trị 0 có kiểm soát
-                            }
-                        }
-                        totalMonthRevenue += localRev; // Cộng dồn số tiền cục bộ
-                        revDataText += `[Ngày: ${r.date} | Doanh thu cơ sở của bạn: ${localRev.toLocaleString('vi-VN')} đ]\n`;
-                    }
-                }
-                
-                if (revDataText) {
-                    systemContext += `- Báo cáo tài chính trong phạm vi cho phép:\n${revDataText}\n`;
-                    if (hasAllAccess && Object.keys(facilityTotals).length > 0) {
-                        const totalsText = Object.entries(facilityTotals).map(([k, v]) => `${k}: ${v.toLocaleString('vi-VN')} đ`).join(', ');
-                        systemContext += `=> [TỔNG DOANH THU TỪNG CƠ SỞ ĐÃ TÍNH SẴN]: ${totalsText}.\n`;
-                    }
-                    systemContext += `=> [TỔNG KẾT HỆ THỐNG ĐÃ TÍNH SẴN]: Tổng doanh thu của các ngày trên cộng lại là: ${totalMonthRevenue.toLocaleString('vi-VN')} đ. AI phải sử dụng con số Tổng này khi được hỏi, tuyệt đối không tự cộng nhẩm!\n`;
-                }
-            } else {
-                systemContext += `- Doanh thu: Không tìm thấy dữ liệu khớp yêu cầu.\n`;
-            }
-            hasData = true;
-        }
+        // --- KHỐI QUÉT TÀI CHÍNH (FINANCE) ĐÃ ĐƯỢC CHUYỂN SANG TOOL CALLING ---
 
         // --- KHỐI QUÉT ĐIỂM DANH (CHECK-IN) ---
         if (contextMsg.match(/(check-in|checkin|điểm danh|chấm công)/i)) {
@@ -3793,7 +3684,34 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
       body: JSON.stringify({
         model: activeAiConfig.aiModel || "google/gemini-2.5-flash",
         stream: true,
-        messages: messagesForAI
+        messages: messagesForAI,
+        tools: [
+            {
+                type: "function",
+                function: {
+                    name: "get_revenue_report",
+                    description: "Lấy báo cáo doanh thu của cơ sở/phòng ban theo thời gian. Dùng tool này BẮT BUỘC KHI NGƯỜI DÙNG HỎI DOANH THU.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            date_range: { 
+                                type: "object", 
+                                description: "Khoảng thời gian cần xem (quan trọng: dùng startDate và endDate định dạng YYYY-MM-DD)",
+                                properties: {
+                                    startDate: { type: "string" },
+                                    endDate: { type: "string" }
+                                }
+                            },
+                            facility_code: { 
+                                type: "string", 
+                                description: "Mã cơ sở cần xem (tùy chọn)." 
+                            }
+                        },
+                        required: ["date_range"]
+                    }
+                }
+            }
+        ]
       }),
       signal: controller.signal // Lệnh #1: Kế thừa AbortController
     });
@@ -3807,6 +3725,8 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
     let buffer = "";
     const decoder = new TextDecoder("utf-8");
     
+    let toolCallsMap = {};
+    let mainToolName = "";
     for await (const chunk of openRouterResponse.body) {
       const textChunk = decoder.decode(chunk, { stream: true });
       buffer += textChunk;
@@ -3821,7 +3741,21 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
         if (trimmedLine.startsWith('data: ')) {
           try {
             const parsed = JSON.parse(trimmedLine.slice(6));
-            const chunkText = parsed.choices?.[0]?.delta?.content || "";
+            const delta = parsed.choices?.[0]?.delta;
+            if (delta?.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                    if (!toolCallsMap[tc.index]) toolCallsMap[tc.index] = { id: '', name: '', arguments: '' };
+                    if (tc.id) toolCallsMap[tc.index].id = tc.id;
+                    if (tc.function?.name) {
+                        toolCallsMap[tc.index].name = tc.function.name;
+                        mainToolName = tc.function.name;
+                    }
+                    if (tc.function?.arguments) {
+                        toolCallsMap[tc.index].arguments += tc.function.arguments;
+                    }
+                }
+            }
+            const chunkText = delta?.content || "";
             
             if (chunkText) {
               fullAiResponse += chunkText;
@@ -3832,6 +3766,84 @@ Khi từ chối, hãy dùng đúng mẫu câu sau: "Xin lỗi Quản lý, tôi l
           }
         }
       }
+    }
+
+    // 3.5. THỰC THI TOOL NẾU CÓ (TWO-PASS STREAMING)
+    if (Object.keys(toolCallsMap).length > 0) {
+        let finalArgs = null;
+        let toolCallId = null;
+        for (const index in toolCallsMap) {
+            try {
+                let rawArgs = toolCallsMap[index].arguments;
+                const firstIdx = rawArgs.indexOf('{');
+                const lastIdx = rawArgs.lastIndexOf('}');
+                if (firstIdx !== -1 && lastIdx !== -1) {
+                    rawArgs = rawArgs.substring(firstIdx, lastIdx + 1);
+                }
+                finalArgs = JSON.parse(rawArgs);
+                toolCallId = toolCallsMap[index].id || 'call_1';
+                break;
+            } catch(e) {}
+        }
+        
+        if (finalArgs && mainToolName === "get_revenue_report") {
+            res.write(`data: ${JSON.stringify({ text: "
+
+⏳ *Hệ thống đang truy xuất dữ liệu doanh thu chính xác từ kho lưu trữ, vui lòng đợi...*
+
+" })}
+
+`);
+            
+            let result = await executeGetRevenueTool(finalArgs, req.user);
+            let toolResultStr = typeof result === 'string' ? result : JSON.stringify(result);
+            if (toolResultStr.length > 15000) toolResultStr = toolResultStr.substring(0, 15000) + "...";
+            
+            messagesForAI.push({
+                role: "assistant",
+                content: fullAiResponse || "",
+                tool_calls: [{ id: toolCallId, type: "function", function: { name: mainToolName, arguments: JSON.stringify(finalArgs) } }]
+            });
+            messagesForAI.push({
+                role: "tool",
+                tool_call_id: toolCallId,
+                name: mainToolName,
+                content: toolResultStr
+            });
+
+            const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${activeAiConfig.apiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ model: activeAiConfig.aiModel || "google/gemini-2.5-flash", stream: true, messages: messagesForAI, tools: tools }),
+                signal: controller.signal
+            });
+            
+            if (response2.ok) {
+                for await (const chunk of response2.body) {
+                    const textChunk = decoder.decode(chunk, { stream: true });
+                    buffer += textChunk;
+                    const lines = buffer.split('
+');
+                    buffer = lines.pop() || "";
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed === 'data: [DONE]') continue;
+                        if (trimmed.startsWith('data: ')) {
+                            try {
+                                const parsed = JSON.parse(trimmed.slice(6));
+                                const chunkText = parsed.choices?.[0]?.delta?.content || "";
+                                if (chunkText) {
+                                    fullAiResponse += chunkText;
+                                    res.write(`data: ${JSON.stringify({ text: chunkText })}
+
+`);
+                                }
+                            } catch(e) {}
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Lệnh #4: Dọn dẹp Buffer Cuối Chu kỳ
