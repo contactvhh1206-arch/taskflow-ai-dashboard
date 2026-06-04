@@ -2852,17 +2852,24 @@ async function executeGetRevenueTool(args, user) {
 
     // 2. Tường Lửa RBAC
     const userRole = user.role;
-    const userFacilityId = user.facility_id || user.facilityCode;
 
     if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(userRole)) {
         // Nhóm All-Access: Không filter ở Tầng API, đẩy thẳng mảng AI gửi xuống SQL.
         // Mã rác sẽ tự động bị loại vì không tồn tại trong DB.
     } else {
         // Nhóm Local (FACILITY_MANAGER): Phủ quyết tàn bạo, ghi đè mảng
-        if (!userFacilityId) {
-            return JSON.stringify({ error: "LỖI PHÂN QUYỀN: Tài khoản của bạn chưa được Admin gắn mã cơ sở (facility_id). Vui lòng liên hệ IT hỗ trợ." });
+        
+        // BƯỚC 1 & 2: Cô lập logic vào khối else, lấy dữ liệu chuẩn snake_case và ép chặt kiểu String
+        const rawFacilityData = user.facility_code || user.facility_id;
+        const safeFacilityString = String(rawFacilityData).trim();
+
+        // Kiểm duyệt nghiêm ngặt: Chống chuỗi rỗng, undefined hoặc null ảo
+        if (!safeFacilityString || safeFacilityString === 'undefined' || safeFacilityString === 'null') {
+            return JSON.stringify({ error: "LỖI PHÂN QUYỀN: Tài khoản của bạn chưa được Admin gắn mã cơ sở. Vui lòng liên hệ IT hỗ trợ." });
         }
-        facility_codes = [userFacilityId.toUpperCase()];
+
+        // Đã qua kiểm duyệt: Gán mảng và thực thi toUpperCase an toàn
+        facility_codes = [safeFacilityString.toUpperCase()];
     }
 
     let sql = "";
