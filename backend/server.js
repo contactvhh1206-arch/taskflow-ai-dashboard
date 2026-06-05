@@ -8,6 +8,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 1.5 Đề nổ Động cơ Cron
+require('./src/cron/aiPingJob');
+
 // 2. Định tuyến Toàn cục (Mount The Iron Gateway)
 app.use('/api', require('./src/routes/index'));
 

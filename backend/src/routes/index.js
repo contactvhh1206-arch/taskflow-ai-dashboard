@@ -17,5 +17,5 @@ router.use('/facilities', facilityRoutes);
 router.use('/kpi', kpiRoutes);
 router.use('/logs', logRoutes);
 router.use('/reports', reportRoutes);
-
+router.use('/ai-ping', require('./aiPingRoutes'));
 module.exports = router;
