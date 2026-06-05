@@ -21,7 +21,7 @@ router.post('/', authGuard, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Thiếu dữ liệu (apply_month, data)' });
         }
 
-        // Xử lý lỗi null value in column "id": Cập nhật bản ghi cũ hoặc tạo mới với id=1
+        // Do Database đã cấu hình tự động tăng ID (Serial), chỉ truyền dữ liệu thực tế
         const { rows } = await pool.query('SELECT id FROM kpi_settings ORDER BY id DESC LIMIT 1');
         
         if (rows.length > 0) {
@@ -31,7 +31,7 @@ router.post('/', authGuard, async (req, res) => {
             );
         } else {
             await pool.query(
-                'INSERT INTO kpi_settings (id, apply_month, data) VALUES (1, $1, $2)',
+                'INSERT INTO kpi_settings (apply_month, data) VALUES ($1, $2)',
                 [apply_month, JSON.stringify(data)]
             );
         }

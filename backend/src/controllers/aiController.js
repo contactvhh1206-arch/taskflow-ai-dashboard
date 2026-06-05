@@ -19,7 +19,10 @@ const chatStreamHandler = async (req, res) => {
     let isNewSession = false;
     if (!sessionId) {
         try {
-            const { rows } = await pool.query('INSERT INTO ai_chat_sessions (title, facility_id) VALUES ($1, $2) RETURNING id', ['Phiên AI mới', userContext.facility_id]);
+            const { rows } = await pool.query(
+                'INSERT INTO ai_chat_sessions (title, facility_id, user_id) VALUES ($1, $2, $3) RETURNING id', 
+                ['Phiên AI mới', userContext.facility_id, userContext.id]
+            );
             sessionId = rows[0].id;
             isNewSession = true;
         } catch (e) {
@@ -72,7 +75,7 @@ const chatStreamHandler = async (req, res) => {
         const llmPayload = {
             model: "openai/gpt-4o", 
             messages: messages,
-            tools: aiService.KANBAN_TOOLS,
+            tools: aiService.AI_TOOLS,
             tool_choice: "auto"
         };
 
@@ -207,7 +210,10 @@ const getSessionsHandler = async (req, res) => {
 
 const createSessionHandler = async (req, res) => {
     try {
-        const { rows } = await pool.query('INSERT INTO ai_chat_sessions (title, facility_id) VALUES ($1, $2) RETURNING *', ['Phiên AI mới', req.user.facility_id]);
+        const { rows } = await pool.query(
+            'INSERT INTO ai_chat_sessions (title, facility_id, user_id) VALUES ($1, $2, $3) RETURNING *', 
+            ['Phiên AI mới', req.user.facility_id, req.user.id]
+        );
         res.json({ success: true, data: rows[0] });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

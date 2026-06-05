@@ -2,7 +2,7 @@ const taskService = require('./taskService');
 const pool = require('../config/database');
 
 // 1. Schema Định nghĩa Tool (Hoàn toàn KHÔNG CÓ tham số định danh cơ sở)
-const KANBAN_TOOLS = [
+const AI_TOOLS = [
     {
         type: "function",
         function: {
@@ -75,10 +75,22 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
         if (functionName === 'fetch_financial_reports') {
             const { month, year } = functionArgs || {};
-            // Cấu trúc DB lưu theo mảng JSON trong cột data
-            let query = 'SELECT date, data FROM daily_financial_reports ORDER BY created_at DESC LIMIT 30';
             
-            const { rows } = await pool.query(query);
+            const query = `
+                SELECT date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
+                FROM daily_financial_reports, 
+                     jsonb_array_elements(CASE WHEN jsonb_typeof(data::jsonb) = 'array' THEN data::jsonb ELSE '[]'::jsonb END) AS elem
+                WHERE ($1::text IS NULL OR elem->>'id' = $1::text)
+                ORDER BY created_at DESC 
+                LIMIT 30;
+            `;
+            
+            // Xử lý lãnh đạo vs quản lý cơ sở
+            const facilityParam = (userContext.role === 'SUPER_ADMIN' || userContext.role === 'VICE_PRESIDENT' || userContext.role === 'ADMIN' || userContext.facility_id === 'ALL') 
+                ? null 
+                : userContext.facility_id;
+                
+            const { rows } = await pool.query(query, [facilityParam]);
 
             if (!rows || rows.length === 0) {
                 return "Hệ thống báo cáo: Không có dữ liệu doanh thu.";
@@ -86,24 +98,18 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
             let resultLines = [];
             for (const r of rows) {
-                let reportData = r.data;
-                if (typeof reportData === 'string') {
-                    try { reportData = JSON.parse(reportData); } catch (e) {}
+                // Lọc theo month/year nếu AI yêu cầu
+                if (month || year) {
+                    const rDate = new Date(r.date);
+                    if (month && rDate.getMonth() + 1 !== month) continue;
+                    if (year && rDate.getFullYear() !== year) continue;
                 }
                 
-                if (Array.isArray(reportData)) {
-                    reportData.forEach(facData => {
-                        // TIÊM NGẦM BẮT BUỘC: Phân quyền cấp cơ sở
-                        if (userContext.role !== 'SUPER_ADMIN' && userContext.role !== 'VICE_PRESIDENT' && userContext.role !== 'ADMIN' && userContext.facility_id !== 'ALL') {
-                            if (facData.id !== userContext.facility_id) return;
-                        }
-                        resultLines.push(`[Cơ sở: ${facData.name || facData.id}] Ngày: ${r.date} - Doanh thu: ${facData.revenue || 0} VNĐ`);
-                    });
-                }
+                resultLines.push(`[Cơ sở: ${r.facility_name}] Ngày: ${r.date} - Doanh thu: ${r.revenue_amount || 0} VNĐ`);
             }
 
             if (resultLines.length === 0) {
-                return "Hệ thống báo cáo: Không có dữ liệu doanh thu cho cơ sở của bạn.";
+                return "Hệ thống báo cáo: Không có dữ liệu doanh thu cho khoảng thời gian này.";
             }
 
             return resultLines.join('\n');
@@ -117,6 +123,6 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 };
 
 module.exports = {
-    KANBAN_TOOLS,
+    AI_TOOLS,
     processToolCall
 };
