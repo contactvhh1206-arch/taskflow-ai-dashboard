@@ -228,7 +228,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   };
 
   useEffect(() => {
-    const submitted = checkins.find(c => Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === selectedShift);
+    const submitted = checkins.find(c => String(c.org_unit) === String(user.facility_id) && c.date === today && c.shift === selectedShift);
     if (submitted) {
       setFormData(submitted.formData);
       setIsSubmitted(true);
@@ -338,7 +338,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
           aiVectorData
         };
         
-        const filtered = checkins.filter(c => !(Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === selectedShift));
+        const filtered = checkins.filter(c => !(String(c.org_unit) === String(user.facility_id) && c.date === today && c.shift === selectedShift));
         const newHistory = [...filtered, newCheckin];
         setCheckins(newHistory);
         
@@ -422,9 +422,9 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     );
   };
 
-  const ca1Status = checkins.find(c => Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === 'Ca 1');
-  const caLoStatus = checkins.find(c => Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === 'Ca Lỡ');
-  const ca2Status = checkins.find(c => Number(c.org_unit) === Number(user.facility_id) && c.date === today && c.shift === 'Ca 2');
+  const ca1Status = checkins.find(c => String(c.org_unit) === String(user.facility_id) && c.date === today && c.shift === 'Ca 1');
+  const caLoStatus = checkins.find(c => String(c.org_unit) === String(user.facility_id) && c.date === today && c.shift === 'Ca Lỡ');
+  const ca2Status = checkins.find(c => String(c.org_unit) === String(user.facility_id) && c.date === today && c.shift === 'Ca 2');
 
   const countAuthAbsence = formData.manual_auth || 0;
   const countUnauthAbsence = formData.manual_unauth || 0;
