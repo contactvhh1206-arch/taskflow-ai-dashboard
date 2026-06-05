@@ -122,6 +122,7 @@ export default function AIAdvisor(props) {
         
         // NGĂN CHẶN XUNG ĐỘT KHI TỰ TẠO SESSION:
         if (isSessionCreatedByMeRef.current) {
+            isSessionCreatedByMeRef.current = false; // Reset ngay để lần click session khác còn chạy được
             return;
         }
 
