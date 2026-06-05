@@ -18,6 +18,18 @@ const AI_TOOLS = [
                     urgency: {
                         type: "boolean",
                         description: "Lọc các công việc đang ở trạng thái khẩn cấp (true/false)"
+                    },
+                    start_date: {
+                        type: "string",
+                        description: "Ngày bắt đầu lọc (YYYY-MM-DD)"
+                    },
+                    end_date: {
+                        type: "string",
+                        description: "Ngày kết thúc lọc (YYYY-MM-DD)"
+                    },
+                    limit: {
+                        type: "number",
+                        description: "Số lượng công việc tối đa cần lấy (max 100)"
                     }
                 },
                 additionalProperties: false
@@ -32,13 +44,17 @@ const AI_TOOLS = [
             parameters: {
                 type: "object",
                 properties: {
-                    month: {
-                        type: "number",
-                        description: "Tháng cần lấy báo cáo (1-12)"
+                    start_date: {
+                        type: "string",
+                        description: "Ngày bắt đầu lọc (YYYY-MM-DD)"
                     },
-                    year: {
+                    end_date: {
+                        type: "string",
+                        description: "Ngày kết thúc lọc (YYYY-MM-DD)"
+                    },
+                    limit: {
                         type: "number",
-                        description: "Năm cần lấy báo cáo"
+                        description: "Số lượng báo cáo tối đa cần lấy (max 100)"
                     }
                 },
                 additionalProperties: false
@@ -51,15 +67,19 @@ const AI_TOOLS = [
 const processToolCall = async (functionName, functionArgs, userContext) => {
     try {
         if (functionName === 'fetch_kanban_tasks') {
+            const { status, urgency, start_date, end_date, limit } = functionArgs || {};
             
-            // TIÊM NGẦM BẮT BUỘC: Không cho AI tự quyết định cơ sở, ép dùng của User
+            // TIÊM NGẦM BẮT BUỘC
             const args = {
-                ...functionArgs,
+                status,
+                urgency,
+                start_date,
+                end_date,
                 userId: userContext.id,
                 role: userContext.role,
                 facilityId: userContext.facility_id,
                 departmentCode: userContext.department_code,
-                limit: 5 // ĐIỀU KHOẢN RAG: Ép cứng limit 5 để chống cạn kiệt Token Context
+                limit: limit ? Math.min(limit, 100) : 50 // Mở khóa limit
             };
 
             const { rows } = await taskService.getTasksList(args);
@@ -68,21 +88,30 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 return "Hệ thống báo cáo: Không có công việc nào thỏa mãn điều kiện.";
             }
 
-            // TINH GỌN RAG: Lọc rác hiển thị, chỉ nạp dữ liệu sống còn cho AI đọc
-            const simplifiedData = rows.map(t => `[ID: ${t.id}] ${t.title} - Status: ${t.status}`).join('\n');
+            // TINH GỌN RAG: Bổ sung các trường sinh tử
+            const simplifiedData = rows.map(t => {
+                const assignee = t.assignee_name || t.pic || "Chưa giao";
+                const dueDate = t.deadline ? new Date(t.deadline).toLocaleDateString('vi-VN') : "Không có";
+                const isUrgent = t.urgent ? "[KHẨN]" : "";
+                return `[ID: ${t.id}] ${isUrgent} ${t.title} - Status: ${t.status} - Phụ trách: ${assignee} - Hạn chót: ${dueDate}`;
+            }).join('\n');
+            
             return simplifiedData;
         }
 
         if (functionName === 'fetch_financial_reports') {
-            const { month, year } = functionArgs || {};
+            const { start_date, end_date, limit } = functionArgs || {};
+            const queryLimit = limit ? Math.min(limit, 100) : 30;
             
             const query = `
-                SELECT date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
+                SELECT TO_CHAR(date, 'YYYY-MM-DD') AS formatted_date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
                 FROM daily_financial_reports, 
                      jsonb_array_elements(CASE WHEN jsonb_typeof(data::jsonb) = 'array' THEN data::jsonb ELSE '[]'::jsonb END) AS elem
                 WHERE ($1::text IS NULL OR elem->>'id' = $1::text)
-                ORDER BY created_at DESC 
-                LIMIT 30;
+                  AND ($2::date IS NULL OR date >= $2::date)
+                  AND ($3::date IS NULL OR date <= $3::date)
+                ORDER BY date DESC 
+                LIMIT $4;
             `;
             
             // Xử lý lãnh đạo vs quản lý cơ sở
@@ -90,26 +119,15 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 ? null 
                 : userContext.facility_id;
                 
-            const { rows } = await pool.query(query, [facilityParam]);
+            const { rows } = await pool.query(query, [facilityParam, start_date || null, end_date || null, queryLimit]);
 
             if (!rows || rows.length === 0) {
-                return "Hệ thống báo cáo: Không có dữ liệu doanh thu.";
+                return "Hệ thống báo cáo: Không có dữ liệu doanh thu cho khoảng thời gian này.";
             }
 
             let resultLines = [];
             for (const r of rows) {
-                // Lọc theo month/year nếu AI yêu cầu
-                if (month || year) {
-                    const rDate = new Date(r.date);
-                    if (month && rDate.getMonth() + 1 !== month) continue;
-                    if (year && rDate.getFullYear() !== year) continue;
-                }
-                
-                resultLines.push(`[Cơ sở: ${r.facility_name}] Ngày: ${r.date} - Doanh thu: ${r.revenue_amount || 0} VNĐ`);
-            }
-
-            if (resultLines.length === 0) {
-                return "Hệ thống báo cáo: Không có dữ liệu doanh thu cho khoảng thời gian này.";
+                resultLines.push(`[Cơ sở: ${r.facility_name}] Ngày: ${r.formatted_date} - Doanh thu: ${r.revenue_amount || 0} VNĐ`);
             }
 
             return resultLines.join('\n');

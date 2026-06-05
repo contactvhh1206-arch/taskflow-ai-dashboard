@@ -1,6 +1,6 @@
 const pool = require('../config/database');
 
-const getTasksList = async ({ userId, role, facilityId, departmentCode, status, limit, offset }) => {
+const getTasksList = async ({ userId, role, facilityId, departmentCode, status, limit, offset, start_date, end_date, urgency }) => {
     let baseWhere = `1=1`;
     const params = [];
 
@@ -29,6 +29,18 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
         baseWhere += ` AND t.status = $${params.length}`;
     } else {
         baseWhere += ` AND (t.status != 'done' OR (t.status = 'done' AND t.updated_at >= date_trunc('month', CURRENT_DATE)))`;
+    }
+
+    if (start_date) {
+        params.push(start_date);
+        baseWhere += ` AND t.created_at >= $${params.length}::date`;
+    }
+    if (end_date) {
+        params.push(end_date);
+        baseWhere += ` AND t.created_at <= $${params.length}::date + interval '1 day' - interval '1 second'`;
+    }
+    if (urgency === true || urgency === 'true') {
+        baseWhere += ` AND t.urgency = true`;
     }
 
     // Lấy tổng số lượng để tính Meta Pagination

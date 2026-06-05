@@ -20,9 +20,10 @@ const chatStreamHandler = async (req, res) => {
     let isNewSession = false;
     if (!sessionId) {
         try {
+            const currentTimestamp = Date.now();
             const { rows } = await pool.query(
-                'INSERT INTO ai_chat_sessions (title, facility_id, user_id) VALUES ($1, $2, $3) RETURNING id', 
-                ['Phiên AI mới', userContext.facility_id, userContext.id]
+                'INSERT INTO ai_chat_sessions (title, facility_id, user_id, timestamp) VALUES ($1, $2, $3, $4) RETURNING id', 
+                ['Phiên AI mới', userContext.facility_id, userContext.id, currentTimestamp]
             );
             sessionId = rows[0].id;
             isNewSession = true;
@@ -60,6 +61,12 @@ const chatStreamHandler = async (req, res) => {
             VALUES ($1, $2, $3, 'user', $4)
         `, [sessionId, logFacilityId, logDepartmentCode, message]);
 
+        // Bump timestamp của session
+        await pool.query(
+            'UPDATE ai_chat_sessions SET timestamp = $1 WHERE id = $2',
+            [Date.now(), sessionId]
+        );
+
         // Bơm SessionID mới về Frontend để React chốt URL
         if (isNewSession && isClientConnected) {
             res.write(`data: ${JSON.stringify({ sessionId: sessionId })}\n\n`);
@@ -88,16 +95,17 @@ const chatStreamHandler = async (req, res) => {
             }
         }
 
-        // 4. Ráp mảng messages nạp cho LLM
+        // 4. Ráp mảng messages nạp cho LLM (Ép múi giờ VN)
+        const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
         const messages = [
-            { role: "system", content: "Bạn là AI Advisor. Hãy phân tích công việc và báo cáo số liệu chuẩn xác." }
+            { role: "system", content: "Bạn là AI Advisor. Hôm nay là ngày " + todayVN + ". Hãy phân tích công việc và báo cáo số liệu chuẩn xác dựa vào khoảng thời gian được cung cấp." }
         ];
 
         for (const msg of historyRows) {
-            const formattedMsg = { 
-                role: msg.role,
-                content: msg.content || "" 
-            };
+            const formattedMsg = { role: msg.role };
+            if (msg.content && msg.content.trim() !== "") {
+                formattedMsg.content = msg.content;
+            }
             
             if (msg.role === 'assistant' && msg.tool_calls) {
                 try {
@@ -118,6 +126,7 @@ const chatStreamHandler = async (req, res) => {
                         if (meta.tool_call_id) toolCallId = meta.tool_call_id;
                     } catch (e) {}
                 }
+                formattedMsg.tool_call_id = toolCallId;
                 formattedMsg.tool_call_id = toolCallId;
             }
             
@@ -274,7 +283,10 @@ const chatStreamHandler = async (req, res) => {
 
 const getSessionsHandler = async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM ai_chat_sessions WHERE facility_id = $1 ORDER BY updated_at DESC', [req.user.facility_id === 'ALL' ? 'ALL' : req.user.facility_id]);
+        const { rows } = await pool.query(
+            'SELECT * FROM ai_chat_sessions WHERE user_id = $1 ORDER BY timestamp DESC NULLS LAST', 
+            [req.user.id]
+        );
         res.json({ success: true, data: rows });
     } catch (error) {
         res.json({ success: true, data: [] });
@@ -283,9 +295,10 @@ const getSessionsHandler = async (req, res) => {
 
 const createSessionHandler = async (req, res) => {
     try {
+        const currentTimestamp = Date.now();
         const { rows } = await pool.query(
-            'INSERT INTO ai_chat_sessions (title, facility_id, user_id) VALUES ($1, $2, $3) RETURNING *', 
-            ['Phiên AI mới', req.user.facility_id, req.user.id]
+            'INSERT INTO ai_chat_sessions (title, facility_id, user_id, timestamp) VALUES ($1, $2, $3, $4) RETURNING *', 
+            ['Phiên AI mới', req.user.facility_id, req.user.id, currentTimestamp]
         );
         res.json({ success: true, data: rows[0] });
     } catch (error) {
