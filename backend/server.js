@@ -1172,15 +1172,17 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
                   if (!isNaN(parsedFac)) {
                       insert_facility_id = parsedFac;
                   } else {
-                      const facRecord = await pool.query('SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1', [insert_facility_id]);
-                      if (facRecord.rows.length > 0) insert_facility_id = facRecord.rows[0].id;
-                      else insert_facility_id = null; 
+                      // KHIÊN CHẶN RÁC BGD: Không map được thì ném lỗi 400
+                      return res.status(400).json({
+                          success: false,
+                          error: "Không tìm thấy cơ sở đích. Vui lòng kiểm tra lại tên cơ sở trong hệ thống!"
+                      });
                   }
               }
           }
           if (!insert_facility_id || insert_facility_id === 'ALL' || insert_facility_id === 'HQ') {
               insert_facility_id = null;
-              if (!insert_dept_code) insert_dept_code = (req.user.role === 'VICE_PRESIDENT' || req.user.role === 'SUPER_ADMIN') ? 'BGD' : 'HQ';
+              if (!insert_dept_code) insert_dept_code = 'HQ';
           }
       }
       else {
@@ -1240,6 +1242,35 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
               }
           }
       }
+
+      // =====================================================================
+      // 4. AUTO-ASSIGN PIC QUẢN LÝ CƠ SỞ (LỆNH PO)
+      // =====================================================================
+      if (insert_facility_id && !final_pic_id) {
+          try {
+              const managerLookup = await pool.query(`
+                  SELECT id, full_name 
+                  FROM users 
+                  WHERE role_id = 6 
+                    AND facility_id = $1 
+                    AND status = 'AC' 
+                  ORDER BY id ASC 
+                  LIMIT 1
+              `, [insert_facility_id]);
+
+              if (managerLookup.rows.length > 0) {
+                  final_pic_id = managerLookup.rows[0].id;
+                  foundPic = { 
+                      id: managerLookup.rows[0].id, 
+                      name: managerLookup.rows[0].full_name 
+                  };
+              }
+          } catch (err) {
+              console.error("Lỗi Auto-Assign PIC:", err);
+              // Bắt buộc cho qua, tuyệt đối không làm đứt luồng tạo Task
+          }
+      }
+
 
       let priorityStars = 0;
       if (req.user.role === 'SUPER_ADMIN') priorityStars = 3;
@@ -1685,14 +1716,24 @@ LƯU Ý 3 TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trác
                if (safeFacFromAI !== "") {
                    // NHÁNH 2 (CƠ SỞ):
                    const { rows } = await pool.query('SELECT id, name, code FROM facilities');
-                   const facStr = safeFacFromAI.toLowerCase().replace(/[^a-z0-9]/g, '');
-                   const match = rows.find(r => {
-                      const n = (r.name||'').toLowerCase().replace(/[^a-z0-9]/g, '');
-                      const c = (r.code||'').toLowerCase().replace(/[^a-z0-9]/g, '');
-                      // Ưu tiên so khớp chính xác trước, sau đó mới dùng includes
-                      if (n === facStr || c === facStr) return true;
-                      return (n && n.includes(facStr)) || (c && c.includes(facStr)) || (facStr && facStr.includes(n)) || (facStr && facStr.includes(c));
-                   });
+                   const facInput = safeFacFromAI.toLowerCase().trim();
+                   
+                   // Lớp 1 (Fast Match): Gọt sạch khoảng trắng, so sánh cứng với code
+                   const fastMatchStr = facInput.replace(/\s+/g, '');
+                   let match = rows.find(r => (r.code || '').toLowerCase().replace(/\s+/g, '') === fastMatchStr);
+                   
+                   // Lớp 2 (Fuzzy Match): Chẻ input thành mảng từ khóa nếu Lớp 1 xịt
+                   if (!match) {
+                       const words = facInput.split(/\s+/).filter(w => w.length > 0);
+                       match = rows.find(r => {
+                           const n = (r.name || '').toLowerCase();
+                           const c = (r.code || '').toLowerCase();
+                           const matchName = n && words.every(w => n.includes(w));
+                           const matchCode = c && words.every(w => c.includes(w));
+                           return matchName || matchCode;
+                       });
+                   }
+
                    if (match) {
                        mappedFacilityId = match.id;
                    }
