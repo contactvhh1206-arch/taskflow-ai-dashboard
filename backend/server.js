@@ -4031,6 +4031,7 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 [SYSTEM INSTRUCTIONS - CÁC LỆNH ĐỊNH TUYẾN VÀ CỐ VẤN CHIẾN LƯỢC]:
 - [THÔNG TIN HỆ THỐNG]: Hôm nay là ngày ${currentDate}. Mọi từ khóa thời gian tương đối BẮT BUỘC phải nội suy từ mốc này để gọi Tool, cấm hỏi lại.
 - BẠN LÀ CHUYÊN GIA CỐ VẤN QUẢN TRỊ CẤP CAO. Tránh lối mòn chatbot hỏi đáp. Không sinh text vặn vẹo, rườm rà.
+- LỆNH TỐI THƯỢNG KHI GỌI TOOL: Nếu Sếp không chỉ định rõ cơ sở, phòng ban hay khoảng thời gian, bạn PHẢI TỰ ĐỘNG dùng giá trị mặc định (như 'all' hoặc rỗng) và KÍCH HOẠT TOOL NGAY. TUYỆT ĐỐI CẤM ĐẶT CÂU HỎI LẠI NHƯ "Sếp muốn xem phòng nào?", "Thời gian nào?". HÀNH ĐỘNG HỎI LẠI NÀY LÀ VI PHẠM KỶ LUẬT THÉP!
 
 [ĐỊNH TUYẾN GỌI TOOL BẮT BUỘC - NGHIÊM CẤM TỰ BỊA SỐ LIỆU]:
 1. Hỏi chuyên biệt về Doanh thu/Tiền: LẬP TỨC GỌI TOOL get_revenue_report.
@@ -4163,7 +4164,7 @@ Giao tiếp thân thiện, linh hoạt, duyên dáng với Sếp nhưng luôn gi
                 type: "function",
                 function: {
                     name: "get_tasks",
-                    description: "[QUÂN LỆNH BẮT BUỘC]: Lấy danh sách các công việc (tasks). KÍCH HOẠT TOOL NÀY NGAY LẬP TỨC khi sếp hỏi về tiến độ, trạng thái, dự án, hoặc danh sách công việc của bất kỳ cơ sở/phòng ban nào (ví dụ: 'tổng quan phòng marketing', 'tiến độ công việc'). NGHIÊM CẤM đặt câu hỏi xác nhận lại với sếp trước khi gọi tool. Tự động nội suy các tham số (ví dụ: 'marketing' -> department_code: 'MARKETING') và gọi Tool ngay.",
+                    description: "[QUÂN LỆNH BẮT BUỘC]: Lấy danh sách các công việc (tasks). KÍCH HOẠT TOOL NÀY NGAY LẬP TỨC khi sếp hỏi về tiến độ, trạng thái, dự án, hoặc danh sách công việc. NGHIÊM CẤM HỎI LẠI (ví dụ: cấm hỏi 'Phòng ban nào?', 'Thời gian nào?'). Nếu thiếu thông tin, TỰ ĐỘNG set các biến time_range='all', department_code='all' và lập tức gọi tool. Không được chat thêm bất kỳ chữ nào trước khi gọi tool.",
                     parameters: {
                         type: "object",
                         properties: {
