@@ -15,10 +15,10 @@ export default function Login() {
 
     try {
       const safeUsername = username ? username.trim().toLowerCase() : '';
-      const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/login', {
+      const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: safeUsername, password })
+        body: JSON.stringify({ email: safeUsername, password })
       });
 
       if (response.ok) {
