@@ -12,6 +12,9 @@ export function useAIChatStream(options?: {
   onStreamComplete?: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [streamingText, setStreamingText] = useState<string>('');
+  const streamingTextRef = useRef<string>('');
+  const lastUpdateRef = useRef<number>(0);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isThinking, setIsThinking] = useState<boolean>(false);
   const isStreamingRef = useRef<boolean>(false);
@@ -42,9 +45,12 @@ export function useAIChatStream(options?: {
 
     setMessages((prev) => [
       ...prev, 
-      { id: generateId(), role: 'user', content, attachment: contextPayload?.attachment },
-      { id: generateId(), role: 'assistant', content: '' } 
+      { id: generateId(), role: 'user', content, attachment: contextPayload?.attachment }
     ]);
+    
+    setStreamingText('');
+    streamingTextRef.current = '';
+    lastUpdateRef.current = Date.now();
 
     try {
       let chatEndpoint = '';
@@ -141,22 +147,15 @@ export function useAIChatStream(options?: {
         }
 
         if (chunkTextToAppend) {
-          setMessages((prev) => {
-            const newMessages = [...prev];
-            const lastIndex = newMessages.length - 1;
-            
-            // 3. RÀO CHẮN OUT OF BOUNDS (-1 CRASH)
-            if (lastIndex >= 0) {
-              newMessages[lastIndex] = {
-                ...newMessages[lastIndex],
-                content: (newMessages[lastIndex].content || '') + chunkTextToAppend
-              };
-            }
-            return newMessages;
-          });
+          streamingTextRef.current += chunkTextToAppend;
+          const now = Date.now();
+          if (now - lastUpdateRef.current > 50) {
+            setStreamingText(streamingTextRef.current);
+            lastUpdateRef.current = now;
+          }
         }
 
-        // 4. CHỐNG THẤT THOÁT BUFFER CUỐI CÙNG
+        // 4. CHỐNG THẤT THOÁT BUFFER CUỐI CÙNG & CỜ [DONE]
         if (done) {
            if (buffer.trim().startsWith('data: ') && !buffer.includes('[DONE]')) {
               try {
@@ -164,18 +163,19 @@ export function useAIChatStream(options?: {
                   const finalParsed = JSON.parse(finalPayload);
                   const finalContent = finalParsed.content || finalParsed.text || finalParsed.choices?.[0]?.delta?.content || "";
                   if (finalContent) {
-                      setMessages((prev) => {
-                          const newMsgs = [...prev];
-                          if (newMsgs.length > 0) {
-                              newMsgs[newMsgs.length - 1].content += finalContent;
-                          }
-                          return newMsgs;
-                      });
+                      streamingTextRef.current += finalContent;
                   }
-              } catch (e) {
-                  // Buffer cuối là rác, bỏ qua an toàn
-              }
+              } catch (e) {}
            }
+           
+           // Khi [DONE], mới gộp toàn bộ streamingText vào mảng messages chính
+           setMessages((prev) => [
+             ...prev,
+             { id: `msg-${Date.now()}`, role: 'assistant', content: streamingTextRef.current }
+           ]);
+           setStreamingText('');
+           streamingTextRef.current = '';
+           
            break;
         }
       }
@@ -215,5 +215,13 @@ export function useAIChatStream(options?: {
     }
   }, []);
 
-  return { messages, isStreaming, isThinking, sendMessage, stopStream, setMessages };
+  return {
+    messages,
+    streamingText,
+    sendMessage,
+    isStreaming,
+    isThinking,
+    stopStream,
+    setMessages
+  };
 }
