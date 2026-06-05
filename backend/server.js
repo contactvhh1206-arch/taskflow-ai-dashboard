@@ -1683,9 +1683,17 @@ LƯU Ý 2 TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trác
                } 
                else if (safeFacFromAI !== "") {
                    // NHÁNH 2 (CƠ SỞ / HOẶC BỊ ĐÁ VĂNG TỪ NHÁNH 1):
-                   const { rows } = await pool.query('SELECT id FROM facilities WHERE name ILIKE $1 LIMIT 1', [`%${safeFacFromAI}%`]);
-                   if (rows.length > 0) {
-                       mappedFacilityId = rows[0].id;
+                   const { rows } = await pool.query('SELECT id, name, code FROM facilities');
+                   const facStr = safeFacFromAI.toLowerCase().replace(/[^a-z0-9]/g, '');
+                   const match = rows.find(r => {
+                      const n = (r.name||'').toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const c = (r.code||'').toLowerCase().replace(/[^a-z0-9]/g, '');
+                      // Ưu tiên so khớp chính xác trước, sau đó mới dùng includes
+                      if (n === facStr || c === facStr) return true;
+                      return (n && n.includes(facStr)) || (c && c.includes(facStr)) || (facStr && facStr.includes(n)) || (facStr && facStr.includes(c));
+                   });
+                   if (match) {
+                       mappedFacilityId = match.id;
                    }
                }
 

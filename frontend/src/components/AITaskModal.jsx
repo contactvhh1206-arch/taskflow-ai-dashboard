@@ -48,7 +48,7 @@ export default function AITaskModal({ onClose, onConfirm, user, initialText = ''
         id: Date.now() + Math.random(),
         title: task.task_title || task.title || 'Task mới',
         desc: task.description || '',
-        pic: task.pic || user.name,
+        pic: typeof task.pic === 'string' ? task.pic : user.name,
         deadline: task.deadline || new Date().toISOString().split('T')[0],
         status: 'todo', // Gán mặc định status: "Cần làm"
         urgent: task.priority_level === 'URGENT' || task.priority === 'Cao',

@@ -863,7 +863,7 @@ function MainDashboard() {
       if (hasFatalError) break; // Kích hoạt ngắt mạch nếu có lỗi trước đó
 
       try {
-        let resolvedPicId = user.id;
+        let resolvedPicId = draft.pic === "" ? null : user.id;
         if (draft.pic && draft.pic !== user.name) {
           const searchName = draft.pic.toLowerCase().trim();
           const normalizeString = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
