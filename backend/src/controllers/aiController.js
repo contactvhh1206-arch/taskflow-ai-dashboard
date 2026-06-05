@@ -165,6 +165,10 @@ const chatStreamHandler = async (req, res) => {
                 VALUES ($1, $2, $3, 'assistant', $4, $5)
             `, [sessionId, logFacilityId, logDepartmentCode, aiMessage.content || "", JSON.stringify(aiMessage.tool_calls)]);
 
+            // [DỌN RÁC LƯỢT 1]: Chống ảo giác schema Gemini
+            if (!aiMessage.content || aiMessage.content.trim() === "") {
+                delete aiMessage.content;
+            }
             messages.push(aiMessage); 
 
             for (const toolCall of aiMessage.tool_calls) {
@@ -189,10 +193,10 @@ const chatStreamHandler = async (req, res) => {
                     VALUES ($1, $2, $3, 'tool', $4, $5)
                 `, [sessionId, logFacilityId, logDepartmentCode, safeToolResult, JSON.stringify(toolMeta)]);
 
+                // [DỌN RÁC LƯỢT 2]: Cấm key name trong role tool
                 messages.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
-                    name: funcName,
                     content: safeToolResult
                 });
             }

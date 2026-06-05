@@ -144,7 +144,6 @@ export function useAIChatStream(options?: {
             const dataPayload = trimmedLine.replace(/^data:\s*/, '');
             if (dataPayload === '[DONE]') continue;
             
-            let streamError = null;
             try {
               const data = JSON.parse(dataPayload);
               
@@ -154,7 +153,8 @@ export function useAIChatStream(options?: {
               }
               
               if (data.error) {
-                  streamError = data.error;
+                  // [TRỊ BỆNH MÙ LỖI]: In thẳng lỗi ra UI và KHÔNG throw để ngắt luồng
+                  chunkTextToAppend += '\n\n[LỖI HỆ THỐNG]: ' + data.error;
               } else {
                   const contentChunk = data.choices?.[0]?.delta?.content || data.content || data.text || "";
                   if (contentChunk) {
@@ -163,10 +163,6 @@ export function useAIChatStream(options?: {
               }
             } catch (parseError) {
               console.warn('[Luồng Thép] Bỏ qua chunk vỡ ngầm:', dataPayload);
-            }
-
-            if (streamError) {
-                throw new Error(streamError);
             }
           }
         }
