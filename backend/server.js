@@ -1640,8 +1640,9 @@ app.post('/api/ai/auto-tasking', authenticateUser, async (req, res) => {
 
     const systemPrompt = `Bạn là một AI điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
 Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "target_department_code" (Mã phòng ban chuẩn hóa), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY').
-LƯU Ý 1: Nếu giao việc cho các phòng ban trung tâm (Truyền thông, Kế toán, Nhân sự, IT, Ban Giám Đốc), BẮT BUỘC trả về mã chuẩn ENUM vào trường "target_department_code" (Chỉ được chọn 1 trong: 'MARKETING', 'FINANCE', 'HR', 'IT', 'BGD') và để RỖNG trường "target_facility" (""). Tuyệt đối không tự chế mã ngoài danh sách này.
-LƯU Ý 2 TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trách), CHỈ trích xuất khi văn bản NÊU ĐÍCH DANH tên một cá nhân cụ thể. Nếu văn bản chỉ dùng các từ chung chung (như 'nhân viên', 'kỹ thuật viên', 'lễ tân'...) hoặc KHÔNG CÓ tên người, BẮT BUỘC trả về trường 'pic' là một chuỗi rỗng "". Tuyệt đối không được tự bịa ra tên người hoặc dùng lại tên cơ sở.`;
+LƯU Ý 1: Nếu văn bản chỉ định đích danh tên một cơ sở cụ thể (ví dụ: 'cơ sở ace', 'db ace', 'db41', 'cơ sở 1', v.v.), BẮT BUỘC điền vào trường "target_facility" và BẮT BUỘC để RỖNG trường "target_department_code". 
+LƯU Ý 2: CHỈ KHI văn bản NÊU ĐÍCH DANH tên các phòng ban trung tâm (ví dụ: 'phòng IT', 'phòng truyền thông', 'kế toán', 'nhân sự'), thì mới trả về mã chuẩn ENUM vào "target_department_code" (Chỉ chọn 1 trong: 'MARKETING', 'FINANCE', 'HR', 'IT', 'BGD') và để RỖNG trường "target_facility". Tuyệt đối không tự suy diễn phòng ban dựa trên nội dung công việc (ví dụ: nhắc đến 'thiết bị', 'máy tính' không có nghĩa là giao cho phòng IT nếu văn bản đã chỉ định cơ sở).
+LƯU Ý 3 TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trách), CHỈ trích xuất khi văn bản NÊU ĐÍCH DANH tên một cá nhân cụ thể. Nếu văn bản chỉ dùng các từ chung chung (như 'nhân viên', 'kỹ thuật viên', 'lễ tân'...) hoặc KHÔNG CÓ tên người, BẮT BUỘC trả về trường 'pic' là một chuỗi rỗng "". Tuyệt đối không được tự bịa ra tên người hoặc dùng lại tên cơ sở.`;
 
     const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
     const aiConfig = configRows.length > 0 ? configRows[0].data : {};
@@ -1681,8 +1682,8 @@ LƯU Ý 2 TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trác
                    // NHÁNH 1 (PHÒNG BAN HỢP LỆ): Chỉ gán khi mã AI nhả ra nằm trong Whitelist
                    mappedDeptCode = safeDeptFromAI;
                } 
-               else if (safeFacFromAI !== "") {
-                   // NHÁNH 2 (CƠ SỞ / HOẶC BỊ ĐÁ VĂNG TỪ NHÁNH 1):
+               if (safeFacFromAI !== "") {
+                   // NHÁNH 2 (CƠ SỞ):
                    const { rows } = await pool.query('SELECT id, name, code FROM facilities');
                    const facStr = safeFacFromAI.toLowerCase().replace(/[^a-z0-9]/g, '');
                    const match = rows.find(r => {
