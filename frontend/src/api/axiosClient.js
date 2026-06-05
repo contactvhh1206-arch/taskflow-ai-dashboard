@@ -31,6 +31,8 @@ axiosClient.interceptors.response.use(
     (error) => {
         if (error.response && error.response.status === 401) {
             localStorage.removeItem('taskflow_token');
+            localStorage.removeItem('token');
+            localStorage.removeItem('taskflow_auth');
             window.location.href = '/login'; // Force logout
         }
         return Promise.reject(error);
