@@ -37,10 +37,7 @@ const chatStreamHandler = async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    // 2.5 Bắn ngay ID Session mới về cho Frontend để cập nhật State (CHỐNG RACE CONDITION)
-    if (isNewSession && sessionId) {
-        res.write(`data: ${JSON.stringify({ new_session_id: sessionId })}\n\n`);
-    }
+
 
     // 3. Cờ kiểm soát Memory Leak (Ngắt luồng khi Client F5 hoặc Đóng tab)
     let isClientConnected = true;
@@ -70,6 +67,11 @@ const chatStreamHandler = async (req, res) => {
             { role: "system", content: "Bạn là AI Advisor. Hãy phân tích công việc và báo cáo số liệu chuẩn xác." },
             { role: "user", content: message }
         ];
+
+        // Bơm SessionID mới về Frontend để React chốt URL
+        if (isNewSession && isClientConnected) {
+            res.write(`data: ${JSON.stringify({ sessionId: sessionId })}\n\n`);
+        }
 
         // 5. LƯỢT 1: Gửi Request lên LLM kèm theo Mồi nhử Tool
         const openRouterKey = process.env.OPENROUTER_API_KEY;

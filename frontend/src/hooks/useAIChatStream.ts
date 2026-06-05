@@ -22,13 +22,21 @@ export function useAIChatStream(options?: {
   const isStreamingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Ép đồng bộ State nội bộ khi API Lịch sử trả về
   useEffect(() => {
     if (options?.initialMessages) {
-      setMessages(options.initialMessages);
+      setMessages((prev) => {
+        // KHIÊN BỌC THÉP: Nếu State hiện tại (prev) đang có nhiều tin nhắn hơn Lịch sử (do User vừa chat thêm),
+        // TUYỆT ĐỐI BỎ QUA việc nạp đè để bảo vệ tin nhắn Real-time!
+        if (prev.length > options.initialMessages!.length) {
+          return prev;
+        }
+        return options.initialMessages!;
+      });
     } else {
       setMessages([]);
     }
-  }, [options?.initialMessages, options?.sessionId]);
+  }, [options?.initialMessages]);
 
   useEffect(() => {
     return () => {
@@ -137,18 +145,17 @@ export function useAIChatStream(options?: {
             if (dataPayload === '[DONE]') continue;
             
             try {
-              const parsed = JSON.parse(dataPayload);
+              const data = JSON.parse(dataPayload);
               
-              // 2. CHỐNG RACE CONDITION TRẠNG THÁI (REACT STATE)
-              // Chỉ kích hoạt callback nếu session thực sự thay đổi
-              if (parsed.new_session_id && options?.onSessionCreated) {
-                // Đẩy tác vụ này ra khỏi Microtask queue hiện tại để tránh chặn Render Stream
-                setTimeout(() => options.onSessionCreated(parsed.new_session_id), 0);
+              // Hứng SessionID mới từ Backend trả về
+              if (data.sessionId && options?.onSessionCreated) {
+                  options.onSessionCreated(data.sessionId);
+                  continue; // Bỏ qua chunk này để đi tiếp vòng lặp
               }
               
-              const content = parsed.content || parsed.text || parsed.choices?.[0]?.delta?.content || "";
-              if (content) {
-                chunkTextToAppend += content;
+              const contentChunk = data.choices?.[0]?.delta?.content || data.content || data.text || "";
+              if (contentChunk) {
+                chunkTextToAppend += contentChunk;
               }
             } catch (parseError) {
               console.warn('[Luồng Thép] Bỏ qua chunk vỡ ngầm:', dataPayload);
