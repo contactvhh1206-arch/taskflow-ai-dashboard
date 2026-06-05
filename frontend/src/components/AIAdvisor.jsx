@@ -493,17 +493,14 @@ export default function AIAdvisor(props) {
                </button>
                {user && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) && (
                  <button 
-                   onClick={() => {
-                     const transcript = chatLog.map(msg => `${msg.role === 'user' ? 'Lãnh đạo' : 'AI'}: ${msg.content}`).join('\n\n');
-                     if (!transcript.trim()) return;
-                     setAiTaskTranscript(transcript);
-                     setShowAITaskModal(true);
-                   }}
-                   disabled={chatLog.length === 0}
-                   title="Phân tích & Giao việc từ đoạn chat này"
-                   className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white px-3 shrink-0 rounded-xl shadow-md shadow-amber-500/20 transition-all flex items-center justify-center font-bold"
-                 >
-                   <span className="material-symbols-outlined">bolt</span>
+                    onClick={() => {
+                      setAiTaskTranscript('');
+                      setShowAITaskModal(true);
+                    }}
+                    title="Trích xuất & Giao việc bằng AI"
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-3 shrink-0 rounded-xl shadow-md shadow-amber-500/20 transition-all flex items-center justify-center font-bold"
+                  >
+                    <span className="material-symbols-outlined">bolt</span>
                  </button>
                )}
              </>
