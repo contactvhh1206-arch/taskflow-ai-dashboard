@@ -1,4 +1,5 @@
 const taskService = require('./taskService');
+const pool = require('../config/database');
 
 // 1. Schema Định nghĩa Tool (Hoàn toàn KHÔNG CÓ tham số định danh cơ sở)
 const KANBAN_TOOLS = [
@@ -17,6 +18,27 @@ const KANBAN_TOOLS = [
                     urgency: {
                         type: "boolean",
                         description: "Lọc các công việc đang ở trạng thái khẩn cấp (true/false)"
+                    }
+                },
+                additionalProperties: false
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "fetch_financial_reports",
+            description: "Lấy báo cáo doanh thu, chi phí của các cơ sở. Dùng khi User hỏi về doanh thu, tài chính, báo cáo ngày/tháng.",
+            parameters: {
+                type: "object",
+                properties: {
+                    month: {
+                        type: "number",
+                        description: "Tháng cần lấy báo cáo (1-12)"
+                    },
+                    year: {
+                        type: "number",
+                        description: "Năm cần lấy báo cáo"
                     }
                 },
                 additionalProperties: false
@@ -48,6 +70,29 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
             // TINH GỌN RAG: Lọc rác hiển thị, chỉ nạp dữ liệu sống còn cho AI đọc
             const simplifiedData = rows.map(t => `[ID: ${t.id}] ${t.title} - Status: ${t.status}`).join('\n');
+            return simplifiedData;
+        }
+
+        if (functionName === 'fetch_financial_reports') {
+            const { month, year } = functionArgs || {};
+            let query = 'SELECT facility_id, date, revenue_amount, expenses_amount FROM daily_financial_reports WHERE 1=1';
+            const params = [];
+            
+            // TIÊM NGẦM BẮT BUỘC: Ép quyền Facility
+            if (userContext.role !== 'SUPER_ADMIN' && userContext.role !== 'VICE_PRESIDENT' && userContext.role !== 'ADMIN' && userContext.facility_id !== 'ALL') {
+                params.push(userContext.facility_id);
+                query += ` AND facility_id = $${params.length}`;
+            }
+
+            query += ` ORDER BY date DESC LIMIT 30`; // RAG Limit
+
+            const { rows } = await pool.query(query, params);
+
+            if (!rows || rows.length === 0) {
+                return "Hệ thống báo cáo: Không có dữ liệu doanh thu.";
+            }
+
+            const simplifiedData = rows.map(r => `[Cơ sở: ${r.facility_id}] Ngày: ${new Date(r.date).toLocaleDateString('vi-VN')} - Doanh thu: ${r.revenue_amount || 0} - Chi phí: ${r.expenses_amount || 0}`).join('\n');
             return simplifiedData;
         }
 
