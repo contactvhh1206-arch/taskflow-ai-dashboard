@@ -1722,14 +1722,22 @@ LƯU Ý 3 TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trác
                    const fastMatchStr = facInput.replace(/\s+/g, '');
                    let match = rows.find(r => (r.code || '').toLowerCase().replace(/\s+/g, '') === fastMatchStr);
                    
-                   // Lớp 2 (Fuzzy Match): Chẻ input thành mảng từ khóa nếu Lớp 1 xịt
+                   // Lớp 2 (Fuzzy Match): Xử lý viết tắt và chẻ từ khóa
                    if (!match) {
-                       const words = facInput.split(/\s+/).filter(w => w.length > 0);
+                       // Chuẩn hóa: Đổi 'db' thành 'dubai', xóa chữ 'cơ sở', 'chi nhánh', 'cs'
+                       let normalizedInput = facInput
+                           .replace(/\bdb\b/g, 'dubai')
+                           .replace(/^db/g, 'dubai')
+                           .replace(/\bcs\b/g, '')
+                           .replace(/cơ sở|chi nhánh/g, '')
+                           .trim();
+                           
+                       const words = normalizedInput.split(/\s+/).filter(w => w.length > 0);
                        match = rows.find(r => {
-                           const n = (r.name || '').toLowerCase();
-                           const c = (r.code || '').toLowerCase();
-                           const matchName = n && words.every(w => n.includes(w));
-                           const matchCode = c && words.every(w => c.includes(w));
+                           const nNoSpace = (r.name || '').toLowerCase().replace(/\s+/g, '');
+                           const cNoSpace = (r.code || '').toLowerCase().replace(/\s+/g, '');
+                           const matchName = nNoSpace && words.every(w => nNoSpace.includes(w));
+                           const matchCode = cNoSpace && words.every(w => cNoSpace.includes(w));
                            return matchName || matchCode;
                        });
                    }
