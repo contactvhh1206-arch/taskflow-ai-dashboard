@@ -144,7 +144,7 @@ const chatStreamHandler = async (req, res) => {
             await pool.query(`
                 INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
                 VALUES ($1, $2, $3, 'assistant', $4, $5)
-            `, [sessionId, logFacilityId, logDepartmentCode, aiMessage.content || null, JSON.stringify(aiMessage.tool_calls)]);
+            `, [sessionId, logFacilityId, logDepartmentCode, aiMessage.content || "", JSON.stringify(aiMessage.tool_calls)]);
 
             messages.push(aiMessage); 
 

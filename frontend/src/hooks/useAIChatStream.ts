@@ -144,6 +144,7 @@ export function useAIChatStream(options?: {
             const dataPayload = trimmedLine.replace(/^data:\s*/, '');
             if (dataPayload === '[DONE]') continue;
             
+            let streamError = null;
             try {
               const data = JSON.parse(dataPayload);
               
@@ -152,12 +153,20 @@ export function useAIChatStream(options?: {
                   continue; 
               }
               
-              const contentChunk = data.choices?.[0]?.delta?.content || data.content || data.text || "";
-              if (contentChunk) {
-                chunkTextToAppend += contentChunk;
+              if (data.error) {
+                  streamError = data.error;
+              } else {
+                  const contentChunk = data.choices?.[0]?.delta?.content || data.content || data.text || "";
+                  if (contentChunk) {
+                    chunkTextToAppend += contentChunk;
+                  }
               }
             } catch (parseError) {
               console.warn('[Luồng Thép] Bỏ qua chunk vỡ ngầm:', dataPayload);
+            }
+
+            if (streamError) {
+                throw new Error(streamError);
             }
           }
         }
