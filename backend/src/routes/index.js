@@ -7,6 +7,7 @@ const aiRoutes = require('./aiRoutes');
 const facilityRoutes = require('./facilityRoutes');
 const kpiRoutes = require('./kpiRoutes');
 const logRoutes = require('./logRoutes');
+const reportRoutes = require('./reportRoutes');
 
 // Trạm Giao thông Tổng
 router.use('/auth', authRoutes);
@@ -15,5 +16,6 @@ router.use('/ai', aiRoutes);
 router.use('/facilities', facilityRoutes);
 router.use('/kpi', kpiRoutes);
 router.use('/logs', logRoutes);
+router.use('/reports', reportRoutes);
 
 module.exports = router;
