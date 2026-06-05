@@ -22,6 +22,11 @@ export function useAIChatStream(options?: {
   const isStreamingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
+
   // Ép đồng bộ State nội bộ khi API Lịch sử trả về
   useEffect(() => {
     if (options?.initialMessages) {
@@ -85,7 +90,6 @@ export function useAIChatStream(options?: {
         chatEndpoint = new URL('/api/ai/chat-stream', baseURL).toString();
 
       } catch (err) {
-        // Lỗi này giờ đây chỉ xảy ra nếu trình duyệt quá cũ không hỗ trợ URL API
         throw new Error('SYSTEM_ERROR: Trình duyệt không thể phân giải đường dẫn mạng.');
       }
 
@@ -112,12 +116,9 @@ export function useAIChatStream(options?: {
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
 
-      // KIẾN TRÚC LUỒNG UI STREAM THÉP - BẢN VÁ TỪ HUBDB 555
       let isFirstChunk = true;
       while (true) {
         const { done, value } = await reader.read();
-        
-        if (done) break;
 
         if (isFirstChunk) {
             setIsThinking(false);
@@ -130,9 +131,8 @@ export function useAIChatStream(options?: {
           buffer += chunk;
         }
 
-        // 1. DIỆT BẪY CRLF: Phân tách chunk chấp nhận cả \n\n và \r\n\r\n
         const lines = buffer.split(/\r?\n\r?\n/);
-        buffer = lines.pop() || ''; // Giữ lại phần chưa nguyên vẹn
+        buffer = lines.pop() || ''; 
 
         let chunkTextToAppend = '';
         
@@ -147,10 +147,9 @@ export function useAIChatStream(options?: {
             try {
               const data = JSON.parse(dataPayload);
               
-              // Hứng SessionID mới từ Backend trả về
-              if (data.sessionId && options?.onSessionCreated) {
-                  options.onSessionCreated(data.sessionId);
-                  continue; // Bỏ qua chunk này để đi tiếp vòng lặp
+              if (data.sessionId && optionsRef.current?.onSessionCreated) {
+                  optionsRef.current.onSessionCreated(data.sessionId);
+                  continue; 
               }
               
               const contentChunk = data.choices?.[0]?.delta?.content || data.content || data.text || "";
@@ -172,7 +171,6 @@ export function useAIChatStream(options?: {
           }
         }
 
-        // 4. CHỐNG THẤT THOÁT BUFFER CUỐI CÙNG & CỜ [DONE]
         if (done) {
            if (buffer.trim().startsWith('data: ') && !buffer.includes('[DONE]')) {
               try {
@@ -185,11 +183,13 @@ export function useAIChatStream(options?: {
               } catch (e) {}
            }
            
-           // Khi [DONE], mới gộp toàn bộ streamingText vào mảng messages chính
-           setMessages((prev) => [
-             ...prev,
-             { id: `msg-${Date.now()}`, role: 'assistant', content: streamingTextRef.current }
-           ]);
+           if (streamingTextRef.current.trim() !== '') {
+               setMessages((prev) => [
+                 ...prev,
+                 { id: generateId(), role: 'assistant', content: streamingTextRef.current }
+               ]);
+           }
+           
            setStreamingText('');
            streamingTextRef.current = '';
            
@@ -204,20 +204,15 @@ export function useAIChatStream(options?: {
         if (streamingTextRef.current) {
            setMessages((prev) => [
              ...prev,
-             { id: `msg-${Date.now()}`, role: 'assistant', content: streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]' }
+             { id: generateId(), role: 'assistant', content: streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]' }
            ]);
            setStreamingText('');
            streamingTextRef.current = '';
         } else {
-           setMessages((prev) => {
-             const newMessages = [...prev];
-             const lastIndex = newMessages.length - 1;
-             newMessages[lastIndex] = {
-               ...newMessages[lastIndex],
-               content: newMessages[lastIndex].content + '\n[LỖI KẾT NỐI STREAM]'
-             };
-             return newMessages;
-           });
+           setMessages((prev) => [
+             ...prev,
+             { id: generateId(), role: 'assistant', content: 'Hệ thống AI đang gián đoạn kết nối. Vui lòng thử lại.' }
+           ]);
         }
       }
     } finally {
@@ -225,7 +220,7 @@ export function useAIChatStream(options?: {
         isStreamingRef.current = false;
         setIsStreaming(false);
         setIsThinking(false);
-        if (options?.onStreamComplete) options.onStreamComplete();
+        if (optionsRef.current?.onStreamComplete) optionsRef.current.onStreamComplete();
         abortControllerRef.current = null;
       }
     }
