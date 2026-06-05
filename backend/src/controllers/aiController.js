@@ -239,9 +239,21 @@ const pingBatchHandler = async (req, res) => {
     }
 };
 
+const getMessagesHandler = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rows } = await pool.query('SELECT id, role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY id ASC', [id]);
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error("Lỗi GET messages:", error);
+        res.json({ success: true, data: [] });
+    }
+};
+
 module.exports = {
     chatStreamHandler,
     getSessionsHandler,
     createSessionHandler,
-    pingBatchHandler
+    pingBatchHandler,
+    getMessagesHandler
 };

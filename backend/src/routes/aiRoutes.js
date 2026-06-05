@@ -13,5 +13,6 @@ router.post('/ping-batch', authGuard, rbacGuard, aiController.pingBatchHandler);
 // Quản lý Sessions
 router.get('/sessions', authGuard, aiController.getSessionsHandler);
 router.post('/sessions', authGuard, aiController.createSessionHandler);
+router.get('/chat-sessions/:id/messages', authGuard, aiController.getMessagesHandler);
 
 module.exports = router;
