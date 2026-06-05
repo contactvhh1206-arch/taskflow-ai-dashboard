@@ -2905,9 +2905,21 @@ async function executeGetTasksTool(args, user) {
         }
 
         if (assignee_name) {
-            sql += ` AND u.full_name ILIKE $${paramCount}`;
-            params.push('%' + assignee_name + '%');
-            paramCount++;
+            let names = [];
+            if (Array.isArray(assignee_name)) {
+                names = assignee_name;
+            } else if (typeof assignee_name === 'string') {
+                names = assignee_name.split(',').map(n => n.trim()).filter(Boolean);
+            }
+            if (names.length > 0) {
+                let conditions = [];
+                for (let i = 0; i < names.length; i++) {
+                    conditions.push(`u.full_name ILIKE $${paramCount}`);
+                    params.push('%' + names[i] + '%');
+                    paramCount++;
+                }
+                sql += ` AND (${conditions.join(' OR ')})`;
+            }
         }
 
         if (status === 'overdue') {
@@ -4198,7 +4210,7 @@ Giao tiếp thân thiện, linh hoạt, duyên dáng với Sếp nhưng luôn gi
                             },
                             assignee_name: {
                                 type: "string",
-                                description: "Tên nhân sự hoặc người phụ trách công việc cần tra cứu (ví dụ: Thiện, Tùng, Phương). LỆNH BẮT BUỘC: Khi người dùng yêu cầu tra cứu tiến độ công việc của một hoặc nhiều nhân sự cụ thể, BẠN PHẢI bóc tách chính xác tên người đó và đưa vào tham số này. TUYỆT ĐỐI CẤM nhét tên người vào tham số search_term. Tham số search_term chỉ được dùng để tìm tên dự án hoặc nội dung công việc. NẾU VI PHẠM SẼ BỊ ĐÌNH CHỈ."
+                                description: "Tên nhân sự phụ trách (VD: Thiện, Tùng). LỆNH BẮT BUỘC: Nếu người dùng yêu cầu tra cứu nhiều người cùng lúc (VD: Thiện, Cường, Tùng), BẠN BẮT BUỘC PHẢI gộp tất cả tên thành 1 chuỗi duy nhất cách nhau bằng dấu phẩy (VD: 'Thiện, Cường, Tùng') VÀ CHỈ GỌI TOOL NÀY 1 LẦN DUY NHẤT. NGHIÊM CẤM GỌI TOOL NHIỀU LẦN SONG SONG cho từng người, làm vậy hệ thống sẽ bị treo."
                             }
                         },
                         required: []
