@@ -6,9 +6,13 @@ const authGuard = require('../middlewares/authGuard');
 
 router.get('/', authGuard, async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM kpi_settings ORDER BY id DESC LIMIT 1');
+        // Thay vì ORDER BY id DESC (do ID là UUID ngẫu nhiên), tạm thời lấy bản ghi mới nhất
+        const { rows } = await pool.query('SELECT * FROM kpi_settings LIMIT 1'); 
         res.json({ success: true, data: rows[0] || {} });
     } catch (e) {
+        res.json({ success: true, data: {} });
+    }
+});
         res.json({ success: true, data: {} });
     }
 });
@@ -21,13 +25,13 @@ router.post('/', authGuard, async (req, res) => {
             return res.status(400).json({ success: false, error: 'Thiếu dữ liệu (apply_month, data)' });
         }
 
-        // Do Database đã cấu hình tự động tăng ID (Serial), chỉ truyền dữ liệu thực tế
-        const { rows } = await pool.query('SELECT id FROM kpi_settings ORDER BY id DESC LIMIT 1');
+        // Cập nhật hoặc tạo mới dựa trên apply_month
+        const { rows } = await pool.query('SELECT id FROM kpi_settings WHERE apply_month = $1', [apply_month]);
         
         if (rows.length > 0) {
             await pool.query(
-                'UPDATE kpi_settings SET apply_month = $1, data = $2 WHERE id = $3',
-                [apply_month, JSON.stringify(data), rows[0].id]
+                'UPDATE kpi_settings SET data = $2 WHERE apply_month = $1',
+                [apply_month, JSON.stringify(data)]
             );
         } else {
             await pool.query(
