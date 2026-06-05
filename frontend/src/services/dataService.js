@@ -37,7 +37,7 @@ export const fetchHistory = async (filters = {}) => {
       }));
       
       // Keep client-side fallback just in case backend doesn't filter perfectly yet
-      if (filters.org_unit) filtered = filtered.filter(item => item.org_unit === filters.org_unit);
+      if (filters.org_unit) filtered = filtered.filter(item => String(item.org_unit) === String(filters.org_unit));
       if (filters.entry_type) filtered = filtered.filter(item => item.entry_type === filters.entry_type);
       if (filters.date) filtered = filtered.filter(item => item.date === filters.date);
       
