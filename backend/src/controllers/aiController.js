@@ -4,15 +4,27 @@ const aiService = require('../services/aiService');
 const chatStreamHandler = async (req, res) => {
     // Tương thích cả camelCase và snake_case từ frontend
     const message = req.body.message;
-    const sessionId = req.body.session_id || req.body.sessionId;
+    let sessionId = req.body.session_id || req.body.sessionId;
     const userContext = req.user;
 
     // 1. Rào chắn đầu vào (Validation)
-    if (!message || !sessionId) {
+    if (!message) {
         return res.status(400).json({
             success: false,
-            message: "Bad Request: Thiếu message hoặc sessionId."
+            message: "Bad Request: Thiếu message."
         });
+    }
+
+    // 1.5 Tự động tạo Session nếu Frontend gửi null (trường hợp click gợi ý mới)
+    let isNewSession = false;
+    if (!sessionId) {
+        try {
+            const { rows } = await pool.query('INSERT INTO ai_chat_sessions (title, facility) VALUES ($1, $2) RETURNING id', ['Phiên AI mới', userContext.facility_id]);
+            sessionId = rows[0].id;
+            isNewSession = true;
+        } catch (e) {
+            console.error("Lỗi tạo session tự động:", e);
+        }
     }
 
     // 2. Khởi tạo Headers chuẩn SSE (Server-Sent Events)
@@ -20,6 +32,11 @@ const chatStreamHandler = async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
+
+    // 2.5 Bắn ngay ID Session mới về cho Frontend để cập nhật State (CHỐNG RACE CONDITION)
+    if (isNewSession && sessionId) {
+        res.write(`data: ${JSON.stringify({ new_session_id: sessionId })}\n\n`);
+    }
 
     // 3. Cờ kiểm soát Memory Leak (Ngắt luồng khi Client F5 hoặc Đóng tab)
     let isClientConnected = true;
