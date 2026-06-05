@@ -104,13 +104,13 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             const queryLimit = limit ? Math.min(limit, 100) : 30;
             
             const query = `
-                SELECT TO_CHAR(date, 'YYYY-MM-DD') AS formatted_date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
+                SELECT date AS formatted_date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
                 FROM daily_financial_reports, 
                      jsonb_array_elements(CASE WHEN jsonb_typeof(data::jsonb) = 'array' THEN data::jsonb ELSE '[]'::jsonb END) AS elem
                 WHERE ($1::text IS NULL OR elem->>'id' = $1::text)
-                  AND ($2::date IS NULL OR date >= $2::date)
-                  AND ($3::date IS NULL OR date <= $3::date)
-                ORDER BY date DESC 
+                  AND ($2::date IS NULL OR date::date >= $2::date)
+                  AND ($3::date IS NULL OR date::date <= $3::date)
+                ORDER BY date::date DESC 
                 LIMIT $4;
             `;
             
@@ -136,7 +136,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
         return "Hệ thống từ chối: Tool không được hỗ trợ.";
     } catch (error) {
         console.error('[AI Service Error - processToolCall]:', error.message);
-        return "Lỗi máy chủ khi truy xuất dữ liệu Tool.";
+        return "Hệ thống không tìm thấy dữ liệu. Hãy báo người dùng thử lại sau.";
     }
 };
 
