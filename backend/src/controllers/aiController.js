@@ -94,24 +94,31 @@ const chatStreamHandler = async (req, res) => {
         ];
 
         for (const msg of historyRows) {
-            const formattedMsg = { role: msg.role };
+            const formattedMsg = { 
+                role: msg.role,
+                content: msg.content || "" 
+            };
             
-            if (msg.content) {
-                formattedMsg.content = msg.content;
-            }
-            
-            if (msg.tool_calls) {
-                const parsedToolCalls = typeof msg.tool_calls === 'string' 
-                    ? JSON.parse(msg.tool_calls) 
-                    : msg.tool_calls;
-
-                if (msg.role === 'assistant') {
-                    formattedMsg.tool_calls = parsedToolCalls;
-                } else if (msg.role === 'tool') {
-                    // Phục hồi tool_call_id và name từ cột tool_calls (JSONB)
-                    formattedMsg.tool_call_id = parsedToolCalls.tool_call_id;
-                    formattedMsg.name = parsedToolCalls.name;
+            if (msg.role === 'assistant' && msg.tool_calls) {
+                try {
+                    const parsedToolCalls = typeof msg.tool_calls === 'string' 
+                        ? JSON.parse(msg.tool_calls) 
+                        : msg.tool_calls;
+                    if (parsedToolCalls && parsedToolCalls.length > 0) {
+                        formattedMsg.tool_calls = parsedToolCalls;
+                    }
+                } catch (e) {}
+            } else if (msg.role === 'tool') {
+                let toolCallId = `call_${msg.id}`;
+                if (msg.tool_calls) {
+                    try {
+                        const meta = typeof msg.tool_calls === 'string' 
+                            ? JSON.parse(msg.tool_calls) 
+                            : msg.tool_calls;
+                        if (meta.tool_call_id) toolCallId = meta.tool_call_id;
+                    } catch (e) {}
                 }
+                formattedMsg.tool_call_id = toolCallId;
             }
             
             messages.push(formattedMsg);
@@ -135,7 +142,10 @@ const chatStreamHandler = async (req, res) => {
             body: JSON.stringify(llmPayload)
         });
 
-        if (!response1.ok) throw new Error('API LLM (Lượt 1) từ chối truy cập.');
+        if (!response1.ok) {
+            const errText = await response1.text();
+            throw new Error(`API LLM (Lượt 1) lỗi ${response1.status}: ${errText}`);
+        }
         const data1 = await response1.json();
         const aiMessage = data1.choices[0].message;
 
@@ -194,7 +204,10 @@ const chatStreamHandler = async (req, res) => {
                 body: JSON.stringify(llmStreamPayload)
             });
 
-            if (!response2.ok) throw new Error('API LLM (Lượt Stream) từ chối truy cập.');
+            if (!response2.ok) {
+                const errText = await response2.text();
+                throw new Error(`API LLM (Lượt Stream) lỗi ${response2.status}: ${errText}`);
+            }
             
             const reader = response2.body.getReader();
             const decoder = new TextDecoder("utf-8");
