@@ -192,10 +192,12 @@ export function useAIChatStream(options?: {
               } catch (e) {}
            }
            
-           if (streamingTextRef.current.trim() !== '') {
+           const finalContentToSave = streamingTextRef.current;
+           if (finalContentToSave.trim() !== '') {
+               const finalId = generateId();
                setMessages((prev) => [
                  ...prev,
-                 { id: generateId(), role: 'assistant', content: streamingTextRef.current }
+                 { id: finalId, role: 'assistant', content: finalContentToSave }
                ]);
            }
            
@@ -211,16 +213,19 @@ export function useAIChatStream(options?: {
       } else {
         console.error('Stream processing error:', error);
         if (streamingTextRef.current) {
+           const fallbackContent = streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]';
+           const fallbackId = generateId();
            setMessages((prev) => [
              ...prev,
-             { id: generateId(), role: 'assistant', content: streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]' }
+             { id: fallbackId, role: 'assistant', content: fallbackContent }
            ]);
            setStreamingText('');
            streamingTextRef.current = '';
         } else {
+           const newId = generateId();
            setMessages((prev) => [
              ...prev,
-             { id: generateId(), role: 'assistant', content: 'Hệ thống AI đang gián đoạn kết nối. Vui lòng thử lại.' }
+             { id: newId, role: 'assistant', content: 'Hệ thống AI đang gián đoạn kết nối. Vui lòng thử lại.' }
            ]);
         }
       }
