@@ -79,4 +79,78 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
     return { totalRecords, rows };
 };
 
-module.exports = { getTasksList };
+const getTasksHistory = async ({ userId, role, facilityId, departmentCode, picId, dateFrom, dateTo, limit, offset }) => {
+    let baseWhere = `t.status = 'done'`;
+    const params = [];
+
+    if (facilityId && facilityId !== 'ALL') {
+        params.push(facilityId);
+        baseWhere += ` AND t.facility_id = $${params.length}`;
+    }
+
+    if (departmentCode && (!facilityId || facilityId === 'ALL')) {
+        params.push(departmentCode);
+        baseWhere += ` AND t.department_code = $${params.length}`;
+    }
+
+    const globalRoles = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'ADMIN'];
+    if (!globalRoles.includes(role) && role !== 'FACILITY_MANAGER') {
+        params.push(userId, userId);
+        baseWhere += ` AND (t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
+    }
+
+    if (picId) {
+        params.push(`%${picId}%`);
+        baseWhere += ` AND (u.full_name ILIKE $${params.length} OR u.email ILIKE $${params.length})`;
+    }
+
+    if (dateFrom) {
+        params.push(dateFrom);
+        baseWhere += ` AND t.updated_at >= $${params.length}::date`;
+    }
+    if (dateTo) {
+        params.push(dateTo);
+        baseWhere += ` AND t.updated_at < $${params.length}::date + interval '1 day'`;
+    }
+
+    const countQuery = `
+        SELECT COUNT(t.id) as total 
+        FROM tasks t
+        LEFT JOIN users u ON t.pic_id = u.id
+        WHERE ${baseWhere}
+    `;
+    const countRes = await pool.query(countQuery, params);
+    const totalRecords = parseInt(countRes.rows[0].total, 10);
+
+    params.push(limit, offset);
+    const dataQuery = `
+        WITH paginated_tasks AS (
+            SELECT t.id, t.title, t.description, t.status, t.urgency, t.deadline, t.created_at, t.updated_at, t.needs_support, t.priority_level, t.pic_id, t.facility_id, t.department_code, u.full_name, u.email
+            FROM tasks t
+            LEFT JOIN users u ON t.pic_id = u.id
+            WHERE ${baseWhere}
+            ORDER BY t.updated_at DESC
+            LIMIT $${params.length - 1} OFFSET $${params.length}
+        )
+        SELECT pt.id, pt.title, pt.description as desc, pt.status, pt.urgency as urgent, 
+               TO_CHAR(pt.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
+               pt.created_at as "createdAt", pt.updated_at as "completedAt",
+               pt.needs_support as "needsSupport",
+               CASE WHEN pt.priority_level = '5' OR pt.priority_level = '3' THEN 5 WHEN pt.priority_level = '2' THEN 3 ELSE 0 END as priority_stars,
+               pt.full_name as pic, pt.email as "picId",
+               f.name as facility, f.code as "facilityId",
+               pt.facility_id as "facilityRawId",
+               pt.department_code as "department_tag",
+               COUNT(tc.id) AS comment_count
+        FROM paginated_tasks pt
+        LEFT JOIN facilities f ON pt.facility_id = f.id AND f.is_deleted = false
+        LEFT JOIN task_comments tc ON pt.id = tc.task_id
+        GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, pt.priority_level, 
+                 pt.full_name, pt.email, f.name, f.code, pt.facility_id, pt.department_code
+        ORDER BY pt.updated_at DESC
+    `;
+    const { rows } = await pool.query(dataQuery, params);
+    return { totalRecords, rows };
+};
+
+module.exports = { getTasksList, getTasksHistory };
