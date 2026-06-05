@@ -7,6 +7,8 @@ export interface Message {
 }
 
 export function useAIChatStream(options?: {
+  sessionId?: string | null;
+  initialMessages?: Message[];
   onSessionCreated?: (sessionId: string) => void;
   onSessionUpdate?: (data: any) => void;
   onStreamComplete?: () => void;
@@ -19,6 +21,14 @@ export function useAIChatStream(options?: {
   const [isThinking, setIsThinking] = useState<boolean>(false);
   const isStreamingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (options?.initialMessages) {
+      setMessages(options.initialMessages);
+    } else {
+      setMessages([]);
+    }
+  }, [options?.initialMessages, options?.sessionId]);
 
   useEffect(() => {
     return () => {

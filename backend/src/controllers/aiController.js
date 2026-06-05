@@ -4,7 +4,8 @@ const aiService = require('../services/aiService');
 const chatStreamHandler = async (req, res) => {
     // Tương thích cả camelCase và snake_case từ frontend
     const message = req.body.message;
-    let sessionId = req.body.session_id || req.body.sessionId;
+    let { sessionId, session_id } = req.body;
+    sessionId = sessionId || session_id;
     const userContext = req.user;
 
     // 1. Rào chắn đầu vào (Validation)
@@ -243,7 +244,15 @@ const pingBatchHandler = async (req, res) => {
 const getMessagesHandler = async (req, res) => {
     try {
         const { id } = req.params;
-        const { rows } = await pool.query('SELECT id, role, content FROM ai_chat_messages WHERE session_id = $1 ORDER BY id ASC', [id]);
+        const userId = req.user.id;
+        const { rows } = await pool.query(
+            `SELECT m.id, m.role, m.content 
+             FROM ai_chat_messages m
+             JOIN ai_chat_sessions s ON m.session_id = s.id
+             WHERE m.session_id = $1 AND s.user_id = $2 
+             ORDER BY m.created_at ASC`, 
+            [id, userId]
+        );
         res.json({ success: true, data: rows });
     } catch (error) {
         console.error("Lỗi GET messages:", error);
