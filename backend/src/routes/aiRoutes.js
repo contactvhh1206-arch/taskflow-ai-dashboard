@@ -5,7 +5,10 @@ const rbacGuard = require('../middlewares/rbacGuard');
 const aiController = require('../controllers/aiController');
 
 // Luồng Stream AI được bọc thép và chạy cơ chế Sandbox
-router.post('/chat/stream', authGuard, rbacGuard, aiController.chatStreamHandler);
+router.post('/chat-stream', authGuard, rbacGuard, aiController.chatStreamHandler);
+
+// Ping Batch
+router.post('/ping-batch', authGuard, rbacGuard, aiController.pingBatchHandler);
 
 // Quản lý Sessions
 router.get('/sessions', authGuard, aiController.getSessionsHandler);

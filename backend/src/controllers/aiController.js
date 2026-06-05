@@ -195,8 +195,28 @@ const createSessionHandler = async (req, res) => {
     }
 };
 
+const pingBatchHandler = async (req, res) => {
+    try {
+        const { taskIds } = req.body;
+        if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const data = taskIds.map(id => ({
+            taskId: id,
+            generated_message: `Cố vấn AI nhận thấy công việc này đang tới hạn. Bạn có cần hỗ trợ điều phối thêm nhân sự không? Đừng quá áp lực nhé!`
+        }));
+
+        res.json({ success: true, data });
+    } catch (error) {
+        console.error("Lỗi AI Ping Batch:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 module.exports = {
     chatStreamHandler,
     getSessionsHandler,
-    createSessionHandler
+    createSessionHandler,
+    pingBatchHandler
 };
