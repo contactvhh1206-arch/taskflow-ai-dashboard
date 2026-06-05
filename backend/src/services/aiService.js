@@ -75,25 +75,38 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
         if (functionName === 'fetch_financial_reports') {
             const { month, year } = functionArgs || {};
-            let query = 'SELECT facility_id, date, revenue_amount, expenses_amount FROM daily_financial_reports WHERE 1=1';
-            const params = [];
+            // Cấu trúc DB lưu theo mảng JSON trong cột data
+            let query = 'SELECT date, data FROM daily_financial_reports ORDER BY created_at DESC LIMIT 30';
             
-            // TIÊM NGẦM BẮT BUỘC: Ép quyền Facility
-            if (userContext.role !== 'SUPER_ADMIN' && userContext.role !== 'VICE_PRESIDENT' && userContext.role !== 'ADMIN' && userContext.facility_id !== 'ALL') {
-                params.push(userContext.facility_id);
-                query += ` AND facility_id = $${params.length}`;
-            }
-
-            query += ` ORDER BY date DESC LIMIT 30`; // RAG Limit
-
-            const { rows } = await pool.query(query, params);
+            const { rows } = await pool.query(query);
 
             if (!rows || rows.length === 0) {
                 return "Hệ thống báo cáo: Không có dữ liệu doanh thu.";
             }
 
-            const simplifiedData = rows.map(r => `[Cơ sở: ${r.facility_id}] Ngày: ${new Date(r.date).toLocaleDateString('vi-VN')} - Doanh thu: ${r.revenue_amount || 0} - Chi phí: ${r.expenses_amount || 0}`).join('\n');
-            return simplifiedData;
+            let resultLines = [];
+            for (const r of rows) {
+                let reportData = r.data;
+                if (typeof reportData === 'string') {
+                    try { reportData = JSON.parse(reportData); } catch (e) {}
+                }
+                
+                if (Array.isArray(reportData)) {
+                    reportData.forEach(facData => {
+                        // TIÊM NGẦM BẮT BUỘC: Phân quyền cấp cơ sở
+                        if (userContext.role !== 'SUPER_ADMIN' && userContext.role !== 'VICE_PRESIDENT' && userContext.role !== 'ADMIN' && userContext.facility_id !== 'ALL') {
+                            if (facData.id !== userContext.facility_id) return;
+                        }
+                        resultLines.push(`[Cơ sở: ${facData.name || facData.id}] Ngày: ${r.date} - Doanh thu: ${facData.revenue || 0} VNĐ`);
+                    });
+                }
+            }
+
+            if (resultLines.length === 0) {
+                return "Hệ thống báo cáo: Không có dữ liệu doanh thu cho cơ sở của bạn.";
+            }
+
+            return resultLines.join('\n');
         }
 
         return "Hệ thống từ chối: Tool không được hỗ trợ.";
