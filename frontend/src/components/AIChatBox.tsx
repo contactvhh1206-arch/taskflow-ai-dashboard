@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, FormEvent, UIEvent } from 'react';
 import { useAIChatStream } from '../hooks/useAIChatStream';
 
 export const AIChatBox: React.FC = () => {
-  const { messages, isStreaming, sendMessage, stopStream } = useAIChatStream();
+  const { messages, streamingText, isStreaming, sendMessage, stopStream } = useAIChatStream();
   const [inputValue, setInputValue] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -58,6 +58,12 @@ export const AIChatBox: React.FC = () => {
             <span className="whitespace-pre-wrap leading-relaxed">{msg.content}</span>
           </div>
         ))}
+        {streamingText && (
+          <div className="p-3 rounded-lg max-w-[85%] shadow-sm bg-white text-gray-800 self-start border border-gray-200 rounded-bl-none">
+            <span className="whitespace-pre-wrap leading-relaxed">{streamingText}</span>
+            <span className="ml-1 animate-pulse">▍</span>
+          </div>
+        )}
         <div ref={messagesEndRef} className="h-px w-full" />
       </div>
 
