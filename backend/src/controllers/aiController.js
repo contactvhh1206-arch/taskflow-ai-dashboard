@@ -2,7 +2,9 @@ const pool = require('../config/database');
 const aiService = require('../services/aiService');
 
 const chatStreamHandler = async (req, res) => {
-    const { message, sessionId } = req.body;
+    // Tương thích cả camelCase và snake_case từ frontend
+    const message = req.body.message;
+    const sessionId = req.body.session_id || req.body.sessionId;
     const userContext = req.user;
 
     // 1. Rào chắn đầu vào (Validation)
