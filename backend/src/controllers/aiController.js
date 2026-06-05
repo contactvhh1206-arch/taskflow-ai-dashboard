@@ -19,7 +19,7 @@ const chatStreamHandler = async (req, res) => {
     let isNewSession = false;
     if (!sessionId) {
         try {
-            const { rows } = await pool.query('INSERT INTO ai_chat_sessions (title, facility) VALUES ($1, $2) RETURNING id', ['Phiên AI mới', userContext.facility_id]);
+            const { rows } = await pool.query('INSERT INTO ai_chat_sessions (title, facility_id) VALUES ($1, $2) RETURNING id', ['Phiên AI mới', userContext.facility_id]);
             sessionId = rows[0].id;
             isNewSession = true;
         } catch (e) {
@@ -198,7 +198,7 @@ const chatStreamHandler = async (req, res) => {
 
 const getSessionsHandler = async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM ai_chat_sessions WHERE facility = $1 ORDER BY updated_at DESC', [req.user.facility_id === 'ALL' ? 'ALL' : req.user.facility_id]);
+        const { rows } = await pool.query('SELECT * FROM ai_chat_sessions WHERE facility_id = $1 ORDER BY updated_at DESC', [req.user.facility_id === 'ALL' ? 'ALL' : req.user.facility_id]);
         res.json({ success: true, data: rows });
     } catch (error) {
         res.json({ success: true, data: [] });
@@ -207,7 +207,7 @@ const getSessionsHandler = async (req, res) => {
 
 const createSessionHandler = async (req, res) => {
     try {
-        const { rows } = await pool.query('INSERT INTO ai_chat_sessions (title, facility) VALUES ($1, $2) RETURNING *', ['Phiên AI mới', req.user.facility_id]);
+        const { rows } = await pool.query('INSERT INTO ai_chat_sessions (title, facility_id) VALUES ($1, $2) RETURNING *', ['Phiên AI mới', req.user.facility_id]);
         res.json({ success: true, data: rows[0] });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
