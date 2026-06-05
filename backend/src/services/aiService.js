@@ -101,7 +101,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
         if (functionName === 'fetch_financial_reports') {
             const { start_date, end_date, limit } = functionArgs || {};
-            const queryLimit = limit ? Math.min(limit, 100) : 30;
+            const queryLimit = limit ? Math.min(limit, 1000) : 500;
             
             const query = `
                 SELECT date AS formatted_date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name

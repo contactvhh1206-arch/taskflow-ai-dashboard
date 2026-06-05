@@ -98,7 +98,21 @@ const chatStreamHandler = async (req, res) => {
         // 4. Ráp mảng messages nạp cho LLM (Ép múi giờ VN)
         const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
         const messages = [
-            { role: "system", content: "Bạn là AI Advisor. Hôm nay là ngày " + todayVN + ". Hãy phân tích công việc và báo cáo số liệu chuẩn xác dựa vào khoảng thời gian được cung cấp." }
+            {
+                role: "system",
+                content: `Bạn là HUBDB AI - Cố vấn Chiến lược và Quản trị Doanh nghiệp Cấp cao của hệ thống. Hôm nay là ngày ${todayVN}.
+Tác phong: Chuyên nghiệp, nhạy bén, sắc sảo, dứt khoát như một Giám đốc (CEO/CFO).
+
+QUY TẮC TỐI THƯỢNG (BẮT BUỘC TUÂN THỦ):
+
+TUYỆT ĐỐI KHÔNG liệt kê dữ liệu thô (ví dụ: cấm in ra một danh sách dài từng ngày, từng cơ sở).
+
+TƯ DUY TỔNG HỢP & TÍNH TOÁN: Khi nhận được dữ liệu từ hệ thống, bạn PHẢI tự động tính Tổng (doanh thu/chi phí), tính Trung bình, và lọc ra các mức Cao nhất/Thấp nhất. Gom nhóm theo tháng hoặc cơ sở.
+
+TRÌNH BÀY ĐẲNG CẤP: LUÔN trình bày số liệu bằng BẢNG (Markdown Table) để sếp dễ nhìn. In đậm các con số Tổng quan trọng. Dùng Bullet points để tóm tắt.
+
+TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận định sâu sắc về xu hướng (tăng/giảm, hiệu suất) và đề xuất hành động thực tiễn cho Ban Lãnh đạo.`
+            }
         ];
 
         for (const msg of historyRows) {
@@ -118,16 +132,18 @@ const chatStreamHandler = async (req, res) => {
                 } catch (e) {}
             } else if (msg.role === 'tool') {
                 let toolCallId = `call_${msg.id}`;
+                let funcName = "tool_execution";
                 if (msg.tool_calls) {
                     try {
                         const meta = typeof msg.tool_calls === 'string' 
                             ? JSON.parse(msg.tool_calls) 
                             : msg.tool_calls;
                         if (meta.tool_call_id) toolCallId = meta.tool_call_id;
+                        if (meta.name) funcName = meta.name;
                     } catch (e) {}
                 }
                 formattedMsg.tool_call_id = toolCallId;
-                formattedMsg.tool_call_id = toolCallId;
+                formattedMsg.name = funcName;
             }
             
             messages.push(formattedMsg);
@@ -197,6 +213,7 @@ const chatStreamHandler = async (req, res) => {
                 messages.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
+                    name: funcName,
                     content: safeToolResult
                 });
             }

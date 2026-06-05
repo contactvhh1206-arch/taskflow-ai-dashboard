@@ -46,7 +46,7 @@ export const AIChatBox: React.FC = () => {
         onScroll={handleScroll}
         className="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"
       >
-        {messages.map((msg) => (
+        {messages.filter(msg => msg.role === 'user' || (msg.role === 'assistant' && msg.content && msg.content.trim() !== '')).map((msg) => (
           <div 
             key={msg.id} 
             className={`p-3 rounded-lg max-w-[85%] shadow-sm ${
