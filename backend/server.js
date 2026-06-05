@@ -2836,7 +2836,7 @@ async function executeCreateTaskTool(args, user) {
 
 
 async function executeGetTasksTool(args, user) {
-    let { status, department_code, facility_id, time_range, priority_level, search_term } = args;
+    let { status, department_code, facility_id, time_range, priority_level, search_term, assignee_name } = args;
 
     try {
         const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
@@ -2900,7 +2900,13 @@ async function executeGetTasksTool(args, user) {
 
         if (search_term) {
             sql += ` AND t.title ILIKE $${paramCount}`;
-            params.push(`%${search_term}%`);
+            params.push('%' + search_term + '%');
+            paramCount++;
+        }
+
+        if (assignee_name) {
+            sql += ` AND u.full_name ILIKE $${paramCount}`;
+            params.push('%' + assignee_name + '%');
             paramCount++;
         }
 
@@ -2925,7 +2931,7 @@ async function executeGetTasksTool(args, user) {
                      AND (t.deadline AT TIME ZONE 'Asia/Ho_Chi_Minh') < date_trunc('month', (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh'))`;
         }
 
-        sql += ` ORDER BY t.deadline ASC NULLS LAST, t.id DESC LIMIT 15`;
+        sql += ` ORDER BY t.deadline ASC NULLS LAST, t.id DESC LIMIT 50`;
 
         const { rows } = await pool.query(sql, params);
         
@@ -4000,6 +4006,10 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                             search_term: {
                                 type: "string",
                                 description: "Từ khóa tìm kiếm tự do trong tiêu đề công việc (nếu người dùng nhắc đến tên dự án, tên task cụ thể)."
+                            },
+                            assignee_name: {
+                                type: "string",
+                                description: "Tên nhân sự hoặc người phụ trách công việc cần tra cứu (ví dụ: Thiện, Tùng, Phương). LỆNH BẮT BUỘC: Khi người dùng yêu cầu tra cứu tiến độ công việc của một hoặc nhiều nhân sự cụ thể, BẠN PHẢI bóc tách chính xác tên người đó và đưa vào tham số này. TUYỆT ĐỐI CẤM nhét tên người vào tham số search_term. Tham số search_term chỉ được dùng để tìm tên dự án hoặc nội dung công việc. NẾU VI PHẠM SẼ BỊ ĐÌNH CHỈ."
                             }
                         },
                         required: []
