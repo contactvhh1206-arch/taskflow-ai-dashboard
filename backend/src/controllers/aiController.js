@@ -115,39 +115,36 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             }
         ];
 
+        // [KIẾN TRÚC RAG THANH KHIẾT]: Gọt sạch mọi dấu vết Tool Call trong Lịch sử
         for (const msg of historyRows) {
-            const formattedMsg = { role: msg.role };
-            if (msg.content && msg.content.trim() !== "") {
-                formattedMsg.content = msg.content;
-            }
             
-            if (msg.role === 'assistant' && msg.tool_calls) {
-                try {
-                    const parsedToolCalls = typeof msg.tool_calls === 'string' 
-                        ? JSON.parse(msg.tool_calls) 
-                        : msg.tool_calls;
-                    if (parsedToolCalls && parsedToolCalls.length > 0) {
-                        formattedMsg.tool_calls = parsedToolCalls;
-                    }
-                } catch (e) {}
-            } else if (msg.role === 'tool') {
-                let toolCallId = `call_${msg.id}`;
-                let funcName = "tool_execution";
-                if (msg.tool_calls) {
-                    try {
-                        const meta = typeof msg.tool_calls === 'string' 
-                            ? JSON.parse(msg.tool_calls) 
-                            : msg.tool_calls;
-                        if (meta.tool_call_id) toolCallId = meta.tool_call_id;
-                        if (meta.name) funcName = meta.name;
-                    } catch (e) {}
+            // 1. Chém không thương tiếc mọi dữ liệu thô (hoặc tin nhắn nén) của Tool
+            if (msg.role === 'tool') {
+                continue; 
+            }
+
+            // 2. Ép Assistant quên đi quá khứ gọi hàm, chỉ nhớ bản tóm tắt
+            if (msg.role === 'assistant') {
+                // Nếu là cái xác không hồn (chỉ chứa tool_calls ẩn, không có text tóm tắt) -> Bỏ qua
+                if (!msg.content || msg.content.trim() === "") {
+                    continue;
                 }
-                formattedMsg.tool_call_id = toolCallId;
-                formattedMsg.name = funcName;
-                formattedMsg.content = "[Hệ thống: Dữ liệu thô đã được nén để tối ưu luồng suy nghĩ. Cố vấn hãy đọc bản báo cáo ở câu trả lời phía sau.]";
-            }
+                // Nếu là bản tóm tắt quý giá -> Nạp vào não AI
+                messages.push({
+                    role: 'assistant',
+                    content: msg.content
+                });
+            } 
             
-            messages.push(formattedMsg);
+            // 3. Giữ nguyên câu hỏi của User
+            else if (msg.role === 'user') {
+                if (msg.content && msg.content.trim() !== "") {
+                    messages.push({
+                        role: 'user',
+                        content: msg.content
+                    });
+                }
+            }
         }
 
         // 5. Gửi Request lên LLM
