@@ -344,22 +344,22 @@ export default function AIAdvisor(props) {
         {chatLog.length === 0 && !isFacilityMode && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
             <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 pointer-events-auto">
-              <div onClick={() => handleAsk('Trích xuất báo cáo chi tiết tổng quan hoạt động của 6 cơ sở: DB41, DBACE, DBPQ, DB PA, DBPAV, DPPAK')} className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-8 rounded-3xl border border-blue-100 dark:border-blue-800/50 cursor-pointer hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1.5 transition-all duration-300 group relative overflow-hidden">
+              <div onClick={() => handleAsk('Hãy đánh giá tổng quan tình hình của toàn bộ 6 cơ sở. Phân tích chéo dữ liệu Doanh thu, Vận hành và Tiến độ công việc để tìm ra điểm nóng hoặc rủi ro tiềm ẩn. Đề xuất cho tôi hướng xử lý ngay lập tức!')} className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-8 rounded-3xl border border-blue-100 dark:border-blue-800/50 cursor-pointer hover:shadow-2xl hover:shadow-blue-500/10 hover:-translate-y-1.5 transition-all duration-300 group relative overflow-hidden">
                 <div className="absolute -right-6 -top-6 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:bg-blue-500/20 transition-all"></div>
                 <div className="relative w-16 h-16 bg-white dark:bg-[#2a2a2a] shadow-sm rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 border border-blue-100/50 dark:border-gray-700">
                   <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>monitoring</span>
                 </div>
                 <h3 className="relative text-2xl font-bold text-gray-800 dark:text-white mb-3 leading-tight">Tổng quan 6 cơ sở</h3>
-                <p className="relative text-base text-gray-600 dark:text-gray-400 leading-relaxed">Báo cáo chi tiết hoạt động của DB41, DBACE, DBPQ, DB PA, DBPAV, DPPAK.</p>
+                <p className="relative text-base text-gray-600 dark:text-gray-400 leading-relaxed">Đánh giá toàn diện hoạt động của các cơ sở, nhận diện rủi ro chéo qua Doanh thu - Vận hành - Task.</p>
               </div>
 
-              <div onClick={() => handleAsk('Cập nhật tiến độ phòng ban (Thiện, Cường, Tùng, Martin, Hoàng, Anh Phương)')} className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-8 rounded-3xl border border-purple-100 dark:border-purple-800/50 cursor-pointer hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1.5 transition-all duration-300 group relative overflow-hidden">
+              <div onClick={() => handleAsk('Hãy đánh giá tổng quan hiệu suất và tiến độ công việc của toàn bộ các phòng ban (Marketing, Tài chính, Kỹ thuật, Nhân sự, BGD). Có phòng ban nào đang bị trễ task hoặc có điểm nóng cần xử lý gấp không? Đề xuất giải pháp!')} className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-8 rounded-3xl border border-purple-100 dark:border-purple-800/50 cursor-pointer hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-1.5 transition-all duration-300 group relative overflow-hidden">
                 <div className="absolute -right-6 -top-6 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all"></div>
                 <div className="relative w-16 h-16 bg-white dark:bg-[#2a2a2a] shadow-sm rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 border border-purple-100/50 dark:border-gray-700">
                   <span className="material-symbols-outlined text-purple-600 dark:text-purple-400 text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>engineering</span>
                 </div>
-                <h3 className="relative text-2xl font-bold text-gray-800 dark:text-white mb-3 leading-tight">Tiến độ phòng ban</h3>
-                <p className="relative text-base text-gray-600 dark:text-gray-400 leading-relaxed">Cập nhật tiến độ phòng ban.</p>
+                <h3 className="relative text-2xl font-bold text-gray-800 dark:text-white mb-3 leading-tight">Tổng quan Phòng ban</h3>
+                <p className="relative text-base text-gray-600 dark:text-gray-400 leading-relaxed">Rà soát tiến độ công việc, đo lường hiệu suất và các điểm nghẽn của tất cả phòng ban.</p>
               </div>
             </div>
           </div>
@@ -407,45 +407,7 @@ export default function AIAdvisor(props) {
         <div ref={messagesEndRef} />
       </div>
       <div className={`p-4 ${chatLog.length > 0 ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
-        {chatLog.length === 0 && (
-          <div className="mb-4 flex flex-wrap gap-2 justify-center">
-             {(isFacilityMode ? [
-               'Tình hình doanh thu hôm nay?',
-               'Đánh giá chuyên cần nhân viên',
-               'Ai đang nghỉ phép/không phép?',
-               'Nhật ký hoạt động gần nhất',
-               'Góc nhìn tổng quan cơ sở'
-             ] : [
-               'Báo cáo doanh thu hôm nay',
-               'Cơ sở nào đang trễ task?',
-               'Tình hình nhân sự',
-               'Cơ sở nào chưa Check-in?',
-               'Phân tích task trễ hạn',
-               'Công việc đang làm của phòng ban',
-               'Công việc cần làm của cơ sở',
-               'Tình trạng và số lượng nghĩ ko phép, có phép',
-               'Cơ sở nào đang cần hỗ trợ'
-             ]).map((prompt, idx) => {
-               const colors = [
-                  'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50',
-                  'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/50',
-                  'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50',
-                  'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/50',
-                  'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/50',
-                  'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/50',
-                  'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50',
-                  'bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 border-pink-200 dark:border-pink-800 hover:bg-pink-100 dark:hover:bg-pink-900/50',
-                  'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50'
-               ];
-               const colorClass = colors[idx % colors.length];
-               return (
-                  <button key={idx} onClick={() => handleAsk(prompt)} className={`px-4 py-2 rounded-full font-medium text-sm border transition-colors shadow-sm hover:shadow ${colorClass}`}>
-                     {prompt}
-                  </button>
-               );
-             })}
-          </div>
-        )}
+
         {attachment && (
           <div className="mb-3 flex items-center gap-3 bg-surface-container dark:bg-[#252525] p-2 rounded-xl border border-outline-variant dark:border-gray-700 max-w-sm relative">
             {attachment.type.startsWith('image/') ? (
