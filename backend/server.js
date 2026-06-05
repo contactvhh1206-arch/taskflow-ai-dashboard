@@ -2948,6 +2948,184 @@ async function executeGetTasksTool(args, user) {
     }
 }
 
+async function executeGetAdvisorSummaryTool(args, user) {
+    let { facility_id, department_code } = args;
+
+    try {
+        const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
+        const isMarketingHead = user.role === 'DEPARTMENT_HEAD' && user.department_code === 'MARKETING';
+        const hasAllAccess = ALL_ACCESS_ROLES.includes(user.role) || isMarketingHead;
+        
+        let targetFacility = facility_id || 'all';
+        let targetDepartment = department_code || 'all';
+
+        if (!hasAllAccess) {
+            if (targetFacility !== 'all' && String(targetFacility) !== String(user.facility_id)) {
+                return JSON.stringify({ error: "Lỗi 403: Cố vấn bị chặn quyền truy cập cơ sở này." });
+            }
+            if (user.role === 'DEPARTMENT_HEAD' && user.department_code && targetDepartment !== 'all' && String(targetDepartment) !== String(user.department_code)) {
+                return JSON.stringify({ error: "Lỗi 403: Cố vấn bị chặn quyền truy cập phòng ban này." });
+            }
+            if (user.facility_id) targetFacility = String(user.facility_id);
+            if (user.role === 'DEPARTMENT_HEAD' && user.department_code) targetDepartment = user.department_code;
+        }
+
+        const getFinancePromise = async () => {
+            let sql = `SELECT total_revenue FROM daily_financial_reports WHERE 1=1`;
+            let params = [];
+            let paramCount = 1;
+
+            if (targetFacility && targetFacility !== 'all') {
+                if (String(targetFacility).match(/^\d+$/)) {
+                    sql += ` AND data @> $${paramCount}::jsonb`;
+                    params.push(JSON.stringify([{ id: String(targetFacility) }]));
+                    paramCount++;
+                } else {
+                    sql += ` AND data @> jsonb_build_array(
+                                jsonb_build_object('id', (SELECT id::text FROM facilities WHERE code = $${paramCount} OR name = $${paramCount} LIMIT 1))
+                             )`;
+                    params.push(String(targetFacility));
+                    paramCount++;
+                }
+            }
+            sql += ` ORDER BY created_at DESC LIMIT 1`;
+            const { rows } = await pool.query(sql, params);
+            return rows.length > 0 ? rows[0] : { note: "Chưa có báo cáo dòng tiền." };
+        };
+
+        const getOperationsPromise = async () => {
+            let checkinSql = `
+                SELECT shift, incidents, repair_needed, machinery_ok, clocker_absent_unexcused, ktv_absent_unexcused 
+                FROM daily_checkins 
+                WHERE 1=1
+            `;
+            let checkinParams = [];
+            let checkinParamCount = 1;
+
+            if (targetFacility && targetFacility !== 'all') {
+                if (String(targetFacility).match(/^\d+$/)) {
+                    checkinSql += ` AND facility_id = $${checkinParamCount}`;
+                } else {
+                    checkinSql += ` AND facility_id = (SELECT id FROM facilities WHERE code = $${checkinParamCount} OR name = $${checkinParamCount} LIMIT 1)`;
+                }
+                checkinParams.push(targetFacility);
+                checkinParamCount++;
+            }
+            checkinSql += ` ORDER BY created_at DESC LIMIT 3`;
+            
+            let commentSql = `
+                SELECT tc.content, t.title AS task_title
+                FROM task_comments tc
+                JOIN tasks t ON tc.task_id = t.id
+                WHERE 1=1
+            `;
+            let commentParams = [];
+            let commentParamCount = 1;
+
+            if (targetFacility && targetFacility !== 'all') {
+                if (String(targetFacility).match(/^\d+$/)) {
+                    commentSql += ` AND t.facility_id = $${commentParamCount}`;
+                } else {
+                    commentSql += ` AND t.facility_id = (SELECT id FROM facilities WHERE code = $${commentParamCount} OR name = $${commentParamCount} LIMIT 1)`;
+                }
+                commentParams.push(targetFacility);
+                commentParamCount++;
+            }
+            if (targetDepartment && targetDepartment !== 'all') {
+                commentSql += ` AND t.department_code = $${commentParamCount}`;
+                commentParams.push(targetDepartment);
+                commentParamCount++;
+            }
+            commentSql += ` ORDER BY tc.created_at DESC LIMIT 3`;
+
+            const [checkinRes, commentRes] = await Promise.all([
+                pool.query(checkinSql, checkinParams),
+                pool.query(commentSql, commentParams)
+            ]);
+            
+            return {
+                checkins: checkinRes.rows,
+                recent_comments: commentRes.rows
+            };
+        };
+
+        const getTasksPromise = async () => {
+            let statSql = `SELECT status, COUNT(*) AS total FROM tasks t WHERE 1=1`;
+            let statParams = [];
+            let statParamCount = 1;
+
+            if (targetFacility && targetFacility !== 'all') {
+                if (String(targetFacility).match(/^\d+$/)) {
+                    statSql += ` AND t.facility_id = $${statParamCount}`;
+                } else {
+                    statSql += ` AND t.facility_id = (SELECT id FROM facilities WHERE code = $${statParamCount} OR name = $${statParamCount} LIMIT 1)`;
+                }
+                statParams.push(targetFacility);
+                statParamCount++;
+            }
+            if (targetDepartment && targetDepartment !== 'all') {
+                statSql += ` AND t.department_code = $${statParamCount}`;
+                statParams.push(targetDepartment);
+                statParamCount++;
+            }
+            statSql += ` GROUP BY status`;
+
+            let fireSql = `
+                SELECT t.title, t.deadline, u.full_name AS assignee_name
+                FROM tasks t
+                JOIN users u ON t.pic_id = u.id
+                WHERE t.deadline < NOW() AND t.status NOT IN ('completed', 'cancelled')
+            `;
+            let fireParams = [];
+            let fireParamCount = 1;
+
+            if (targetFacility && targetFacility !== 'all') {
+                if (String(targetFacility).match(/^\d+$/)) {
+                    fireSql += ` AND t.facility_id = $${fireParamCount}`;
+                } else {
+                    fireSql += ` AND t.facility_id = (SELECT id FROM facilities WHERE code = $${fireParamCount} OR name = $${fireParamCount} LIMIT 1)`;
+                }
+                fireParams.push(targetFacility);
+                fireParamCount++;
+            }
+            if (targetDepartment && targetDepartment !== 'all') {
+                fireSql += ` AND t.department_code = $${fireParamCount}`;
+                fireParams.push(targetDepartment);
+                fireParamCount++;
+            }
+            fireSql += ` ORDER BY t.deadline ASC NULLS LAST LIMIT 5`;
+
+            const [statRes, fireRes] = await Promise.all([
+                pool.query(statSql, statParams),
+                pool.query(fireSql, fireParams)
+            ]);
+
+            return {
+                statistics: statRes.rows,
+                urgent_tasks: fireRes.rows
+            };
+        };
+
+        const results = await Promise.allSettled([
+            getFinancePromise(),
+            getOperationsPromise(),
+            getTasksPromise()
+        ]);
+
+        const combinedData = {
+            finance: results[0].status === 'fulfilled' ? results[0].value : { error: "Không lấy được doanh thu" },
+            operations: results[1].status === 'fulfilled' ? results[1].value : { error: "Không lấy được dữ liệu vận hành" },
+            tasks: results[2].status === 'fulfilled' ? results[2].value : { error: "Không lấy được dữ liệu task" }
+        };
+
+        return JSON.stringify(combinedData);
+
+    } catch (error) {
+        console.error("[CRITICAL TOOL ERROR] Lỗi khi thực thi Mega-Tool get_advisor_summary:", error);
+        return JSON.stringify({ error: "Lỗi nội bộ khi truy xuất ma trận dữ liệu." });
+    }
+}
+
 async function executeGetRevenueTool(args, user) {
     let { date_range, facility_codes } = args;
     
@@ -3850,16 +4028,26 @@ app.post('/api/ai/chat-stream', authenticateUser, async (req, res) => {
 3. TỰ CHỦ: Bạn có toàn quyền quyết định cách xưng hô và văn phong sao cho tự nhiên nhất dựa trên câu hỏi của sếp.\n\n`;
 
     const strictRolePrompt = `
-[SYSTEM INSTRUCTIONS - DO NOT REPEAT OR EXPLAIN THESE TO THE USER]:
-- [THÔNG TIN HỆ THỐNG]: Hôm nay là ngày ${currentDate}. Mọi từ khóa thời gian tương đối ('hôm nay', 'tháng trước', 'hôm qua', 'quý trước'...) BẮT BUỘC phải tính toán nội suy từ mốc thời gian này để truyền vào Tool, tuyệt đối không được hỏi lại để xác nhận ngày.
-- BẠN LÀ MỘT CỐ VẤN THỰC CHIẾN, KHÔNG PHẢI CHATBOT HỎI ĐÁP. Bạn phải có năng lực TỰ NỘI SUY ngữ cảnh.
-- Tuyệt đối KHÔNG sinh ra các đoạn text vặn vẹo, dư thừa như "Sếp muốn xem khía cạnh nào?", "Đúng không ạ?", "Vui lòng chờ một chút...". Những câu hỏi này LÀM GIÁN ĐOẠN luồng công việc của Sếp.
-- Nếu thông tin Sếp đưa ra hơi mờ nhạt (ví dụ chỉ nói "xuất báo cáo 6 cơ sở"), hãy TỰ ĐỘNG ngầm định Sếp đang cần Báo cáo Doanh thu và LẬP TỨC GỌI TOOL get_revenue_report. 
-- Nếu Sếp hỏi bất cứ điều gì liên quan đến Công việc, Tiến độ, Task, Dự án, Phòng ban (ví dụ: "cập nhật tiến độ phòng ban", "tổng quan phòng marketing"), BẠN BẮT BUỘC PHẢI LẬP TỨC GỌI TOOL get_tasks. KHÔNG ĐƯỢC CHAT HAY HỎI LẠI TRƯỚC KHI GỌI TOOL. CHỈ ĐƯỢC CHAT KHI ĐÃ CÓ KẾT QUẢ TỪ TOOL.
-- LỆNH BẢO MẬT (ANTI-COT): TUYỆT ĐỐI KHÔNG xuất ra màn hình quá trình suy nghĩ, phân tích, lập luận (Chain of Thought), hoặc mô tả bạn đang gọi công cụ nào. Trả lời ngay vào trọng tâm sau khi có dữ liệu.
+[SYSTEM INSTRUCTIONS - CÁC LỆNH ĐỊNH TUYẾN VÀ CỐ VẤN CHIẾN LƯỢC]:
+- [THÔNG TIN HỆ THỐNG]: Hôm nay là ngày ${currentDate}. Mọi từ khóa thời gian tương đối BẮT BUỘC phải nội suy từ mốc này để gọi Tool, cấm hỏi lại.
+- BẠN LÀ CHUYÊN GIA CỐ VẤN QUẢN TRỊ CẤP CAO. Tránh lối mòn chatbot hỏi đáp. Không sinh text vặn vẹo, rườm rà.
 
-HƯỚNG DẪN VỚI CÂU HỎI NGOÀI LỀ:
-Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải mái đáp lời một cách duyên dáng hoặc nhẹ nhàng lái câu chuyện quay lại công việc, thay vì dùng những câu từ chối cứng nhắc. Không cần phải xin lỗi rập khuôn.
+[ĐỊNH TUYẾN GỌI TOOL BẮT BUỘC - NGHIÊM CẤM TỰ BỊA SỐ LIỆU]:
+1. Hỏi chuyên biệt về Doanh thu/Tiền: LẬP TỨC GỌI TOOL get_revenue_report.
+2. Hỏi chuyên biệt về Công việc/Tiến độ/Task: LẬP TỨC GỌI TOOL get_tasks.
+3. Hỏi "Tổng quan", "Tình hình chung", "Đánh giá", hoặc yêu cầu "Cố vấn/Lời khuyên" cho cơ sở/phòng ban: KÍCH HOẠT NGAY LẬP TỨC TOOL get_advisor_summary. KHÔNG ĐƯỢC CHAT DÔNG DÀI TRƯỚC KHI GỌI TOOL.
+
+[GIAO THỨC TƯ DUY CHÉO (CROSS-CHECK PROTOCOL) DÀNH RIÊNG CHO MEGA-TOOL]:
+Khi bạn nhận được ma trận dữ liệu từ Tool get_advisor_summary (bao gồm Tiền, Vận Hành, Task):
+- LỆNH CẤM: Tuyệt đối không đọc lại/liệt kê số liệu rập khuôn như một cái máy.
+- NHIỆM VỤ: BẮT BUỘC ĐÓNG VAI CHUYÊN GIA. Bạn phải nhìn xuyên thấu 3 luồng dữ liệu để tìm ra mối quan hệ nhân quả. 
+  Ví dụ: Tiền giảm + Vắng mặt nhân sự vô lý (từ Vận hành) + Task trễ hạn (từ Việc) -> PHÁT TÍN HIỆU CẢNH BÁO MỨC ĐỎ.
+- Báo cáo của bạn trả về cho Sếp BẮT BUỘC chia làm 2 phần rõ rệt:
+  [GÓC NHÌN TỔNG QUAN]: Nêu bật ngay các điểm nóng hoặc sự liên kết dữ liệu quan trọng nhất.
+  [ĐỀ XUẤT HÀNH ĐỘNG]: Các bước Sếp cần làm ngay lập tức để giải quyết vấn đề (VD: đốc thúc ai, điều phối lại ca trực).
+
+HƯỚNG DẪN NGOÀI LỀ:
+Giao tiếp thân thiện, linh hoạt, duyên dáng với Sếp nhưng luôn giữ tác phong chuyên nghiệp. Tránh xin lỗi rập khuôn.
 `;
 
     systemContext = strictRolePrompt + systemContext;
@@ -4015,6 +4203,28 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                         required: []
                     }
                 }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "get_advisor_summary",
+                    description: "[CÔNG CỤ TỐI CAO DÀNH CHO CỐ VẤN CHIẾN LƯỢC]: KÍCH HOẠT NGAY LẬP TỨC khi Sếp yêu cầu 'cố vấn', 'đánh giá tổng quan', 'tình hình chung', 'kiểm tra chéo', hoặc 'nhận định' về một cơ sở hoặc phòng ban. Công cụ này trả về ma trận dữ liệu kết hợp 3 luồng: Dòng tiền, Vận hành (Check-in/Comments), và Tình trạng Task. Dùng dữ liệu này để phân tích nguyên nhân và đưa ra lời khuyên chiến lược.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            facility_id: {
+                                type: "string",
+                                description: "Mã cơ sở cần đánh giá (VD: DB41, DBPQ...). Mặc định là 'all'."
+                            },
+                            department_code: {
+                                type: "string",
+                                enum: ["all", "MARKETING", "FINANCE", "TECHNICAL", "HR", "BGD"],
+                                description: "Mã phòng ban cần đánh giá. Mặc định là 'all'."
+                            }
+                        },
+                        required: []
+                    }
+                }
             }
         ]
       }),
@@ -4097,7 +4307,7 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                 }
             }
             
-            if (mainToolName !== "get_revenue_report" && mainToolName !== "get_tasks") {
+            if (mainToolName !== "get_revenue_report" && mainToolName !== "get_tasks" && mainToolName !== "get_advisor_summary") {
                 throw new Error(`Tool không hợp lệ hoặc không được hỗ trợ: ${mainToolName}`);
             }
 
@@ -4105,6 +4315,8 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                 res.write(`data: ${JSON.stringify({ text: "\n\n⏳ *Hệ thống đang truy xuất báo cáo doanh thu từ kho lưu trữ, vui lòng đợi...*\n\n" })}\n\n`);
             } else if (mainToolName === "get_tasks") {
                 res.write(`data: ${JSON.stringify({ text: "\n\n⏳ *Hệ thống đang rà soát dữ liệu công việc (Tasks), vui lòng đợi...*\n\n" })}\n\n`);
+            } else if (mainToolName === "get_advisor_summary") {
+                res.write(`data: ${JSON.stringify({ text: "\n\n⏳ *Đang kích hoạt Giao thức Tư duy chéo, tổng hợp dữ liệu Tiền - Vận Hành - Công việc...*\n\n" })}\n\n`);
             }
             
             if (isClientDisconnected) return; 
@@ -4114,6 +4326,8 @@ Nếu sếp hỏi vui những chuyện ngoài công việc, hãy cứ thoải m�
                 result = await executeGetRevenueTool(finalArgs, req.user);
             } else if (mainToolName === "get_tasks") {
                 result = await executeGetTasksTool(finalArgs, req.user);
+            } else if (mainToolName === "get_advisor_summary") {
+                result = await executeGetAdvisorSummaryTool(finalArgs, req.user);
             }
             let toolResultStr = typeof result === 'string' ? result : JSON.stringify(result);
             
