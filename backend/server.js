@@ -1253,7 +1253,7 @@ app.post('/api/tasks', authenticateUser, async (req, res) => {
                   FROM users 
                   WHERE role_id = 6 
                     AND facility_id = $1 
-                    AND status = 'AC' 
+                    AND status = 'ACTIVE' 
                   ORDER BY id ASC 
                   LIMIT 1
               `, [insert_facility_id]);
