@@ -330,7 +330,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       if (newRecord) {
         const newCheckin = {
           id: newRecord.id,
-          facility_id: newRecord.org_unit,
+          org_unit: newRecord.org_unit,
           date: newRecord.date,
           shift: selectedShift,
           timestamp: newRecord.displayTime,
