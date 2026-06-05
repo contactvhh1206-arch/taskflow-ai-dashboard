@@ -82,7 +82,7 @@ export default function AIAdvisor(props) {
     }, 0);
   };
 
-  const { messages, isStreaming, isThinking, sendMessage, stopStream, setMessages } = useAIChatStream({
+  const { messages, streamingText, isStreaming, isThinking, sendMessage, stopStream, setMessages } = useAIChatStream({
     onSessionCreated: (newSessionId) => {
       isSessionCreatedByMeRef.current = true;
       if (props.onSessionCreated) props.onSessionCreated(newSessionId);
@@ -387,6 +387,14 @@ export default function AIAdvisor(props) {
             </div>
           </div>
         ))}
+        {streamingText && (
+          <div className="flex justify-start mb-4 w-full">
+            <div className="max-w-[85%] p-3 rounded-2xl text-sm bg-gray-100 text-gray-800 rounded-bl-none border border-gray-200 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700">
+              <span className="whitespace-pre-wrap leading-relaxed">{streamingText}</span>
+              <span className="ml-1 animate-pulse">▍</span>
+            </div>
+          </div>
+        )}
         {isThinking && (
           <div className="flex justify-start">
             <div className="bg-surface-container dark:bg-[#2a2a2a] p-4 rounded-2xl rounded-tl-none border border-outline-variant dark:border-gray-700 flex gap-2 items-center text-gray-500 text-sm">
