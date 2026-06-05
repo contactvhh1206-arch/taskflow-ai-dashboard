@@ -144,6 +144,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 }
                 formattedMsg.tool_call_id = toolCallId;
                 formattedMsg.name = funcName;
+                formattedMsg.content = "[Hệ thống: Dữ liệu thô đã được nén để tối ưu luồng suy nghĩ. Cố vấn hãy đọc bản báo cáo ở câu trả lời phía sau.]";
             }
             
             messages.push(formattedMsg);
@@ -158,14 +159,19 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             tool_choice: "auto"
         };
 
+        const controller1 = new AbortController();
+        const timeoutId1 = setTimeout(() => controller1.abort(), 45000);
+
         const response1 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${openRouterKey}`,
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(llmPayload)
+            body: JSON.stringify(llmPayload),
+            signal: controller1.signal
         });
+        clearTimeout(timeoutId1);
 
         if (!response1.ok) {
             const errText = await response1.text();
@@ -225,16 +231,21 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 max_tokens: 4096
             };
 
+            const controller2 = new AbortController();
+            const timeoutId2 = setTimeout(() => controller2.abort(), 45000);
+
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${openRouterKey}`,
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify(llmStreamPayload)
+                body: JSON.stringify(llmStreamPayload),
+                signal: controller2.signal
             });
 
             if (!response2.ok) {
+                clearTimeout(timeoutId2);
                 const errText = await response2.text();
                 throw new Error(`API LLM (Lượt Stream) lỗi ${response2.status}: ${errText}`);
             }
@@ -245,26 +256,30 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             let fullAiReply = "";
             let buffer = ""; 
             
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done || !isClientConnected) break;
-                
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-                
-                for (const line of lines) {
-                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-                            const contentChunk = data.choices[0]?.delta?.content || "";
-                            if (contentChunk) {
-                                fullAiReply += contentChunk;
-                                res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
-                            }
-                        } catch (parseErr) {}
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done || !isClientConnected) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                const contentChunk = data.choices[0]?.delta?.content || "";
+                                if (contentChunk) {
+                                    fullAiReply += contentChunk;
+                                    res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
+                                }
+                            } catch (parseErr) {}
+                        }
                     }
                 }
+            } finally {
+                clearTimeout(timeoutId2);
             }
 
             // [DB WRITE] Lưu luồng AI Text (Lưu bất chấp mạng Client đứt)
@@ -294,9 +309,14 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         }
 
     } catch (error) {
-        console.error('[AI Controller Error]:', error.message);
+        console.error('[AI Controller Error]:', error.name, error.message);
         if (isClientConnected) {
-            res.write(`data: ${JSON.stringify({ error: 'Đã xảy ra sự cố giao tiếp với Hệ thống Thần kinh AI.' })}\n\n`);
+            const errorMsg = error.name === 'AbortError' 
+                ? "Kết nối AI quá tải (Timeout 45s). Đã kích hoạt cơ chế bảo vệ UI. Xin thử lại." 
+                : "Đã xảy ra sự cố giao tiếp với Hệ thống Thần kinh AI.";
+                
+            res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
+            res.write('data: [DONE]\n\n');
             res.end();
         }
     }
@@ -355,6 +375,7 @@ const getMessagesHandler = async (req, res) => {
              FROM ai_chat_messages m
              JOIN ai_chat_sessions s ON m.session_id = s.id
              WHERE m.session_id = $1 AND s.user_id = $2 
+             AND m.role IN ('user', 'assistant')
              ORDER BY m.created_at ASC`, 
             [id, userId]
         );
