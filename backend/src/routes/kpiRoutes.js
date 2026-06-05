@@ -13,9 +13,7 @@ router.get('/', authGuard, async (req, res) => {
         res.json({ success: true, data: {} });
     }
 });
-        res.json({ success: true, data: {} });
-    }
-});
+
 
 router.post('/', authGuard, async (req, res) => {
     try {
