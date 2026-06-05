@@ -12,7 +12,7 @@ const loginHandler = async (req, res) => {
 
         // Lệnh truy vấn Xóa mù Role (Bắt buộc JOIN để lấy tên quyền)
         const query = `
-            SELECT u.id, u.password_hash, u.facility_id, u.department_code, r.name as role_name 
+            SELECT u.id, u.password_hash, u.facility_id, u.department_code, u.full_name as name, u.email as username, r.name as role_name 
             FROM users u 
             LEFT JOIN roles r ON u.role_id = r.id 
             WHERE u.email = $1
@@ -37,7 +37,9 @@ const loginHandler = async (req, res) => {
             id: user.id,
             role: user.role_name,
             facility_id: user.facility_id,
-            department_code: user.department_code
+            department_code: user.department_code,
+            name: user.name || user.username || 'User',
+            username: user.username
         };
 
         const token = jwt.sign(payload, process.env.SECRET_KEY || 'YOUR_SECRET_KEY', { expiresIn: '24h' });
