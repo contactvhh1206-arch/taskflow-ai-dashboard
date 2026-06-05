@@ -115,7 +115,8 @@ const chatStreamHandler = async (req, res) => {
             const llmStreamPayload = {
                 model: "openai/gpt-4o",
                 messages: messages,
-                stream: true
+                stream: true,
+                max_tokens: 4096
             };
 
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {

@@ -184,15 +184,24 @@ export function useAIChatStream(options?: {
         console.warn('Network request aborted to prevent Race Condition (Normal Behavior)');
       } else {
         console.error('Stream processing error:', error);
-        setMessages((prev) => {
-          const newMessages = [...prev];
-          const lastIndex = newMessages.length - 1;
-          newMessages[lastIndex] = {
-            ...newMessages[lastIndex],
-            content: newMessages[lastIndex].content + '\n[LỖI KẾT NỐI STREAM]'
-          };
-          return newMessages;
-        });
+        if (streamingTextRef.current) {
+           setMessages((prev) => [
+             ...prev,
+             { id: `msg-${Date.now()}`, role: 'assistant', content: streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]' }
+           ]);
+           setStreamingText('');
+           streamingTextRef.current = '';
+        } else {
+           setMessages((prev) => {
+             const newMessages = [...prev];
+             const lastIndex = newMessages.length - 1;
+             newMessages[lastIndex] = {
+               ...newMessages[lastIndex],
+               content: newMessages[lastIndex].content + '\n[LỖI KẾT NỐI STREAM]'
+             };
+             return newMessages;
+           });
+        }
       }
     } finally {
       if (abortControllerRef.current === abortController) {
