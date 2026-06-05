@@ -60,7 +60,9 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
 
   useEffect(() => {
     const fetchAll = async () => {
-      const attendanceData = await fetchHistory({ entry_type: 'Attendance' });
+      const orgUnitFilter = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) ? {} : { org_unit: user?.facility_id };
+      
+      const attendanceData = await fetchHistory({ entry_type: 'Attendance', ...orgUnitFilter });
       setCheckins(attendanceData.map(item => ({
         id: item.id,
         org_unit: item.org_unit,
@@ -71,7 +73,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         aiVectorData: item.aiVectorData
       })));
 
-      const logsData = await fetchHistory({ entry_type: 'Operation_Log' });
+      const logsData = await fetchHistory({ entry_type: 'Operation_Log', ...orgUnitFilter });
       setLogs(logsData.map(item => ({
         id: item.id,
         org_unit: item.org_unit,

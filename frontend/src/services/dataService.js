@@ -27,7 +27,8 @@ export const saveData = async ({ org_unit, entry_type, content, attachments = []
 
 export const fetchHistory = async (filters = {}) => {
   try {
-    const result = await axiosClient.get('/api/logs');
+    const query = new URLSearchParams(filters).toString();
+    const result = await axiosClient.get(`/api/logs?${query}`);
     if (result.success) {
       let filtered = result.data.map(item => ({
         ...item,
@@ -35,6 +36,7 @@ export const fetchHistory = async (filters = {}) => {
         aiVectorData: item.ai_vector_data
       }));
       
+      // Keep client-side fallback just in case backend doesn't filter perfectly yet
       if (filters.org_unit) filtered = filtered.filter(item => item.org_unit === filters.org_unit);
       if (filters.entry_type) filtered = filtered.filter(item => item.entry_type === filters.entry_type);
       if (filters.date) filtered = filtered.filter(item => item.date === filters.date);

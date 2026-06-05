@@ -4,7 +4,25 @@ const pool = require('../config/database');
 
 router.get('/', async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM daily_logs ORDER BY id DESC LIMIT 50');
+        let query = 'SELECT * FROM daily_logs';
+        let values = [];
+        let conditions = [];
+
+        if (req.query.org_unit) {
+            conditions.push(`org_unit = $${values.length + 1}`);
+            values.push(req.query.org_unit);
+        }
+        if (req.query.entry_type) {
+            conditions.push(`entry_type = $${values.length + 1}`);
+            values.push(req.query.entry_type);
+        }
+
+        if (conditions.length > 0) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+        query += ' ORDER BY id DESC LIMIT 100';
+
+        const { rows } = await pool.query(query, values);
         res.json({ success: true, data: rows });
     } catch (e) {
         console.error("Lỗi GET /api/logs:", e);
