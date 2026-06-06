@@ -256,7 +256,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         };
 
         const controller1 = new AbortController();
-        const timeoutId1 = setTimeout(() => controller1.abort(), 300000);
+        const timeoutId1 = setTimeout(() => controller1.abort(), 45000); // Hạ xuống 45 giây cho Lượt 1
 
         const signal1 = AbortSignal.any([
             controller1.signal,
@@ -306,6 +306,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
             const isAllAccess = ALL_ACCESS_ROLES.includes(userContext.role) || 
                                 (userContext.role === 'DEPARTMENT_HEAD' && logDepartmentCode === 'MARKETING');
+
+            // [SYNTHETIC CHUNK - BƠM MÁU UI]: Phá vỡ khoảng thời gian chờ (latency) chết người
+            if (isClientConnected) {
+                res.write(`data: ${JSON.stringify({ content: "\n\n_⏳ Đang truy cập kho dữ liệu hệ thống..._\n\n" })}\n\n`);
+            }
 
             const toolPromises = aiMessage.tool_calls.map(async (toolCall) => {
                 const funcName = toolCall.function.name;
@@ -398,7 +403,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             };
 
             const controller2 = new AbortController();
-            const timeoutId2 = setTimeout(() => controller2.abort(), 300000);
+            const timeoutId2 = setTimeout(() => controller2.abort(), 60000); // Hạ xuống 60 giây cho luồng Stream
 
             const startTimeL2 = Date.now();
 
@@ -537,7 +542,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         console.error('[AI Controller Error]:', error.name, error.message);
         if (isClientConnected) {
             const errorMsg = error.name === 'AbortError' 
-                ? "Kết nối AI bị người dùng hoặc mạng ngắt." 
+                ? "Kết nối AI bị ngắt do Timeout (Quá thời gian chờ) hoặc lỗi mạng. Vui lòng thử lại." 
                 : "Đã xảy ra sự cố giao tiếp với Hệ thống Thần kinh AI.";
                 
             res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);

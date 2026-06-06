@@ -107,7 +107,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 SELECT date AS formatted_date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
                 FROM daily_financial_reports, 
                      jsonb_array_elements(CASE WHEN jsonb_typeof(data::jsonb) = 'array' THEN data::jsonb ELSE '[]'::jsonb END) AS elem
-                WHERE ($1::text IS NULL OR elem->>'id' = $1::text)
+                WHERE ($1::text[] IS NULL OR elem->>'id' = ANY($1::text[]))
                   AND ($2::date IS NULL OR date::date >= $2::date)
                   AND ($3::date IS NULL OR date::date <= $3::date)
                 ORDER BY date::date DESC 
@@ -115,9 +115,16 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             `;
             
             // Xử lý lãnh đạo vs quản lý cơ sở
-            const facilityParam = (userContext.role === 'SUPER_ADMIN' || userContext.role === 'VICE_PRESIDENT' || userContext.role === 'ADMIN' || userContext.facility_id === 'ALL') 
-                ? null 
-                : userContext.facility_id;
+            let facilityParam = null;
+            if (userContext.role !== 'SUPER_ADMIN' && userContext.role !== 'VICE_PRESIDENT' && userContext.role !== 'ADMIN' && userContext.facility_id !== 'ALL') {
+                if (Array.isArray(userContext.facility_id)) {
+                    facilityParam = userContext.facility_id;
+                } else if (typeof userContext.facility_id === 'string') {
+                    facilityParam = userContext.facility_id.split(',').map(s => s.trim());
+                } else {
+                    facilityParam = [String(userContext.facility_id)];
+                }
+            }
                 
             const { rows } = await pool.query(query, [facilityParam, start_date || null, end_date || null, queryLimit]);
 
