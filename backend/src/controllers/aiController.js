@@ -351,27 +351,42 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             // Để ép nó chỉ sinh text, ta PHẢI XÓA MẢNG TOOLS.
             // Nhưng OpenRouter sẽ báo lỗi 400 nếu lịch sử có 'tool'/'tool_calls' mà không có mảng 'tools'.
             // => GIẢI PHÁP: Phẳng hóa (Flatten) toàn bộ lịch sử thành user/assistant thuần túy!
+            // LUẬT GEMINI: Role phải xen kẽ (user -> assistant -> user). Do đó ta gom tất cả các tin nhắn trùng role liên tiếp.
             
-            const flattenedMessages = messages.map(msg => {
+            const flattenedMessages = [];
+            let lastRole = null;
+
+            for (const msg of messages) {
+                let flattenedRole = msg.role;
+                let flattenedContent = msg.content || "";
+                let reasoning = null;
+
                 if (msg.role === 'assistant' && msg.tool_calls) {
-                    const newMsg = { role: 'assistant', content: msg.content && msg.content.trim() !== "" ? msg.content : "Đang lấy dữ liệu..." };
-                    // BẮT BUỘC MANG THEO REASONING QUA LƯỢT 2 KHI XÓA TOOL
-                    if (msg.reasoning) {
-                        newMsg.reasoning = msg.reasoning;
-                    }
-                    return newMsg;
+                    flattenedRole = 'assistant';
+                    flattenedContent = msg.content && msg.content.trim() !== "" ? msg.content : "Đang lấy dữ liệu...";
+                    reasoning = msg.reasoning;
+                } else if (msg.role === 'tool') {
+                    flattenedRole = 'user';
+                    flattenedContent = `[DỮ LIỆU TỪ HỆ THỐNG - CÔNG CỤ ${msg.name}]:\n${msg.content}`;
                 }
-                if (msg.role === 'tool') {
-                    return { role: 'user', content: `[DỮ LIỆU TỪ HỆ THỐNG - CÔNG CỤ ${msg.name}]:\n${msg.content}` };
+
+                if (flattenedRole === lastRole) {
+                    flattenedMessages[flattenedMessages.length - 1].content += "\n\n" + flattenedContent;
+                } else {
+                    const newMsg = { role: flattenedRole, content: flattenedContent };
+                    if (reasoning) newMsg.reasoning = reasoning;
+                    flattenedMessages.push(newMsg);
+                    lastRole = flattenedRole;
                 }
-                return msg;
-            });
+            }
 
             // Thêm một tin nhắn hệ thống vào cuối cùng để dặn dò Gemini phân tích
-            flattenedMessages.push({
-                role: "user",
-                content: "[HƯỚNG DẪN TỪ BAN QUẢN TRỊ]: Toàn bộ dữ liệu bạn cần đã được cung cấp ở trên. Hãy trực tiếp phân tích, đối chiếu chéo các dữ liệu này và trả lời người dùng ngay bây giờ bằng văn bản rõ ràng, súc tích."
-            });
+            const systemPromptL2 = "[HƯỚNG DẪN TỪ BAN QUẢN TRỊ]: Toàn bộ dữ liệu bạn cần đã được cung cấp ở trên. Hãy trực tiếp phân tích, đối chiếu chéo các dữ liệu này và trả lời người dùng ngay bây giờ bằng văn bản rõ ràng, súc tích.";
+            if (lastRole === 'user') {
+                flattenedMessages[flattenedMessages.length - 1].content += "\n\n" + systemPromptL2;
+            } else {
+                flattenedMessages.push({ role: "user", content: systemPromptL2 });
+            }
 
             const llmStreamPayload = {
                 model: aiModel,
@@ -445,9 +460,19 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                 const dataStr = completeEvent.slice(6).trim();
                                 if (dataStr === '[DONE]') continue;
                                 
-                                try {
                                     const data = JSON.parse(dataStr);
                                     
+                                    if (data.error) {
+                                        console.error('[OPENROUTER STREAM ERROR]:', data.error);
+                                        if (isClientConnected) {
+                                            res.write(`data: ${JSON.stringify({ error: "Lỗi từ OpenRouter/Model: " + (data.error.message || "Unknown error") })}\n\n`);
+                                            res.write('data: [DONE]\n\n');
+                                            res.end();
+                                        }
+                                        if (controller2 && typeof controller2.abort === 'function') controller2.abort();
+                                        throw new Error("STREAM_API_ERROR");
+                                    }
+
                                     if (data.choices && data.choices.length > 0) {
                                         const delta = data.choices[0].delta;
 

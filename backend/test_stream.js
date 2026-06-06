@@ -1,58 +1,34 @@
+require('dotenv').config();
 const fetch = require('node-fetch');
 
 async function test() {
-    const messages = [
-        { role: 'user', content: 'doanh thu tháng 5' },
-        { 
-            role: 'assistant', 
-            content: ' ', 
-            tool_calls: [{
-                id: 'call_123',
-                type: 'function',
-                function: {
-                    name: 'fetch_financial_reports',
-                    arguments: '{}'
-                }
-            }]
-        },
-        {
-            role: 'tool',
-            tool_call_id: 'call_123',
-            content: '[Cơ sở: DUBAI 41] Ngày: 2026-05-31 - Doanh thu: 1000'
-        }
-    ];
-
-    const llmStreamPayload = {
-        model: "google/gemini-3.1-pro-preview",
-        messages: messages,
-        stream: true,
-        max_tokens: 4096,
-        tool_choice: "none"
-    };
-
-    console.log("Sending payload to OpenRouter...");
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    console.log("Key:", process.env.OPENROUTER_API_KEY.substring(0, 10));
+    const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
             "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
             "Content-Type": "application/json"
         },
-        body: JSON.stringify(llmStreamPayload)
+        body: JSON.stringify({
+            model: "google/gemini-3.1-pro-preview",
+            stream: true,
+            messages: [
+                { role: "user", content: "hello" },
+                { role: "assistant", content: "Đang lấy dữ liệu..." },
+                { role: "user", content: "[DỮ LIỆU TỪ HỆ THỐNG]: abc" },
+                { role: "user", content: "[HƯỚNG DẪN TỪ BAN QUẢN TRỊ]: def" }
+            ]
+        })
     });
-
-    console.log("Status:", response.status);
-    if (!response.ok) {
-        console.log("Error response:", await response.text());
-        return;
+    console.log("Status:", response2.status);
+    
+    try {
+        const reader = response2.body;
+        for await (const chunk of reader) {
+            console.log("Chunk:", chunk.toString());
+        }
+    } catch (e) {
+        console.error("Stream Error:", e.message);
     }
-
-    const reader = response.body;
-    reader.on('data', chunk => {
-        console.log("CHUNK:", chunk.toString());
-    });
-    reader.on('end', () => {
-        console.log("END STREAM");
-    });
 }
-
 test();
