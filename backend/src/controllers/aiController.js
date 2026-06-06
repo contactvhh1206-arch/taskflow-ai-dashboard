@@ -75,6 +75,19 @@ const chatStreamHandler = async (req, res) => {
         }
     }
 
+    // --- BƯỚC 1 FIX: NẠP SYSTEM PROMPT AN TOÀN TRƯỚC KHI KHỞI TẠO STREAM ---
+    const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const defaultPrompt = `Bạn là HUBDB AI - Cố vấn Chiến lược và Quản trị Doanh nghiệp Cấp cao của hệ thống. Hôm nay là ngày ${todayVN}.
+Tác phong: Chuyên nghiệp, nhạy bén, sắc sảo, dứt khoát như một Giám đốc (CEO/CFO).
+
+QUY TẮC TỐI THƯỢNG (BẮT BUỘC TUÂN THỦ):
+TUYỆT ĐỐI KHÔNG liệt kê dữ liệu thô (ví dụ: cấm in ra một danh sách dài từng ngày, từng cơ sở).
+TƯ DUY TỔNG HỢP & TÍNH TOÁN: Khi nhận được dữ liệu từ hệ thống, bạn PHẢI tự động tính Tổng (doanh thu/chi phí), tính Trung bình, và lọc ra các mức Cao nhất/Thấp nhất. Gom nhóm theo tháng hoặc cơ sở.
+TRÌNH BÀY ĐẲNG CẤP: LUÔN trình bày số liệu bằng BẢNG (Markdown Table) để sếp dễ nhìn. In đậm các con số Tổng quan trọng. Dùng Bullet points để tóm tắt.
+TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận định sâu sắc về xu hướng (tăng/giảm, hiệu suất) và đề xuất hành động thực tiễn cho Ban Lãnh đạo.`;
+
+    const safeSystemPrompt = process.env.SAFE_SYSTEM_PROMPT || defaultPrompt;
+
     // 2. Khởi tạo Headers chuẩn SSE (Server-Sent Events)
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -200,23 +213,11 @@ const chatStreamHandler = async (req, res) => {
             }
         }
 
-        // 4. Ráp mảng messages nạp cho LLM (Ép múi giờ VN)
-        const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+        // 4. Ráp mảng messages nạp cho LLM
         const messages = [
             {
                 role: "system",
-                content: `Bạn là HUBDB AI - Cố vấn Chiến lược và Quản trị Doanh nghiệp Cấp cao của hệ thống. Hôm nay là ngày ${todayVN}.
-Tác phong: Chuyên nghiệp, nhạy bén, sắc sảo, dứt khoát như một Giám đốc (CEO/CFO).
-
-QUY TẮC TỐI THƯỢNG (BẮT BUỘC TUÂN THỦ):
-
-TUYỆT ĐỐI KHÔNG liệt kê dữ liệu thô (ví dụ: cấm in ra một danh sách dài từng ngày, từng cơ sở).
-
-TƯ DUY TỔNG HỢP & TÍNH TOÁN: Khi nhận được dữ liệu từ hệ thống, bạn PHẢI tự động tính Tổng (doanh thu/chi phí), tính Trung bình, và lọc ra các mức Cao nhất/Thấp nhất. Gom nhóm theo tháng hoặc cơ sở.
-
-TRÌNH BÀY ĐẲNG CẤP: LUÔN trình bày số liệu bằng BẢNG (Markdown Table) để sếp dễ nhìn. In đậm các con số Tổng quan trọng. Dùng Bullet points để tóm tắt.
-
-TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận định sâu sắc về xu hướng (tăng/giảm, hiệu suất) và đề xuất hành động thực tiễn cho Ban Lãnh đạo.`
+                content: safeSystemPrompt
             }
         ];
 
@@ -594,8 +595,12 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 ? "Kết nối AI bị ngắt do Timeout (Quá thời gian chờ) hoặc lỗi mạng. Vui lòng thử lại." 
                 : "Đã xảy ra sự cố giao tiếp với Hệ thống Thần kinh AI.";
                 
-            res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
-            res.write('data: [DONE]\n\n');
+            // Kiểm soát ngoại lệ: Trả về Chunk lỗi và HTTP 500 nếu Header chưa bị khóa
+            if (!res.headersSent) {
+                res.status(500);
+            }
+            res.write(`data: ${JSON.stringify({ error: errorMsg, status: 500 })}\n\n`);
+            res.write('data: [DONE_WITH_ERROR]\n\n');
             res.end();
         }
     } finally {

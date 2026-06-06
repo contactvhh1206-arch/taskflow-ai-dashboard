@@ -112,6 +112,9 @@ export function useAIChatStream(options?: {
       });
 
       if (!response.ok || !response.body) {
+        if (response.status === 500) {
+            throw new Error('SERVER_INTERNAL_ERROR');
+        }
         throw new Error(`HTTP Error: ${response.status}`);
       }
 
@@ -146,6 +149,25 @@ export function useAIChatStream(options?: {
           if (trimmedLine.startsWith('data: ')) {
             const dataPayload = trimmedLine.replace(/^data:\s*/, '');
             if (dataPayload === '[DONE]') continue;
+            
+            // --- BƯỚC 2 FIX: BẮT CỜ LỖI SERVER TRONG QUÁ TRÌNH STREAM ---
+            if (dataPayload === '[DONE_WITH_ERROR]') {
+                const errorContent = streamingTextRef.current + chunkTextToAppend + `\n\n🚨 [LỖI HỆ THỐNG]: Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.`;
+                const errorId = generateId();
+                
+                // Sử dụng functional update của React state để triệt tiêu Race Condition mảng
+                setMessages((prev) => [
+                    ...prev,
+                    { id: errorId, role: 'assistant', content: errorContent }
+                ]);
+                
+                setStreamingText('');
+                streamingTextRef.current = '';
+                chunkTextToAppend = ''; // Dọn sạch buffer tức thời
+                
+                // Ném lỗi nội bộ để văng thẳng xuống Catch, cắt đứt hoàn toàn vòng lặp while(true)
+                throw new Error('SERVER_INTERNAL_ERROR'); 
+            }
             
             try {
               const data = JSON.parse(dataPayload);
@@ -236,44 +258,42 @@ export function useAIChatStream(options?: {
         }
       }
     } catch (error: any) {
-      // KIỂM SOÁT FALLBACK CHÍNH XÁC KHI NGẮT KẾT NỐI
-      if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}`;
+
+      // 1. NẾU LÀ LỖI HỆ THỐNG NỘI BỘ HOẶC BẮT ĐƯỢC TỪ [DONE_WITH_ERROR]
+      if (error.message === 'SERVER_INTERNAL_ERROR') {
+          console.error('[Luồng Thép AI] Đã ngắt luồng do Server báo lỗi 500 (Internal Error).');
+          // Không cần setMessages ở đây nữa vì đã set ở trên lúc bắt [DONE_WITH_ERROR]
+          // Nhưng nếu gãy từ HTTP fetch 500 ban đầu thì fallback bù vào:
+          if (!streamingTextRef.current.includes("Sự cố hệ thống AI nội bộ")) {
+              const fallbackContent = streamingTextRef.current + '\n\n🚨 [LỖI HỆ THỐNG]: Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.';
+              setMessages((prev) => [...prev, { id: generateId(), role: 'assistant', content: fallbackContent }]);
+              setStreamingText('');
+              streamingTextRef.current = '';
+          }
+      }
+      // 2. CHỈ HIỂN THỊ "LỖI MẠNG / DDoS" KHI MẤT KẾT NỐI HOẶC BỊ RATE LIMIT THẬT SỰ
+      else if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message.includes('429') || error.message === 'Failed to fetch') {
         if (isUserAbortedRef.current) {
            console.warn('[Luồng Thép AI] Người dùng đã chủ động dừng tạo phản hồi (Normal Behavior).');
         } else {
            console.error('[Luồng Thép AI] Luồng Stream bị đứt kết nối ngầm do lỗi mạng hoặc Server Rate Limit (DDoS)!');
-           const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}`;
            const errorMsg = streamingTextRef.current + '\n\n🚨 **[Hệ thống AI]**: Lỗi gián đoạn kết nối do mạng không ổn định hoặc quá tải băng thông. Vui lòng thử lại sau giây lát.';
-           const errorId = generateId();
-           setMessages((prev) => [
-             ...prev,
-             { id: errorId, role: 'assistant', content: errorMsg }
-           ]);
+           setMessages((prev) => [...prev, { id: generateId(), role: 'assistant', content: errorMsg }]);
            setStreamingText('');
            streamingTextRef.current = '';
         }
-      } else {
+      } 
+      // 3. CÁC LỖI KHÁC (Parse JSON lỗi, HTTP status lạ...)
+      else {
         console.error('Stream processing error:', error);
-        const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}`;
-        if (streamingTextRef.current) {
-           const fallbackContent = streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]';
-           const fallbackId = generateId();
-           setMessages((prev) => [
-             ...prev,
-             { id: fallbackId, role: 'assistant', content: fallbackContent }
-           ]);
-           setStreamingText('');
-           streamingTextRef.current = '';
-        } else {
-           const newId = generateId();
-           setMessages((prev) => [
-             ...prev,
-             { id: newId, role: 'assistant', content: 'Hệ thống AI đang gián đoạn kết nối. Vui lòng thử lại.' }
-           ]);
-        }
+        const fallbackContent = streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]';
+        setMessages((prev) => [...prev, { id: generateId(), role: 'assistant', content: fallbackContent }]);
+        setStreamingText('');
+        streamingTextRef.current = '';
       }
       
-      // [BỌC THÉP UI]: Dù rớt mạng hay văng lỗi lạ, bắt buộc phải nhả cờ UI để không bị treo nút Gửi
+      // [BỌC THÉP UI]: Mở khóa cờ Race Condition và giải phóng giao diện ngay lập tức
       setIsThinking(false);
       setIsStreaming(false);
       isStreamingRef.current = false;
