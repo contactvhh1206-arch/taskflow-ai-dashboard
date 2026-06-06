@@ -15,4 +15,7 @@ router.get('/sessions', authGuard, aiController.getSessionsHandler);
 router.post('/sessions', authGuard, aiController.createSessionHandler);
 router.get('/chat-sessions/:id/messages', authGuard, aiController.getMessagesHandler);
 
+// Cấu hình AI
+router.post('/test-key', authGuard, aiController.testKeyHandler);
+
 module.exports = router;

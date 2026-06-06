@@ -606,10 +606,45 @@ const getMessagesHandler = async (req, res) => {
     }
 };
 
+const testKeyHandler = async (req, res) => {
+    try {
+        const { apiKey, model } = req.body;
+        if (!apiKey || !model) {
+            return res.status(400).json({ success: false, message: 'Thiếu API Key hoặc Model ID' });
+        }
+
+        const testPayload = {
+            model: model,
+            messages: [{ role: 'user', content: 'Say hello in 1 word' }],
+            max_tokens: 5
+        };
+
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: 'POST',
+            headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(testPayload)
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`OpenRouter báo lỗi ${response.status}: ${errText}`);
+        }
+
+        res.json({ success: true, message: 'Kết nối thành công!' });
+    } catch (error) {
+        console.error('[API Test Error]:', error.message);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     chatStreamHandler,
     getSessionsHandler,
     createSessionHandler,
     pingBatchHandler,
-    getMessagesHandler
+    getMessagesHandler,
+    testKeyHandler
 };
