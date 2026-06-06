@@ -230,6 +230,12 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 });
             }
 
+            // [KHIÊN TÂM LÝ]: Prompt Injection Lượt 2 để dằn mặt AI
+            messages.push({
+                role: "user",
+                content: "HỆ THỐNG CẢNH BÁO: Dữ liệu đã được hệ thống cung cấp đầy đủ. TUYỆT ĐỐI CẤM SỬ DỤNG THÊM BẤT KỲ CÔNG CỤ (TOOL) NÀO NỮA. Yêu cầu phân tích tổng hợp thành văn bản trả lời cho người dùng NGAY LẬP TỨC."
+            });
+
             const llmStreamPayload = {
                 model: "google/gemini-3.1-pro-preview",
                 messages: messages,
