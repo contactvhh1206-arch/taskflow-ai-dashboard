@@ -229,7 +229,6 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             const llmStreamPayload = {
                 model: "google/gemini-3.1-pro-preview",
                 messages: messages,
-                tools: aiService.AI_TOOLS,
                 stream: true,
                 max_tokens: 4096
             };
@@ -397,6 +396,9 @@ const getMessagesHandler = async (req, res) => {
              JOIN ai_chat_sessions s ON m.session_id = s.id
              WHERE m.session_id = $1 AND s.user_id = $2 
              AND m.role IN ('user', 'assistant')
+             AND m.content IS NOT NULL 
+             AND TRIM(m.content) != '' 
+             AND m.content != 'EMPTY'
              ORDER BY m.created_at ASC`, 
             [id, userId]
         );
