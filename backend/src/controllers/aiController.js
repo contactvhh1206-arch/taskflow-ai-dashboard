@@ -216,6 +216,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 const astMsg = { role: 'assistant' };
                 if (msg.content && msg.content.trim() !== "" && msg.content.trim() !== "EMPTY") {
                     astMsg.content = msg.content;
+                } else {
+                    astMsg.content = " "; // KHẮC PHỤC BUG: OpenRouter/Gemini yêu cầu content không được rỗng
                 }
                 if (msg.tool_calls) {
                     astMsg.tool_calls = msg.tool_calls;
@@ -275,9 +277,9 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 VALUES ($1, $2, $3, 'assistant', $4, $5)
             `, [sessionId, logFacilityId, logDepartmentCode, aiMessage.content || "", JSON.stringify(aiMessage.tool_calls)]);
 
-            // [SCHEMA FIX]: Thay vì gán "", ta xóa bỏ nếu rỗng hoặc "EMPTY" để không bị Gemini bắt lỗi empty text part
+            // [SCHEMA FIX]: Thay vì gán "", ta gán khoảng trắng " " để không bị Gemini bắt lỗi empty text part
             if (!aiMessage.content || aiMessage.content.trim() === "" || aiMessage.content.trim() === "EMPTY") {
-                delete aiMessage.content;
+                aiMessage.content = " ";
             }
             messages.push(aiMessage); 
 
