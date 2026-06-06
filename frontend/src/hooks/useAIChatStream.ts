@@ -156,14 +156,33 @@ export function useAIChatStream(options?: {
               // CHỮA BỆNH MÙ LÒA FRONTEND: BẮT LỖI TỪ API TRẢ VỀ
               // ====================================================
               if (data?.error) {
-                  // Ép lấy thông điệp lỗi an toàn bằng Optional Chaining
-                  const errorDetail = data?.error?.message || data?.error?.type || JSON.stringify(data.error);
-                  chunkTextToAppend += `\n\n**[LỖI HỆ THỐNG]:** ${errorDetail}`;
+                  // Ép kiểu an toàn (Do Backend trả về chuỗi trực tiếp)
+                  const errorDetail = typeof data.error === 'string' ? data.error : (data.error?.message || data.error?.type || "Lỗi Hệ thống Thần kinh AI không xác định");
                   
-                  // Ép UI tắt trạng thái Thinking (Nút gửi sẽ tự mở lại)
+                  // Ép state React cập nhật ngay lập tức tin nhắn báo lỗi này vào mảng hiển thị
+                  const errorContent = streamingTextRef.current + chunkTextToAppend + `\n\n🚨 [LỖI HỆ THỐNG]: ${errorDetail}`;
+                  const errorId = generateId();
+                  setMessages((prev) => [
+                    ...prev,
+                    { id: errorId, role: 'assistant', content: errorContent }
+                  ]);
+                  
+                  setStreamingText('');
+                  streamingTextRef.current = '';
+                  chunkTextToAppend = ''; // Xóa buffer tạm
+                  
+                  // Ép UI tắt trạng thái Thinking & Tắt cờ Race Condition
                   setIsThinking(false);
                   setIsStreaming(false);
-                  continue; // Đã bắt được lỗi, không cần parse content nữa
+                  isStreamingRef.current = false;
+                  
+                  // Bóp chết luồng treo (Kill Switch)
+                  if (abortControllerRef.current) {
+                      abortControllerRef.current.abort();
+                  }
+                  
+                  // Thay lệnh continue; bằng lệnh break; để văng ra khỏi vòng lặp đọc stream
+                  break; 
               }
 
               // Sử dụng Optional Chaining an toàn để lấy chuỗi Stream
@@ -235,6 +254,12 @@ export function useAIChatStream(options?: {
            ]);
         }
       }
+      
+      // [BỌC THÉP UI]: Dù rớt mạng hay văng lỗi lạ, bắt buộc phải nhả cờ UI để không bị treo nút Gửi
+      setIsThinking(false);
+      setIsStreaming(false);
+      isStreamingRef.current = false;
+      
     } finally {
       if (abortControllerRef.current === abortController) {
         isStreamingRef.current = false;

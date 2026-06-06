@@ -115,25 +115,29 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             }
         ];
 
-        // [KIẾN TRÚC RAG THANH KHIẾT]: Gọt sạch mọi dấu vết Tool Call trong Lịch sử
+        // [KIẾN TRÚC RAG THANH KHIẾT]: Phục hồi toàn bộ chuỗi nhân quả của Tool Call
         for (const msg of historyRows) {
             
-            // 1. Chém không thương tiếc mọi dữ liệu thô (hoặc tin nhắn nén) của Tool
             if (msg.role === 'tool') {
-                continue; 
-            }
-
-            // 2. Ép Assistant quên đi quá khứ gọi hàm, chỉ nhớ bản tóm tắt
-            if (msg.role === 'assistant') {
-                // [CHỐT CHẶN VIRUS]: Băm nát các tin nhắn rỗng, toàn khoảng trắng, hoặc chứa chính xác chữ "EMPTY"
-                if (!msg.content || msg.content.trim() === "" || msg.content === "EMPTY") {
-                    continue;
+                const parsedMeta = typeof msg.tool_calls === 'string' ? JSON.parse(msg.tool_calls) : (msg.tool_calls || {});
+                messages.push({ role: 'tool', tool_call_id: parsedMeta.tool_call_id, content: msg.content || "" });
+            } 
+            
+            else if (msg.role === 'assistant') {
+                if (msg.tool_calls) {
+                    const safeParsedToolCallsArray = typeof msg.tool_calls === 'string' ? JSON.parse(msg.tool_calls) : msg.tool_calls;
+                    messages.push({ 
+                        role: 'assistant', 
+                        content: (msg.content === "EMPTY" || !msg.content) ? "" : msg.content, 
+                        tool_calls: safeParsedToolCallsArray 
+                    });
+                } else {
+                    // [CHỐT CHẶN VIRUS]: Băm nát các tin nhắn rỗng, toàn khoảng trắng, hoặc chứa chính xác chữ "EMPTY"
+                    if (!msg.content || msg.content.trim() === "" || msg.content === "EMPTY") {
+                        continue;
+                    }
+                    messages.push({ role: 'assistant', content: msg.content });
                 }
-                // Nếu là bản tóm tắt quý giá -> Nạp vào não AI
-                messages.push({
-                    role: 'assistant',
-                    content: msg.content
-                });
             } 
             
             // 3. Giữ nguyên câu hỏi của User
@@ -230,7 +234,6 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 model: "google/gemini-3.1-pro-preview",
                 messages: messages,
                 tools: aiService.AI_TOOLS,
-                tool_choice: "none",
                 stream: true,
                 max_tokens: 4096
             };
