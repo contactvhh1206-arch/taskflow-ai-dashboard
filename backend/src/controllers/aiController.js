@@ -178,6 +178,12 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         const aiMessage = data1.choices[0].message;
 
         if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
+            
+            // [DIỆT VIRUS OPENROUTER]: Triệt tiêu chữ "EMPTY" do OpenRouter tự ý nhét vào
+            if (aiMessage.content === "EMPTY") {
+                aiMessage.content = "";
+            }
+
             // [DB WRITE] Lưu luồng Tool Call từ Assistant (Thay "EMPTY" bằng chuỗi rỗng "")
             await pool.query(`
                 INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
