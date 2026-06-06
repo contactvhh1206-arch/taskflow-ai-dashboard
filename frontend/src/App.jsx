@@ -1115,7 +1115,7 @@ function MainDashboard() {
         // MỞ CỔNG THÀNH: Chỉ mở khóa sau khi đã xử lý xong hoàn toàn
         isFetchingTasks.current = false; 
     }
-  }, [user?.id, user?.role, user?.facility_id, user?.facility_name, user?.department_code]); 
+  }, [user?.id, user?.role, String(user?.facility_id), user?.facility_name, user?.department_code]); 
   // Dependency Array chỉ chứa các biến primitive tĩnh, miễn nhiễm hoàn toàn với luồng AI Stream!
 
   // =======================================================================
@@ -1126,6 +1126,8 @@ function MainDashboard() {
     
     const executeFetch = async () => {
         if (!isMounted) return;
+        // Bọc thêm 1 lớp bảo vệ: Mặc dù đã chặn bên trong fetchTasks, kiểm tra nhanh ở ngoài vẫn là best-practice
+        if (isFetchingTasks.current) return;
         await fetchTasks(); 
     };
 

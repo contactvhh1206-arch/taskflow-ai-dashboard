@@ -9,17 +9,33 @@ const axiosClient = axios.create({
     },
 });
 
-// Interceptor tự động nhúng Token
+// Cache trượt thời gian (Sliding Window) để chống DDoS ở Frontend
+const taskApiRateLimiter = {
+    timestamps: []
+};
+
+// Interceptor tự động nhúng Token và Rate Limiter
 axiosClient.interceptors.request.use((config) => {
     const token = localStorage.getItem('taskflow_token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // GÀI BỌ TRUY VẾT KHẨN CẤP ĐỂ TÌM THỦ PHẠM GỌI /tasks
+    // RÀO CHẮN BĂNG THÔNG CHO ENDPOINT /tasks
     if (config.url && config.url.includes('/api/tasks')) {
-      console.warn('[TRACE-DDoS] Lệnh gọi API Tasks được kích hoạt từ:');
-      console.trace(); // TỬ HUYỆT BÓC TRẦN CALL STACK! SẼ BIẾT ĐÍCH XÁC FILE NÀO GỌI!
+        const now = Date.now();
+        // Lọc để chỉ giữ lại các mốc thời gian trong vòng 1 giây qua (1000ms)
+        taskApiRateLimiter.timestamps = taskApiRateLimiter.timestamps.filter(ts => now - ts < 1000);
+        
+        // Ngưỡng cứng: 3 requests / giây
+        if (taskApiRateLimiter.timestamps.length >= 3) {
+            console.warn('[Network Shield] DDoS Protection: Đã chặn Request tới /api/tasks (Vượt ngưỡng 3 requests/giây)');
+            // Ném lỗi CancelError để hủy Request ngay từ trong kén, không cho gửi đi
+            throw new axios.Cancel('DDoS Protection: Bị chặn bởi Frontend Network Shield');
+        }
+        
+        // Đẩy thời điểm request hợp lệ vào mảng
+        taskApiRateLimiter.timestamps.push(now);
     }
     
     return config;

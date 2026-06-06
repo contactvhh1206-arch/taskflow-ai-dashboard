@@ -21,6 +21,7 @@ export function useAIChatStream(options?: {
   const [isThinking, setIsThinking] = useState<boolean>(false);
   const isStreamingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isUserAbortedRef = useRef<boolean>(false); // Cờ theo dõi nguyên nhân ngắt luồng
 
   const optionsRef = useRef(options);
   useEffect(() => {
@@ -52,6 +53,8 @@ export function useAIChatStream(options?: {
   }, []);
 
   const sendMessage = useCallback(async (content: string, contextPayload: any) => {
+    isUserAbortedRef.current = false; // Mở cờ trạng thái khởi tạo
+
     if (isStreamingRef.current) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -233,10 +236,25 @@ export function useAIChatStream(options?: {
         }
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.warn('Network request aborted to prevent Race Condition (Normal Behavior)');
+      // KIỂM SOÁT FALLBACK CHÍNH XÁC KHI NGẮT KẾT NỐI
+      if (error.name === 'AbortError' || error.name === 'CanceledError') {
+        if (isUserAbortedRef.current) {
+           console.warn('[Luồng Thép AI] Người dùng đã chủ động dừng tạo phản hồi (Normal Behavior).');
+        } else {
+           console.error('[Luồng Thép AI] Luồng Stream bị đứt kết nối ngầm do lỗi mạng hoặc Server Rate Limit (DDoS)!');
+           const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}`;
+           const errorMsg = streamingTextRef.current + '\n\n🚨 **[Hệ thống AI]**: Lỗi gián đoạn kết nối do mạng không ổn định hoặc quá tải băng thông. Vui lòng thử lại sau giây lát.';
+           const errorId = generateId();
+           setMessages((prev) => [
+             ...prev,
+             { id: errorId, role: 'assistant', content: errorMsg }
+           ]);
+           setStreamingText('');
+           streamingTextRef.current = '';
+        }
       } else {
         console.error('Stream processing error:', error);
+        const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}`;
         if (streamingTextRef.current) {
            const fallbackContent = streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]';
            const fallbackId = generateId();
@@ -273,6 +291,7 @@ export function useAIChatStream(options?: {
 
   const stopStream = useCallback(() => {
     if (abortControllerRef.current) {
+      isUserAbortedRef.current = true; // Lệnh Khóa: Khẳng định đây là hành động chủ ý của User
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
       isStreamingRef.current = false;
