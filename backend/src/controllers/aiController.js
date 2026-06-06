@@ -120,7 +120,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             
             if (msg.role === 'tool') {
                 const parsedMeta = typeof msg.tool_calls === 'string' ? JSON.parse(msg.tool_calls) : (msg.tool_calls || {});
-                messages.push({ role: 'tool', tool_call_id: parsedMeta.tool_call_id, content: msg.content || "" });
+                messages.push({ role: 'tool', tool_call_id: parsedMeta.tool_call_id, name: parsedMeta.name || "unknown_tool", content: msg.content || "" });
             } 
             
             else if (msg.role === 'assistant') {
@@ -222,10 +222,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     VALUES ($1, $2, $3, 'tool', $4, $5)
                 `, [sessionId, logFacilityId, logDepartmentCode, safeToolResult, JSON.stringify(toolMeta)]);
 
-                // [DỌN RÁC LƯỢT 2]: Cấm key name trong role tool
+                // [KHÔI PHỤC SCHEMA]: OpenRouter/Gemini bắt buộc phải có key name để map kết quả tool
                 messages.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
+                    name: funcName,
                     content: safeToolResult
                 });
             }
@@ -250,7 +251,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
-                    "Authorization": `Bearer ${openRouterKey}`,
+                    "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify(llmStreamPayload),
@@ -263,47 +264,61 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 throw new Error(`API LLM (Lượt Stream) lỗi ${response2.status}: ${errText}`);
             }
             
-            const reader = response2.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            
             let fullAiReply = "";
-            let buffer = ""; 
             
             try {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done || !isClientConnected) break;
+                if (isClientConnected) {
+                    const reader = response2.body;
+                    let streamBuffer = ""; 
                     
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop();
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                            try {
-                                const data = JSON.parse(line.slice(6));
-                                
-                                // [PHÁ TỬ HUYỆT 1]: Chặn đứng và trích xuất nguyên vẹn bằng chứng lỗi gốc từ OpenRouter
-                                if (data.error) {
-                                    console.error('[OpenRouter API Error]:', data.error);
-                                    res.write(`data: ${JSON.stringify({ error: data.error })}\n\n`);
-                                    res.write('data: [DONE]\n\n');
-                                    
-                                    // [PHÁ TỬ HUYỆT 2]: Lệnh "return" sinh tử! 
-                                    // Chém đứt toàn bộ function, chống bom sập Server (ERR_STREAM_WRITE_AFTER_END).
-                                    return; 
-                                }
+                    reader.on('data', async (chunkBuffer) => {
+                        if (!isClientConnected) {
+                            if (controller2 && typeof controller2.abort === 'function') {
+                                controller2.abort();
+                            }
+                            return;
+                        }
 
-                                const contentChunk = data?.choices?.[0]?.delta?.content || data?.content || "";
-                                if (contentChunk) {
-                                    fullAiReply += contentChunk;
-                                    res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
+                        streamBuffer += chunkBuffer.toString();
+                        
+                        const lines = streamBuffer.split('\n');
+                        streamBuffer = lines.pop(); // TỬ HUYỆT BẢO TỒN MẠNG
+                        
+                        for (const line of lines) {
+                            if (line.trim() === '') continue;
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.slice(6).trim();
+                                if (dataStr === '[DONE]') continue;
+                                try {
+                                    const data = JSON.parse(dataStr);
+                                    const delta = data?.choices?.[0]?.delta;
+                                    
+                                    // [LƯỚI ĐIỆN VẬT LÝ]: Radar Chống Mù Parser & Kill-Switch
+                                    if (delta && delta.tool_calls) {
+                                        console.warn('[SECURITY WARNING]: AI đang cố gắng vượt rào gọi hàm đệ quy trong luồng stream.');
+                                        if (isClientConnected) {
+                                            const errMsg = "Cảnh báo An ninh: AI đang cố gắng trích xuất dữ liệu vượt ranh giới phân quyền. Tác vụ đã bị chặn bởi hệ thống phòng thủ HUBDB.";
+                                            res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
+                                            res.write('data: [DONE]\n\n');
+                                            res.end();
+                                        }
+                                        if (controller2 && typeof controller2.abort === 'function') {
+                                            controller2.abort();
+                                        }
+                                        break; // Văng khỏi vòng lặp đọc stream ngay lập tức
+                                    }
+
+                                    const contentChunk = delta?.content || data?.content || "";
+                                    if (contentChunk) {
+                                        fullAiReply += contentChunk;
+                                        res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
+                                    }
+                                } catch (e) {
+                                    console.error('[STREAM PARSE ERROR] Lỗi phân mảnh:', e.message, 'Data thô:', dataStr);
                                 }
-                            } catch (parseErr) {
-                                console.error('[Stream Parse JSON Error]:', parseErr.message, 'Raw Line:', line);
                             }
                         }
-                    }
+                    });
                 }
             } finally {
                 clearTimeout(timeoutId2);
