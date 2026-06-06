@@ -460,6 +460,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                 const dataStr = completeEvent.slice(6).trim();
                                 if (dataStr === '[DONE]') continue;
                                 
+                                try {
                                     const data = JSON.parse(dataStr);
                                     
                                     if (data.error) {
