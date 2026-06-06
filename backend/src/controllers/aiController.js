@@ -343,24 +343,39 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 messages.push(resolved.msgObj);
             }
 
-            // Thêm một tin nhắn hệ thống vào cuối cùng để dặn dò Gemini không gọi tool nữa
-            messages.push({
+            // [TRICK] Gemini 3.1 Pro Preview bị kẹt khi truyền tools vào Lượt 2 dù đã dặn không dùng tool.
+            // Để ép nó chỉ sinh text, ta PHẢI XÓA MẢNG TOOLS.
+            // Nhưng OpenRouter sẽ báo lỗi 400 nếu lịch sử có 'tool'/'tool_calls' mà không có mảng 'tools'.
+            // => GIẢI PHÁP: Phẳng hóa (Flatten) toàn bộ lịch sử thành user/assistant thuần túy!
+            
+            const flattenedMessages = messages.map(msg => {
+                if (msg.role === 'assistant' && msg.tool_calls) {
+                    return { role: 'assistant', content: msg.content && msg.content.trim() !== "" ? msg.content : "Đang lấy dữ liệu..." };
+                }
+                if (msg.role === 'tool') {
+                    return { role: 'user', content: `[DỮ LIỆU TỪ HỆ THỐNG - CÔNG CỤ ${msg.name}]:\n${msg.content}` };
+                }
+                return msg;
+            });
+
+            // Thêm một tin nhắn hệ thống vào cuối cùng để dặn dò Gemini phân tích
+            flattenedMessages.push({
                 role: "user",
-                content: "[HƯỚNG DẪN HỆ THỐNG QUAN TRỌNG TỪ BAN QUẢN TRỊ]: Dữ liệu công cụ đã được trả về đầy đủ. BẮT BUỘC KHÔNG ĐƯỢC GỌI THÊM BẤT KỲ CÔNG CỤ NÀO NỮA. Hãy trực tiếp phân tích dữ liệu trên và trả lời người dùng bằng văn bản ngay bây giờ."
+                content: "[HƯỚNG DẪN TỪ BAN QUẢN TRỊ]: Toàn bộ dữ liệu bạn cần đã được cung cấp ở trên. Hãy trực tiếp phân tích, đối chiếu chéo các dữ liệu này và trả lời người dùng ngay bây giờ bằng văn bản rõ ràng, súc tích."
             });
 
             const llmStreamPayload = {
                 model: aiModel,
-                messages: messages,
-                tools: aiService.AI_TOOLS,
+                messages: flattenedMessages,
+                // KHÔNG TRUYỀN TOOLS VÀO ĐÂY NỮA
                 stream: true,
                 max_tokens: 4096
             };
 
             console.log("=== [BẪY MỒI 1] CHUẨN BỊ GỌI LƯỢT 2 ===");
             console.log("- Model:", aiModel);
-            console.log("- Số lượng messages:", messages.length);
-            console.log("- Message cuối cùng:", messages[messages.length - 1].content.substring(0, 50) + "...");
+            console.log("- Số lượng messages (flattened):", flattenedMessages.length);
+            console.log("- Message cuối cùng:", flattenedMessages[flattenedMessages.length - 1].content.substring(0, 50) + "...");
 
             const controller2 = new AbortController();
             const timeoutId2 = setTimeout(() => controller2.abort(), 300000);
