@@ -122,21 +122,22 @@ export default function AIAdvisor(props) {
     const abortController = new AbortController();
     
     if (activeSessionId !== currentSessionIdRef.current) {
-        if (isStreamingRef.current || isTypingRef.current) {
-             stopStream();
+        const isSessionGeneratedByCurrentAction = isSessionCreatedByMeRef.current;
+        isSessionCreatedByMeRef.current = false;
+        
+        if (!isSessionGeneratedByCurrentAction) {
+            if (isStreamingRef.current || isTypingRef.current) {
+                 stopStream();
+            }
+            setMessages([]);
         }
-        setMessages([]);
     }
     
     currentSessionIdRef.current = activeSessionId;
+    
     if (!activeSessionId) return; 
     
     const loadHistory = async () => {
-        if (isSessionCreatedByMeRef.current) {
-            isSessionCreatedByMeRef.current = false;
-            return;
-        }
-
         isFetchingHistory.current = true;
         try {
             const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`, {

@@ -32,6 +32,8 @@ const chatStreamHandler = async (req, res) => {
     sessionId = sessionId || session_id;
     const userContext = req.user;
 
+    const reqAbortController = new AbortController();
+
     // 1. Rào chắn đầu vào (Validation)
     if (!message) {
         return res.status(400).json({
@@ -74,7 +76,8 @@ const chatStreamHandler = async (req, res) => {
 
     // 2. Khởi tạo Headers chuẩn SSE (Server-Sent Events)
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
@@ -101,6 +104,7 @@ const chatStreamHandler = async (req, res) => {
 
     req.on('close', () => {
         isClientConnected = false;
+        reqAbortController.abort();
         saveAiReplyToDb(); // Kích hoạt lưu ngay phần chữ bị gãy khi mạng đứt
         res.end();
     });
@@ -228,8 +232,10 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             tool_choice: "auto"
         };
 
-        const controller1 = new AbortController();
-        const timeoutId1 = setTimeout(() => controller1.abort(), 120000);
+        const signal1 = AbortSignal.any([
+            AbortSignal.timeout(120000),
+            reqAbortController.signal
+        ]);
 
         const response1 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
@@ -238,9 +244,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(llmPayload),
-            signal: controller1.signal
+            signal: signal1
         });
-        clearTimeout(timeoutId1);
 
         if (!response1.ok) {
             const errText = await response1.text();
@@ -325,8 +330,10 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 max_tokens: 4096
             };
 
-            const controller2 = new AbortController();
-            const timeoutId2 = setTimeout(() => controller2.abort(), 120000);
+            const signal2 = AbortSignal.any([
+                AbortSignal.timeout(120000),
+                reqAbortController.signal
+            ]);
 
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
@@ -335,11 +342,10 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify(llmStreamPayload),
-                signal: controller2.signal
+                signal: signal2
             });
 
             if (!response2.ok) {
-                clearTimeout(timeoutId2);
                 const errText = await response2.text();
                 throw new Error(`API LLM (Lượt Stream) lỗi ${response2.status}: ${errText}`);
             }
@@ -353,7 +359,6 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     // Sử dụng Async Iterable thay vì listener on('data') để khóa luồng thực thi
                     for await (const chunkBuffer of reader) {
                         if (!isClientConnected) {
-                            if (controller2 && typeof controller2.abort === 'function') controller2.abort();
                             break;
                         }
 
@@ -386,7 +391,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                             res.write('data: [DONE]\n\n');
                                             res.end();
                                         }
-                                        if (controller2 && typeof controller2.abort === 'function') controller2.abort();
+                                        reqAbortController.abort();
                                         throw new Error("KILL_SWITCH_TRIGGERED"); // Ném lỗi văng ra catch để chạy mượt xuống finally
                                     }
 
@@ -405,7 +410,6 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             } catch (err) {
                  if (err.message !== "KILL_SWITCH_TRIGGERED") throw err;
             } finally {
-                clearTimeout(timeoutId2);
                 // BẮT BUỘC ĐỢI STREAM TRẢ HẾT / GÃY RỒI MỚI CHẠY LƯU DB CHỐNG ASYNC LEAK
                 await saveAiReplyToDb(); 
             }
