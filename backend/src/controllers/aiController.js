@@ -213,11 +213,14 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 const parsedMeta = safeJsonParse(msg.tool_calls, {});
                 messages.push({ role: 'tool', tool_call_id: parsedMeta.tool_call_id, name: parsedMeta.name || "unknown_tool", content: msg.content || "" });
             } else if (msg.role === 'assistant') {
-                if (msg.tool_calls) {
-                    messages.push({ role: 'assistant', content: msg.content || "", tool_calls: msg.tool_calls });
-                } else {
-                    messages.push({ role: 'assistant', content: msg.content });
+                const astMsg = { role: 'assistant' };
+                if (msg.content && msg.content.trim() !== "" && msg.content.trim() !== "EMPTY") {
+                    astMsg.content = msg.content;
                 }
+                if (msg.tool_calls) {
+                    astMsg.tool_calls = msg.tool_calls;
+                }
+                messages.push(astMsg);
             } else if (msg.role === 'user') {
                 messages.push({ role: 'user', content: msg.content });
             }
@@ -234,7 +237,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         };
 
         const controller1 = new AbortController();
-        const timeoutId1 = setTimeout(() => controller1.abort(), 120000);
+        const timeoutId1 = setTimeout(() => controller1.abort(), 300000);
 
         const signal1 = AbortSignal.any([
             controller1.signal,
@@ -272,9 +275,9 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 VALUES ($1, $2, $3, 'assistant', $4, $5)
             `, [sessionId, logFacilityId, logDepartmentCode, aiMessage.content || "", JSON.stringify(aiMessage.tool_calls)]);
 
-            // [SCHEMA FIX]: Phục hồi key content = "" thay vì delete, chống OpenRouter/Gemini báo lỗi schema
-            if (!aiMessage.content || aiMessage.content.trim() === "") {
-                aiMessage.content = ""; 
+            // [SCHEMA FIX]: Thay vì gán "", ta xóa bỏ nếu rỗng hoặc "EMPTY" để không bị Gemini bắt lỗi empty text part
+            if (!aiMessage.content || aiMessage.content.trim() === "" || aiMessage.content.trim() === "EMPTY") {
+                delete aiMessage.content;
             }
             messages.push(aiMessage); 
 
@@ -336,7 +339,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             };
 
             const controller2 = new AbortController();
-            const timeoutId2 = setTimeout(() => controller2.abort(), 120000);
+            const timeoutId2 = setTimeout(() => controller2.abort(), 300000);
 
             const signal2 = AbortSignal.any([
                 controller2.signal,
@@ -451,7 +454,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         console.error('[AI Controller Error]:', error.name, error.message);
         if (isClientConnected) {
             const errorMsg = error.name === 'AbortError' 
-                ? "Kết nối AI quá tải (Timeout 120s). Đã kích hoạt cơ chế bảo vệ UI. Xin thử lại." 
+                ? "Kết nối AI quá tải (Timeout 300s). Đã kích hoạt cơ chế bảo vệ UI. Xin thử lại." 
                 : "Đã xảy ra sự cố giao tiếp với Hệ thống Thần kinh AI.";
                 
             res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
