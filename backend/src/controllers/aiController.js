@@ -157,7 +157,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         };
 
         const controller1 = new AbortController();
-        const timeoutId1 = setTimeout(() => controller1.abort(), 45000);
+        const timeoutId1 = setTimeout(() => controller1.abort(), 120000);
 
         const response1 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
@@ -229,7 +229,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             };
 
             const controller2 = new AbortController();
-            const timeoutId2 = setTimeout(() => controller2.abort(), 45000);
+            const timeoutId2 = setTimeout(() => controller2.abort(), 120000);
 
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
@@ -290,7 +290,6 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         } else {
             // [DB WRITE] Lưu Chat Thường
             const content = aiMessage.content || "";
-            res.write(`data: ${JSON.stringify({ content })}\n\n`);
             
             if (content && content.length > 0) {
                 await pool.query(`
@@ -298,6 +297,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     VALUES ($1, $2, $3, 'assistant', $4)
                 `, [sessionId, logFacilityId, logDepartmentCode, content]);
             }
+
+            res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
+            return;
         }
 
         if (isClientConnected) {
@@ -309,7 +313,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         console.error('[AI Controller Error]:', error.name, error.message);
         if (isClientConnected) {
             const errorMsg = error.name === 'AbortError' 
-                ? "Kết nối AI quá tải (Timeout 45s). Đã kích hoạt cơ chế bảo vệ UI. Xin thử lại." 
+                ? "Kết nối AI quá tải (Timeout 120s). Đã kích hoạt cơ chế bảo vệ UI. Xin thử lại." 
                 : "Đã xảy ra sự cố giao tiếp với Hệ thống Thần kinh AI.";
                 
             res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);

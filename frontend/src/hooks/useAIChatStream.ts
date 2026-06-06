@@ -152,14 +152,24 @@ export function useAIChatStream(options?: {
                   continue; 
               }
               
-              if (data.error) {
-                  // [TRỊ BỆNH MÙ LỖI]: In thẳng lỗi ra UI và KHÔNG throw để ngắt luồng
-                  chunkTextToAppend += '\n\n[LỖI HỆ THỐNG]: ' + data.error;
-              } else {
-                  const contentChunk = data.choices?.[0]?.delta?.content || data.content || data.text || "";
-                  if (contentChunk) {
-                    chunkTextToAppend += contentChunk;
-                  }
+              // ====================================================
+              // CHỮA BỆNH MÙ LÒA FRONTEND: BẮT LỖI TỪ API TRẢ VỀ
+              // ====================================================
+              if (data?.error) {
+                  // Ép lấy thông điệp lỗi an toàn bằng Optional Chaining
+                  const errorDetail = data?.error?.message || data?.error?.type || JSON.stringify(data.error);
+                  chunkTextToAppend += `\n\n**[LỖI HỆ THỐNG]:** ${errorDetail}`;
+                  
+                  // Ép UI tắt trạng thái Thinking (Nút gửi sẽ tự mở lại)
+                  setIsThinking(false);
+                  setIsStreaming(false);
+                  continue; // Đã bắt được lỗi, không cần parse content nữa
+              }
+
+              // Sử dụng Optional Chaining an toàn để lấy chuỗi Stream
+              const chunk = data?.choices?.[0]?.delta?.content || data?.content || data?.text || '';
+              if (chunk) {
+                  chunkTextToAppend += chunk;
               }
             } catch (parseError) {
               console.warn('[Luồng Thép] Bỏ qua chunk vỡ ngầm:', dataPayload);
