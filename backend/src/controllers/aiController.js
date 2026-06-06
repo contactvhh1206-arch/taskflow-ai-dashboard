@@ -190,9 +190,9 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 VALUES ($1, $2, $3, 'assistant', $4, $5)
             `, [sessionId, logFacilityId, logDepartmentCode, aiMessage.content || "", JSON.stringify(aiMessage.tool_calls)]);
 
-            // [DỌN RÁC LƯỢT 1]: Chống ảo giác schema Gemini
+            // [SCHEMA FIX]: Phục hồi key content = "" thay vì delete, chống OpenRouter/Gemini báo lỗi schema
             if (!aiMessage.content || aiMessage.content.trim() === "") {
-                delete aiMessage.content;
+                aiMessage.content = ""; 
             }
             messages.push(aiMessage); 
 
@@ -229,6 +229,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             const llmStreamPayload = {
                 model: "google/gemini-3.1-pro-preview",
                 messages: messages,
+                tools: aiService.AI_TOOLS,
                 stream: true,
                 max_tokens: 4096
             };
