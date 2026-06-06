@@ -30,7 +30,7 @@ router.post('/', authGuard, async (req, res) => {
         const valCol = colNames.find(c => ['value', 'data', 'config_value', 'setting_value'].includes(c)) || 'value';
 
         const upsertConfig = async (k, v) => {
-            const { rows } = await pool.query(`SELECT id FROM system_config WHERE ${keyCol} = $1`, [k]);
+            const { rows } = await pool.query(`SELECT ${keyCol} FROM system_config WHERE ${keyCol} = $1`, [k]);
             if (rows.length > 0) {
                 await pool.query(`UPDATE system_config SET ${valCol} = $2 WHERE ${keyCol} = $1`, [k, JSON.stringify(v)]);
             } else {
