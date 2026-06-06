@@ -142,15 +142,15 @@ const chatStreamHandler = async (req, res) => {
 
         // [DB READ] 2. Trích xuất Context - Sliding Window LIMIT 20 & RBAC Kỷ luật thép
         const { rows: historyRows } = await pool.query(`
-            SELECT m.role, m.content, m.tool_calls
+            SELECT m.role, m.content, m.tool_calls, m.reasoning
             FROM ai_chat_messages m
             INNER JOIN ai_chat_sessions s ON m.session_id = s.id
             WHERE m.session_id = $1 AND s.user_id = $2
             ORDER BY m.created_at DESC
             LIMIT 20
         `, [sessionId, userContext.id]);
-
-        // Đảo ngược mảng để trả về đúng timeline cũ -> mới
+        
+        // [KHẮC PHỤC LỖI NGHỊCH LÝ THỜI GIAN]: Đảo ngược mảng để trả về đúng timeline cũ -> mới
         historyRows.reverse();
 
         // 3. KHẮC PHỤC BUG 3: RAG FILTER V2 (DUYỆT 2 CHU KỲ - ID MAPPING)
@@ -234,6 +234,10 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 if (msg.tool_calls) {
                     astMsg.tool_calls = msg.tool_calls;
                 }
+                // [PHỤC HỒI TRÍ NHỚ]: Trả lại Reasoning nếu tồn tại và khác rỗng
+                if (msg.reasoning && msg.reasoning.trim() !== "") {
+                    astMsg.reasoning = msg.reasoning;
+                }
                 messages.push(astMsg);
             } else if (msg.role === 'user') {
                 messages.push({ role: 'user', content: msg.content });
@@ -282,13 +286,13 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             if (aiMessage.content && aiMessage.content.trim().includes("EMPTY")) {
                 aiMessage.content = "";
             }
-
-            // [DB WRITE] Lưu luồng Tool Call từ Assistant (Thay "EMPTY" bằng chuỗi rỗng "")
+            // [BẮT GIỮ SUY LUẬN]: Trích xuất Chain of Thought (Nếu có)
+            const reasoningStr = aiMessage.reasoning || null;
+            // [DB WRITE] Lưu luồng Tool Call từ Assistant, Bơm Parameterized Query chống SQL Injection
             await pool.query(`
-                INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
-                VALUES ($1, $2, $3, 'assistant', $4, $5)
-            `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim() || " ", JSON.stringify(aiMessage.tool_calls)]);
-
+                INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls, reasoning)
+                VALUES ($1, $2, $3, 'assistant', $4, $5, $6)
+            `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim() || " ", JSON.stringify(aiMessage.tool_calls), reasoningStr]);
             // [SCHEMA FIX]: Thay vì gán "", ta gán khoảng trắng " " để không bị Gemini bắt lỗi empty text part
             if (!aiMessage.content || aiMessage.content.trim() === "" || aiMessage.content.trim() === "EMPTY") {
                 aiMessage.content = " ";
@@ -350,7 +354,12 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             
             const flattenedMessages = messages.map(msg => {
                 if (msg.role === 'assistant' && msg.tool_calls) {
-                    return { role: 'assistant', content: msg.content && msg.content.trim() !== "" ? msg.content : "Đang lấy dữ liệu..." };
+                    const newMsg = { role: 'assistant', content: msg.content && msg.content.trim() !== "" ? msg.content : "Đang lấy dữ liệu..." };
+                    // BẮT BUỘC MANG THEO REASONING QUA LƯỢT 2 KHI XÓA TOOL
+                    if (msg.reasoning) {
+                        newMsg.reasoning = msg.reasoning;
+                    }
+                    return newMsg;
                 }
                 if (msg.role === 'tool') {
                     return { role: 'user', content: `[DỮ LIỆU TỪ HỆ THỐNG - CÔNG CỤ ${msg.name}]:\n${msg.content}` };
