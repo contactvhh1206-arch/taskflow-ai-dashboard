@@ -330,11 +330,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     msgObj: { tool_call_id: toolCall.id, role: "tool", name: funcName, content: safeToolResult }
                 };
             });
-
-            // Kích hoạt tất cả tiến trình lấy Data chạy CÙNG LÚC
-            const resolvedTools = await Promise.all(toolPromises);
-
-            // [LƯU DB TUẦN TỰ]: Sau khi Data đã gom đủ, lưu lần lượt vào DB để bảo vệ Connection Pool & giữ đúng trật tự Causality
+        // [LƯU DB TUẦN TỰ]: Sau khi Data đã gom đủ, lưu lần lượt vào DB để bảo vệ Connection Pool & giữ đúng trật tự Causality
             for (const resolved of resolvedTools) {
                 await pool.query(`
                     INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
@@ -352,41 +348,51 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             const llmStreamPayload = {
                 model: aiModel,
                 messages: messages,
-                tools: aiService.AI_TOOLS, // Bắt buộc phải có tools nếu lịch sử có tool_calls
-                // tool_choice: "none" -> BỎ vì gây lỗi trên OpenRouter với Gemini
+                tools: aiService.AI_TOOLS,
                 stream: true,
                 max_tokens: 4096
             };
 
+            console.log("=== [BẪY MỒI 1] CHUẨN BỊ GỌI LƯỢT 2 ===");
+            console.log("- Model:", aiModel);
+            console.log("- Số lượng messages:", messages.length);
+            console.log("- Message cuối cùng:", messages[messages.length - 1].content.substring(0, 50) + "...");
+
             const controller2 = new AbortController();
             const timeoutId2 = setTimeout(() => controller2.abort(), 300000);
 
-            const signal2 = AbortSignal.any([
-                controller2.signal,
-                reqAbortController.signal
-            ]);
+            console.log("=== [BẪY MỒI 2] BẮT ĐẦU FETCH LƯỢT 2 TỪ OPENROUTER ===");
+            const startTimeL2 = Date.now();
 
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    'HTTP-Referer': process.env.SITE_URL || 'https://hubdb.app',
+                    'X-Title': process.env.SITE_NAME || 'HUBDB'
                 },
                 body: JSON.stringify(llmStreamPayload),
-                signal: signal2
+                signal: controller2.signal
             });
+
+            console.log(`=== [BẪY MỒI 3] FETCH LƯỢT 2 XONG (MẤT ${Date.now() - startTimeL2}ms). STATUS: ${response2.status} ===`);
 
             if (!response2.ok) {
                 clearTimeout(timeoutId2);
                 const errText = await response2.text();
+                console.error(`=== [BẪY MỒI LỖI] HTTP ${response2.status}: ${errText} ===`);
                 throw new Error(`API LLM (Lượt Stream) lỗi ${response2.status}: ${errText}`);
             }
-            
+
+            console.log("=== [BẪY MỒI 4] BẮT ĐẦU ĐỌC STREAM TỪ OPENROUTER ===");
+
             try {
                 // 4. KHẮC PHỤC BUG 4: ASYNC ACCUMULATOR CHỐNG RÁCH CHUỖI VÀ ĐỒNG BỘ LUỒNG
                 if (isClientConnected) {
                     const reader = response2.body;
                     let streamBuffer = ""; 
+                    let isFirstChunkReceived = false;
                     
                     // Sử dụng Async Iterable thay vì listener on('data') để khóa luồng thực thi
                     for await (const chunkBuffer of reader) {
@@ -414,24 +420,32 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                 try {
                                     const data = JSON.parse(dataStr);
                                     
-                                    const delta = data?.choices?.[0]?.delta;
-                                    // [LƯỚI ĐIỆN VẬT LÝ]: Radar Chống Mù Parser & Kill-Switch
-                                    if (delta && delta.tool_calls) {
-                                        console.warn('[SECURITY WARNING]: AI đang cố gắng vượt rào gọi hàm đệ quy trong luồng stream.');
-                                        if (isClientConnected) {
-                                            const errMsg = "Cảnh báo An ninh: AI đang cố gắng trích xuất dữ liệu vượt ranh giới phân quyền. Tác vụ đã bị chặn bởi hệ thống phòng thủ HUBDB.";
-                                            res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
-                                            res.write('data: [DONE]\n\n');
-                                            res.end();
-                                        }
-                                        if (controller2 && typeof controller2.abort === 'function') controller2.abort();
-                                        throw new Error("KILL_SWITCH_TRIGGERED"); // Ném lỗi văng ra catch để chạy mượt xuống finally
-                                    }
+                                    if (data.choices && data.choices.length > 0) {
+                                        const delta = data.choices[0].delta;
 
-                                    const contentChunk = delta?.content || data?.content || "";
-                                    if (contentChunk) {
-                                        fullAiReply += contentChunk;
-                                        res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
+                                        if (!isFirstChunkReceived) {
+                                            isFirstChunkReceived = true;
+                                            console.log(`=== [BẪY MỒI 5] ĐÃ NHẬN CHUNK ĐẦU TIÊN TỪ OPENROUTER (SAU ${Date.now() - startTimeL2}ms) ===`);
+                                        }
+
+                                        // [LƯỚI ĐIỆN VẬT LÝ]: Radar Chống Mù Parser & Kill-Switch
+                                        if (delta && delta.tool_calls) {
+                                            console.warn('[SECURITY WARNING]: AI đang cố gắng vượt rào gọi hàm đệ quy trong luồng stream.');
+                                            if (isClientConnected) {
+                                                const errMsg = "Cảnh báo An ninh: AI đang cố gắng trích xuất dữ liệu vượt ranh giới phân quyền. Tác vụ đã bị chặn bởi hệ thống phòng thủ HUBDB.";
+                                                res.write(`data: ${JSON.stringify({ error: errMsg })}\n\n`);
+                                                res.write('data: [DONE]\n\n');
+                                                res.end();
+                                            }
+                                            if (controller2 && typeof controller2.abort === 'function') controller2.abort();
+                                            throw new Error("KILL_SWITCH_TRIGGERED"); // Ném lỗi văng ra catch để chạy mượt xuống finally
+                                        }
+
+                                        const chunkText = delta?.content || "";
+                                        if (chunkText) {
+                                            fullAiReply += chunkText;
+                                            res.write(`data: ${JSON.stringify({ content: chunkText })}\n\n`);
+                                        }
                                     }
                                 } catch (e) {
                                     console.error('[STREAM PARSE ERROR] Đã bảo vệ luồng:', e.message);
@@ -441,10 +455,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     }
                 }
             } catch (err) {
+                 console.error("=== [BẪY MỒI LỖI STREAM] ===", err.message);
                  if (err.message !== "KILL_SWITCH_TRIGGERED") throw err;
             } finally {
+                console.log("=== [BẪY MỒI 6] KẾT THÚC STREAM HOẶC ĐÓNG KẾT NỐI ===");
                 clearTimeout(timeoutId2);
-                // BẮT BUỘC ĐỢI STREAM TRẢ HẾT / GÃY RỒI MỚI CHẠY LƯU DB CHỐNG ASYNC LEAK
                 await saveAiReplyToDb(); 
             }
             
