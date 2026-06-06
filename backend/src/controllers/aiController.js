@@ -106,6 +106,7 @@ const chatStreamHandler = async (req, res) => {
     let keepAliveInterval;
 
     req.on('close', () => {
+        console.warn("[NETWORK] Client connection closed by browser/proxy");
         isClientConnected = false;
         if (keepAliveInterval) clearInterval(keepAliveInterval);
         reqAbortController.abort(); // CHÉM ĐỨT NGAY LẬP TỨC MỌI FETCH REQUEST ĐANG CHẠY NGẦM
@@ -399,7 +400,9 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             console.log("=== [BẪY MỒI 1] CHUẨN BỊ GỌI LƯỢT 2 ===");
             console.log("- Model:", aiModel);
             console.log("- Số lượng messages (flattened):", flattenedMessages.length);
-            console.log("- Message cuối cùng:", flattenedMessages[flattenedMessages.length - 1].content.substring(0, 50) + "...");
+            const payloadStr = JSON.stringify(llmStreamPayload);
+            console.log("- Tổng dung lượng Payload Lượt 2:", payloadStr.length, "ký tự");
+            console.log("- Message cuối cùng (độ dài):", flattenedMessages[flattenedMessages.length - 1].content.length);
 
             const controller2 = new AbortController();
             const timeoutId2 = setTimeout(() => controller2.abort(), 300000);
@@ -439,13 +442,17 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     
                     // Sử dụng Async Iterable thay vì listener on('data') để khóa luồng thực thi
                     for await (const chunkBuffer of reader) {
+                        const chunkStr = chunkBuffer.toString();
+                        console.log(`[RAW CHUNK LENGTH]: ${chunkStr.length} bytes`);
+                        
                         if (!isClientConnected) {
+                            console.error("[DIAGNOSTIC] Client đã ngắt kết nối (isClientConnected=false) trong lúc đọc Stream!");
                             if (controller2 && typeof controller2.abort === 'function') controller2.abort();
                             break;
                         }
 
                         // Tích lũy đệm
-                        streamBuffer += chunkBuffer.toString();
+                        streamBuffer += chunkStr;
                         
                         let boundaryIndex;
                         // Phá vách kép \n\n
