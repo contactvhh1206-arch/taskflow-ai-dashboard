@@ -1074,39 +1074,36 @@ function MainDashboard() {
             // ====================================================
             // LOGIC KIỂM TRA THÔNG BÁO NGẦM (KHÔNG ĐỤNG CHẠM GIAO DIỆN)
             // ====================================================
-            const isTodoActive = activeTab === 'tasks' && currentFilter === 'todo';
-            if (!isTodoActive) {
-                let hasNewNotification = false;
-                fetchedTasks.forEach(task => {
-                    const isAssignedToMe = (user.role === 'FACILITY_MANAGER' && String(task.pic) === String(user.facility_name)) 
-                                        || (user.role === 'DEPARTMENT_HEAD' && String(task.pic) === String(user.department_code))
-                                        || String(task.pic_id) === String(user.id);
+            let hasNewNotification = false;
+            fetchedTasks.forEach(task => {
+                const isAssignedToMe = (user.role === 'FACILITY_MANAGER' && String(task.pic) === String(user.facility_name)) 
+                                    || (user.role === 'DEPARTMENT_HEAD' && String(task.pic) === String(user.department_code))
+                                    || String(task.pic_id) === String(user.id);
 
-                    if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
-                        // CHỮA BỆNH STALE CLOSURE: Check thẳng vào bộ nhớ tĩnh .current
-                        if (!prevIds.current.has(task.id) && task.status === 'todo') {
-                            if (!notifiedTaskIds.current.has(`task_${task.id}`)) {
-                                notifiedTaskIds.current.add(`task_${task.id}`);
-                                hasNewNotification = true;
-                                const existingNotis = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
-                                existingNotis.push({
-                                    id: `noti_${task.id}_${Date.now()}`,
-                                    taskId: task.id,
-                                    title: 'Công việc mới được giao',
-                                    message: `Bạn vừa được giao xử lý: ${task.title}`,
-                                    timestamp: new Date().toISOString(),
-                                    read: false
-                                });
-                                localStorage.setItem('taskflow_notifications', JSON.stringify(existingNotis));
-                                window.dispatchEvent(new Event('taskflow_notify'));
-                            }
+                if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
+                    // CHỮA BỆNH STALE CLOSURE: Check thẳng vào bộ nhớ tĩnh .current
+                    if (!prevIds.current.has(task.id) && task.status === 'todo') {
+                        if (!notifiedTaskIds.current.has(`task_${task.id}`)) {
+                            notifiedTaskIds.current.add(`task_${task.id}`);
+                            hasNewNotification = true;
+                            const existingNotis = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+                            existingNotis.push({
+                                id: `noti_${task.id}_${Date.now()}`,
+                                taskId: task.id,
+                                title: 'Công việc mới được giao',
+                                message: `Bạn vừa được giao xử lý: ${task.title}`,
+                                timestamp: new Date().toISOString(),
+                                read: false
+                            });
+                            localStorage.setItem('taskflow_notifications', JSON.stringify(existingNotis));
+                            window.dispatchEvent(new Event('taskflow_notify'));
                         }
                     }
-                });
-                
-                if (hasNewNotification) {
-                    playNotificationSound();
                 }
+            });
+            
+            if (hasNewNotification) {
+                playNotificationSound();
             }
 
             // CẬP NHẬT TRÍ NHỚ TĨNH: Không gọi setState, triệt tiêu Re-render rác!
@@ -1118,7 +1115,7 @@ function MainDashboard() {
         // MỞ CỔNG THÀNH: Chỉ mở khóa sau khi đã xử lý xong hoàn toàn
         isFetchingTasks.current = false; 
     }
-  }, [user?.id, user?.role, user?.facility_id, user?.facility_name, user?.department_code, activeTab, currentFilter]); 
+  }, [user?.id, user?.role, user?.facility_id, user?.facility_name, user?.department_code]); 
   // Dependency Array chỉ chứa các biến primitive tĩnh, miễn nhiễm hoàn toàn với luồng AI Stream!
 
   // =======================================================================
