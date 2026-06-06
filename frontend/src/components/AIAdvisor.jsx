@@ -104,56 +104,58 @@ export default function AIAdvisor(props) {
   const fileInputRef = React.useRef(null);
   const isSessionCreatedByMeRef = React.useRef(false);
   const isFetchingHistory = React.useRef(false);
+  const isStreamingRef = React.useRef(isStreaming);
+  const isTypingRef = React.useRef(isTyping);
 
   React.useEffect(() => {
-      scrollToBottom();
-  }, [chatLog]);
-
-
+     isStreamingRef.current = isStreaming;
+     isTypingRef.current = isTyping;
+  }, [isStreaming, isTyping]);
 
   React.useEffect(() => {
-    currentSessionIdRef.current = activeSessionId;
+      if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+  }, [messages]);
+
+  React.useEffect(() => {
+    const abortController = new AbortController();
     
-    // KHÓA RACE CONDITION: Nếu không có session, hủy ngay
+    if (activeSessionId !== currentSessionIdRef.current) {
+        if (isStreamingRef.current || isTypingRef.current) {
+             stopStream();
+        }
+        setMessages([]);
+    }
+    
+    currentSessionIdRef.current = activeSessionId;
     if (!activeSessionId) return; 
     
     const loadHistory = async () => {
-        if (isFetchingHistory.current) return;
-        
-        // NGĂN CHẶN XUNG ĐỘT KHI TỰ TẠO SESSION:
         if (isSessionCreatedByMeRef.current) {
-            isSessionCreatedByMeRef.current = false; // Reset ngay để lần click session khác còn chạy được
-            return;
-        }
-
-        // TUYỆT ĐỐI KHÔNG FETCH KHI ĐANG STREAM / ĐANG GÕ PHÍM 
-        if (isTyping || isStreaming) {
-            console.warn("Đang stream AI, từ chối fetch lịch sử để bảo vệ UI!");
+            isSessionCreatedByMeRef.current = false;
             return;
         }
 
         isFetchingHistory.current = true;
         try {
-            const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`);
+            const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`, {
+                signal: abortController.signal
+            });
             
             if (data.success && data.data) {
-                if (data.data.length > 0) {
-                    setMessages(data.data.map(m => ({ id: m.id || Math.random().toString(), role: m.role, content: m.content })));
-                } else {
-                    setMessages([]);
-                }
+                setMessages(data.data.length > 0 ? data.data.map(m => ({ id: m.id || Math.random().toString(), role: m.role, content: m.content })) : []);
             } else if (Array.isArray(data)) {
-                if (data.length > 0) {
-                    setMessages(data.map(m => ({ id: m.id || Math.random().toString(), role: m.role, content: m.content })));
-                } else {
-                    setMessages([]);
-                }
+                setMessages(data.length > 0 ? data.map(m => ({ id: m.id || Math.random().toString(), role: m.role, content: m.content })) : []);
             } else {
                 setMessages([]);
             }
         } catch (err) {
+            if (err.name === 'CanceledError' || err.name === 'AbortError') {
+                console.log('Đã bóp cổ Request tải lịch sử của phiên:', activeSessionId);
+                return; 
+            }
             console.error("Lỗi tải lịch sử chat:", err);
-            // BẪY LỖI: Tự động dọn rác nếu Phiên chat đã bị xóa ở Backend
             if (err?.response?.status === 403 || err?.response?.status === 404) {
                 if (props.onSessionCreated) props.onSessionCreated(null);
                 setMessages([]);
@@ -162,7 +164,12 @@ export default function AIAdvisor(props) {
             isFetchingHistory.current = false;
         }
     };
+    
     loadHistory();
+
+    return () => {
+        abortController.abort();
+    };
   }, [activeSessionId]);
 
 
@@ -189,14 +196,32 @@ export default function AIAdvisor(props) {
              const data = new Uint8Array(ev.target.result);
              const workbook = window.XLSX.read(data, {type: 'array'});
              let extractedText = '';
-             workbook.SheetNames.forEach(sheetName => {
+             let sheetCount = 0;
+
+             for (let sheetName of workbook.SheetNames) {
+                if (sheetCount >= 2) break; 
                 const sheet = workbook.Sheets[sheetName];
+                
+                const aoa = window.XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                
+                // [CHỐT CHẶN FATAL ERROR]: Bỏ qua ngay lập tức nếu User up Sheet rỗng, bảo vệ engine
+                if (!aoa || aoa.length === 0) continue;
+                
+                const slicedArray = aoa.slice(0, 50);
+                const miniSheet = window.XLSX.utils.aoa_to_sheet(slicedArray);
+                
                 extractedText += `--- Sheet: ${sheetName} ---\n`;
-                extractedText += window.XLSX.utils.sheet_to_csv(sheet).substring(0, 5000);
-             });
+                extractedText += window.XLSX.utils.sheet_to_csv(miniSheet);
+                sheetCount++;
+             }
+
+             if (workbook.SheetNames.length > 2) {
+                 extractedText += `\n... (Đã lược bớt các sheet còn lại để tối ưu bộ nhớ API)`;
+             }
+
              setAttachment({ name: file.name, type: file.type || ext, url: null, extractedText, isDoc: true });
           } catch (err) {
-             if (window.showToast) window.showToast('Lỗi đọc file bảng tính: ' + err.message, 'error');
+             console.error('Lỗi đọc file bảng tính:', err.message);
           }
        };
        reader.readAsArrayBuffer(file);

@@ -123,14 +123,14 @@ const chatStreamHandler = async (req, res) => {
             res.write(`data: ${JSON.stringify({ sessionId: sessionId })}\n\n`);
         }
 
-        // [DB READ] 2. Trích xuất Context - Sliding Window LIMIT 100 & RBAC Kỷ luật thép
+        // [DB READ] 2. Trích xuất Context - Sliding Window LIMIT 20 & RBAC Kỷ luật thép
         const { rows: historyRows } = await pool.query(`
             SELECT m.role, m.content, m.tool_calls
             FROM ai_chat_messages m
             INNER JOIN ai_chat_sessions s ON m.session_id = s.id
             WHERE m.session_id = $1 AND s.user_id = $2
             ORDER BY m.created_at DESC
-            LIMIT 100
+            LIMIT 20
         `, [sessionId, userContext.id]);
 
         // Đảo ngược mảng để trả về đúng timeline cũ -> mới
@@ -160,10 +160,12 @@ const chatStreamHandler = async (req, res) => {
                     // Healing Mảng: Ép khớp với lượng Tool thực sự trả về
                     const safeToolCalls = parsedToolCalls.filter(tc => completedToolIds.has(tc.id));
                     
+                    const hasValidContent = (msg.content && msg.content.trim() !== "EMPTY" && msg.content.trim() !== "");
+
                     if (safeToolCalls.length > 0) {
                         msg.tool_calls = safeToolCalls; 
                         validHistory.push(msg);
-                    } else if (msg.content && msg.content.trim() !== "EMPTY" && msg.content.trim() !== "") {
+                    } else if (hasValidContent) {
                         delete msg.tool_calls;
                         validHistory.push(msg);
                     }
@@ -179,7 +181,6 @@ const chatStreamHandler = async (req, res) => {
                 if (msg.content && msg.content.trim() !== "") validHistory.push(msg);
             }
         }
-        historyRows = validHistory;
 
         // 4. Ráp mảng messages nạp cho LLM (Ép múi giờ VN)
         const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
@@ -202,45 +203,26 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         ];
 
         // [KIẾN TRÚC RAG THANH KHIẾT]: Phục hồi toàn bộ chuỗi nhân quả của Tool Call
-        for (const msg of historyRows) {
-            
+        for (const msg of validHistory) {
             if (msg.role === 'tool') {
                 const parsedMeta = safeJsonParse(msg.tool_calls, {});
                 messages.push({ role: 'tool', tool_call_id: parsedMeta.tool_call_id, name: parsedMeta.name || "unknown_tool", content: msg.content || "" });
-            } 
-            
-            else if (msg.role === 'assistant') {
+            } else if (msg.role === 'assistant') {
                 if (msg.tool_calls) {
-                    const safeParsedToolCallsArray = safeJsonParse(msg.tool_calls, []);
-                    messages.push({ 
-                        role: 'assistant', 
-                        content: (msg.content === "EMPTY" || !msg.content) ? "" : msg.content, 
-                        tool_calls: safeParsedToolCallsArray 
-                    });
+                    messages.push({ role: 'assistant', content: msg.content || "", tool_calls: msg.tool_calls });
                 } else {
-                    // [CHỐT CHẶN VIRUS]: Băm nát các tin nhắn rỗng, toàn khoảng trắng, hoặc chứa chính xác chữ "EMPTY"
-                    if (!msg.content || msg.content.trim() === "" || msg.content === "EMPTY") {
-                        continue;
-                    }
                     messages.push({ role: 'assistant', content: msg.content });
                 }
-            } 
-            
-            // 3. Giữ nguyên câu hỏi của User
-            else if (msg.role === 'user') {
-                if (msg.content && msg.content.trim() !== "") {
-                    messages.push({
-                        role: 'user',
-                        content: msg.content
-                    });
-                }
+            } else if (msg.role === 'user') {
+                messages.push({ role: 'user', content: msg.content });
             }
         }
 
         // 5. Gửi Request lên LLM
         const openRouterKey = process.env.OPENROUTER_API_KEY;
+        const aiModel = req.body.model || process.env.DEFAULT_AI_MODEL || "google/gemini-3.1-pro-preview";
         const llmPayload = {
-            model: "google/gemini-3.1-pro-preview", 
+            model: aiModel, 
             messages: messages,
             tools: aiService.AI_TOOLS,
             tool_choice: "auto"
@@ -286,47 +268,59 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             }
             messages.push(aiMessage); 
 
-            for (const toolCall of aiMessage.tool_calls) {
+            // ==========================================
+            // [BẢO MẬT & HIỆU NĂNG - MỤC 1 & 4]: ĐA LUỒNG & RBAC HARD-CODE
+            // ==========================================
+            const ALL_ACCESS_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'];
+            const isAllAccess = ALL_ACCESS_ROLES.includes(userContext.role) || 
+                                (userContext.role === 'DEPARTMENT_HEAD' && logDepartmentCode === 'MARKETING');
+
+            const toolPromises = aiMessage.tool_calls.map(async (toolCall) => {
                 const funcName = toolCall.function.name;
                 const funcArgs = safeJsonParse(toolCall.function.arguments, {});
 
-                // Chạy Tool thực tế
-                const toolResult = await aiService.processToolCall(funcName, funcArgs, userContext);
-                
-                // Ép kiểu an toàn chống [object Object]
-                const safeToolResult = typeof toolResult === 'object' ? JSON.stringify(toolResult) : String(toolResult);
-                
-                // Gói tool metadata vào dạng JSON để lưu vào cột tool_calls
-                const toolMeta = {
-                    tool_call_id: toolCall.id,
-                    name: funcName
-                };
+                // [CHỐT CHẶN RBAC THÉP]: Nếu KHÔNG phải Tướng/Soái -> Ép đè Facility & Department bằng JWT Token
+                if (!isAllAccess) {
+                    funcArgs.facility_id = logFacilityId;
+                    funcArgs.facilityId = logFacilityId; 
+                    funcArgs.department_code = logDepartmentCode;
+                    funcArgs.departmentCode = logDepartmentCode;
+                }
 
-                // [DB WRITE] Lưu Luồng Tool Result
+                let safeToolResult = "";
+                let toolMeta = { tool_call_id: toolCall.id, name: funcName };
+
+                try {
+                    const toolResult = await aiService.processToolCall(funcName, funcArgs, userContext);
+                    safeToolResult = typeof toolResult === 'object' ? JSON.stringify(toolResult) : String(toolResult);
+                } catch (toolError) {
+                    console.error(`[TOOL ERROR] Lỗi tại tool ${funcName}:`, toolError.message);
+                    safeToolResult = JSON.stringify({ error: `Hệ thống gặp lỗi khi truy xuất dữ liệu từ API nội bộ (${toolError.message}). Hãy tiếp tục phân tích dựa trên các dữ liệu khác.` });
+                }
+
+                return {
+                    dbArgs: [sessionId, logFacilityId, logDepartmentCode, safeToolResult, JSON.stringify(toolMeta)],
+                    msgObj: { tool_call_id: toolCall.id, role: "tool", name: funcName, content: safeToolResult }
+                };
+            });
+
+            // Kích hoạt tất cả tiến trình lấy Data chạy CÙNG LÚC
+            const resolvedTools = await Promise.all(toolPromises);
+
+            // [LƯU DB TUẦN TỰ]: Sau khi Data đã gom đủ, lưu lần lượt vào DB để bảo vệ Connection Pool & giữ đúng trật tự Causality
+            for (const resolved of resolvedTools) {
                 await pool.query(`
                     INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
                     VALUES ($1, $2, $3, 'tool', $4, $5)
-                `, [sessionId, logFacilityId, logDepartmentCode, safeToolResult, JSON.stringify(toolMeta)]);
-
-                // [KHÔI PHỤC SCHEMA]: OpenRouter/Gemini bắt buộc phải có key name để map kết quả tool
-                messages.push({
-                    tool_call_id: toolCall.id,
-                    role: "tool",
-                    name: funcName,
-                    content: safeToolResult
-                });
+                `, resolved.dbArgs);
+                messages.push(resolved.msgObj);
             }
 
-            // [KHIÊN TÂM LÝ]: Prompt Injection Lượt 2 để dằn mặt AI
-            messages.push({
-                role: "user",
-                content: "HỆ THỐNG CẢNH BÁO: Dữ liệu đã được hệ thống cung cấp đầy đủ. TUYỆT ĐỐI CẤM SỬ DỤNG THÊM BẤT KỲ CÔNG CỤ (TOOL) NÀO NỮA. Yêu cầu phân tích tổng hợp thành văn bản trả lời cho người dùng NGAY LẬP TỨC."
-            });
-
             const llmStreamPayload = {
-                model: "google/gemini-3.1-pro-preview",
+                model: aiModel,
                 messages: messages,
                 tools: aiService.AI_TOOLS,
+                tool_choice: "none",
                 stream: true,
                 max_tokens: 4096
             };
