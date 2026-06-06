@@ -1,6 +1,17 @@
 const pool = require('../config/database');
 const aiService = require('../services/aiService');
 
+// UTILITY HELPER: Tiền xử lý Sanitization 
+const parseSafeFacilityId = (facilityId) => {
+    if (facilityId !== undefined && facilityId !== null && facilityId !== 'ALL' && facilityId !== '') {
+        const parsed = Number(facilityId);
+        if (!isNaN(parsed)) {
+            return parsed;
+        }
+    }
+    return null;
+};
+
 const chatStreamHandler = async (req, res) => {
     // Tương thích cả camelCase và snake_case từ frontend
     const message = req.body.message;
@@ -16,6 +27,9 @@ const chatStreamHandler = async (req, res) => {
         });
     }
 
+    // 1. Áp dụng Helper làm sạch Facility ID
+    const safeFacilityId = parseSafeFacilityId(userContext.facility_id);
+
     // 1.5 Tự động tạo Session nếu Frontend gửi null (trường hợp click gợi ý mới)
     let isNewSession = false;
     if (!sessionId) {
@@ -23,12 +37,22 @@ const chatStreamHandler = async (req, res) => {
             const currentTimestamp = Date.now();
             const { rows } = await pool.query(
                 'INSERT INTO ai_chat_sessions (title, facility_id, user_id, timestamp) VALUES ($1, $2, $3, $4) RETURNING id', 
-                ['Phiên AI mới', userContext.facility_id, userContext.id, currentTimestamp]
+                ['Phiên AI mới', safeFacilityId, userContext.id, currentTimestamp]
             );
             sessionId = rows[0].id;
             isNewSession = true;
         } catch (e) {
-            console.error("Lỗi tạo session tự động:", e);
+            console.error("[CRITICAL] Lỗi khởi tạo Session tự động (SSE):", e.message);
+            
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders();
+            
+            res.write(`data: ${JSON.stringify({ error: "[LỖI HỆ THỐNG]: Không thể khởi tạo Phiên Chat mới do sự cố phân quyền hoặc CSDL." })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
+            return;
         }
     }
 
@@ -45,12 +69,8 @@ const chatStreamHandler = async (req, res) => {
         res.end();
     });
 
-    // Ép kiểu INT4 an toàn cho facility_id để ghi Log DB
-    let logFacilityId = null;
-    if (userContext.facility_id !== null && userContext.facility_id !== undefined && userContext.facility_id !== 'ALL') {
-        const parsed = Number(userContext.facility_id);
-        if (!isNaN(parsed)) logFacilityId = parsed;
-    }
+    // Dùng chung safeFacilityId đã làm sạch cho các thao tác ghi log bên dưới
+    const logFacilityId = safeFacilityId;
     
     const logDepartmentCode = userContext.department_code || null;
 
@@ -382,14 +402,19 @@ const getSessionsHandler = async (req, res) => {
 
 const createSessionHandler = async (req, res) => {
     try {
+        const safeFacilityId = parseSafeFacilityId(req.user.facility_id);
         const currentTimestamp = Date.now();
         const { rows } = await pool.query(
             'INSERT INTO ai_chat_sessions (title, facility_id, user_id, timestamp) VALUES ($1, $2, $3, $4) RETURNING *', 
-            ['Phiên AI mới', req.user.facility_id, req.user.id, currentTimestamp]
+            ['Phiên AI mới', safeFacilityId, req.user.id, currentTimestamp]
         );
         res.json({ success: true, data: rows[0] });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        console.error("[CRITICAL] Lỗi tạo Session thủ công (REST API):", error.message);
+        return res.status(500).json({ 
+            success: false, 
+            message: '[LỖI HỆ THỐNG]: Không thể khởi tạo Phiên Chat mới do sự cố phân quyền hoặc CSDL.' 
+        });
     }
 };
 
