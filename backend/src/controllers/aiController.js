@@ -454,6 +454,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                         // Tích lũy đệm
                         streamBuffer += chunkStr;
                         
+                        // [CHÌA KHÓA BẺ KHÓA]: Chuẩn hóa CRLF (\r\n) thành LF (\n)
+                        // OpenRouter trả về stream có dính \r\n\r\n thay vì \n\n thuần túy.
+                        // Hàm indexOf('\n\n') sẽ bị mù hoàn toàn nếu dính \r ở giữa!
+                        streamBuffer = streamBuffer.replace(/\r\n/g, '\n');
+
                         let boundaryIndex;
                         // Phá vách kép \n\n
                         while ((boundaryIndex = streamBuffer.indexOf('\n\n')) !== -1) {
