@@ -275,7 +275,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             await pool.query(`
                 INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
                 VALUES ($1, $2, $3, 'assistant', $4, $5)
-            `, [sessionId, logFacilityId, logDepartmentCode, aiMessage.content || "", JSON.stringify(aiMessage.tool_calls)]);
+            `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim(), JSON.stringify(aiMessage.tool_calls)]);
 
             // [SCHEMA FIX]: Thay vì gán "", ta gán khoảng trắng " " để không bị Gemini bắt lỗi empty text part
             if (!aiMessage.content || aiMessage.content.trim() === "" || aiMessage.content.trim() === "EMPTY") {
@@ -334,8 +334,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             const llmStreamPayload = {
                 model: aiModel,
                 messages: messages,
-                tools: aiService.AI_TOOLS,
-                tool_choice: "none",
+                tools: aiService.AI_TOOLS, // Bắt buộc phải có tools nếu lịch sử có tool_calls
+                tool_choice: "none", // Yêu cầu model chỉ trả về text
                 stream: true,
                 max_tokens: 4096
             };
