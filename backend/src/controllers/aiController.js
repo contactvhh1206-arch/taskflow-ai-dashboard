@@ -103,14 +103,26 @@ const chatStreamHandler = async (req, res) => {
         }
     };
 
+    let keepAliveInterval;
+
     req.on('close', () => {
         isClientConnected = false;
+        if (keepAliveInterval) clearInterval(keepAliveInterval);
         reqAbortController.abort(); // CHÉM ĐỨT NGAY LẬP TỨC MỌI FETCH REQUEST ĐANG CHẠY NGẦM
         saveAiReplyToDb(); // Kích hoạt lưu ngay phần chữ bị gãy khi mạng đứt
         res.end();
     });
 
     try {
+        // [CHỐNG RENDER TIMEOUT 100s]: Bật Heartbeat ping liên tục
+        if (isClientConnected) {
+            keepAliveInterval = setInterval(() => {
+                if (isClientConnected) {
+                    res.write(': heartbeat\n\n');
+                }
+            }, 15000); // 15 giây gửi một lần
+        }
+
         // [DB WRITE] 1. Hứng câu hỏi của User
         await pool.query(`
             INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content)
@@ -459,16 +471,19 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         }
 
     } catch (error) {
+        if (keepAliveInterval) clearInterval(keepAliveInterval);
         console.error('[AI Controller Error]:', error.name, error.message);
         if (isClientConnected) {
             const errorMsg = error.name === 'AbortError' 
-                ? "Kết nối AI quá tải (Timeout 300s). Đã kích hoạt cơ chế bảo vệ UI. Xin thử lại." 
+                ? "Kết nối AI bị người dùng hoặc mạng ngắt." 
                 : "Đã xảy ra sự cố giao tiếp với Hệ thống Thần kinh AI.";
                 
             res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
             res.write('data: [DONE]\n\n');
             res.end();
         }
+    } finally {
+        if (keepAliveInterval) clearInterval(keepAliveInterval);
     }
 };
 
