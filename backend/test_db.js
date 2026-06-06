@@ -1,31 +1,31 @@
-import pkg from 'pg';
-const { Pool } = pkg;
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, '.env') });
+require('dotenv').config();
+const { Pool } = require('pg');
 
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-async function run() {
+async function testInsert() {
   try {
-    const { rows } = await pool.query("SELECT id, org_unit, entry_type, content, date FROM daily_logs WHERE entry_type = 'Operation_Log' ORDER BY id DESC LIMIT 5");
-    console.log(JSON.stringify(rows, null, 2));
+    const res = await pool.query(`
+      INSERT INTO ai_chat_messages (session_id, role, content)
+      VALUES ('test_session', 'assistant', '')
+      RETURNING *
+    `);
+    console.log("Inserted row with empty string:", res.rows[0]);
+    
+    const res2 = await pool.query(`
+      INSERT INTO ai_chat_messages (session_id, role, content)
+      VALUES ('test_session', 'assistant', null)
+      RETURNING *
+    `);
+    console.log("Inserted row with null:", res2.rows[0]);
   } catch (err) {
-    console.error(err);
+    console.error("DB Error:", err);
   } finally {
-    await pool.end();
+    pool.end();
   }
 }
 
-run();
+testInsert();

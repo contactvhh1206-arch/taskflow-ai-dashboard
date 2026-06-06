@@ -330,7 +330,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     msgObj: { tool_call_id: toolCall.id, role: "tool", name: funcName, content: safeToolResult }
                 };
             });
-        // [LƯU DB TUẦN TỰ]: Sau khi Data đã gom đủ, lưu lần lượt vào DB để bảo vệ Connection Pool & giữ đúng trật tự Causality
+
+            // Kích hoạt tất cả tiến trình lấy Data chạy CÙNG LÚC
+            const resolvedTools = await Promise.all(toolPromises);
+
+            // [LƯU DB TUẦN TỰ]: Sau khi Data đã gom đủ, lưu lần lượt vào DB để bảo vệ Connection Pool & giữ đúng trật tự Causality
             for (const resolved of resolvedTools) {
                 await pool.query(`
                     INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
