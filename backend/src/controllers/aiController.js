@@ -125,8 +125,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
 
             // 2. Ép Assistant quên đi quá khứ gọi hàm, chỉ nhớ bản tóm tắt
             if (msg.role === 'assistant') {
-                // Nếu là cái xác không hồn (chỉ chứa tool_calls ẩn, không có text tóm tắt) -> Bỏ qua
-                if (!msg.content || msg.content.trim() === "") {
+                // [CHỐT CHẶN VIRUS]: Băm nát các tin nhắn rỗng, toàn khoảng trắng, hoặc chứa chính xác chữ "EMPTY"
+                if (!msg.content || msg.content.trim() === "" || msg.content === "EMPTY") {
                     continue;
                 }
                 // Nếu là bản tóm tắt quý giá -> Nạp vào não AI
@@ -178,7 +178,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         const aiMessage = data1.choices[0].message;
 
         if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
-            // [DB WRITE] Lưu luồng Tool Call từ Assistant
+            // [DB WRITE] Lưu luồng Tool Call từ Assistant (Thay "EMPTY" bằng chuỗi rỗng "")
             await pool.query(`
                 INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
                 VALUES ($1, $2, $3, 'assistant', $4, $5)
@@ -266,12 +266,26 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                         if (line.startsWith('data: ') && line !== 'data: [DONE]') {
                             try {
                                 const data = JSON.parse(line.slice(6));
-                                const contentChunk = data.choices[0]?.delta?.content || "";
+                                
+                                // [PHÁ TỬ HUYỆT 1]: Chặn đứng và trích xuất nguyên vẹn bằng chứng lỗi gốc từ OpenRouter
+                                if (data.error) {
+                                    console.error('[OpenRouter API Error]:', data.error);
+                                    res.write(`data: ${JSON.stringify({ error: data.error })}\n\n`);
+                                    res.write('data: [DONE]\n\n');
+                                    
+                                    // [PHÁ TỬ HUYỆT 2]: Lệnh "return" sinh tử! 
+                                    // Chém đứt toàn bộ function, chống bom sập Server (ERR_STREAM_WRITE_AFTER_END).
+                                    return; 
+                                }
+
+                                const contentChunk = data?.choices?.[0]?.delta?.content || data?.content || "";
                                 if (contentChunk) {
                                     fullAiReply += contentChunk;
                                     res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
                                 }
-                            } catch (parseErr) {}
+                            } catch (parseErr) {
+                                console.error('[Stream Parse JSON Error]:', parseErr.message, 'Raw Line:', line);
+                            }
                         }
                     }
                 }
