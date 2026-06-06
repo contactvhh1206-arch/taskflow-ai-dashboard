@@ -397,17 +397,9 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 max_tokens: 4096
             };
 
-            console.log("=== [BẪY MỒI 1] CHUẨN BỊ GỌI LƯỢT 2 ===");
-            console.log("- Model:", aiModel);
-            console.log("- Số lượng messages (flattened):", flattenedMessages.length);
-            const payloadStr = JSON.stringify(llmStreamPayload);
-            console.log("- Tổng dung lượng Payload Lượt 2:", payloadStr.length, "ký tự");
-            console.log("- Message cuối cùng (độ dài):", flattenedMessages[flattenedMessages.length - 1].content.length);
-
             const controller2 = new AbortController();
             const timeoutId2 = setTimeout(() => controller2.abort(), 300000);
 
-            console.log("=== [BẪY MỒI 2] BẮT ĐẦU FETCH LƯỢT 2 TỪ OPENROUTER ===");
             const startTimeL2 = Date.now();
 
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -422,16 +414,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 signal: controller2.signal
             });
 
-            console.log(`=== [BẪY MỒI 3] FETCH LƯỢT 2 XONG (MẤT ${Date.now() - startTimeL2}ms). STATUS: ${response2.status} ===`);
-
             if (!response2.ok) {
                 clearTimeout(timeoutId2);
                 const errText = await response2.text();
-                console.error(`=== [BẪY MỒI LỖI] HTTP ${response2.status}: ${errText} ===`);
                 throw new Error(`API LLM (Lượt Stream) lỗi ${response2.status}: ${errText}`);
             }
-
-            console.log("=== [BẪY MỒI 4] BẮT ĐẦU ĐỌC STREAM TỪ OPENROUTER ===");
 
             try {
                 // 4. KHẮC PHỤC BUG 4: ASYNC ACCUMULATOR CHỐNG RÁCH CHUỖI VÀ ĐỒNG BỘ LUỒNG
@@ -440,13 +427,10 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     let streamBuffer = ""; 
                     let isFirstChunkReceived = false;
                     
-                    // Sử dụng Async Iterable thay vì listener on('data') để khóa luồng thực thi
                     for await (const chunkBuffer of reader) {
                         const chunkStr = chunkBuffer.toString();
-                        console.log(`[RAW CHUNK LENGTH]: ${chunkStr.length} bytes`);
                         
                         if (!isClientConnected) {
-                            console.error("[DIAGNOSTIC] Client đã ngắt kết nối (isClientConnected=false) trong lúc đọc Stream!");
                             if (controller2 && typeof controller2.abort === 'function') controller2.abort();
                             break;
                         }
@@ -491,7 +475,6 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
 
                                         if (!isFirstChunkReceived) {
                                             isFirstChunkReceived = true;
-                                            console.log(`=== [BẪY MỒI 5] ĐÃ NHẬN CHUNK ĐẦU TIÊN TỪ OPENROUTER (SAU ${Date.now() - startTimeL2}ms) ===`);
                                         }
 
                                         // [LƯỚI ĐIỆN VẬT LÝ]: Radar Chống Mù Parser & Kill-Switch
@@ -521,10 +504,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     }
                 }
             } catch (err) {
-                 console.error("=== [BẪY MỒI LỖI STREAM] ===", err.message);
                  if (err.message !== "KILL_SWITCH_TRIGGERED") throw err;
             } finally {
-                console.log("=== [BẪY MỒI 6] KẾT THÚC STREAM HOẶC ĐÓNG KẾT NỐI ===");
                 clearTimeout(timeoutId2);
                 await saveAiReplyToDb(); 
             }
