@@ -1,5 +1,6 @@
 const pool = require('../config/database');
 const aiService = require('../services/aiService');
+const crypto = require('crypto'); // KHẮC PHỤC BUG 1: Import độc lập
 
 // UTILITY HELPER: Tiền xử lý Sanitization 
 const parseSafeFacilityId = (facilityId) => {
@@ -10,6 +11,18 @@ const parseSafeFacilityId = (facilityId) => {
         }
     }
     return null;
+};
+
+// BẢO VỆ BUG 3: Khiên Parse JSON chống sập luồng
+const safeJsonParse = (str, fallbackValue = null) => {
+    if (!str) return fallbackValue;
+    if (typeof str !== 'string') return str;
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        console.error("[JSON PARSE ERROR] Dữ liệu Database bị hỏng cấu trúc:", str);
+        return fallbackValue;
+    }
 };
 
 const chatStreamHandler = async (req, res) => {
@@ -30,20 +43,23 @@ const chatStreamHandler = async (req, res) => {
     // 1. Áp dụng Helper làm sạch Facility ID
     const safeFacilityId = parseSafeFacilityId(userContext.facility_id);
 
-    // 1.5 Tự động tạo Session nếu Frontend gửi null (trường hợp click gợi ý mới)
+    const logDepartmentCode = userContext.department_code || null;
+    const logFacilityId = safeFacilityId;
+
     let isNewSession = false;
+    
+    // 1. KHẮC PHỤC BUG 1: TỰ BĂM UUID KHI TẠO SESSION 
     if (!sessionId) {
         try {
+            sessionId = crypto.randomUUID(); // Sinh ID tại Backend
             const currentTimestamp = Date.now();
-            const { rows } = await pool.query(
-                'INSERT INTO ai_chat_sessions (title, facility_id, user_id, timestamp) VALUES ($1, $2, $3, $4) RETURNING id', 
-                ['Phiên AI mới', safeFacilityId, userContext.id, currentTimestamp]
+            await pool.query(
+                'INSERT INTO ai_chat_sessions (id, title, facility_id, user_id, timestamp) VALUES ($1, $2, $3, $4, $5)', 
+                [sessionId, 'Phiên AI mới', safeFacilityId, userContext.id, currentTimestamp]
             );
-            sessionId = rows[0].id;
             isNewSession = true;
         } catch (e) {
             console.error("[CRITICAL] Lỗi khởi tạo Session tự động (SSE):", e.message);
-            
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
@@ -62,17 +78,32 @@ const chatStreamHandler = async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    // 3. Cờ kiểm soát Memory Leak (Ngắt luồng khi Client F5 hoặc Đóng tab)
+    // 2. KHẮC PHỤC BUG 2: CỜ TRẠNG THÁI VÀ HELPER LƯU DB BẤT TỬ
     let isClientConnected = true;
+    let isAiReplySaved = false;
+    let fullAiReply = "";
+
+    const saveAiReplyToDb = async () => {
+        // Khóa cờ ngay lập tức chống Race Condition nếu gọi đúp từ finally & sự kiện close
+        if (!isAiReplySaved && fullAiReply.trim() !== "") {
+            isAiReplySaved = true; 
+            try {
+                await pool.query(`
+                    INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content)
+                    VALUES ($1, $2, $3, 'assistant', $4)
+                `, [sessionId, logFacilityId, logDepartmentCode, fullAiReply]);
+            } catch (err) {
+                console.error("[CRITICAL] Lỗi lưu Database khi hoàn tất/rớt mạng Stream:", err.message);
+                isAiReplySaved = false; // Phục hồi cờ
+            }
+        }
+    };
+
     req.on('close', () => {
         isClientConnected = false;
+        saveAiReplyToDb(); // Kích hoạt lưu ngay phần chữ bị gãy khi mạng đứt
         res.end();
     });
-
-    // Dùng chung safeFacilityId đã làm sạch cho các thao tác ghi log bên dưới
-    const logFacilityId = safeFacilityId;
-    
-    const logDepartmentCode = userContext.department_code || null;
 
     try {
         // [DB WRITE] 1. Hứng câu hỏi của User
@@ -105,15 +136,50 @@ const chatStreamHandler = async (req, res) => {
         // Đảo ngược mảng để trả về đúng timeline cũ -> mới
         historyRows.reverse();
 
-        // [LOGIC] 3. Lọc "Tin nhắn mồ côi" (Chống lỗi HTTP 400)
-        while (historyRows.length > 0) {
-            const firstMsg = historyRows[0];
-            if (firstMsg.role === 'tool' || (firstMsg.role === 'assistant' && firstMsg.tool_calls)) {
-                historyRows.shift();
-            } else {
-                break;
+        // 3. KHẮC PHỤC BUG 3: RAG FILTER V2 (DUYỆT 2 CHU KỲ - ID MAPPING)
+        const requestedToolIds = new Set();
+        const completedToolIds = new Set();
+
+        // Chu kỳ 1: Gom ID Toàn cục
+        for (const msg of historyRows) {
+            if (msg.role === 'assistant' && msg.tool_calls) {
+                const parsedToolCalls = safeJsonParse(msg.tool_calls, []);
+                parsedToolCalls.forEach(tc => requestedToolIds.add(tc.id));
+            } else if (msg.role === 'tool') {
+                const parsedMeta = safeJsonParse(msg.tool_calls, {});
+                if (parsedMeta.tool_call_id) completedToolIds.add(parsedMeta.tool_call_id);
             }
         }
+
+        // Chu kỳ 2: Bộ lọc Song Ánh
+        const validHistory = [];
+        for (const msg of historyRows) {
+            if (msg.role === 'assistant') {
+                if (msg.tool_calls) {
+                    const parsedToolCalls = safeJsonParse(msg.tool_calls, []);
+                    // Healing Mảng: Ép khớp với lượng Tool thực sự trả về
+                    const safeToolCalls = parsedToolCalls.filter(tc => completedToolIds.has(tc.id));
+                    
+                    if (safeToolCalls.length > 0) {
+                        msg.tool_calls = safeToolCalls; 
+                        validHistory.push(msg);
+                    } else if (msg.content && msg.content.trim() !== "EMPTY" && msg.content.trim() !== "") {
+                        delete msg.tool_calls;
+                        validHistory.push(msg);
+                    }
+                } else if (msg.content && msg.content.trim() !== "EMPTY" && msg.content.trim() !== "") {
+                    validHistory.push(msg);
+                }
+            } else if (msg.role === 'tool') {
+                const parsedMeta = safeJsonParse(msg.tool_calls, {});
+                if (parsedMeta.tool_call_id && requestedToolIds.has(parsedMeta.tool_call_id)) {
+                    validHistory.push(msg);
+                }
+            } else if (msg.role === 'user') {
+                if (msg.content && msg.content.trim() !== "") validHistory.push(msg);
+            }
+        }
+        historyRows = validHistory;
 
         // 4. Ráp mảng messages nạp cho LLM (Ép múi giờ VN)
         const todayVN = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
@@ -139,13 +205,13 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         for (const msg of historyRows) {
             
             if (msg.role === 'tool') {
-                const parsedMeta = typeof msg.tool_calls === 'string' ? JSON.parse(msg.tool_calls) : (msg.tool_calls || {});
+                const parsedMeta = safeJsonParse(msg.tool_calls, {});
                 messages.push({ role: 'tool', tool_call_id: parsedMeta.tool_call_id, name: parsedMeta.name || "unknown_tool", content: msg.content || "" });
             } 
             
             else if (msg.role === 'assistant') {
                 if (msg.tool_calls) {
-                    const safeParsedToolCallsArray = typeof msg.tool_calls === 'string' ? JSON.parse(msg.tool_calls) : msg.tool_calls;
+                    const safeParsedToolCallsArray = safeJsonParse(msg.tool_calls, []);
                     messages.push({ 
                         role: 'assistant', 
                         content: (msg.content === "EMPTY" || !msg.content) ? "" : msg.content, 
@@ -222,7 +288,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
 
             for (const toolCall of aiMessage.tool_calls) {
                 const funcName = toolCall.function.name;
-                const funcArgs = toolCall.function.arguments ? JSON.parse(toolCall.function.arguments) : {};
+                const funcArgs = safeJsonParse(toolCall.function.arguments, {});
 
                 // Chạy Tool thực tế
                 const toolResult = await aiService.processToolCall(funcName, funcArgs, userContext);
@@ -284,35 +350,39 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 throw new Error(`API LLM (Lượt Stream) lỗi ${response2.status}: ${errText}`);
             }
             
-            let fullAiReply = "";
-            
             try {
+                // 4. KHẮC PHỤC BUG 4: ASYNC ACCUMULATOR CHỐNG RÁCH CHUỖI VÀ ĐỒNG BỘ LUỒNG
                 if (isClientConnected) {
                     const reader = response2.body;
                     let streamBuffer = ""; 
                     
-                    reader.on('data', async (chunkBuffer) => {
+                    // Sử dụng Async Iterable thay vì listener on('data') để khóa luồng thực thi
+                    for await (const chunkBuffer of reader) {
                         if (!isClientConnected) {
-                            if (controller2 && typeof controller2.abort === 'function') {
-                                controller2.abort();
-                            }
-                            return;
+                            if (controller2 && typeof controller2.abort === 'function') controller2.abort();
+                            break;
                         }
 
+                        // Tích lũy đệm
                         streamBuffer += chunkBuffer.toString();
                         
-                        const lines = streamBuffer.split('\n');
-                        streamBuffer = lines.pop(); // TỬ HUYỆT BẢO TỒN MẠNG
-                        
-                        for (const line of lines) {
-                            if (line.trim() === '') continue;
-                            if (line.startsWith('data: ')) {
-                                const dataStr = line.slice(6).trim();
+                        let boundaryIndex;
+                        // Phá vách kép \n\n
+                        while ((boundaryIndex = streamBuffer.indexOf('\n\n')) !== -1) {
+                            const completeEvent = streamBuffer.slice(0, boundaryIndex).trim();
+                            // Lưu trữ mảnh vỡ chưa hoàn thành cho vòng for kế
+                            streamBuffer = streamBuffer.slice(boundaryIndex + 2);
+                            
+                            if (!completeEvent) continue;
+                            
+                            if (completeEvent.startsWith('data: ')) {
+                                const dataStr = completeEvent.slice(6).trim();
                                 if (dataStr === '[DONE]') continue;
+                                
                                 try {
                                     const data = JSON.parse(dataStr);
-                                    const delta = data?.choices?.[0]?.delta;
                                     
+                                    const delta = data?.choices?.[0]?.delta;
                                     // [LƯỚI ĐIỆN VẬT LÝ]: Radar Chống Mù Parser & Kill-Switch
                                     if (delta && delta.tool_calls) {
                                         console.warn('[SECURITY WARNING]: AI đang cố gắng vượt rào gọi hàm đệ quy trong luồng stream.');
@@ -322,10 +392,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                             res.write('data: [DONE]\n\n');
                                             res.end();
                                         }
-                                        if (controller2 && typeof controller2.abort === 'function') {
-                                            controller2.abort();
-                                        }
-                                        break; // Văng khỏi vòng lặp đọc stream ngay lập tức
+                                        if (controller2 && typeof controller2.abort === 'function') controller2.abort();
+                                        throw new Error("KILL_SWITCH_TRIGGERED"); // Ném lỗi văng ra catch để chạy mượt xuống finally
                                     }
 
                                     const contentChunk = delta?.content || data?.content || "";
@@ -334,22 +402,18 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                         res.write(`data: ${JSON.stringify({ content: contentChunk })}\n\n`);
                                     }
                                 } catch (e) {
-                                    console.error('[STREAM PARSE ERROR] Lỗi phân mảnh:', e.message, 'Data thô:', dataStr);
+                                    console.error('[STREAM PARSE ERROR] Đã bảo vệ luồng:', e.message);
                                 }
                             }
                         }
-                    });
+                    }
                 }
+            } catch (err) {
+                 if (err.message !== "KILL_SWITCH_TRIGGERED") throw err;
             } finally {
                 clearTimeout(timeoutId2);
-            }
-
-            // [DB WRITE] Lưu luồng AI Text (Lưu bất chấp mạng Client đứt)
-            if (fullAiReply && fullAiReply.length > 0) {
-                await pool.query(`
-                    INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content)
-                    VALUES ($1, $2, $3, 'assistant', $4)
-                `, [sessionId, logFacilityId, logDepartmentCode, fullAiReply]);
+                // BẮT BUỘC ĐỢI STREAM TRẢ HẾT / GÃY RỒI MỚI CHẠY LƯU DB CHỐNG ASYNC LEAK
+                await saveAiReplyToDb(); 
             }
             
         } else {
@@ -403,10 +467,14 @@ const getSessionsHandler = async (req, res) => {
 const createSessionHandler = async (req, res) => {
     try {
         const safeFacilityId = parseSafeFacilityId(req.user.facility_id);
+        
+        // 1. KHẮC PHỤC BUG 1: BĂM UUID 
+        const sessionId = crypto.randomUUID(); 
         const currentTimestamp = Date.now();
+        
         const { rows } = await pool.query(
-            'INSERT INTO ai_chat_sessions (title, facility_id, user_id, timestamp) VALUES ($1, $2, $3, $4) RETURNING *', 
-            ['Phiên AI mới', safeFacilityId, req.user.id, currentTimestamp]
+            'INSERT INTO ai_chat_sessions (id, title, facility_id, user_id, timestamp) VALUES ($1, $2, $3, $4, $5) RETURNING *', 
+            [sessionId, 'Phiên AI mới', safeFacilityId, req.user.id, currentTimestamp]
         );
         res.json({ success: true, data: rows[0] });
     } catch (error) {
