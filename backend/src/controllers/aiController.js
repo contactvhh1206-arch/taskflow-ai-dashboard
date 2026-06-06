@@ -220,7 +220,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             }
         ];
 
-        // [KIẾN TRÚC RAG THANH KHIẾT]: Phục hồi toàn bộ chuỗi nhân quả của Tool Call
+        // [KHÔI PHỤC NGỮ CẢNH LƯỢT 2]: Phục hồi mảng messages nguyên gốc cho LLM
         for (const msg of validHistory) {
             if (msg.role === 'tool') {
                 const parsedMeta = safeJsonParse(msg.tool_calls, {});
@@ -245,12 +245,61 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             }
         }
 
+        // [FLATTEN LƯỢT 1]: Phẳng hóa lịch sử cho Lượt 1 để sửa lỗi Gemini Alternating Roles
+        const flattenedL1Messages = [];
+        let lastRoleL1 = null;
+
+        for (const msg of validHistory) {
+            let roleToPush = msg.role;
+            let contentToPush = msg.content || " ";
+            let toolsToPush = msg.tool_calls || null;
+            let reasoningToPush = msg.reasoning || null;
+
+            if (roleToPush === 'tool') {
+                roleToPush = 'assistant';
+                contentToPush = msg.content ? `[Kết quả tra cứu/hành động]:\n${msg.content}` : " ";
+            }
+
+            if (roleToPush === lastRoleL1) {
+                // Nối nội dung nếu cùng Role (chống lỗi Gemini Alternating Roles)
+                flattenedL1Messages[flattenedL1Messages.length - 1].content += "\n\n" + contentToPush;
+                if (toolsToPush) {
+                    if (!flattenedL1Messages[flattenedL1Messages.length - 1].tool_calls) {
+                        flattenedL1Messages[flattenedL1Messages.length - 1].tool_calls = [];
+                    }
+                    flattenedL1Messages[flattenedL1Messages.length - 1].tool_calls.push(...toolsToPush);
+                }
+            } else {
+                const newMsg = { role: roleToPush, content: contentToPush };
+                if (toolsToPush) newMsg.tool_calls = toolsToPush;
+                if (reasoningToPush && roleToPush === 'assistant') newMsg.reasoning = reasoningToPush;
+                flattenedL1Messages.push(newMsg);
+            }
+            lastRoleL1 = roleToPush;
+        }
+
         // 5. Gửi Request lên LLM
         const openRouterKey = process.env.OPENROUTER_API_KEY;
         const aiModel = req.body.model || process.env.DEFAULT_AI_MODEL || "google/gemini-3.1-pro-preview";
+
+        // Thêm câu hỏi hiện tại vào mảng đã làm phẳng
+        const currentUserContent = `(Phiên làm việc: ${sessionId})\n${message}`;
+        if (lastRoleL1 === 'user') {
+            if (flattenedL1Messages.length > 0) {
+                flattenedL1Messages[flattenedL1Messages.length - 1].content += "\n\n" + currentUserContent;
+            } else {
+                flattenedL1Messages.push({ role: 'user', content: currentUserContent });
+            }
+        } else {
+            flattenedL1Messages.push({ role: 'user', content: currentUserContent });
+        }
+
         const llmPayload = {
             model: aiModel, 
-            messages: messages,
+            messages: [
+                { role: "system", content: safeSystemPrompt },
+                ...flattenedL1Messages
+            ],
             tools: aiService.AI_TOOLS,
             tool_choice: "auto"
         };

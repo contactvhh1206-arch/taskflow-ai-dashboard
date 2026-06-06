@@ -118,32 +118,38 @@ export default function AIAdvisor(props) {
       }
   }, [messages]);
 
-  React.useEffect(() => {
-    const abortController = new AbortController();
-    
-    if (activeSessionId !== currentSessionIdRef.current) {
-        // [KHIÊN BỌC THÉP V2] Đã di dời logic nhả cờ ra vị trí đồng bộ Failsafe.
-        const isSessionGeneratedByCurrentAction = isSessionCreatedByMeRef.current;
-        
-        // Luôn luôn nhả cờ ngay lập tức ở cấp độ đồng bộ (tránh dính Kẹt Cờ / State Leak)
-        isSessionCreatedByMeRef.current = false;
+  // [FIX RACE CONDITION]: Sử dụng state nội bộ để track chính xác sự chuyển đổi Session
+  const [internalSessionId, setInternalSessionId] = React.useState(activeSessionId);
 
-        // CHỈ ngắt luồng và xóa tin nhắn nếu ĐÂY KHÔNG PHẢI LÀ SESSION DO CHÍNH USER VỪA TẠO
-        if (!isSessionGeneratedByCurrentAction) {
+  // Khối 1: Lắng nghe sự thay đổi của Prop và quyết định có chém luồng hay không
+  React.useEffect(() => {
+    if (activeSessionId !== internalSessionId) {
+        const wasCreatedHere = isSessionCreatedByMeRef.current;
+        isSessionCreatedByMeRef.current = false; // Luôn nhả cờ an toàn
+
+        // Chỉ ngắt luồng và xóa UI nếu hành động đổi Session KHÔNG xuất phát từ chính Component này
+        if (!wasCreatedHere) {
             if (isStreamingRef.current || isTypingRef.current) {
                  stopStream();
             }
             setMessages([]);
         }
+        
+        currentSessionIdRef.current = activeSessionId; // Đồng bộ Ref cũ phòng hờ các logic khác còn dùng
+        setInternalSessionId(activeSessionId);
     }
+  }, [activeSessionId, internalSessionId, stopStream, setMessages]);
+
+  // Khối 2: Luồng tải lịch sử giờ chỉ phụ thuộc vào internalSessionId đã được sàng lọc
+  React.useEffect(() => {
+    if (!internalSessionId) return; 
     
-    currentSessionIdRef.current = activeSessionId;
-    if (!activeSessionId) return; 
+    const abortController = new AbortController();
     
     const loadHistory = async () => {
         isFetchingHistory.current = true;
         try {
-            const data = await axiosClient.get(`/api/ai/chat-sessions/${activeSessionId}/messages`, {
+            const data = await axiosClient.get(`/api/ai/chat-sessions/${internalSessionId}/messages`, {
                 signal: abortController.signal
             });
             
@@ -156,7 +162,7 @@ export default function AIAdvisor(props) {
             }
         } catch (err) {
             if (err.name === 'CanceledError' || err.name === 'AbortError') {
-                console.log('Đã bóp cổ Request tải lịch sử của phiên:', activeSessionId);
+                console.log('Đã bóp cổ Request tải lịch sử của phiên:', internalSessionId);
                 return; 
             }
             console.error("Lỗi tải lịch sử chat:", err);
@@ -174,7 +180,7 @@ export default function AIAdvisor(props) {
     return () => {
         abortController.abort();
     };
-  }, [activeSessionId]);
+  }, [internalSessionId]);
 
 
 

@@ -53,13 +53,13 @@ export function useAIChatStream(options?: {
   }, []);
 
   const sendMessage = useCallback(async (content: string, contextPayload: any) => {
-    isUserAbortedRef.current = false; // Mở cờ trạng thái khởi tạo
-
+    // [FIX DOUBLE-FIRE]: Chặn ngay lập tức nếu luồng đang bận, KHÔNG TỰ SÁT LUỒNG CŨ
     if (isStreamingRef.current) {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      console.warn("Luồng đang bận, từ chối gửi đúp tin nhắn.");
+      return;
     }
+
+    isUserAbortedRef.current = false; // Mở cờ trạng thái khởi tạo
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
