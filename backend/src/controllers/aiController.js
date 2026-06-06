@@ -640,11 +640,38 @@ const testKeyHandler = async (req, res) => {
     }
 };
 
+const getAuditLogsHandler = async (req, res) => {
+    try {
+        // Mô phỏng Audit Logs từ bảng ai_chat_messages vì hệ thống chưa ghi log token chuyên dụng
+        const { rows } = await pool.query(`
+            SELECT 
+                m.id as message_id,
+                m.created_at,
+                s.user_id,
+                'Chat Request' as task_type,
+                LENGTH(COALESCE(m.content, '')) / 4 as total_tokens,
+                'OK' as status,
+                false as is_violation
+            FROM ai_chat_messages m
+            JOIN ai_chat_sessions s ON m.session_id = s.id
+            WHERE m.role = 'assistant'
+            ORDER BY m.created_at DESC
+            LIMIT 100
+        `);
+        
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Lỗi GET Audit Logs:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 module.exports = {
     chatStreamHandler,
     getSessionsHandler,
     createSessionHandler,
     pingBatchHandler,
     getMessagesHandler,
-    testKeyHandler
+    testKeyHandler,
+    getAuditLogsHandler
 };

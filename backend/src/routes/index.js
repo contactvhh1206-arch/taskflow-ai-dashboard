@@ -22,4 +22,5 @@ router.use('/checkin', checkinRoutes);
 router.use('/ai-ping', require('./aiPingRoutes'));
 router.use('/config', require('./configRoutes'));
 router.use('/users', require('./userRoutes'));
+router.use('/rag', require('./ragRoutes'));
 module.exports = router;
