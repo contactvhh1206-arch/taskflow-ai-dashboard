@@ -229,6 +229,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             const llmStreamPayload = {
                 model: "google/gemini-3.1-pro-preview",
                 messages: messages,
+                tools: aiService.AI_TOOLS,
+                tool_choice: "none",
                 stream: true,
                 max_tokens: 4096
             };
