@@ -180,7 +180,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
             
             // [DIỆT VIRUS OPENROUTER]: Triệt tiêu chữ "EMPTY" do OpenRouter tự ý nhét vào
-            if (aiMessage.content === "EMPTY") {
+            if (aiMessage.content && aiMessage.content.trim().includes("EMPTY")) {
                 aiMessage.content = "";
             }
 
@@ -222,7 +222,6 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 messages.push({
                     tool_call_id: toolCall.id,
                     role: "tool",
-                    name: funcName,
                     content: safeToolResult
                 });
             }
