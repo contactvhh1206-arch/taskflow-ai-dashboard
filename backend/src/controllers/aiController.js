@@ -275,7 +275,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             await pool.query(`
                 INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
                 VALUES ($1, $2, $3, 'assistant', $4, $5)
-            `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim(), JSON.stringify(aiMessage.tool_calls)]);
+            `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim() || " ", JSON.stringify(aiMessage.tool_calls)]);
 
             // [SCHEMA FIX]: Thay vì gán "", ta gán khoảng trắng " " để không bị Gemini bắt lỗi empty text part
             if (!aiMessage.content || aiMessage.content.trim() === "" || aiMessage.content.trim() === "EMPTY") {
@@ -333,8 +333,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
 
             // Thêm một tin nhắn hệ thống vào cuối cùng để dặn dò Gemini không gọi tool nữa
             messages.push({
-                role: "system",
-                content: "Dữ liệu công cụ đã được trả về đầy đủ. BẮT BUỘC KHÔNG ĐƯỢC GỌI THÊM BẤT KỲ CÔNG CỤ NÀO NỮA. Hãy trực tiếp phân tích dữ liệu và trả lời người dùng bằng văn bản."
+                role: "user",
+                content: "[HƯỚNG DẪN HỆ THỐNG QUAN TRỌNG TỪ BAN QUẢN TRỊ]: Dữ liệu công cụ đã được trả về đầy đủ. BẮT BUỘC KHÔNG ĐƯỢC GỌI THÊM BẤT KỲ CÔNG CỤ NÀO NỮA. Hãy trực tiếp phân tích dữ liệu trên và trả lời người dùng bằng văn bản ngay bây giờ."
             });
 
             const llmStreamPayload = {
