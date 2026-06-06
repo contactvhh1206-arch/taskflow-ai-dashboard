@@ -29,7 +29,7 @@ const AI_TOOLS = [
                     },
                     limit: {
                         type: "number",
-                        description: "Số lượng công việc tối đa cần lấy (max 100)"
+                        description: "Số lượng công việc tối đa cần lấy (max 1000)"
                     }
                 },
                 additionalProperties: false
@@ -54,7 +54,7 @@ const AI_TOOLS = [
                     },
                     limit: {
                         type: "number",
-                        description: "Số lượng báo cáo tối đa cần lấy (max 100)"
+                        description: "Số lượng báo cáo tối đa cần lấy (max 1000)"
                     }
                 },
                 additionalProperties: false
@@ -79,7 +79,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 role: userContext.role,
                 facilityId: userContext.facility_id,
                 departmentCode: userContext.department_code,
-                limit: limit ? Math.min(limit, 100) : 50 // Mở khóa limit
+                limit: limit ? Math.min(limit, 1000) : 500 // Mở khóa limit
             };
 
             const { rows } = await taskService.getTasksList(args);

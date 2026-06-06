@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef, useCallback } from 'react';
 import axiosClient from './api/axiosClient.js';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
@@ -397,8 +397,12 @@ const filterTaskForDeptHead = (t, currentUser, deptId) => {
 };
 
 function MainDashboard() {
-  const isFetchingTasks = useRef(false);
-  const notifiedTaskIds = useRef(new Set()); // Bức tường chặn Spam Ping
+  // -----------------------------------------------------------------------
+  // KIẾN TRÚC TĨNH: KHÓA LUỒNG & LƯU TRỮ NGẦM (KHÔNG KÍCH HOẠT RE-RENDER)
+  // -----------------------------------------------------------------------
+  const isFetchingTasks = useRef(false); // Semaphore: Khóa cổng chống bão DDoS API
+  const prevIds = useRef(new Set());     // Trí nhớ tĩnh: Lưu ID cũ để check thông báo (Chống Stale Closure)
+  const notifiedTaskIds = useRef(new Set()); // Trí nhớ tĩnh: Lưu ID đã bắn Noti (Tránh spam âm báo lặp lại)
   const { user, logout } = useContext(AuthContext);
   const [viewMode, setViewMode] = useState('kanban');
   const [darkMode, setDarkMode] = useState(false);
@@ -1034,132 +1038,106 @@ function MainDashboard() {
     }
   };
 
-  useEffect(() => {
-    // 1. Cởi trói điều kiện khắt khe: Chỉ cần tồn tại Object user là cho phép chạy
+  // =======================================================================
+  // BỨC TƯỜNG THÉP: CÔ LẬP LUỒNG FETCH BẰNG USECALLBACK + SEMAPHORE KHÓA
+  // =======================================================================
+  const fetchTasks = useCallback(async () => {
+    // Chặn tức thì: Nếu không có User hoặc cờ Semaphore đang khóa (API đang xử lý)
     if (!user || isFetchingTasks.current) return;
+    
+    // ĐÓNG CỔNG THÀNH NGAY LẬP TỨC để chặn mọi cuộc gọi chồng chéo
+    isFetchingTasks.current = true;
 
-    let isMounted = true; // Khóa an toàn chống Memory Leak khi component bị hủy
+    try {
+        const res = await axiosClient.get('/api/tasks');
+        if (res.data && res.data.success) {
+            let fetchedTasks = res.data.data;
+            const isManager = user.role === 'FACILITY_MANAGER';
+            const isDeptHead = user.role === 'DEPARTMENT_HEAD';
+            const isBoss = user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT';
+            const isFinance = user.role === 'FINANCE_DEPT';
 
-    const fetchTasks = async () => {
-        isFetchingTasks.current = true;
-        try {
-          const res = await axiosClient.get('/api/tasks');
-          
-          if (!res.success) {
-             setTasks([]);
-             showToast('Lấy dữ liệu thất bại: ' + (res.error || ''));
-             return;
-          }
-          
-          const fetchedTasks = res.data || [];
-          setTasks(fetchedTasks);
-          
-          // Notification polling logic
-          const currentIds = new Set(fetchedTasks.map(t => t.id));
-          const currentComments = fetchedTasks.reduce((acc, t) => ({...acc, [t.id]: parseInt(t.comments_count || 0)}), {});
-          let prevIds = new Set();
-          let prevComments = {};
-          try {
-              const storedIds = sessionStorage.getItem('taskflow_prev_ids');
-              if (storedIds) prevIds = new Set(JSON.parse(storedIds));
-              const storedComments = sessionStorage.getItem('taskflow_prev_comments');
-              if (storedComments) prevComments = JSON.parse(storedComments);
-          } catch (e) {}
-          
-          if ((prevIds.size > 0 || Object.keys(prevComments).length > 0) && user) {
-              fetchedTasks.forEach(task => {
-                  const myNames = [String(user.name).toLowerCase(), String(user.username).toLowerCase(), '@' + String(user.username).toLowerCase()];
-                  let isAssignedToMe = myNames.some(n => String(task.pic).toLowerCase().includes(n) || String(task.picId).toLowerCase().includes(n));
-                  
-                  if (!isAssignedToMe) {
-                      const isVP = user?.role === 'VICE_PRESIDENT';
-                      const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
-                      const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING'));
-                      // Chỉ lấy ID số nguyên để so sánh tuyệt đối
-                      const currentUserFacilityId = Number(user?.facility_id);
-                      const targetTaskFacilityId = Number(task?.facilityRawId);
-                      
-                      if (isDeptHead) {
-                          if (filterTaskForDeptHead(task, user, deptId)) {
-                              isAssignedToMe = true;
-                          }
-                      } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user.role)) {
-                          // CHỐT CHẶN DUY NHẤT: So sánh tuyệt đối ID Số nguyên của User và Task
-                          if (
-                              currentUserFacilityId && 
-                              targetTaskFacilityId && 
-                              currentUserFacilityId === targetTaskFacilityId
-                          ) {
-                              isAssignedToMe = true;
-                          }
-                      }
-                  }
-                  
-                  if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
-                      if (!prevIds.has(task.id) && task.status === 'todo') {
-                          if (!notifiedTaskIds.current.has(`task_${task.id}`)) {
-                              notifiedTaskIds.current.add(`task_${task.id}`);
-                              const newNotif = {
-                                  title: 'Công việc mới',
-                                  message: 'Bạn được giao công việc: ' + task.title,
-                                  time: new Date().toLocaleTimeString('vi-VN')
-                              };
-                              const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
-                              localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
-                              window.dispatchEvent(new Event('taskflow_notify'));
-                              setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
-                          }
-                      }
-                  }
-                  
-                  const prevC = prevComments[task.id] || 0;
-                  const currC = parseInt(task.comments_count || 0);
-                  if (currC > prevC && task.latest_comment) {
-                      const lc = task.latest_comment.toLowerCase();
-                      const isMentioned = myNames.some(n => lc.includes(n)) || lc.includes('@all') || lc.includes('@tất cả') || (lc.includes('@ban giám đốc') && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role));
-                      if (isMentioned && String(task.latest_comment_user_id) !== String(user.id)) {
-                          if (!notifiedTaskIds.current.has(`comment_${task.id}_${currC}`)) {
-                              notifiedTaskIds.current.add(`comment_${task.id}_${currC}`);
-                              const newNotif = {
-                                  title: 'Nhắc tên (@)',
-                                  message: 'Bạn được nhắc đến trong bình luận của công việc: ' + task.title,
-                                  time: new Date().toLocaleTimeString('vi-VN')
-                              };
-                              const notifs = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
-                              localStorage.setItem('taskflow_notifications', JSON.stringify([newNotif, ...notifs]));
-                              window.dispatchEvent(new Event('taskflow_notify'));
-                              setTimeout(() => { if(typeof playNotificationSound === 'function') playNotificationSound(); }, 500);
-                          }
-                      }
-                  }
-              });
-          }
-          sessionStorage.setItem('taskflow_prev_ids', JSON.stringify(Array.from(currentIds)));
-          sessionStorage.setItem('taskflow_prev_comments', JSON.stringify(currentComments));
-        } catch (error) {
-          console.error("Lỗi tải tasks:", error);
-          showToast('Lỗi kết nối khi lấy dữ liệu');
-        } finally {
-          isFetchingTasks.current = false;
+            if (isManager && user.facility_id) {
+                fetchedTasks = fetchedTasks.filter(t => 
+                    String(t.facilityId || t.facilityRawId) === String(user.facility_id) || 
+                    String(t.facility) === String(user.facility_name)
+                );
+            } else if (isDeptHead && user.department_code) {
+                fetchedTasks = fetchedTasks.filter(t => filterTaskForDeptHead(t, user, user.department_code));
+            } else if (isFinance) {
+                // Kế toán thấy toàn bộ để duyệt chi
+            }
+
+            // Cập nhật State UI DUY NHẤT 1 LẦN
+            setTasks(fetchedTasks);
+            
+            // ====================================================
+            // LOGIC KIỂM TRA THÔNG BÁO NGẦM (KHÔNG ĐỤNG CHẠM GIAO DIỆN)
+            // ====================================================
+            const isTodoActive = activeTab === 'tasks' && currentFilter === 'todo';
+            if (!isTodoActive) {
+                let hasNewNotification = false;
+                fetchedTasks.forEach(task => {
+                    const isAssignedToMe = (user.role === 'FACILITY_MANAGER' && String(task.pic) === String(user.facility_name)) 
+                                        || (user.role === 'DEPARTMENT_HEAD' && String(task.pic) === String(user.department_code))
+                                        || String(task.pic_id) === String(user.id);
+
+                    if (isAssignedToMe && user.role !== 'SUPER_ADMIN') {
+                        // CHỮA BỆNH STALE CLOSURE: Check thẳng vào bộ nhớ tĩnh .current
+                        if (!prevIds.current.has(task.id) && task.status === 'todo') {
+                            if (!notifiedTaskIds.current.has(`task_${task.id}`)) {
+                                notifiedTaskIds.current.add(`task_${task.id}`);
+                                hasNewNotification = true;
+                                const existingNotis = JSON.parse(localStorage.getItem('taskflow_notifications') || '[]');
+                                existingNotis.push({
+                                    id: `noti_${task.id}_${Date.now()}`,
+                                    taskId: task.id,
+                                    title: 'Công việc mới được giao',
+                                    message: `Bạn vừa được giao xử lý: ${task.title}`,
+                                    timestamp: new Date().toISOString(),
+                                    read: false
+                                });
+                                localStorage.setItem('taskflow_notifications', JSON.stringify(existingNotis));
+                                window.dispatchEvent(new Event('taskflow_notify'));
+                            }
+                        }
+                    }
+                });
+                
+                if (hasNewNotification) {
+                    playNotificationSound();
+                }
+            }
+
+            // CẬP NHẬT TRÍ NHỚ TĨNH: Không gọi setState, triệt tiêu Re-render rác!
+            prevIds.current = new Set(fetchedTasks.map(t => t.id));
         }
-    };
+    } catch (err) {
+        console.error("Lỗi khi fetch tasks:", err);
+    } finally {
+        // MỞ CỔNG THÀNH: Chỉ mở khóa sau khi đã xử lý xong hoàn toàn
+        isFetchingTasks.current = false; 
+    }
+  }, [user?.id, user?.role, user?.facility_id, user?.facility_name, user?.department_code, activeTab, currentFilter]); 
+  // Dependency Array chỉ chứa các biến primitive tĩnh, miễn nhiễm hoàn toàn với luồng AI Stream!
 
+  // =======================================================================
+  // BỨC TƯỜNG THÉP 2: KÍCH HOẠT ĐỘC LẬP
+  // =======================================================================
+  useEffect(() => {
+    let isMounted = true;
+    
     const executeFetch = async () => {
         if (!isMounted) return;
-        fetchTasks(); 
+        await fetchTasks(); 
     };
 
     executeFetch();
 
-    
-
-    // 2. BỨC TƯỜNG DỌN DẸP (CLEANUP): Tiêu chuẩn Vàng của React 18
     return () => {
-        isMounted = false;
-        isFetchingTasks.current = false; // BẮT BUỘC MỞ KHÓA CHO LẦN MOUNT SAU!
-        
+        isMounted = false; // Ngăn chặn Memory Leak khi Component unmount
     };
-  }, [user?.id]); // BỨC TƯỜNG HIỆU NĂNG: Chỉ bám theo primitive properties để chống re-render vô tận
+  }, [fetchTasks]);
 
   const fetchFacilityStatuses = async () => {
     try {
