@@ -131,7 +131,7 @@ export function useAIChatStream(options?: {
           buffer += chunk;
         }
 
-        const lines = buffer.split(/\r?\n\r?\n/);
+        const lines = buffer.split(/\n/);
         buffer = lines.pop() || ''; 
 
         let chunkTextToAppend = '';
