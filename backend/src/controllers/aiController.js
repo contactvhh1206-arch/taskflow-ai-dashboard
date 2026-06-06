@@ -331,11 +331,17 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 messages.push(resolved.msgObj);
             }
 
+            // Thêm một tin nhắn hệ thống vào cuối cùng để dặn dò Gemini không gọi tool nữa
+            messages.push({
+                role: "system",
+                content: "Dữ liệu công cụ đã được trả về đầy đủ. BẮT BUỘC KHÔNG ĐƯỢC GỌI THÊM BẤT KỲ CÔNG CỤ NÀO NỮA. Hãy trực tiếp phân tích dữ liệu và trả lời người dùng bằng văn bản."
+            });
+
             const llmStreamPayload = {
                 model: aiModel,
                 messages: messages,
                 tools: aiService.AI_TOOLS, // Bắt buộc phải có tools nếu lịch sử có tool_calls
-                tool_choice: "none", // Yêu cầu model chỉ trả về text
+                // tool_choice: "none" -> BỎ vì gây lỗi trên OpenRouter với Gemini
                 stream: true,
                 max_tokens: 4096
             };
