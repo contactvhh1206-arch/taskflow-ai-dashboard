@@ -32,6 +32,7 @@ const chatStreamHandler = async (req, res) => {
     sessionId = sessionId || session_id;
     const userContext = req.user;
 
+    // [BỔ SUNG GLOBAL ABORT CONTROLLER]
     const reqAbortController = new AbortController();
 
     // 1. Rào chắn đầu vào (Validation)
@@ -104,7 +105,7 @@ const chatStreamHandler = async (req, res) => {
 
     req.on('close', () => {
         isClientConnected = false;
-        reqAbortController.abort();
+        reqAbortController.abort(); // CHÉM ĐỨT NGAY LẬP TỨC MỌI FETCH REQUEST ĐANG CHẠY NGẦM
         saveAiReplyToDb(); // Kích hoạt lưu ngay phần chữ bị gãy khi mạng đứt
         res.end();
     });
@@ -232,8 +233,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             tool_choice: "auto"
         };
 
+        const controller1 = new AbortController();
+        const timeoutId1 = setTimeout(() => controller1.abort(), 120000);
+
         const signal1 = AbortSignal.any([
-            AbortSignal.timeout(120000),
+            controller1.signal,
             reqAbortController.signal
         ]);
 
@@ -246,6 +250,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             body: JSON.stringify(llmPayload),
             signal: signal1
         });
+        clearTimeout(timeoutId1);
 
         if (!response1.ok) {
             const errText = await response1.text();
@@ -330,8 +335,11 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 max_tokens: 4096
             };
 
+            const controller2 = new AbortController();
+            const timeoutId2 = setTimeout(() => controller2.abort(), 120000);
+
             const signal2 = AbortSignal.any([
-                AbortSignal.timeout(120000),
+                controller2.signal,
                 reqAbortController.signal
             ]);
 
@@ -346,6 +354,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             });
 
             if (!response2.ok) {
+                clearTimeout(timeoutId2);
                 const errText = await response2.text();
                 throw new Error(`API LLM (Lượt Stream) lỗi ${response2.status}: ${errText}`);
             }
@@ -359,6 +368,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                     // Sử dụng Async Iterable thay vì listener on('data') để khóa luồng thực thi
                     for await (const chunkBuffer of reader) {
                         if (!isClientConnected) {
+                            if (controller2 && typeof controller2.abort === 'function') controller2.abort();
                             break;
                         }
 
@@ -391,7 +401,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                             res.write('data: [DONE]\n\n');
                                             res.end();
                                         }
-                                        reqAbortController.abort();
+                                        if (controller2 && typeof controller2.abort === 'function') controller2.abort();
                                         throw new Error("KILL_SWITCH_TRIGGERED"); // Ném lỗi văng ra catch để chạy mượt xuống finally
                                     }
 
@@ -410,6 +420,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             } catch (err) {
                  if (err.message !== "KILL_SWITCH_TRIGGERED") throw err;
             } finally {
+                clearTimeout(timeoutId2);
                 // BẮT BUỘC ĐỢI STREAM TRẢ HẾT / GÃY RỒI MỚI CHẠY LƯU DB CHỐNG ASYNC LEAK
                 await saveAiReplyToDb(); 
             }

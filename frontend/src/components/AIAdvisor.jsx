@@ -122,9 +122,13 @@ export default function AIAdvisor(props) {
     const abortController = new AbortController();
     
     if (activeSessionId !== currentSessionIdRef.current) {
+        // [KHIÊN BỌC THÉP V2] Đã di dời logic nhả cờ ra vị trí đồng bộ Failsafe.
         const isSessionGeneratedByCurrentAction = isSessionCreatedByMeRef.current;
-        isSessionCreatedByMeRef.current = false;
         
+        // Luôn luôn nhả cờ ngay lập tức ở cấp độ đồng bộ (tránh dính Kẹt Cờ / State Leak)
+        isSessionCreatedByMeRef.current = false;
+
+        // CHỈ ngắt luồng và xóa tin nhắn nếu ĐÂY KHÔNG PHẢI LÀ SESSION DO CHÍNH USER VỪA TẠO
         if (!isSessionGeneratedByCurrentAction) {
             if (isStreamingRef.current || isTypingRef.current) {
                  stopStream();
@@ -134,7 +138,6 @@ export default function AIAdvisor(props) {
     }
     
     currentSessionIdRef.current = activeSessionId;
-    
     if (!activeSessionId) return; 
     
     const loadHistory = async () => {
