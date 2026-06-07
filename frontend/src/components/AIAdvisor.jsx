@@ -430,19 +430,19 @@ export default function AIAdvisor(props) {
             </div>
           </div>
         )}
-        {streamError && (
-          <div className="flex justify-center mb-4 w-full animate-fade-in">
-            <div className="bg-red-50 text-red-600 border border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400 p-3 rounded-2xl text-sm shadow-sm flex items-center gap-3">
-              <span className="material-symbols-outlined">error</span>
-              <span className="font-medium whitespace-pre-wrap">{streamError}</span>
-              <button onClick={() => setStreamError && setStreamError(null)} className="ml-2 text-red-500 hover:text-red-700 bg-red-100 dark:bg-red-900/40 rounded-full w-6 h-6 flex items-center justify-center transition-colors">
-                <span className="material-symbols-outlined text-[16px]">close</span>
-              </button>
-            </div>
-          </div>
-        )}
         <div ref={messagesEndRef} />
       </div>
+      {streamError && (
+        <div className="px-4 py-2 w-full animate-fade-in bg-red-50 border-t border-red-200 dark:bg-red-900/20 dark:border-red-800/50">
+          <div className="text-red-600 dark:text-red-400 text-sm shadow-sm flex items-center gap-3">
+            <span className="material-symbols-outlined">error</span>
+            <span className="font-medium whitespace-pre-wrap flex-1">{streamError}</span>
+            <button onClick={() => setStreamError && setStreamError(null)} className="ml-2 text-red-500 hover:text-red-700 bg-red-100 dark:bg-red-900/40 rounded-full w-6 h-6 flex items-center justify-center transition-colors">
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          </div>
+        </div>
+      )}
       <div className={`p-4 ${chatLog.length > 0 ? 'border-t' : 'border-t-0 pt-0'} border-outline-variant dark:border-gray-800 bg-surface-container-lowest dark:bg-[#1a1a1a]`}>
 
         {attachment && (

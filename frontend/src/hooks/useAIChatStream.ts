@@ -244,16 +244,11 @@ export function useAIChatStream(options?: {
            
            const finalContentToSave = streamingTextRef.current;
            if (finalContentToSave.trim() !== '') {
-               // BẮT CHẾT CHUỖI MỒI CỦA CỐ VẤN AI
-               if (finalContentToSave.includes("Đang truy cập kho dữ liệu hệ thống...")) {
-                   setStreamError("Lỗi hệ thống AI: Không thể tổng hợp báo cáo từ kho dữ liệu.");
-               } else {
-                   const finalId = generateId();
-                   setMessages((prev) => [
-                     ...prev,
-                     { id: finalId, role: 'assistant', content: finalContentToSave }
-                   ]);
-               }
+               const finalId = generateId();
+               setMessages((prev) => [
+                 ...prev,
+                 { id: finalId, role: 'assistant', content: finalContentToSave }
+               ]);
            }
            
            setStreamingText('');
