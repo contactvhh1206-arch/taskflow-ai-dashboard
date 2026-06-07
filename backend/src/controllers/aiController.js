@@ -130,7 +130,18 @@ const chatStreamHandler = async (req, res) => {
             // FIX BUG 1: Chỉ quét trên câu hỏi hiện tại, tránh Double Coding gọi DB 1000 lần liên tục do dư âm từ khóa cũ
             const lowerMsg = message.toLowerCase();
             
-            if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || lowerMsg.includes('báo cáo')) {
+            let isRevenueContext = false;
+            if (historyRows.length > 0) {
+                const lastMsg = historyRows[historyRows.length - 1].content.toLowerCase();
+                if (lastMsg.includes('doanh thu') || lastMsg.includes('tài chính') || lastMsg.includes('báo cáo')) {
+                    isRevenueContext = true;
+                }
+            }
+
+            const hasRevenueKeyword = lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || lowerMsg.includes('báo cáo') || lowerMsg.includes('chi tiết') || lowerMsg.includes('tuần') || lowerMsg.includes('ngày') || lowerMsg.includes('tháng');
+            const hasConfirmationKeyword = lowerMsg.includes('ok') || lowerMsg.includes('có') || lowerMsg.includes('đồng ý') || lowerMsg.includes('xem') || lowerMsg.includes('trích xuất');
+
+            if (hasRevenueKeyword || (isRevenueContext && hasConfirmationKeyword)) {
                 let targetMonth = null;
                 const monthMatch = lowerMsg.match(/tháng\s*(\d{1,2})/);
                 if (monthMatch) targetMonth = parseInt(monthMatch[1], 10);
