@@ -226,7 +226,7 @@ const createTaskHandler = async (req, res) => {
                    TO_CHAR(pt.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
                    pt.created_at as "createdAt", pt.updated_at as "completedAt",
                    pt.needs_support as "needsSupport",
-                   CASE WHEN pt.priority_level = '5' OR pt.priority_level = '3' THEN 5 WHEN pt.priority_level = '2' THEN 3 ELSE 0 END as priority_stars,
+                   CASE WHEN pt.priority_level = 'CRITICAL' THEN 5 WHEN pt.priority_level = 'HIGH' THEN 3 WHEN pt.priority_level = '5' OR pt.priority_level = '3' THEN 5 WHEN pt.priority_level = '2' THEN 3 ELSE 0 END as priority_stars,
                    u.full_name as pic, u.email as "picId", pt.pic_id,
                    pt.created_by as "createdBy", pt.created_by_role as "creator_role",
                    f.name as facility, f.code as "facilityId",

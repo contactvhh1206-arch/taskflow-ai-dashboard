@@ -142,7 +142,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
     
     if (formData.pic) {
       const selectedPic = picOptions.find(u => String(u.id) === String(formData.pic_id) || u.name === formData.pic);
-      if (selectedPic && !['SUPER_ADMIN', 'ADMIN', 'VICE_PRESIDENT'].includes(selectedPic.role)) {
+      if (selectedPic && !['SUPER_ADMIN', 'ADMIN', 'VICE_PRESIDENT'].includes(user.role) && !['SUPER_ADMIN', 'ADMIN', 'VICE_PRESIDENT'].includes(selectedPic.role)) {
         const rawFac = selectedPic.facility_code || selectedPic.facility_id || selectedPic.facility_name || '';
         const facCodes = Array.isArray(rawFac) ? rawFac.map(s => String(s).toLowerCase()) : String(rawFac).toLowerCase().split(',').map(s => s.trim());
         
@@ -157,7 +157,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
       }
     }
     return { filteredFacilities: facs, availableDepts: depts };
-  }, [formData.pic, formData.pic_id, picOptions]);
+  }, [formData.pic, formData.pic_id, picOptions, user.role, activeFacilities]);
   
   // Auto-select if there is only 1 option
   React.useEffect(() => {
