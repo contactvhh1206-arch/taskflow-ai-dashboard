@@ -102,7 +102,10 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             const queryLimit = limit ? Math.min(limit, 1000) : 500;
             
             const query = `
-                WITH RecentDates AS (
+                WITH AllowedFacs AS (
+                    SELECT id, name FROM facilities WHERE $1::text[] IS NULL OR id = ANY($1::text[])
+                ),
+                RecentDates AS (
                     SELECT DISTINCT date
                     FROM daily_financial_reports
                     WHERE ($2::date IS NULL OR date::date >= $2::date)
@@ -114,7 +117,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 FROM daily_financial_reports d
                 JOIN RecentDates rd ON d.date = rd.date,
                      jsonb_array_elements(CASE WHEN jsonb_typeof(d.data::jsonb) = 'array' THEN d.data::jsonb ELSE '[]'::jsonb END) AS elem
-                WHERE ($1::text[] IS NULL OR elem->>'id' = ANY($1::text[]))
+                WHERE ($1::text[] IS NULL OR elem->>'id' IN (SELECT id FROM AllowedFacs) OR elem->>'name' IN (SELECT name FROM AllowedFacs))
                 GROUP BY d.date, elem->>'name'
                 ORDER BY d.date DESC;
             `;
