@@ -303,8 +303,8 @@ export default function AIAdvisor(props) {
 
   const handleAsk = async (overrideQuery) => {
     // KHÓA CỨNG BẰNG REF (Synchronous Check - Chống Spam Click triệt để)
-    if (isGeneratingRef.current || isSwitchingSessionRef.current) {
-        console.warn("Chặn đúp request: AI đang xử lý hoặc phiên đang chuyển.");
+    if (isGeneratingRef.current) {
+        console.warn("Chặn đúp request: AI đang xử lý.");
         return;
     }
 
