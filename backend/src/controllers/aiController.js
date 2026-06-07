@@ -185,11 +185,12 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
         if (isClientConnected) {
             const reader = response.body;
             let streamBuffer = ""; 
+            const decoder = new TextDecoder("utf-8");
             
             for await (const chunkBuffer of reader) {
                 if (!isClientConnected) break;
                 
-                streamBuffer += chunkBuffer.toString().replace(/\r\n/g, '\n');
+                streamBuffer += decoder.decode(chunkBuffer, { stream: true }).replace(/\r\n/g, '\n');
                 let boundaryIndex;
                 
                 while ((boundaryIndex = streamBuffer.indexOf('\n\n')) !== -1) {
