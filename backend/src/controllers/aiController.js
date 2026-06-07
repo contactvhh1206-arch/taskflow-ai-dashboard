@@ -445,51 +445,13 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 messages.push(resolved.msgObj); // Nạp vào mảng LLM cho Lượt 2
             }
 
-            // [TRICK] Gemini 3.1 Pro Preview bị kẹt khi truyền tools vào Lượt 2 dù đã dặn không dùng tool.
-            // Để ép nó chỉ sinh text, ta PHẢI XÓA MẢNG TOOLS.
-            // Nhưng OpenRouter sẽ báo lỗi 400 nếu lịch sử có 'tool'/'tool_calls' mà không có mảng 'tools'.
-            // => GIẢI PHÁP: Phẳng hóa (Flatten) toàn bộ lịch sử thành user/assistant thuần túy!
-            // LUẬT GEMINI: Role phải xen kẽ (user -> assistant -> user). Do đó ta gom tất cả các tin nhắn trùng role liên tiếp.
+            // [CHUẨN MỰC OPENAI]: Truyền mảng messages nguyên gốc (giữ nguyên tool_calls và tool_call_id).
+            // KHÔNG Flatten, KHÔNG độ chế rác System Prompt để model Reasoning không bị ảo giác.
             
-            const flattenedMessages = [];
-            let lastRole = null;
-
-            for (const msg of messages) {
-                let flattenedRole = msg.role;
-                let flattenedContent = msg.content || "";
-                let reasoning = null;
-
-                if (msg.role === 'assistant' && msg.tool_calls) {
-                    flattenedRole = 'assistant';
-                    flattenedContent = msg.content && msg.content.trim() !== "" ? msg.content : "Đang lấy dữ liệu...";
-                    reasoning = msg.reasoning;
-                } else if (msg.role === 'tool') {
-                    flattenedRole = 'user';
-                    flattenedContent = `[DỮ LIỆU TỪ HỆ THỐNG - CÔNG CỤ ${msg.name}]:\n${msg.content}`;
-                }
-
-                if (flattenedRole === lastRole) {
-                    flattenedMessages[flattenedMessages.length - 1].content += "\n\n" + flattenedContent;
-                } else {
-                    const newMsg = { role: flattenedRole, content: flattenedContent };
-                    if (reasoning) newMsg.reasoning = reasoning;
-                    flattenedMessages.push(newMsg);
-                    lastRole = flattenedRole;
-                }
-            }
-
-            // Thêm một tin nhắn hệ thống vào cuối cùng để dặn dò Gemini phân tích
-            const systemPromptL2 = "[HƯỚNG DẪN TỪ BAN QUẢN TRỊ]: Toàn bộ dữ liệu bạn cần đã được cung cấp ở trên. Hãy trực tiếp phân tích, đối chiếu chéo các dữ liệu này và trả lời người dùng ngay bây giờ bằng văn bản rõ ràng, súc tích.";
-            if (lastRole === 'user') {
-                flattenedMessages[flattenedMessages.length - 1].content += "\n\n" + systemPromptL2;
-            } else {
-                flattenedMessages.push({ role: "user", content: systemPromptL2 });
-            }
-
             const llmStreamPayload = {
                 model: aiModel,
-                messages: flattenedMessages,
-                // KHÔNG TRUYỀN TOOLS VÀO ĐÂY NỮA
+                messages: messages,
+                // KHÔNG TRUYỀN TOOLS VÀO ĐÂY NỮA ĐỂ ÉP MODEL CHỐT HẠ BẰNG TEXT
                 stream: true,
                 max_tokens: 4096
             };

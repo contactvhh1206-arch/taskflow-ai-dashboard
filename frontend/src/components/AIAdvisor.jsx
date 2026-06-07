@@ -83,7 +83,7 @@ export default function AIAdvisor(props) {
     }, 0);
   };
 
-  const { messages, streamingText, isStreaming, isThinking, sendMessage, stopStream, setMessages } = useAIChatStream({
+  const { messages, streamingText, streamError, isStreaming, isThinking, sendMessage, stopStream, setMessages, setStreamError } = useAIChatStream({
     onSessionCreated: (newSessionId) => {
       isSessionCreatedByMeRef.current = true;
       if (props.onSessionCreated) props.onSessionCreated(newSessionId);
@@ -427,6 +427,17 @@ export default function AIAdvisor(props) {
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce"></div>
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce delay-100"></div>
               <div className="w-2 h-2 rounded-full bg-secondary animate-bounce delay-200"></div>
+            </div>
+          </div>
+        )}
+        {streamError && (
+          <div className="flex justify-center mb-4 w-full animate-fade-in">
+            <div className="bg-red-50 text-red-600 border border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400 p-3 rounded-2xl text-sm shadow-sm flex items-center gap-3">
+              <span className="material-symbols-outlined">error</span>
+              <span className="font-medium whitespace-pre-wrap">{streamError}</span>
+              <button onClick={() => setStreamError && setStreamError(null)} className="ml-2 text-red-500 hover:text-red-700 bg-red-100 dark:bg-red-900/40 rounded-full w-6 h-6 flex items-center justify-center transition-colors">
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
             </div>
           </div>
         )}
