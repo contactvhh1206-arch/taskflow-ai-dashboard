@@ -10,7 +10,8 @@ export default function AITaskModal({ onClose, onConfirm, user, initialText = ''
     setIsAnalyzing(true);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/ai/auto-tasking` : '/api/ai/auto-tasking';
+      // Dùng URL cứng giống các phần khác của app để tránh lỗi 405 trên Vercel/Netlify
+      const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/ai/auto-tasking` : 'https://taskflow-ai-dashboard.onrender.com/api/ai/auto-tasking';
       const token = JSON.parse(localStorage.getItem('taskflow_auth') || '{}').token;
 
       const response = await fetch(API_URL, {
