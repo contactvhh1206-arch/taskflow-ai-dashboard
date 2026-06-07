@@ -121,8 +121,7 @@ const createTaskHandler = async (req, res) => {
         const userRole = req.user.role;
         
         // Biến xác định nhóm All-Access (Tuyệt đối không có ADMIN ở đây)
-        const isAllAccess = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'].includes(userRole) 
-                            || (userRole === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING');
+        const isAllAccess = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(userRole);
 
         if (userRole === 'FACILITY_MANAGER') {
             insert_facility_id = parseInt(req.user.facility_id, 10);
