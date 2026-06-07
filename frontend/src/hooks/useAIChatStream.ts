@@ -28,6 +28,14 @@ export function useAIChatStream(options?: {
     optionsRef.current = options;
   }, [options]);
 
+  const sessionIdRef = useRef<string | null>(options?.sessionId || null);
+
+  useEffect(() => {
+    if (options?.sessionId) {
+      sessionIdRef.current = options.sessionId;
+    }
+  }, [options?.sessionId]);
+
   // Ép đồng bộ State nội bộ khi API Lịch sử trả về
   useEffect(() => {
     if (options?.initialMessages) {
@@ -104,7 +112,7 @@ export function useAIChatStream(options?: {
         },
         body: JSON.stringify({ 
           message: content, 
-          session_id: contextPayload?.sessionId, 
+          session_id: sessionIdRef.current || contextPayload?.sessionId, 
           attachment: contextPayload?.attachment,
           context: contextPayload 
         }),
@@ -172,8 +180,13 @@ export function useAIChatStream(options?: {
             try {
               const data = JSON.parse(dataPayload);
               
-              if (data.sessionId && optionsRef.current?.onSessionCreated) {
-                  optionsRef.current.onSessionCreated(data.sessionId);
+              if (data.sessionId) {
+                  // [GIAI ĐOẠN 2]: Khóa cứng ID ngay lập tức xuống Ref để chặn đúp session ảo!
+                  sessionIdRef.current = data.sessionId;
+                  
+                  if (optionsRef.current?.onSessionCreated) {
+                      optionsRef.current.onSessionCreated(data.sessionId);
+                  }
                   continue; 
               }
               

@@ -344,34 +344,6 @@ export default function AIAdvisor(props) {
     const currentAttachment = attachment;
     setAttachment(null);
 
-    if (isFacilityMode) {
-        const forbiddenKeywords = ['cơ sở khác', 'phòng ban', 'chuỗi', 'tất cả cơ sở', 'cơ sở 1', 'cơ sở 2', 'toàn hệ thống'];
-        const isForbidden = forbiddenKeywords.some(kw => userQuery.toLowerCase().includes(kw));
-        
-        if (isForbidden) {
-            isGeneratingRef.current = false; // Xả khóa nếu bị chặn bởi Filter
-            setMessages(prev => [
-                ...prev,
-                { role: 'user', content: userQuery, id: crypto.randomUUID() },
-                { role: 'ai', content: '❌ [TỪ CHỐI TRUY CẬP]: Yêu cầu của bạn đã vi phạm chính sách truy vấn chéo dữ liệu cơ sở của hệ thống HUBDB AI.\nHệ thống chỉ cho phép bạn tra cứu dữ liệu thuộc thẩm quyền của cơ sở hiện tại.\n\n⚠️ LƯU Ý: Hành vi này đã được lưu vết tự động vào hệ thống giám sát hành vi của Sếp!', id: crypto.randomUUID() }
-            ]);
-            try {
-              const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
-              violations.push({
-                id: Date.now(),
-                timestamp: new Date().toISOString(),
-                userId: user?.username || user?.id,
-                facility: facilityName,
-                query: userQuery,
-                status: 'Violation'
-              });
-              localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
-            } catch {}
-            isSessionCreatedByMeRef.current = false;
-            return;
-        }
-    }
-
     let sessionId = props.activeSessionId || null;
     sendMessage(userQuery, { sessionId: sessionId, attachment: currentAttachment });
     isSessionCreatedByMeRef.current = false;

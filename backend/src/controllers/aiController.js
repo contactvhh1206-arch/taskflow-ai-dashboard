@@ -4,12 +4,33 @@ const crypto = require('crypto'); // KHẮC PHỤC BUG 1: Import độc lập
 
 // UTILITY HELPER: Tiền xử lý Sanitization 
 const parseSafeFacilityId = (facilityId) => {
-    if (facilityId !== undefined && facilityId !== null && facilityId !== 'ALL' && facilityId !== '') {
-        const parsed = Number(facilityId);
-        if (!isNaN(parsed)) {
-            return parsed;
+    if (facilityId === undefined || facilityId === null || facilityId === 'ALL' || facilityId === '') {
+        return null;
+    }
+    
+    let rawId = facilityId;
+    
+    // Kiểm tra an toàn xem có phải định dạng mảng JSON "[...]" không
+    if (typeof facilityId === 'string' && facilityId.includes('[') && facilityId.includes(']')) {
+        try {
+            const parsedArray = JSON.parse(facilityId);
+            // Xác minh nghiêm ngặt 3 lớp: Là mảng? Có dữ liệu? Phần tử [0] hợp lệ?
+            if (Array.isArray(parsedArray) && parsedArray.length > 0 && parsedArray[0] !== null && parsedArray[0] !== undefined && parsedArray[0] !== '') {
+                rawId = parsedArray[0];
+            } else {
+                return null; // Trả về null nếu mảng rỗng hoặc phần tử không hợp lệ
+            }
+        } catch (e) {
+            return null; // Bắt buộc trả về null nếu JSON.parse lỗi (Tránh crash luồng)
         }
     }
+
+    // Ép kiểu cuối cùng
+    const parsed = Number(rawId);
+    if (!isNaN(parsed)) {
+        return parsed;
+    }
+    
     return null;
 };
 
@@ -100,21 +121,23 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
 
     // 2. KHẮC PHỤC BUG 2: CỜ TRẠNG THÁI VÀ HELPER LƯU DB BẤT TỬ
     let isClientConnected = true;
-    let isAiReplySaved = false;
+    let isDbSaved = false;
     let fullAiReply = "";
 
     const saveAiReplyToDb = async () => {
-        // Khóa cờ ngay lập tức chống Race Condition nếu gọi đúp từ finally & sự kiện close
-        if (!isAiReplySaved && fullAiReply.trim() !== "") {
-            isAiReplySaved = true; 
+        // [GIAI ĐOẠN 4]: Cờ Mutex Lock chống Race Condition đè Promise
+        if (isDbSaved) return;
+        
+        if (fullAiReply.trim() !== "") {
+            isDbSaved = true; // Khóa luồng ngay lập tức
             try {
                 await pool.query(`
                     INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content)
                     VALUES ($1, $2, $3, 'assistant', $4)
                 `, [sessionId, logFacilityId, logDepartmentCode, fullAiReply]);
             } catch (err) {
-                console.error("[CRITICAL] Lỗi lưu Database khi hoàn tất/rớt mạng Stream:", err.message);
-                isAiReplySaved = false; // Phục hồi cờ
+                console.error("[CRITICAL] Lỗi lưu Database khi rớt mạng Stream:", err.message);
+                // Nuốt trọn lỗi, tuyệt đối không quăng Unhandled Rejection ra Event Loop
             }
         }
     };
@@ -360,11 +383,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             }
             // [BẮT GIỮ SUY LUẬN]: Trích xuất Chain of Thought (Nếu có)
             const reasoningStr = aiMessage.reasoning || null;
-            // [DB WRITE] Lưu luồng Tool Call từ Assistant, Bơm Parameterized Query chống SQL Injection
-            await pool.query(`
-                INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls, reasoning)
-                VALUES ($1, $2, $3, 'assistant', $4, $5, $6)
-            `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim() || " ", JSON.stringify(aiMessage.tool_calls), reasoningStr]);
+            
             // [SCHEMA FIX]: Thay vì gán "", ta gán khoảng trắng " " để không bị Gemini bắt lỗi empty text part
             if (!aiMessage.content || aiMessage.content.trim() === "" || aiMessage.content.trim() === "EMPTY") {
                 aiMessage.content = " ";
@@ -389,6 +408,9 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
 
                 // [CHỐT CHẶN RBAC THÉP]: Nếu KHÔNG phải Tướng/Soái -> Ép đè Facility & Department bằng JWT Token
                 if (!isAllAccess) {
+                    if (logFacilityId === null || logFacilityId === undefined) {
+                        throw new Error("403_FORBIDDEN_FACILITY");
+                    }
                     funcArgs.facility_id = logFacilityId;
                     funcArgs.facilityId = logFacilityId; 
                     funcArgs.department_code = logDepartmentCode;
@@ -412,16 +434,39 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 };
             });
 
+            // [GIAI ĐOẠN 3]: PHA 1 - RAM & NETWORK (Lấy Data từ API)
             // Kích hoạt tất cả tiến trình lấy Data chạy CÙNG LÚC
             const resolvedTools = await Promise.all(toolPromises);
 
-            // [LƯU DB TUẦN TỰ]: Sau khi Data đã gom đủ, lưu lần lượt vào DB để bảo vệ Connection Pool & giữ đúng trật tự Causality
-            for (const resolved of resolvedTools) {
-                await pool.query(`
-                    INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
-                    VALUES ($1, $2, $3, 'tool', $4, $5)
-                `, resolved.dbArgs);
-                messages.push(resolved.msgObj);
+            // [GIAI ĐOẠN 3]: PHA 2 - DATABASE TRANSACTION (Bảo Toàn Tính Nguyên Tử)
+            // Chỉ khi API mạng thành công 100%, mới mở Connection Pool
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+                
+                // 1. Chèn lệnh khởi xướng của Assistant
+                await client.query(`
+                    INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls, reasoning)
+                    VALUES ($1, $2, $3, 'assistant', $4, $5, $6)
+                `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim() || " ", JSON.stringify(aiMessage.tool_calls), reasoningStr]);
+
+                // 2. Chèn dữ liệu trả về của Tool
+                for (const resolved of resolvedTools) {
+                    await client.query(`
+                        INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
+                        VALUES ($1, $2, $3, 'tool', $4, $5)
+                    `, resolved.dbArgs);
+                    
+                    messages.push(resolved.msgObj); // Nạp vào mảng LLM cho Lượt 2
+                }
+                
+                await client.query('COMMIT');
+            } catch (dbErr) {
+                await client.query('ROLLBACK');
+                console.error("[CRITICAL] Lỗi Transaction Ghi Tool Calls. Đã Rollback toàn bộ rác dữ liệu:", dbErr.message);
+                throw new Error("TRANSACTION_DB_ERROR"); // Ép văng xuống Catch tổng
+            } finally {
+                client.release(); // Kỷ luật thép: Giải phóng Connection Pool
             }
 
             // [TRICK] Gemini 3.1 Pro Preview bị kẹt khi truyền tools vào Lượt 2 dù đã dặn không dùng tool.
@@ -616,6 +661,26 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
     } catch (error) {
         if (keepAliveInterval) clearInterval(keepAliveInterval);
         console.error('[AI Controller Error]:', error.name, error.message);
+
+        // --- BÍT TỬ HUYỆT BẢO MẬT: GHI LOG VI PHẠM (AUDIT LOG) XUỐNG DB ---
+        if (error.message === "403_FORBIDDEN_FACILITY") {
+            const violationMsg = "❌ [SECURITY_VIOLATION] Cảnh báo an ninh: Phát hiện hành vi truy xuất chéo cơ sở hoặc lỗi định danh. Yêu cầu đã bị hệ thống chặn đứng và lưu vết bảo mật.";
+            
+            pool.query(`
+                INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content)
+                VALUES ($1, $2, $3, 'assistant', $4)
+            `, [sessionId, logFacilityId, logDepartmentCode, violationMsg])
+            .catch(dbErr => console.error("[CRITICAL] Lỗi ghi Audit Log RBAC:", dbErr));
+
+            if (isClientConnected) {
+                if (!res.headersSent) res.status(403);
+                res.write(`data: ${JSON.stringify({ error: violationMsg, status: 403 })}\n\n`);
+                res.write('data: [DONE_WITH_ERROR]\n\n');
+                res.end();
+            }
+            return;
+        }
+
         if (isClientConnected) {
             const errorMsg = error.name === 'AbortError' 
                 ? "Kết nối AI bị ngắt do Timeout (Quá thời gian chờ) hoặc lỗi mạng. Vui lòng thử lại." 
