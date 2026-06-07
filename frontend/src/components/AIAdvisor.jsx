@@ -145,7 +145,7 @@ export default function AIAdvisor(props) {
   // Khối 2: Luồng tải lịch sử giờ chỉ phụ thuộc vào internalSessionId đã được sàng lọc
   React.useEffect(() => {
     if (!internalSessionId) return; 
-    if (isStreamingRef.current || isTypingRef.current) return; // FIX TẠI ĐÂY: Tránh đè bong bóng khi stream đang chạy
+    if (isGeneratingRef.current) return; // FIX TẠI ĐÂY: Tránh đè bong bóng khi AI đang xử lý (thinking/streaming)
     
     const abortController = new AbortController();
     
