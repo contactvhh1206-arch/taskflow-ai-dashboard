@@ -78,7 +78,6 @@ const chatStreamHandler = async (req, res) => {
         }
     }
 
-    let isClientConnected = true;
     let isDbSaved = false;
     let fullAiReply = "";
 
@@ -98,9 +97,7 @@ const chatStreamHandler = async (req, res) => {
     };
 
     req.on('close', () => {
-        isClientConnected = false;
         saveAiReplyToDb();
-        res.end();
     });
 
     try {
@@ -181,9 +178,13 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
             }
         }
 
-        // FIX BUG 3: Chặn crash Node.js (Cannot set headers after they are sent) khi user ngắt mạng sớm do đợi DB quá lâu
-        if (!isClientConnected || res.headersSent) {
-            console.log("[AI Stream] Client đã ngắt kết nối trước khi kịp gửi Headers, tự động hủy bỏ.");
+        // FIX BUG 3: Chặn crash Node.js (Cannot set headers after they are sent)
+        if (res.headersSent) {
+            console.log("[AI Stream] Headers đã được gửi, không thể khởi tạo luồng SSE mới.");
+            return;
+        }
+        if (req.aborted || res.writableEnded) {
+            console.log("[AI Stream] Request đã bị hủy hoặc Response đã đóng.");
             return;
         }
 
@@ -197,9 +198,9 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
         });
         res.flushHeaders();
 
-        if (isNewSession && isClientConnected) {
+        if (isNewSession && !req.aborted && !res.writableEnded) {
             res.write(`data: ${JSON.stringify({ sessionId: sessionId })}\n\n`);
-        } else if (isClientConnected) {
+        } else if (!req.aborted && !res.writableEnded) {
             // Gửi heartbeat để đảm bảo kết nối SSE được mở ngay lập tức, chống timeout
             res.write(`: heartbeat\n\n`);
         }
@@ -236,13 +237,13 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
             throw new Error(`API LLM lỗi ${response.status}: ${errText}`);
         }
 
-        if (isClientConnected) {
+        if (!req.aborted && !res.writableEnded) {
             const reader = response.body;
             let streamBuffer = ""; 
             const decoder = new TextDecoder("utf-8");
             
             for await (const chunkBuffer of reader) {
-                if (!isClientConnected) break;
+                if (req.aborted || res.writableEnded) break;
                 
                 streamBuffer += decoder.decode(chunkBuffer, { stream: true }).replace(/\r\n/g, '\n');
                 let boundaryIndex;
@@ -283,7 +284,7 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
             }
         }
         
-        if (isClientConnected) {
+        if (!req.aborted && !res.writableEnded) {
             res.write('data: [DONE]\n\n');
             res.end();
         }
@@ -292,8 +293,10 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
 
     } catch (error) {
         console.error('[AI Controller Error]:', error.message);
-        if (isClientConnected) {
-            if (!res.headersSent) res.status(500);
+        if (!req.aborted && !res.writableEnded) {
+            if (!res.headersSent) {
+                res.status(500);
+            }
             res.write(`data: ${JSON.stringify({ error: "Sự cố API LLM. " + error.message, status: 500 })}\n\n`);
             res.write('data: [DONE_WITH_ERROR]\n\n');
             res.end();
