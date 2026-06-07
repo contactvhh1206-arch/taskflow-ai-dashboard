@@ -22,6 +22,7 @@ export function useAIChatStream(options?: {
   const isStreamingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isUserAbortedRef = useRef<boolean>(false); // Cờ theo dõi nguyên nhân ngắt luồng
+  const [streamError, setStreamError] = useState<string | null>(null);
 
   const optionsRef = useRef(options);
   useEffect(() => {
@@ -74,6 +75,7 @@ export function useAIChatStream(options?: {
     isStreamingRef.current = true;
     setIsThinking(true);
     setIsStreaming(false);
+    setStreamError(null); // Reset lỗi cũ
 
     const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random()}`;
 
@@ -160,14 +162,7 @@ export function useAIChatStream(options?: {
             
             // --- BƯỚC 2 FIX: BẮT CỜ LỖI SERVER TRONG QUÁ TRÌNH STREAM ---
             if (dataPayload === '[DONE_WITH_ERROR]') {
-                const errorContent = streamingTextRef.current + chunkTextToAppend + `\n\n🚨 [LỖI HỆ THỐNG]: Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.`;
-                const errorId = generateId();
-                
-                // Sử dụng functional update của React state để triệt tiêu Race Condition mảng
-                setMessages((prev) => [
-                    ...prev,
-                    { id: errorId, role: 'assistant', content: errorContent }
-                ]);
+                setStreamError("Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.");
                 
                 setStreamingText('');
                 streamingTextRef.current = '';
@@ -197,13 +192,8 @@ export function useAIChatStream(options?: {
                   // Ép kiểu an toàn (Do Backend trả về chuỗi trực tiếp)
                   const errorDetail = typeof data.error === 'string' ? data.error : (data.error?.message || data.error?.type || "Lỗi Hệ thống Thần kinh AI không xác định");
                   
-                  // Ép state React cập nhật ngay lập tức tin nhắn báo lỗi này vào mảng hiển thị
-                  const errorContent = streamingTextRef.current + chunkTextToAppend + `\n\n🚨 [LỖI HỆ THỐNG]: ${errorDetail}`;
-                  const errorId = generateId();
-                  setMessages((prev) => [
-                    ...prev,
-                    { id: errorId, role: 'assistant', content: errorContent }
-                  ]);
+                  // Không nhét lỗi vào mảng messages nữa, tách ra UI Box riêng
+                  setStreamError(`[Lỗi Hệ Thống]: ${errorDetail}`);
                   
                   setStreamingText('');
                   streamingTextRef.current = '';
@@ -259,11 +249,16 @@ export function useAIChatStream(options?: {
            
            const finalContentToSave = streamingTextRef.current;
            if (finalContentToSave.trim() !== '') {
-               const finalId = generateId();
-               setMessages((prev) => [
-                 ...prev,
-                 { id: finalId, role: 'assistant', content: finalContentToSave }
-               ]);
+               // BẮT CHẾT CHUỖI MỒI CỦA CỐ VẤN AI
+               if (finalContentToSave.includes("Đang truy cập kho dữ liệu hệ thống...")) {
+                   setStreamError("Lỗi hệ thống AI: Không thể tổng hợp báo cáo từ kho dữ liệu.");
+               } else {
+                   const finalId = generateId();
+                   setMessages((prev) => [
+                     ...prev,
+                     { id: finalId, role: 'assistant', content: finalContentToSave }
+                   ]);
+               }
            }
            
            setStreamingText('');
@@ -279,14 +274,12 @@ export function useAIChatStream(options?: {
       // 1. NẾU LÀ LỖI HỆ THỐNG NỘI BỘ HOẶC BẮT ĐƯỢC TỪ [DONE_WITH_ERROR]
       if (error.message === 'SERVER_INTERNAL_ERROR') {
           console.error('[Luồng Thép AI] Đã ngắt luồng do Server báo lỗi 500 (Internal Error).');
-          // Không cần setMessages ở đây nữa vì đã set ở trên lúc bắt [DONE_WITH_ERROR]
-          // Nhưng nếu gãy từ HTTP fetch 500 ban đầu thì fallback bù vào:
-          if (!streamingTextRef.current.includes("Sự cố hệ thống AI nội bộ")) {
-              const fallbackContent = streamingTextRef.current + '\n\n🚨 [LỖI HỆ THỐNG]: Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.';
-              setMessages((prev) => [...prev, { id: generateId(), role: 'assistant', content: fallbackContent }]);
-              setStreamingText('');
-              streamingTextRef.current = '';
+          // Fallback UI bằng Error State thay vì lưu vào DB
+          if (!streamError) {
+              setStreamError("Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.");
           }
+          setStreamingText('');
+          streamingTextRef.current = '';
       }
       // 2. CHỈ HIỂN THỊ "LỖI MẠNG / DDoS" KHI MẤT KẾT NỐI HOẶC BỊ RATE LIMIT THẬT SỰ
       else if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message.includes('429') || error.message === 'Failed to fetch') {
@@ -294,8 +287,7 @@ export function useAIChatStream(options?: {
            console.warn('[Luồng Thép AI] Người dùng đã chủ động dừng tạo phản hồi (Normal Behavior).');
         } else {
            console.error('[Luồng Thép AI] Luồng Stream bị đứt kết nối ngầm do lỗi mạng hoặc Server Rate Limit (DDoS)!');
-           const errorMsg = streamingTextRef.current + '\n\n🚨 **[Hệ thống AI]**: Lỗi gián đoạn kết nối do mạng không ổn định hoặc quá tải băng thông. Vui lòng thử lại sau giây lát.';
-           setMessages((prev) => [...prev, { id: generateId(), role: 'assistant', content: errorMsg }]);
+           setStreamError('Lỗi gián đoạn kết nối do mạng không ổn định hoặc quá tải băng thông. Vui lòng thử lại sau giây lát.');
            setStreamingText('');
            streamingTextRef.current = '';
         }
@@ -303,8 +295,7 @@ export function useAIChatStream(options?: {
       // 3. CÁC LỖI KHÁC (Parse JSON lỗi, HTTP status lạ...)
       else {
         console.error('Stream processing error:', error);
-        const fallbackContent = streamingTextRef.current + '\n\n[Mạng chập chờn, luồng AI bị ngắt quãng]';
-        setMessages((prev) => [...prev, { id: generateId(), role: 'assistant', content: fallbackContent }]);
+        setStreamError('Mạng chập chờn, luồng AI bị ngắt quãng');
         setStreamingText('');
         streamingTextRef.current = '';
       }
@@ -339,10 +330,12 @@ export function useAIChatStream(options?: {
   return {
     messages,
     streamingText,
+    streamError,
     sendMessage,
     isStreaming,
     isThinking,
     stopStream,
-    setMessages
+    setMessages,
+    setStreamError
   };
 }

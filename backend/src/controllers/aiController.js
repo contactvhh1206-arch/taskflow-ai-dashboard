@@ -123,18 +123,20 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
     let isClientConnected = true;
     let isDbSaved = false;
     let fullAiReply = "";
+    let fullReasoningReply = "";
 
     const saveAiReplyToDb = async () => {
         // [GIAI ĐOẠN 4]: Cờ Mutex Lock chống Race Condition đè Promise
         if (isDbSaved) return;
         
-        if (fullAiReply.trim() !== "") {
+        if (fullAiReply.trim() !== "" || fullReasoningReply.trim() !== "") {
             isDbSaved = true; // Khóa luồng ngay lập tức
             try {
+                const finalContent = fullAiReply.trim() !== "" ? fullAiReply : "[Đã suy luận và xử lý dữ liệu hoàn tất]";
                 await pool.query(`
-                    INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content)
-                    VALUES ($1, $2, $3, 'assistant', $4)
-                `, [sessionId, logFacilityId, logDepartmentCode, fullAiReply]);
+                    INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, reasoning)
+                    VALUES ($1, $2, $3, 'assistant', $4, $5)
+                `, [sessionId, logFacilityId, logDepartmentCode, finalContent, fullReasoningReply]);
             } catch (err) {
                 console.error("[CRITICAL] Lỗi lưu Database khi rớt mạng Stream:", err.message);
                 // Nuốt trọn lỗi, tuyệt đối không quăng Unhandled Rejection ra Event Loop
@@ -438,35 +440,9 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             // Kích hoạt tất cả tiến trình lấy Data chạy CÙNG LÚC
             const resolvedTools = await Promise.all(toolPromises);
 
-            // [GIAI ĐOẠN 3]: PHA 2 - DATABASE TRANSACTION (Bảo Toàn Tính Nguyên Tử)
-            // Chỉ khi API mạng thành công 100%, mới mở Connection Pool
-            const client = await pool.connect();
-            try {
-                await client.query('BEGIN');
-                
-                // 1. Chèn lệnh khởi xướng của Assistant
-                await client.query(`
-                    INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls, reasoning)
-                    VALUES ($1, $2, $3, 'assistant', $4, $5, $6)
-                `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim() || " ", JSON.stringify(aiMessage.tool_calls), reasoningStr]);
-
-                // 2. Chèn dữ liệu trả về của Tool
-                for (const resolved of resolvedTools) {
-                    await client.query(`
-                        INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
-                        VALUES ($1, $2, $3, 'tool', $4, $5)
-                    `, resolved.dbArgs);
-                    
-                    messages.push(resolved.msgObj); // Nạp vào mảng LLM cho Lượt 2
-                }
-                
-                await client.query('COMMIT');
-            } catch (dbErr) {
-                await client.query('ROLLBACK');
-                console.error("[CRITICAL] Lỗi Transaction Ghi Tool Calls. Đã Rollback toàn bộ rác dữ liệu:", dbErr.message);
-                throw new Error("TRANSACTION_DB_ERROR"); // Ép văng xuống Catch tổng
-            } finally {
-                client.release(); // Kỷ luật thép: Giải phóng Connection Pool
+            // [GIAI ĐOẠN 3]: PHA 2 - CHUẨN BỊ MẢNG LLM CHO LƯỢT 2 (KHÔNG GHI DB Ở ĐÂY NỮA)
+            for (const resolved of resolvedTools) {
+                messages.push(resolved.msgObj); // Nạp vào mảng LLM cho Lượt 2
             }
 
             // [TRICK] Gemini 3.1 Pro Preview bị kẹt khi truyền tools vào Lượt 2 dù đã dặn không dùng tool.
@@ -616,6 +592,12 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                             throw new Error("KILL_SWITCH_TRIGGERED"); // Ném lỗi văng ra catch để chạy mượt xuống finally
                                         }
 
+                                        // BẮT SÓNG REASONING: Cộng dồn suy luận ngầm của AI
+                                        const reasoningChunk = delta?.reasoning || "";
+                                        if (reasoningChunk) {
+                                            fullReasoningReply += reasoningChunk;
+                                        }
+
                                         const chunkText = delta?.content || "";
                                         if (chunkText) {
                                             fullAiReply += chunkText;
@@ -633,7 +615,47 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                  if (err.message !== "KILL_SWITCH_TRIGGERED") throw err;
             } finally {
                 clearTimeout(timeoutId2);
-                await saveAiReplyToDb(); 
+                
+                // [KỶ LUẬT THÉP DATABASE - BƯỚC 2 FIX]
+                // Đảm bảo Nguyên tử (Atomicity): Trì hoãn việc ghi Lượt 1 xuống tận đây.
+                // Chỉ lưu nếu Lượt 2 thành công và nhả ra nội dung hợp lệ (hoặc ít nhất là có suy luận).
+                if (fullAiReply.trim() !== "" || fullReasoningReply.trim() !== "") {
+                    const client = await pool.connect();
+                    try {
+                        await client.query('BEGIN');
+                        
+                        // 1. Chèn lệnh khởi xướng của Assistant
+                        await client.query(`
+                            INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls, reasoning)
+                            VALUES ($1, $2, $3, 'assistant', $4, $5, $6)
+                        `, [sessionId, logFacilityId, logDepartmentCode, (aiMessage.content || "").replace(/EMPTY/g, "").trim() || " ", JSON.stringify(aiMessage.tool_calls), reasoningStr]);
+
+                        // 2. Chèn dữ liệu trả về của Tool
+                        for (const resolved of resolvedTools) {
+                            await client.query(`
+                                INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, tool_calls)
+                                VALUES ($1, $2, $3, 'tool', $4, $5)
+                            `, resolved.dbArgs);
+                        }
+
+                        // 3. Chèn kết quả chốt hạ của Assistant (Bắt buộc giữ Role Sequence)
+                        const finalContentToSave = fullAiReply.trim() !== "" ? fullAiReply : "[Đã suy luận và xử lý dữ liệu hoàn tất]";
+                        await client.query(`
+                            INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content, reasoning)
+                            VALUES ($1, $2, $3, 'assistant', $4, $5)
+                        `, [sessionId, logFacilityId, logDepartmentCode, finalContentToSave, fullReasoningReply]);
+                        
+                        await client.query('COMMIT');
+                        isDbSaved = true; // Khóa Mutex Lock để cờ saveAiReplyToDb bỏ qua
+                    } catch (dbErr) {
+                        await client.query('ROLLBACK');
+                        console.error("[CRITICAL] Lỗi Transaction Ghi DB Cuối Cùng. Đã Rollback toàn bộ rác dữ liệu:", dbErr.message);
+                    } finally {
+                        client.release();
+                    }
+                }
+
+                await saveAiReplyToDb(); // Gọi phòng hờ, nếu isDbSaved = true thì hàm này sẽ bỏ qua
             }
             
         } else {
