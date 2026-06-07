@@ -78,40 +78,6 @@ const chatStreamHandler = async (req, res) => {
         }
     }
 
-    // CHÈN DỮ LIỆU TỰ ĐỘNG (Pre-flight RAG) THAY VÌ TOOL CALLING THEO YÊU CẦU CỦA USER
-    let dbContextStr = "";
-    try {
-        const lowerMsg = message.toLowerCase();
-        if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || lowerMsg.includes('báo cáo')) {
-            const revData = await aiService.processToolCall('fetch_financial_reports', { limit: 30 }, userContext);
-            if (!revData.includes('Không có dữ liệu')) {
-                dbContextStr += "\n\n[DỮ LIỆU DOANH THU THỰC TẾ]:\n" + revData;
-            }
-        }
-        
-        if (lowerMsg.includes('công việc') || lowerMsg.includes('task') || lowerMsg.includes('tiến độ') || lowerMsg.includes('chưa làm')) {
-            const taskData = await aiService.processToolCall('fetch_kanban_tasks', { limit: 50 }, userContext);
-            if (!taskData.includes('Không có công việc nào')) {
-                dbContextStr += "\n\n[DỮ LIỆU CÔNG VIỆC HIỆN TẠI]:\n" + taskData;
-            }
-        }
-    } catch (e) {
-        console.error("Lỗi chèn RAG tự động:", e.message);
-    }
-
-    // PROMPT HOÀNG KIM f4605ca
-    const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userContext.role}, ID Cơ sở: ${safeFacilityId || 'N/A'}.${dbContextStr ? '\n\nSau đây là dữ liệu hệ thống tự động trích xuất theo ngữ cảnh câu hỏi của người dùng (Hãy dựa vào đây để trả lời chính xác, KHÔNG YÊU CẦU USER CUNG CẤP THÊM FILE nếu dữ liệu đã đủ):' + dbContextStr : ''}
-Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi một cách tự nhiên, chuyên nghiệp. Tuyệt đối tuân thủ phân quyền và RAG context.`;
-
-    res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no', 
-        'Access-Control-Allow-Origin': '*'
-    });
-    res.flushHeaders();
-
     let isClientConnected = true;
     let isDbSaved = false;
     let fullAiReply = "";
@@ -138,6 +104,7 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
     });
 
     try {
+        // 1. Lưu tin nhắn User vào DB và Cập nhật thời gian Session
         await pool.query(`
             INSERT INTO ai_chat_messages (session_id, facility_id, department_code, role, content)
             VALUES ($1, $2, $3, 'user', $4)
@@ -148,13 +115,7 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
             [Date.now(), sessionId]
         );
 
-        if (isNewSession && isClientConnected) {
-            res.write(`data: ${JSON.stringify({ sessionId: sessionId })}\n\n`);
-        } else if (isClientConnected) {
-            // Gửi heartbeat để đảm bảo kết nối SSE được mở ngay lập tức, chống timeout
-            res.write(`: heartbeat\n\n`);
-        }
-
+        // 2. Lấy lịch sử 20 tin nhắn gần nhất để tạo bối cảnh (Context)
         const { rows: historyRows } = await pool.query(`
             SELECT m.role, m.content
             FROM ai_chat_messages m
@@ -165,6 +126,33 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
         `, [sessionId, userContext.id]);
         
         historyRows.reverse();
+
+        // 3. CHÈN DỮ LIỆU TỰ ĐỘNG (Pre-flight RAG) - Phân tích từ khóa trên 4 tin nhắn gần nhất để không bị mất RAG ở câu thứ 2
+        let dbContextStr = "";
+        try {
+            const recentMessages = historyRows.slice(-4).map(r => r.content).join(' ');
+            const lowerMsg = recentMessages.toLowerCase();
+            
+            if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || lowerMsg.includes('báo cáo')) {
+                const revData = await aiService.processToolCall('fetch_financial_reports', { limit: 1000 }, userContext);
+                if (!revData.includes('Không có dữ liệu')) {
+                    dbContextStr += "\n\n[DỮ LIỆU DOANH THU THỰC TẾ]:\n" + revData;
+                }
+            }
+            
+            if (lowerMsg.includes('công việc') || lowerMsg.includes('task') || lowerMsg.includes('tiến độ') || lowerMsg.includes('chưa làm')) {
+                const taskData = await aiService.processToolCall('fetch_kanban_tasks', { limit: 1000 }, userContext);
+                if (!taskData.includes('Không có công việc nào')) {
+                    dbContextStr += "\n\n[DỮ LIỆU CÔNG VIỆC HIỆN TẠI]:\n" + taskData;
+                }
+            }
+        } catch (e) {
+            console.error("Lỗi chèn RAG tự động:", e.message);
+        }
+
+        // 4. Tạo System Prompt có RAG
+        const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userContext.role}, ID Cơ sở: ${safeFacilityId || 'N/A'}.${dbContextStr ? '\n\nSau đây là dữ liệu hệ thống tự động trích xuất theo ngữ cảnh câu hỏi của người dùng (Hãy dựa vào đây để trả lời chính xác, KHÔNG YÊU CẦU USER CUNG CẤP THÊM FILE nếu dữ liệu đã đủ):' + dbContextStr : ''}
+Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi một cách tự nhiên, chuyên nghiệp. Tuyệt đối tuân thủ phân quyền và RAG context.`;
 
         const messages = [ { role: "system", content: systemPrompt } ];
 
@@ -183,12 +171,30 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
             }
         }
         
+        // Đảm bảo tin nhắn hiện tại có trong mảng (phòng hờ historyRows thiếu)
         if (messages.length === 1 || messages[messages.length - 1].content !== message) {
             if (messages[messages.length - 1].role === 'user') {
                 messages[messages.length - 1].content += "\n\n" + message;
             } else {
                 messages.push({ role: 'user', content: message });
             }
+        }
+
+        // 5. Trả Headers SSE và Gửi Heartbeat cho Frontend (Bắt đầu Stream)
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache, no-transform',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no', 
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.flushHeaders();
+
+        if (isNewSession && isClientConnected) {
+            res.write(`data: ${JSON.stringify({ sessionId: sessionId })}\n\n`);
+        } else if (isClientConnected) {
+            // Gửi heartbeat để đảm bảo kết nối SSE được mở ngay lập tức, chống timeout
+            res.write(`: heartbeat\n\n`);
         }
 
         const openRouterKey = process.env.OPENROUTER_API_KEY;
@@ -201,6 +207,9 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
             max_tokens: 2000
         };
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -209,8 +218,11 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
                 'HTTP-Referer': process.env.SITE_URL || 'https://hubdb.app',
                 'X-Title': process.env.SITE_NAME || 'HUBDB'
             },
-            body: JSON.stringify(llmPayload)
+            body: JSON.stringify(llmPayload),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const errText = await response.text();
