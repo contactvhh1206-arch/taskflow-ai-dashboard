@@ -1,7 +1,7 @@
 const pool = require('../config/database');
 const aiService = require('../services/aiService');
 const crypto = require('crypto'); // KHẮC PHỤC BUG 1: Import độc lập
-
+const ragService = require('../services/ragService');
 // UTILITY HELPER: Tiền xử lý Sanitization 
 const parseSafeFacilityId = (facilityId) => {
     if (facilityId === undefined || facilityId === null || facilityId === 'ALL' || facilityId === '') {
@@ -170,6 +170,15 @@ const chatStreamHandler = async (req, res) => {
                 const taskData = await aiService.processToolCall('fetch_kanban_tasks', { limit: 1000 }, userContext);
                 if (!taskData.includes('Không có công việc nào')) {
                     dbContextStr += "\n\n[DỮ LIỆU CÔNG VIỆC HIỆN TẠI]:\n" + taskData;
+                }
+            }
+
+            // [MỚI] TRUY VẤN RAG TÀI LIỆU (TỪ DATABASE CHUẨN)
+            const ragResults = await ragService.searchKnowledgeBase(message, userContext, 3);
+            if (ragResults && ragResults.length > 0) {
+                const ragTexts = ragResults.filter(r => r.content && !r.content.startsWith('Hệ thống từ chối')).map(r => r.content);
+                if (ragTexts.length > 0) {
+                    dbContextStr += "\n\n[DỮ LIỆU NỘI BỘ THAM KHẢO (RAG)]:\n" + ragTexts.join('\n---\n');
                 }
             }
         } catch (e) {

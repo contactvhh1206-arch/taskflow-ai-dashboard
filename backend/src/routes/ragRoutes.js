@@ -4,7 +4,7 @@ const multer = require('multer');
 const pool = require('../config/database');
 const authGuard = require('../middlewares/authGuard');
 const rbacGuard = require('../middlewares/rbacGuard');
-
+const ragService = require('../services/ragService');
 // Setup Multer (chỉ cho phép .txt tối đa 500KB)
 const storage = multer.memoryStorage();
 const upload = multer({ 
@@ -52,23 +52,45 @@ router.post('/upload', authGuard, rbacGuard, upload.single('file'), async (req, 
             return res.status(400).json({ success: false, error: 'Không tìm thấy tệp' });
         }
 
-        // Mô phỏng quá trình Chunking & Embedding 
-        // 1 chunk = ~1000 ký tự
+        // Quá trình Chunking & Embedding thực tế
         const textContent = req.file.buffer.toString('utf8');
-        const chunkCount = Math.max(1, Math.ceil(textContent.length / 1000));
+        const chunkSize = 1000;
+        const chunks = [];
+        for (let i = 0; i < textContent.length; i += chunkSize) {
+            chunks.push(textContent.substring(i, i + chunkSize));
+        }
+        const chunkCount = chunks.length;
 
-        // Lưu vào Database
+        // Lưu vào Database quản lý UI (rag_documents)
         const { rows } = await pool.query(
             `INSERT INTO rag_documents (file_name, file_size, chunk_count) 
              VALUES ($1, $2, $3) RETURNING id`,
             [req.file.originalname, req.file.size, chunkCount]
         );
 
+        // Lưu nội dung và vector vào company_knowledge_base
+        let chunksProcessed = 0;
+        for (let i = 0; i < chunks.length; i++) {
+            try {
+                await ragService.saveToKnowledgeBase(chunks[i], 'DOCUMENT_UPLOAD', {
+                    filename: req.file.originalname,
+                    chunk_index: i,
+                    total_chunks: chunkCount,
+                    department_code: req.user.department_code || 'GLOBAL',
+                    facility_id: req.user.facility_id,
+                    uploader_id: req.user.id
+                });
+                chunksProcessed++;
+            } catch (err) {
+                console.error(`Lỗi tạo vector chunk ${i}:`, err.message);
+            }
+        }
+
         res.json({ 
             success: true, 
             message: 'Đã mã hóa Vector thành công',
             document_id: rows[0].id,
-            chunks_processed: chunkCount
+            chunks_processed: chunksProcessed
         });
     } catch (error) {
         console.error('Lỗi POST RAG upload:', error);

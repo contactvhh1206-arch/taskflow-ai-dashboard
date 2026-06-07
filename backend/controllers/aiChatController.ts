@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AiAuditService } from '../services/aiAuditService';
+const ragService = require('../src/services/ragService');
 
 export const streamAIChat = async (req: Request, res: Response) => {
   const message = req.body.message;
@@ -47,7 +48,26 @@ export const streamAIChat = async (req: Request, res: Response) => {
   });
 
   try {
-    const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userRole}, ID Cơ sở: ${facilityId}. Tuyệt đối tuân thủ phân quyền và RAG context.`;
+    let ragContextStr = '';
+    try {
+      const userContext = { 
+        id: userId, 
+        role: userRole, 
+        facility_id: facilityId, 
+        department_code: (req as any).user?.department_code || '' 
+      };
+      const ragResults = await ragService.searchKnowledgeBase(message, userContext, 3);
+      if (ragResults && ragResults.length > 0) {
+        const ragTexts = ragResults.filter((r: any) => r.content && !r.content.startsWith('Hệ thống từ chối')).map((r: any) => r.content);
+        if (ragTexts.length > 0) {
+            ragContextStr = '\n\n[DỮ LIỆU NỘI BỘ THAM KHẢO (RAG)]:\n' + ragTexts.join('\n---\n');
+        }
+      }
+    } catch (e: any) {
+      console.error('Lỗi khi truy vấn RAG:', e.message);
+    }
+
+    const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userRole}, ID Cơ sở: ${facilityId}. Tuyệt đối tuân thủ phân quyền và RAG context.${ragContextStr}`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
