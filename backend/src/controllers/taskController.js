@@ -30,6 +30,7 @@ const getTasksHandler = async (req, res) => {
         });
 
         // Trả về JSON sạch sẽ, chuẩn API Meta Data
+        console.log("DEBUG getTasksHandler rows:", rows.length, rows);
         return res.status(200).json({
             success: true,
             data: rows,

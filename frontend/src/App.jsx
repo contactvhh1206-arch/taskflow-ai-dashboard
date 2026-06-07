@@ -1050,8 +1050,8 @@ function MainDashboard() {
 
     try {
         const res = await axiosClient.get('/api/tasks');
-        if (res.data && res.data.success) {
-            let fetchedTasks = res.data.data;
+        if (res.success) {
+            let fetchedTasks = res.data || [];
             const isManager = user.role === 'FACILITY_MANAGER';
             const isDeptHead = user.role === 'DEPARTMENT_HEAD';
             const isBoss = user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT';

@@ -75,7 +75,7 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
                COUNT(tc.id) AS comment_count
         FROM paginated_tasks pt
         LEFT JOIN users u ON pt.pic_id = u.id
-        LEFT JOIN facilities f ON pt.facility_id = f.id AND f.is_deleted = false
+        LEFT JOIN facilities f ON pt.facility_id = f.id
         LEFT JOIN task_operations top ON pt.id = top.task_id
         LEFT JOIN task_comments tc ON pt.id = tc.task_id
         GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, pt.priority_level, pt.pic_id, pt.created_by, pt.created_by_role, 
@@ -156,7 +156,7 @@ const getTasksHistory = async ({ userId, role, facilityId, departmentCode, picId
                pt.department_code as "department_tag",
                COUNT(tc.id) AS comment_count
         FROM paginated_tasks pt
-        LEFT JOIN facilities f ON pt.facility_id = f.id AND f.is_deleted = false
+        LEFT JOIN facilities f ON pt.facility_id = f.id
         LEFT JOIN task_comments tc ON pt.id = tc.task_id
         GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, pt.priority_level, 
                  pt.full_name, pt.email, f.name, f.code, pt.facility_id, pt.department_code
