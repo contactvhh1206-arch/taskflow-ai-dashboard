@@ -7,6 +7,9 @@ const aiController = require('../controllers/aiController');
 // Quản lý Audit Logs
 router.get('/audit-logs', authGuard, rbacGuard, aiController.getAuditLogsHandler);
 
+// Trích xuất Auto-Tasking
+router.post('/auto-tasking', authGuard, aiController.autoTaskingHandler);
+
 // Luồng Stream AI được bọc thép và chạy cơ chế Sandbox
 router.post('/chat-stream', authGuard, rbacGuard, aiController.chatStreamHandler);
 

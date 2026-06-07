@@ -10,7 +10,7 @@ export default function AITaskModal({ onClose, onConfirm, user, initialText = ''
     setIsAnalyzing(true);
     
     try {
-      const API_URL = 'https://taskflow-ai-dashboard.onrender.com/api/ai/auto-tasking';
+      const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/ai/auto-tasking` : '/api/ai/auto-tasking';
       const token = JSON.parse(localStorage.getItem('taskflow_auth') || '{}').token;
 
       const response = await fetch(API_URL, {

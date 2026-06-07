@@ -460,6 +460,65 @@ const getAuditLogsHandler = async (req, res) => {
     }
 };
 
+const autoTaskingHandler = async (req, res) => {
+  try {
+    const { meetingTranscript, facilityId } = req.body;
+
+    if (!meetingTranscript) {
+      return res.status(400).json({ error: 'Vui lòng cung cấp biên bản cuộc họp.' });
+    }
+
+    const systemPrompt = `Bạn là một AI điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
+Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY'). \nLƯU Ý TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trách), CHỈ trích xuất khi văn bản NÊU ĐÍCH DANH tên một cá nhân cụ thể. Nếu văn bản chỉ dùng các từ chung chung (như 'nhân viên', 'kỹ thuật viên', 'lễ tân'...) hoặc KHÔNG CÓ tên người, BẮT BUỘC trả về trường 'pic' là một chuỗi rỗng "". Tuyệt đối không được tự bịa ra tên người hoặc dùng lại tên cơ sở.`;
+
+    const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
+    const aiConfig = configRows.length > 0 ? configRows[0].data : {};
+    const aiModel = aiConfig.model || "google/gemini-2.5-flash";
+    const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: aiModel,
+        messages: [ { role: "system", content: systemPrompt }, { role: "user", content: meetingTranscript } ],
+        response_format: { type: "json_object" }
+      })
+    });
+
+    const aiData = await response.json();
+    let extractedTasks = [];
+
+    if (aiData.choices && aiData.choices.length > 0) {
+      try {
+        extractedTasks = JSON.parse(aiData.choices[0].message.content);
+        if (extractedTasks.tasks) extractedTasks = extractedTasks.tasks;
+        if (Array.isArray(extractedTasks)) {
+            for (let t of extractedTasks) {
+               let mappedFacilityId = facilityId;
+               if (t.target_facility) {
+                   const { rows } = await pool.query('SELECT id FROM facilities WHERE name ILIKE $1 LIMIT 1', [`%${t.target_facility}%`]);
+                   if (rows.length > 0) {
+                       mappedFacilityId = rows[0].id;
+                   }
+               }
+               t.facility_id = mappedFacilityId;
+               t.priority_level = t.priority_level === 'URGENT' ? 'URGENT' : 'PRIORITY';
+               t.created_by_role = req.user.role;
+            }
+        }
+      } catch (e) {
+        console.error("AI không trả về JSON hợp lệ");
+      }
+    }
+
+    res.json({ success: true, message: 'Trích xuất Auto-Tasking thành công.', data: extractedTasks });
+
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi khi gọi AI API.' });
+  }
+};
+
 module.exports = {
     chatStreamHandler,
     getSessionsHandler,
@@ -467,5 +526,6 @@ module.exports = {
     pingBatchHandler,
     getMessagesHandler,
     testKeyHandler,
-    getAuditLogsHandler
+    getAuditLogsHandler,
+    autoTaskingHandler
 };
