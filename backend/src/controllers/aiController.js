@@ -34,7 +34,6 @@ const parseSafeFacilityId = (facilityId) => {
     return null;
 };
 
-// BẢO VỆ BUG 3: Khiên Parse JSON chống sập luồng
 const safeJsonParse = (str, fallbackValue = null) => {
     if (!str) return fallbackValue;
     if (typeof str !== 'string') return str;
@@ -44,6 +43,16 @@ const safeJsonParse = (str, fallbackValue = null) => {
         console.error("[JSON PARSE ERROR] Dữ liệu Database bị hỏng cấu trúc:", str);
         return fallbackValue;
     }
+};
+
+// [MỚI] HELPER TỐI ƯU CHUỖI TIẾNG VIỆT
+const normalizeName = (str) => {
+    if (!str) return '';
+    return str.toString()
+        .normalize('NFD') // Tách dấu ra khỏi ký tự
+        .replace(/[\u0300-\u036f]/g, '') // Xóa dấu
+        .toLowerCase() // Đưa về chữ thường
+        .trim(); // Xóa khoảng trắng thừa
 };
 
 const chatStreamHandler = async (req, res) => {
@@ -460,6 +469,7 @@ const getAuditLogsHandler = async (req, res) => {
     }
 };
 
+// [MỚI] AUTO-TASKING HANDLER ĐÃ ĐƯỢC TỐI ƯU HÓA THEO CHỈ THỊ HUBDB 555
 const autoTaskingHandler = async (req, res) => {
   try {
     const { meetingTranscript, facilityId } = req.body;
@@ -468,8 +478,9 @@ const autoTaskingHandler = async (req, res) => {
       return res.status(400).json({ error: 'Vui lòng cung cấp biên bản cuộc họp.' });
     }
 
+    // [CẬP NHẬT] Tinh chỉnh System Prompt thép
     const systemPrompt = `Bạn là một AI điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
-Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY'). \nLƯU Ý TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trách), CHỈ trích xuất khi văn bản NÊU ĐÍCH DANH tên một cá nhân cụ thể. Nếu văn bản chỉ dùng các từ chung chung (như 'nhân viên', 'kỹ thuật viên', 'lễ tân'...) hoặc KHÔNG CÓ tên người, BẮT BUỘC trả về trường 'pic' là một chuỗi rỗng "". Tuyệt đối không được tự bịa ra tên người hoặc dùng lại tên cơ sở.`;
+Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY'). \nLƯU Ý TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trách), CHỈ bóc tách tên khi có danh tính rõ ràng. Tuyệt đối cấm bóc chức danh (như 'kỹ thuật', 'lễ tân'). Nếu không rõ tên, trả về pic: "". Tuyệt đối không được tự bịa ra tên người hoặc dùng lại tên cơ sở.`;
 
     const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
     const aiConfig = configRows.length > 0 ? configRows[0].data : {};
@@ -493,8 +504,25 @@ Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" 
       try {
         extractedTasks = JSON.parse(aiData.choices[0].message.content);
         if (extractedTasks.tasks) extractedTasks = extractedTasks.tasks;
+        
         if (Array.isArray(extractedTasks)) {
+            
+            // [MỚI] BỘ NHỚ ĐỆM (CACHING) TRƯỚC VÒNG LẶP: Truy xuất toàn bộ nhân sự của Cơ sở gốc
+            let cachedUsers = [];
+            if (facilityId) {
+                try {
+                    const { rows: usersRows } = await pool.query(
+                        'SELECT id, full_name, role_id FROM users WHERE facility_id = $1',
+                        [parseSafeFacilityId(facilityId)]
+                    );
+                    cachedUsers = usersRows;
+                } catch (cacheErr) {
+                    console.error("Lỗi khi load cache Users:", cacheErr.message);
+                }
+            }
+
             for (let t of extractedTasks) {
+               // Xử lý cơ sở
                let mappedFacilityId = facilityId;
                if (t.target_facility) {
                    const { rows } = await pool.query('SELECT id FROM facilities WHERE name ILIKE $1 LIMIT 1', [`%${t.target_facility}%`]);
@@ -505,16 +533,58 @@ Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" 
                t.facility_id = mappedFacilityId;
                t.priority_level = t.priority_level === 'URGENT' ? 'URGENT' : 'PRIORITY';
                t.created_by_role = req.user.role;
+
+               // --- [MỚI] THUẬT TOÁN ĐIỀU PHỐI PIC CÓ CACHING ---
+               let finalPicId = null;
+               let finalPicName = "";
+
+               // Khớp tên từ AI
+               if (t.pic && typeof t.pic === 'string' && t.pic.trim() !== '') {
+                   const normalizedInput = normalizeName(t.pic);
+                   
+                   // Lọc tất cả nhân sự khớp tên
+                   const matchedUsers = cachedUsers.filter(u => 
+                       normalizeName(u.full_name).includes(normalizedInput)
+                   );
+
+                   // Chỉ gán khi tìm thấy ĐÚNG 1 người (Đảm bảo độ chính xác tuyệt đối)
+                   if (matchedUsers.length === 1) {
+                       finalPicId = matchedUsers[0].id;
+                       finalPicName = matchedUsers[0].full_name;
+                   }
+               }
+
+               // FALLBACK (Nếu AI không mò ra tên, hoặc Khớp tên thất bại)
+               if (finalPicId === null) {
+                   // Tìm thẳng Quản lý cơ sở (role_id = 6) trong bộ nhớ đệm
+                   const facilityManager = cachedUsers.find(u => u.role_id === 6);
+                   
+                   if (facilityManager) {
+                       finalPicId = facilityManager.id;
+                       finalPicName = facilityManager.full_name;
+                   } else {
+                       // Tối ưu chống crash: Cơ sở chưa có Quản lý
+                       console.warn(`[Auto-Tasking] Cảnh báo: Cơ sở ${mappedFacilityId} không có Facility Manager (role_id=6)`);
+                       finalPicId = null; 
+                       finalPicName = t.pic || ""; // Giữ nguyên tên gốc hoặc để trống
+                   }
+               }
+
+               // Gán ngược dữ liệu đã chuẩn hóa vào task
+               t.pic_id = finalPicId;
+               t.pic = finalPicName;
+               // --------------------------------------------------
             }
         }
       } catch (e) {
-        console.error("AI không trả về JSON hợp lệ");
+        console.error("AI không trả về JSON hợp lệ:", e.message);
       }
     }
 
     res.json({ success: true, message: 'Trích xuất Auto-Tasking thành công.', data: extractedTasks });
 
   } catch (error) {
+    console.error('[AI Controller Error]:', error.message);
     res.status(500).json({ error: 'Lỗi khi gọi AI API.' });
   }
 };
