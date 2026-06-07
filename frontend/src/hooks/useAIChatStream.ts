@@ -225,10 +225,12 @@ export function useAIChatStream(options?: {
 
               // Sử dụng Optional Chaining an toàn để lấy chuỗi Stream
               const chunk = data?.choices?.[0]?.delta?.content || data?.content || data?.text || '';
+              console.log('--- STREAM CHUNK ---', chunk); // [TRAP 1] BẪY LƯỚI BỘ NHỚ
               if (chunk) {
                   chunkTextToAppend += chunk;
               }
             } catch (parseError) {
+              console.error('--- [TRAP 1] JSON PARSE ERROR ---', parseError, 'PAYLOAD:', dataPayload); // [TRAP 1]
               console.warn('[Luồng Thép] Bỏ qua chunk vỡ ngầm:', dataPayload);
             }
           }
@@ -271,6 +273,7 @@ export function useAIChatStream(options?: {
         }
       }
     } catch (error: any) {
+      console.error('--- [TRAP 1] OUTER CATCH STREAM ERROR ---', error); // [TRAP 1]
       const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}`;
 
       // 1. NẾU LÀ LỖI HỆ THỐNG NỘI BỘ HOẶC BẮT ĐƯỢC TỪ [DONE_WITH_ERROR]
