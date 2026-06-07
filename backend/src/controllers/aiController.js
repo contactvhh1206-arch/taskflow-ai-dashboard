@@ -131,9 +131,13 @@ const chatStreamHandler = async (req, res) => {
             const lowerMsg = message.toLowerCase();
             
             if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || lowerMsg.includes('báo cáo')) {
-                const revData = await aiService.processToolCall('fetch_financial_reports', { limit: 1000 }, userContext);
+                let targetMonth = null;
+                const monthMatch = lowerMsg.match(/tháng\s*(\d{1,2})/);
+                if (monthMatch) targetMonth = parseInt(monthMatch[1], 10);
+                
+                const revData = await aiService.processToolCall('fetch_revenue_summary', { month: targetMonth }, userContext);
                 if (!revData.includes('Không có dữ liệu')) {
-                    dbContextStr += "\n\n[DỮ LIỆU DOANH THU THỰC TẾ]:\n" + revData;
+                    dbContextStr += "\n\n[DỮ LIỆU DOANH THU THỰC TẾ (TỔNG KẾT TỪ DASHBOARD)]:\n" + revData;
                 }
             }
             
