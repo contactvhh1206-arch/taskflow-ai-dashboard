@@ -4,9 +4,14 @@ const pool = require('../config/database');
 const getTasksHandler = async (req, res) => {
     try {
         // Thu thập tham số đầu vào. Mọi lỗ hổng phân quyền facility_id ĐÃ BỊ GUARD CHẶN TỪ TRƯỚC.
-        const facilityId = req.query.facility_id || null;
-        const departmentCode = req.user.department_code || null;
+        let facilityId = req.query.facility_id || null;
+        let departmentCode = req.user.department_code || null;
         const status = req.query.status || null;
+        
+        if (req.user.role === 'FACILITY_MANAGER') {
+            facilityId = req.user.facility_id || facilityId;
+            departmentCode = null;
+        }
         
         // Toán học phân trang
         const page = parseInt(req.query.page, 10) || 1;
@@ -47,11 +52,16 @@ const getTasksHandler = async (req, res) => {
 
 const getTasksHistoryHandler = async (req, res) => {
     try {
-        const facilityId = req.query.facility_id || null;
-        const departmentCode = req.user.department_code || null;
+        let facilityId = req.query.facility_id || null;
+        let departmentCode = req.user.department_code || null;
         const picId = req.query.pic_id || null;
         const dateFrom = req.query.date_from || null;
         const dateTo = req.query.date_to || null;
+
+        if (req.user.role === 'FACILITY_MANAGER') {
+            facilityId = req.user.facility_id || facilityId;
+            departmentCode = null;
+        }
         
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 50;

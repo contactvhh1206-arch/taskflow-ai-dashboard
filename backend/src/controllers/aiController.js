@@ -558,17 +558,17 @@ Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" 
 
                // FALLBACK (Nếu AI không mò ra tên, hoặc Khớp tên thất bại)
                if (finalPicId === null) {
-                   // Tìm thẳng Quản lý cơ sở (role_id = 6) trong bộ nhớ đệm
+                   // TAm th3ng Qun lA c sY (role_id = 6) trong bT nh> `m
                    const facilityManager = cachedUsers.find(u => u.role_id === 6);
                    
                    if (facilityManager) {
                        finalPicId = facilityManager.id;
                        finalPicName = facilityManager.full_name;
                    } else {
-                       // Tối ưu chống crash: Cơ sở chưa có Quản lý
-                       console.warn(`[Auto-Tasking] Cảnh báo: Cơ sở ${mappedFacilityId} không có Facility Manager (role_id=6)`);
+                       // T`i u ch`ng crash: C sY cha cA3 Qun lA
+                       console.warn(`[Auto-Tasking] Cnh bAo: C sY ${mappedFacilityId} khA'ng cA3 Facility Manager (role_id=6)`);
                        finalPicId = null; 
-                       finalPicName = t.pic || ""; // Giữ nguyên tên gốc hoặc để trống
+                       finalPicName = t.pic || ""; // Gi_ nguyAn tAn g`c hoc ` tr`ng
                    }
                }
 
