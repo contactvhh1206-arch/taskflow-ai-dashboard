@@ -220,7 +220,26 @@ const createTaskHandler = async (req, res) => {
 
         const newTaskRow = await taskService.createNewTask(taskPayload);
 
-        res.status(201).json({ success: true, data: newTaskRow });
+        // Fetch fully hydrated task to send back to frontend
+        const { rows } = await pool.query(`
+            SELECT pt.id, pt.title, pt.description as desc, pt.status, pt.urgency as urgent, 
+                   TO_CHAR(pt.deadline, 'YYYY-MM-DD"T"HH24:MI') as deadline, 
+                   pt.created_at as "createdAt", pt.updated_at as "completedAt",
+                   pt.needs_support as "needsSupport",
+                   CASE WHEN pt.priority_level = '5' OR pt.priority_level = '3' THEN 5 WHEN pt.priority_level = '2' THEN 3 ELSE 0 END as priority_stars,
+                   u.full_name as pic, u.email as "picId", pt.pic_id,
+                   pt.created_by as "createdBy", pt.created_by_role as "creator_role",
+                   f.name as facility, f.code as "facilityId",
+                   pt.facility_id as "facilityRawId",
+                   pt.department_code as "department_tag",
+                   0 as comment_count
+            FROM tasks pt
+            LEFT JOIN users u ON pt.pic_id = u.id
+            LEFT JOIN facilities f ON pt.facility_id = f.id
+            WHERE pt.id = $1
+        `, [newTaskRow.id]);
+
+        res.status(201).json({ success: true, data: rows[0] });
 
     } catch (error) {
         console.error("[Controller Error - createTaskHandler]:", error.message);
