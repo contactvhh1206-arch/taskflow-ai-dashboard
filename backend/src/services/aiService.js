@@ -103,7 +103,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             
             const query = `
                 WITH AllowedFacs AS (
-                    SELECT id, name FROM facilities WHERE $1::text[] IS NULL OR id = ANY($1::text[])
+                    SELECT id::text AS id, name::text AS name FROM facilities WHERE $1::text[] IS NULL OR id::text = ANY($1::text[])
                 ),
                 RecentDates AS (
                     SELECT DISTINCT date
