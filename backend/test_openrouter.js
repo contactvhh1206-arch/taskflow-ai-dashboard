@@ -1,60 +1,35 @@
 const fetch = require('node-fetch');
 
-async function test() {
+async function run() {
     const messages = [
-        { role: 'user', content: 'doanh thu tháng 5' },
-        { 
-            role: 'assistant', 
-            content: '', 
-            tool_calls: [{
-                id: 'call_123',
-                type: 'function',
-                function: {
-                    name: 'fetch_financial_reports',
-                    arguments: '{}'
-                }
-            }]
-        },
-        {
-            role: 'tool',
-            tool_call_id: 'call_123',
-            content: '[Cơ sở: DUBAI 41] Ngày: 2026-05-31 - Doanh thu: 1000'
-        }
+        { role: "system", content: "You are an AI." },
+        { role: "user", content: "doanh thu tháng 5" },
+        { role: "assistant", content: "Dữ liệu doanh thu trong tháng 5 không được cung cấp." },
+        { role: "user", content: "vậy ngày 1 và 2 tháng 6" }
     ];
-
-    const aiService = require('./src/services/aiService');
-
-    const llmStreamPayload = {
-        model: "google/gemini-3.1-pro-preview",
-        messages: messages,
-        tools: aiService.AI_TOOLS,
-        stream: true,
-        max_tokens: 4096
-    };
-
-    console.log("Sending payload...");
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    
+    console.log("Starting fetch...");
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
             "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
             "Content-Type": "application/json"
         },
-        body: JSON.stringify(llmStreamPayload)
+        body: JSON.stringify({
+            model: "openai/gpt-3.5-turbo",
+            messages: messages,
+            stream: true,
+            max_tokens: 2000
+        })
     });
-
-    console.log("Status:", response.status);
-    if (!response.ok) {
-        console.log("Error:", await response.text());
+    console.log("Status:", res.status);
+    if (!res.ok) {
+        console.log("Error:", await res.text());
         return;
     }
-
-    const reader = response.body;
-    reader.on('data', chunk => {
-        console.log("CHUNK:", chunk.toString());
-    });
-    reader.on('end', () => {
-        console.log("END");
-    });
+    const decoder = new TextDecoder("utf-8");
+    for await (const chunk of res.body) {
+        console.log("Chunk:", decoder.decode(chunk));
+    }
 }
-
-test();
+run();

@@ -102,14 +102,20 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             const queryLimit = limit ? Math.min(limit, 1000) : 500;
             
             const query = `
-                SELECT date AS formatted_date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
-                FROM daily_financial_reports, 
-                     jsonb_array_elements(CASE WHEN jsonb_typeof(data::jsonb) = 'array' THEN data::jsonb ELSE '[]'::jsonb END) AS elem
+                WITH RecentDates AS (
+                    SELECT DISTINCT date
+                    FROM daily_financial_reports
+                    WHERE ($2::date IS NULL OR date::date >= $2::date)
+                      AND ($3::date IS NULL OR date::date <= $3::date)
+                    ORDER BY date DESC
+                    LIMIT $4
+                )
+                SELECT d.date AS formatted_date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
+                FROM daily_financial_reports d
+                JOIN RecentDates rd ON d.date = rd.date,
+                     jsonb_array_elements(CASE WHEN jsonb_typeof(d.data::jsonb) = 'array' THEN d.data::jsonb ELSE '[]'::jsonb END) AS elem
                 WHERE ($1::text[] IS NULL OR elem->>'id' = ANY($1::text[]))
-                  AND ($2::date IS NULL OR date::date >= $2::date)
-                  AND ($3::date IS NULL OR date::date <= $3::date)
-                ORDER BY date::date DESC 
-                LIMIT $4;
+                ORDER BY d.date DESC;
             `;
             
             // Xử lý lãnh đạo vs quản lý cơ sở

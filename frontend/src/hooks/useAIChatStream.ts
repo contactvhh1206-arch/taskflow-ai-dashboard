@@ -226,7 +226,20 @@ export function useAIChatStream(options?: {
       }
     } catch (error: any) {
       if (error.message === 'SERVER_INTERNAL_ERROR') {
-          if (!streamError) setStreamError("Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.");
+          const errMsg = "Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.";
+          if (!streamError) setStreamError(errMsg);
+          setMessages((prev) => {
+              const newMessages = [...prev];
+              const lastIndex = newMessages.length - 1;
+              if (lastIndex >= 0) {
+                  newMessages[lastIndex] = {
+                      ...newMessages[lastIndex],
+                      content: newMessages[lastIndex].content + `\n\n⚠️ **[LỖI API]:** ${errMsg}`,
+                      isError: true
+                  };
+              }
+              return newMessages;
+          });
       } else if (error.message === 'API_STREAM_ERROR') {
           // Lỗi đã được setStreamError
       } else if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message?.includes('429') || error.message?.includes('Failed to fetch')) {
@@ -237,7 +250,8 @@ export function useAIChatStream(options?: {
             if (lastIndex >= 0) {
                 newMessages[lastIndex] = {
                 ...newMessages[lastIndex],
-                content: newMessages[lastIndex].content + '\n\n**[LỖI KẾT NỐI STREAM]**'
+                content: newMessages[lastIndex].content + '\n\n**[LỖI KẾT NỐI STREAM]**',
+                isError: true
                 };
             }
             return newMessages;
