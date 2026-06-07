@@ -165,4 +165,87 @@ const getTasksHistory = async ({ userId, role, facilityId, departmentCode, picId
     return { totalRecords, rows };
 };
 
-module.exports = { getTasksList, getTasksHistory };
+// --- CÁC HÀM HỖ TRỢ (HELPERS) ---
+
+const getFacilityIdByNameOrCode = async (facilityNameOrCode) => {
+    const query = 'SELECT id FROM facilities WHERE code = $1 OR name = $1 LIMIT 1';
+    const { rows } = await pool.query(query, [facilityNameOrCode]);
+    return rows.length > 0 ? rows[0].id : null;
+};
+
+// Truy xuất User với logic Tách biệt: Chuẩn Regex để giữ toàn vẹn Index
+const getUserDetails = async (input) => {
+    let query = '';
+    let values = [];
+
+    // Nếu đầu vào chỉ chứa số -> Query theo ID (int4)
+    if (/^\d+$/.test(input)) {
+        query = 'SELECT id, facility_id, department_code FROM users WHERE id = $1 LIMIT 1';
+        values = [parseInt(input, 10)];
+    } 
+    // Nếu đầu vào có '@' -> Query theo Email (varchar)
+    else if (input.includes('@')) {
+        query = 'SELECT id, facility_id, department_code FROM users WHERE email = $1 LIMIT 1';
+        values = [input];
+    } 
+    // Nếu đầu vào không hợp lệ, không thực hiện truy vấn để tránh crash DB
+    else {
+        return null;
+    }
+
+    const { rows } = await pool.query(query, values);
+    return rows.length > 0 ? rows[0] : null;
+};
+
+// --- HÀM THỰC THI CHÍNH TẠO TASK ---
+
+const createNewTask = async (data) => {
+    // Lệnh INSERT hard-coded chuẩn 100% với Schema của DDL
+    // TUYỆT ĐỐI không dùng 'desc' hay 'urgent'. 
+    // Đã thêm created_by_role (chuẩn varchar) vào SQL
+    const insertQuery = `
+      INSERT INTO tasks (
+          title, 
+          description, 
+          status, 
+          urgency, 
+          deadline, 
+          pic_id, 
+          facility_id, 
+          department_code, 
+          priority_level, 
+          created_by, 
+          created_by_role, 
+          created_at, 
+          updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+      RETURNING *;
+    `;
+    
+    // Mảng map theo đúng thứ tự 11 tham số ($1 -> $11)
+    const values = [
+        data.title, 
+        data.description, 
+        data.status, 
+        data.urgency, 
+        data.deadline, 
+        data.pic_id, 
+        data.facility_id,
+        data.department_code,
+        data.priority_level,
+        data.created_by,
+        data.created_by_role
+    ];
+
+    const { rows } = await pool.query(insertQuery, values);
+    return rows[0];
+};
+
+module.exports = { 
+    getTasksList, 
+    getTasksHistory, 
+    getFacilityIdByNameOrCode, 
+    getUserDetails, 
+    createNewTask 
+};

@@ -88,4 +88,127 @@ const getTasksHistoryHandler = async (req, res) => {
     }
 };
 
-module.exports = { getTasksHandler, getTasksHistoryHandler };
+const createTaskHandler = async (req, res) => {
+    try {
+        const { title, desc, pic_id, pic, deadline, status, urgent, facility, department_code, facility_id } = req.body;
+        
+        // --- 1. ÉP KIỂU STRICT (INT4) & CHUẨN HOÁ DỮ LIỆU ---
+        let rawFacility = facility_id || facility;
+        let insert_facility_id = parseInt(rawFacility, 10);
+        if (isNaN(insert_facility_id)) {
+            insert_facility_id = null;
+        }
+
+        let insert_dept_code = department_code;
+        if (insert_dept_code === "" || insert_dept_code === undefined) {
+            insert_dept_code = null;
+        }
+
+        // --- 2. KIỂM SOÁT RBAC (ROLE-BASED ACCESS CONTROL) KHẮT KHE ---
+        const GLOBAL_DEPTS = ['MARKETING', 'FINANCE', 'HQ', 'IT', 'HR', 'BGD'];
+        const userRole = req.user.role;
+        
+        // Biến xác định nhóm All-Access (Tuyệt đối không có ADMIN ở đây)
+        const isAllAccess = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT'].includes(userRole) 
+                            || (userRole === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING');
+
+        if (userRole === 'FACILITY_MANAGER') {
+            insert_facility_id = parseInt(req.user.facility_id, 10);
+            insert_dept_code = null;
+        } 
+        else if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(userRole) && !isAllAccess) {
+            insert_facility_id = null;
+            insert_dept_code = req.user.department_code;
+        }
+        else if (isAllAccess) {
+            const upperFacility = rawFacility ? String(rawFacility).toUpperCase() : '';
+            if (GLOBAL_DEPTS.includes(upperFacility)) {
+                insert_dept_code = upperFacility;
+                insert_facility_id = null;
+            } else {
+                if (insert_facility_id === null && rawFacility && rawFacility !== 'ALL' && rawFacility !== 'HQ') {
+                    const dbFacId = await taskService.getFacilityIdByNameOrCode(rawFacility);
+                    insert_facility_id = dbFacId;
+                }
+            }
+        }
+        else {
+            // Nhân viên thường (Local Staff)
+            if (req.user.facility_id) {
+                insert_facility_id = parseInt(req.user.facility_id, 10);
+                insert_dept_code = null;
+            } else if (req.user.department_code) {
+                insert_facility_id = null;
+                insert_dept_code = req.user.department_code;
+            } else {
+                insert_facility_id = null;
+                insert_dept_code = null;
+            }
+        }
+
+        // BỨC TƯỜNG ZERO TRUST TỐI HẬU
+        if (insert_facility_id === null) {
+            if (!isAllAccess && !insert_dept_code) {
+                return res.status(403).json({ 
+                    success: false, 
+                    error: "LỖI ZERO TRUST: Dữ liệu định danh khu vực bị hỏng. Bạn không có quyền khởi tạo công việc ở cấp độ toàn cục!" 
+                });
+            }
+        }
+
+        // --- 3. ĐỊNH DANH ƯU TIÊN VÀ NGƯỜI NHẬN VIỆC (PIC) ---
+        let priorityLevel = 'LOW';
+        if (userRole === 'SUPER_ADMIN') priorityLevel = 'CRITICAL';
+        else if (userRole === 'VICE_PRESIDENT') priorityLevel = 'HIGH';
+        else if (userRole === 'FACILITY_MANAGER' || userRole === 'DEPARTMENT_HEAD') priorityLevel = 'MEDIUM';
+
+        const input_pic_id = pic_id || pic;
+        let final_pic_id = null;
+
+        if (input_pic_id) { 
+            const foundPic = await taskService.getUserDetails(input_pic_id);
+            if (!foundPic) {
+                return res.status(404).json({ success: false, error: "Lỗi: Người phụ trách (PIC) không tồn tại hoặc đã nghỉ việc!" });
+            }
+            
+            final_pic_id = foundPic.id;
+            
+            if (!isAllAccess) {
+                if (req.user.facility_id) {
+                    if (foundPic.facility_id !== parseInt(req.user.facility_id, 10)) {
+                        return res.status(403).json({ success: false, error: "Lỗi 403: Không được phép gán việc cho nhân sự ngoài cơ sở!" });
+                    }
+                } else if (req.user.department_code) {
+                    if (String(foundPic.department_code || '').toLowerCase() !== String(req.user.department_code || '').toLowerCase()) {
+                        return res.status(403).json({ success: false, error: "Lỗi 403: Không được phép gán việc cho nhân sự ngoài phòng ban!" });
+                    }
+                }
+            }
+        }
+
+        // --- 4. CHUẨN BỊ PAYLOAD VÀ CHỌC XUỐNG SERVICE ---
+        const taskPayload = {
+            title: title, 
+            description: desc || '', 
+            status: status || 'todo', 
+            urgency: urgent === true || urgent === 'true', 
+            deadline: deadline, 
+            pic_id: final_pic_id, 
+            facility_id: insert_facility_id,
+            department_code: insert_dept_code,
+            priority_level: priorityLevel, 
+            created_by: parseInt(req.user.id, 10),
+            created_by_role: userRole 
+        };
+
+        const newTaskRow = await taskService.createNewTask(taskPayload);
+
+        res.status(201).json({ success: true, data: newTaskRow });
+
+    } catch (error) {
+        console.error("[Controller Error - createTaskHandler]:", error.message);
+        res.status(500).json({ success: false, error: 'Đã xảy ra lỗi máy chủ trong quá trình lưu công việc. Vui lòng thử lại.' });
+    }
+};
+
+module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler };
