@@ -110,11 +110,12 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                     ORDER BY date DESC
                     LIMIT $4
                 )
-                SELECT d.date AS formatted_date, elem->>'revenue' AS revenue_amount, elem->>'name' AS facility_name
+                SELECT d.date AS formatted_date, SUM(CAST(elem->>'revenue' AS NUMERIC)) AS revenue_amount, elem->>'name' AS facility_name
                 FROM daily_financial_reports d
                 JOIN RecentDates rd ON d.date = rd.date,
                      jsonb_array_elements(CASE WHEN jsonb_typeof(d.data::jsonb) = 'array' THEN d.data::jsonb ELSE '[]'::jsonb END) AS elem
                 WHERE ($1::text[] IS NULL OR elem->>'id' = ANY($1::text[]))
+                GROUP BY d.date, elem->>'name'
                 ORDER BY d.date DESC;
             `;
             
@@ -136,7 +137,20 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 return "Hệ thống báo cáo: Không có dữ liệu doanh thu cho khoảng thời gian này.";
             }
 
-            let resultLines = [];
+            // Tự động tính tổng kỳ bằng Javascript
+            const summary = {};
+            for (const r of rows) {
+                if (!summary[r.facility_name]) summary[r.facility_name] = 0;
+                summary[r.facility_name] += Number(r.revenue_amount || 0);
+            }
+
+            let resultLines = ["=== TỔNG DOANH THU TRONG KỲ (AI HÃY ƯU TIÊN DÙNG SỐ NÀY ĐỂ BÁO CÁO) ==="];
+            for (const [fac, total] of Object.entries(summary)) {
+                resultLines.push(`- Cơ sở: ${fac} | TỔNG DOANH THU: ${total} VNĐ`);
+            }
+            resultLines.push("======================================================================");
+            resultLines.push("=== CHI TIẾT DOANH THU TỪNG NGÀY ===");
+
             for (const r of rows) {
                 resultLines.push(`[Cơ sở: ${r.facility_name}] Ngày: ${r.formatted_date} - Doanh thu: ${r.revenue_amount || 0} VNĐ`);
             }
