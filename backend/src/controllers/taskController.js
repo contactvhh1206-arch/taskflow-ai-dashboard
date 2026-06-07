@@ -180,11 +180,14 @@ const createTaskHandler = async (req, res) => {
         let final_pic_id = null;
 
         if (input_pic_id) { 
-            const foundPic = await taskService.getUserDetails(input_pic_id);
-            if (!foundPic) {
-                return res.status(404).json({ success: false, error: "Lỗi: Người phụ trách (PIC) không tồn tại hoặc đã nghỉ việc!" });
-            }
+            // Lọc sạch rác từ Frontend, chỉ giữ lại tên/email gốc (VD: "dbace (QL)" -> "dbace")
+            const clean_pic_input = String(input_pic_id).replace(/\s*\(.*?\)\s*/g, '').trim();
             
+            const foundPic = await taskService.getUserDetails(clean_pic_input);
+            // TRẢ LẠI CỜ 404 BẢO MẬT: Không tìm thấy người thì ném lỗi, không được gán null mù quáng!
+            if (!foundPic) {
+                return res.status(404).json({ success: false, error: "Lỗi: Người phụ trách (PIC) không tồn tại hoặc dữ liệu sai lệch!" });
+            }
             final_pic_id = foundPic.id;
             
             if (!isAllAccess) {

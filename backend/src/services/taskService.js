@@ -176,22 +176,17 @@ const getFacilityIdByNameOrCode = async (facilityNameOrCode) => {
 
 // Truy xuất User với logic Tách biệt: Chuẩn Regex để giữ toàn vẹn Index
 const getUserDetails = async (input) => {
+    if (!input) return null;
     let query = '';
-    let values = [];
+    let values = [input];
 
     // Nếu đầu vào chỉ chứa số -> Query theo ID (int4)
     if (/^\d+$/.test(input)) {
         query = 'SELECT id, facility_id, department_code FROM users WHERE id = $1 LIMIT 1';
         values = [parseInt(input, 10)];
-    } 
-    // Nếu đầu vào có '@' -> Query theo Email (varchar)
-    else if (input.includes('@')) {
-        query = 'SELECT id, facility_id, department_code FROM users WHERE email = $1 LIMIT 1';
-        values = [input];
-    } 
-    // Nếu đầu vào không hợp lệ, không thực hiện truy vấn để tránh crash DB
-    else {
-        return null;
+    } else {
+        // Gỡ bỏ luật @. Quét cả email và full_name
+        query = 'SELECT id, full_name, facility_id, department_code FROM users WHERE email = $1 OR full_name = $1 LIMIT 1';
     }
 
     const { rows } = await pool.query(query, values);
