@@ -163,7 +163,21 @@ export function useAIChatStream(options?: {
                   setIsThinking(false);
                   setIsStreaming(false);
                   isStreamingRef.current = false;
-                  throw new Error('API_STREAM_ERROR');
+                  
+                  // Chèn lỗi vào bong bóng AI hiện tại để tránh "bong bóng tàng hình" và giữ luồng chat liền mạch
+                  setMessages((prev) => {
+                      const newMessages = [...prev];
+                      const lastIndex = newMessages.length - 1;
+                      if (lastIndex >= 0 && newMessages[lastIndex].role === 'assistant') {
+                          newMessages[lastIndex] = {
+                              ...newMessages[lastIndex],
+                              content: newMessages[lastIndex].content + `\n\n⚠️ **[LỖI API]:** ${errorDetail}`,
+                              isError: true
+                          };
+                      }
+                      return newMessages;
+                  });
+                  break; // Ngắt vòng lặp đọc chunk thay vì throw Error
               }
 
               const contentStr = data?.choices?.[0]?.delta?.content || data?.content || data?.text || '';

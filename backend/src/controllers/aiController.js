@@ -204,7 +204,13 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
                         
                         try {
                             const data = JSON.parse(dataStr);
-                            if (data.error) throw new Error(data.error.message || "Unknown error");
+                            if (data.error) {
+                                console.error("[OpenRouter Stream Error]:", data.error);
+                                res.write(`data: ${JSON.stringify({ error: typeof data.error === 'string' ? data.error : (data.error.message || "Lỗi API AI") })}\n\n`);
+                                res.write('data: [DONE]\n\n');
+                                res.end();
+                                return; // Thoát hẳn để kết thúc stream
+                            }
                             
                             if (data.choices && data.choices.length > 0) {
                                 const chunkText = data.choices[0].delta?.content || "";
@@ -214,7 +220,9 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
                                 }
                             }
                         } catch (e) {
-                            // Ignore small chunk parse errors
+                            if (e.message !== "Unexpected end of JSON input" && !e.message.includes("Unexpected token")) {
+                                console.error("[Chunk Processing Error]:", e.message, "Data:", dataStr);
+                            }
                         }
                     }
                 }
