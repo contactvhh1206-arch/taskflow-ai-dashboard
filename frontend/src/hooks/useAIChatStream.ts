@@ -204,13 +204,8 @@ export function useAIChatStream(options?: {
                   setIsStreaming(false);
                   isStreamingRef.current = false;
                   
-                  // Bóp chết luồng treo (Kill Switch)
-                  if (abortControllerRef.current) {
-                      abortControllerRef.current.abort();
-                  }
-                  
-                  // Thay lệnh continue; bằng lệnh break; để văng ra khỏi vòng lặp đọc stream
-                  break; 
+                  // Ném lỗi để thoát thẳng ra Outer Catch, ngăn chặn khối if (done) hoặc AbortError đè lỗi
+                  throw new Error('API_STREAM_ERROR');
               }
 
               // Sử dụng Optional Chaining an toàn để lấy chuỗi Stream
@@ -280,6 +275,11 @@ export function useAIChatStream(options?: {
           }
           setStreamingText('');
           streamingTextRef.current = '';
+      }
+      // 1.5. NẾU BẮT ĐƯỢC LỖI TRỰC TIẾP TỪ OPENROUTER/API (Ném từ trong parse)
+      else if (error.message === 'API_STREAM_ERROR') {
+          console.error('[Luồng Thép AI] Ngắt luồng do API LLM trả về lỗi. Lỗi nguyên thủy đã được bảo tồn.');
+          // Đã gọi setStreamError ở trên, không làm gì thêm để bảo vệ thông báo lỗi.
       }
       // 2. CHỈ HIỂN THỊ "LỖI MẠNG / DDoS" KHI MẤT KẾT NỐI HOẶC BỊ RATE LIMIT THẬT SỰ
       else if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message.includes('429') || error.message === 'Failed to fetch') {

@@ -446,12 +446,13 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             }
 
             // [CHUẨN MỰC OPENAI]: Truyền mảng messages nguyên gốc (giữ nguyên tool_calls và tool_call_id).
-            // KHÔNG Flatten, KHÔNG độ chế rác System Prompt để model Reasoning không bị ảo giác.
+            // BẮT BUỘC TRUYỀN TOOLS VÀ tool_choice: "none" ĐỂ OPENROUTER KHÔNG BÁO LỖI 400 MÀ VẪN ÉP ĐƯỢC MODEL CHỐT HẠ BẰNG TEXT.
             
             const llmStreamPayload = {
                 model: aiModel,
                 messages: messages,
-                // KHÔNG TRUYỀN TOOLS VÀO ĐÂY NỮA ĐỂ ÉP MODEL CHỐT HẠ BẰNG TEXT
+                tools: aiService.AI_TOOLS,
+                tool_choice: "none",
                 stream: true,
                 max_tokens: 4096
             };
@@ -525,13 +526,7 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                     
                                     if (data.error) {
                                         console.error('[OPENROUTER STREAM ERROR]:', data.error);
-                                        if (isClientConnected) {
-                                            res.write(`data: ${JSON.stringify({ error: "Lỗi từ OpenRouter/Model: " + (data.error.message || "Unknown error") })}\n\n`);
-                                            res.write('data: [DONE]\n\n');
-                                            res.end();
-                                        }
-                                        if (controller2 && typeof controller2.abort === 'function') controller2.abort();
-                                        throw new Error("STREAM_API_ERROR");
+                                        throw new Error("API_STREAM_ERROR");
                                     }
 
                                     if (data.choices && data.choices.length > 0) {
@@ -568,13 +563,19 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                                     }
                                 } catch (e) {
                                     console.error('[STREAM PARSE ERROR] Đã bảo vệ luồng:', e.message);
+                                    if (e.message === "API_STREAM_ERROR") throw e;
                                 }
                             }
                         }
                     }
                 }
             } catch (err) {
-                 if (err.message !== "KILL_SWITCH_TRIGGERED") throw err;
+                 if (err.message !== "KILL_SWITCH_TRIGGERED" && err.message !== "API_STREAM_ERROR") throw err;
+                 if (err.message === "API_STREAM_ERROR") {
+                    res.write(`data: ${JSON.stringify({ error: "Sự cố API LLM (Stream Error). Vui lòng thử lại." })}\n\n`);
+                    res.write('data: [DONE]\n\n');
+                    res.end();
+                 }
             } finally {
                 clearTimeout(timeoutId2);
                 
