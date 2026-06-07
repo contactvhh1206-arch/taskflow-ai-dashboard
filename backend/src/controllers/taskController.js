@@ -91,10 +91,10 @@ const getTasksHistoryHandler = async (req, res) => {
 
 const createTaskHandler = async (req, res) => {
     try {
-        const { title, desc, pic_id, pic, deadline, status, urgent, facility, department_code, facility_id } = req.body;
+        const { title, desc, pic_id, picId, pic, deadline, status, urgent, facility, facilityId, department_code, facility_id } = req.body;
         
         // --- 1. ÉP KIỂU STRICT (INT4) & CHUẨN HOÁ DỮ LIỆU ---
-        let rawFacility = facility_id || facility;
+        let rawFacility = facility_id || facilityId || facility;
         let insert_facility_id = parseInt(rawFacility, 10);
         if (isNaN(insert_facility_id)) {
             insert_facility_id = null;
@@ -166,7 +166,7 @@ const createTaskHandler = async (req, res) => {
         else if (userRole === 'VICE_PRESIDENT') priorityLevel = 'HIGH';
         else if (userRole === 'FACILITY_MANAGER' || userRole === 'DEPARTMENT_HEAD') priorityLevel = 'MEDIUM';
 
-        const input_pic_id = pic_id || pic;
+        const input_pic_id = pic_id || picId || pic;
         let final_pic_id = null;
 
         if (input_pic_id) { 
