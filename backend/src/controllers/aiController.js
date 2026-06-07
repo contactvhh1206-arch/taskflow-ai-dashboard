@@ -129,6 +129,9 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
 
         if (isNewSession && isClientConnected) {
             res.write(`data: ${JSON.stringify({ sessionId: sessionId })}\n\n`);
+        } else if (isClientConnected) {
+            // Gửi heartbeat để đảm bảo kết nối SSE được mở ngay lập tức, chống timeout
+            res.write(`: heartbeat\n\n`);
         }
 
         const { rows: historyRows } = await pool.query(`
@@ -144,16 +147,27 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
 
         const messages = [ { role: "system", content: systemPrompt } ];
 
+        let lastRole = "system";
         for (const msg of historyRows) {
             if (msg.role === 'assistant' || msg.role === 'user') {
                 if (msg.content && msg.content.trim() !== "") {
-                    messages.push({ role: msg.role, content: msg.content });
+                    if (msg.role !== lastRole) {
+                        messages.push({ role: msg.role, content: msg.content });
+                        lastRole = msg.role;
+                    } else {
+                        // Merge content if role is the same
+                        messages[messages.length - 1].content += "\n\n" + msg.content;
+                    }
                 }
             }
         }
         
         if (messages.length === 1 || messages[messages.length - 1].content !== message) {
-            messages.push({ role: 'user', content: message });
+            if (messages[messages.length - 1].role === 'user') {
+                messages[messages.length - 1].content += "\n\n" + message;
+            } else {
+                messages.push({ role: 'user', content: message });
+            }
         }
 
         const openRouterKey = process.env.OPENROUTER_API_KEY;
