@@ -135,9 +135,14 @@ const chatStreamHandler = async (req, res) => {
                 const monthMatch = lowerMsg.match(/tháng\s*(\d{1,2})/);
                 if (monthMatch) targetMonth = parseInt(monthMatch[1], 10);
                 
-                const revData = await aiService.processToolCall('fetch_revenue_summary', { month: targetMonth }, userContext);
-                if (!revData.includes('Không có dữ liệu')) {
-                    dbContextStr += "\n\n[DỮ LIỆU DOANH THU THỰC TẾ (TỔNG KẾT TỪ DASHBOARD)]:\n" + revData;
+                const revSummary = await aiService.processToolCall('fetch_revenue_summary', { month: targetMonth }, userContext);
+                if (!revSummary.includes('Không có dữ liệu')) {
+                    dbContextStr += "\n\n[DỮ LIỆU TỔNG DOANH THU CHUẨN (TỪ DASHBOARD)]:\n" + revSummary;
+                }
+
+                const revDetails = await aiService.processToolCall('fetch_financial_reports', { limit: 1000 }, userContext);
+                if (!revDetails.includes('Không có dữ liệu')) {
+                    dbContextStr += "\n\n[CHI TIẾT DOANH THU THEO TỪNG NGÀY]:\n" + revDetails;
                 }
             }
             
@@ -210,7 +215,7 @@ Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi
         }
 
         const openRouterKey = process.env.OPENROUTER_API_KEY;
-        const aiModel = req.body.model || process.env.DEFAULT_AI_MODEL || "openai/gpt-3.5-turbo";
+        const aiModel = req.body.model || process.env.DEFAULT_AI_MODEL || "google/gemini-3.1-pro-preview";
 
         const llmPayload = {
             model: aiModel,
