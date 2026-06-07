@@ -1,5 +1,5 @@
 const taskService = require('../services/taskService');
-const pool = require('../config/db');
+const pool = require('../config/database');
 
 const getTasksHandler = async (req, res) => {
     try {
