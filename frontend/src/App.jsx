@@ -867,8 +867,8 @@ function MainDashboard() {
       if (hasFatalError) break; // Kích hoạt ngắt mạch nếu có lỗi trước đó
 
       try {
-        let resolvedPicId = draft.pic === "" ? null : user.id;
-        if (draft.pic && draft.pic !== user.name) {
+        let resolvedPicId = draft.pic_id || null;
+        if (!resolvedPicId && draft.pic && draft.pic !== user.name) {
           const searchName = draft.pic.toLowerCase().trim();
           const normalizeString = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
           const normalizedSearch = normalizeString(draft.pic);
@@ -1059,7 +1059,8 @@ function MainDashboard() {
 
             if (isManager && user.facility_id) {
                 fetchedTasks = fetchedTasks.filter(t => 
-                    String(t.facilityId || t.facilityRawId) === String(user.facility_id) || 
+                    String(t.facilityRawId) === String(user.facility_id) || 
+                    String(t.facilityId) === String(user.facility_id) || 
                     String(t.facility) === String(user.facility_name)
                 );
             } else if (isDeptHead && user.department_code) {
