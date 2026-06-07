@@ -4,6 +4,7 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  attachment?: any;
 }
 
 export function useAIChatStream(options?: {
@@ -14,20 +15,12 @@ export function useAIChatStream(options?: {
   onStreamComplete?: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [streamingText, setStreamingText] = useState<string>('');
-  const streamingTextRef = useRef<string>('');
-  const lastUpdateRef = useRef<number>(0);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isThinking, setIsThinking] = useState<boolean>(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  
   const isStreamingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const isUserAbortedRef = useRef<boolean>(false); // Cờ theo dõi nguyên nhân ngắt luồng
-  const [streamError, setStreamError] = useState<string | null>(null);
-
-  const optionsRef = useRef(options);
-  useEffect(() => {
-    optionsRef.current = options;
-  }, [options]);
 
   const sessionIdRef = useRef<string | null>(options?.sessionId || null);
 
@@ -37,12 +30,9 @@ export function useAIChatStream(options?: {
     }
   }, [options?.sessionId]);
 
-  // Ép đồng bộ State nội bộ khi API Lịch sử trả về
   useEffect(() => {
     if (options?.initialMessages) {
       setMessages((prev) => {
-        // KHIÊN BỌC THÉP: Nếu State hiện tại (prev) đang có nhiều tin nhắn hơn Lịch sử (do User vừa chat thêm),
-        // TUYỆT ĐỐI BỎ QUA việc nạp đè để bảo vệ tin nhắn Real-time!
         if (prev.length > options.initialMessages!.length) {
           return prev;
         }
@@ -62,46 +52,37 @@ export function useAIChatStream(options?: {
   }, []);
 
   const sendMessage = useCallback(async (content: string, contextPayload: any) => {
-    // [FIX DOUBLE-FIRE]: Chặn ngay lập tức nếu luồng đang bận, KHÔNG TỰ SÁT LUỒNG CŨ
     if (isStreamingRef.current) {
-      console.warn("Luồng đang bận, từ chối gửi đúp tin nhắn.");
-      return;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     }
-
-    isUserAbortedRef.current = false; // Mở cờ trạng thái khởi tạo
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     isStreamingRef.current = true;
     setIsThinking(true);
     setIsStreaming(false);
-    setStreamError(null); // Reset lỗi cũ
+    setStreamError(null);
 
     const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}-${Math.random()}`;
 
+    // HYBRID FIX: Thêm ngay bong bóng assistant rỗng để chạy chữ
     setMessages((prev) => [
       ...prev, 
-      { id: generateId(), role: 'user', content, attachment: contextPayload?.attachment }
+      { id: generateId(), role: 'user', content, attachment: contextPayload?.attachment },
+      { id: generateId(), role: 'assistant', content: '' } 
     ]);
-    
-    setStreamingText('');
-    streamingTextRef.current = '';
-    lastUpdateRef.current = Date.now();
 
     try {
       let chatEndpoint = '';
       try {
         let rawBase = import.meta.env.VITE_API_BASE_URL?.replace(/^["']|["']$/g, '').trim();
-        
-        // AUTO-CORRECTION BỌC THÉP
         if (rawBase && !rawBase.startsWith('http')) {
-            console.warn('[CẢNH BÁO MÔI TRƯỜNG] VITE_API_BASE_URL thiếu Protocol. Hệ thống tự động gắn https://');
             rawBase = 'https://' + rawBase; 
         }
-
         const baseURL = rawBase || 'https://taskflow-ai-dashboard.onrender.com';
         chatEndpoint = new URL('/api/ai/chat-stream', baseURL).toString();
-
       } catch (err) {
         throw new Error('SYSTEM_ERROR: Trình duyệt không thể phân giải đường dẫn mạng.');
       }
@@ -135,7 +116,7 @@ export function useAIChatStream(options?: {
       let isFirstChunk = true;
       while (true) {
         const { done, value } = await reader.read();
-
+        
         if (isFirstChunk) {
             setIsThinking(false);
             setIsStreaming(true);
@@ -147,7 +128,7 @@ export function useAIChatStream(options?: {
           buffer += chunk;
         }
 
-        const lines = buffer.split(/\n/);
+        const lines = buffer.split(/\r?\n\r?\n/);
         buffer = lines.pop() || ''; 
 
         let chunkTextToAppend = '';
@@ -160,15 +141,8 @@ export function useAIChatStream(options?: {
             const dataPayload = trimmedLine.replace(/^data:\s*/, '');
             if (dataPayload === '[DONE]') continue;
             
-            // --- BƯỚC 2 FIX: BẮT CỜ LỖI SERVER TRONG QUÁ TRÌNH STREAM ---
             if (dataPayload === '[DONE_WITH_ERROR]') {
                 setStreamError("Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.");
-                
-                setStreamingText('');
-                streamingTextRef.current = '';
-                chunkTextToAppend = ''; // Dọn sạch buffer tức thời
-                
-                // Ném lỗi nội bộ để văng thẳng xuống Catch, cắt đứt hoàn toàn vòng lặp while(true)
                 throw new Error('SERVER_INTERNAL_ERROR'); 
             }
             
@@ -176,58 +150,44 @@ export function useAIChatStream(options?: {
               const data = JSON.parse(dataPayload);
               
               if (data.sessionId) {
-                  // [GIAI ĐOẠN 2]: Khóa cứng ID ngay lập tức xuống Ref để chặn đúp session ảo!
                   sessionIdRef.current = data.sessionId;
-                  
-                  if (optionsRef.current?.onSessionCreated) {
-                      optionsRef.current.onSessionCreated(data.sessionId);
+                  if (options?.onSessionCreated) {
+                      setTimeout(() => options.onSessionCreated!(data.sessionId), 0);
                   }
                   continue; 
               }
               
-              // ====================================================
-              // CHỮA BỆNH MÙ LÒA FRONTEND: BẮT LỖI TỪ API TRẢ VỀ
-              // ====================================================
-              if (data?.error) {
-                  // Ép kiểu an toàn (Do Backend trả về chuỗi trực tiếp)
-                  const errorDetail = typeof data.error === 'string' ? data.error : (data.error?.message || data.error?.type || "Lỗi Hệ thống Thần kinh AI không xác định");
-                  
-                  // Không nhét lỗi vào mảng messages nữa, tách ra UI Box riêng
+              if (data.error) {
+                  const errorDetail = typeof data.error === 'string' ? data.error : (data.error?.message || data.error?.type || "Lỗi Hệ thống AI");
                   setStreamError(`[Lỗi Hệ Thống]: ${errorDetail}`);
-                  
-                  setStreamingText('');
-                  streamingTextRef.current = '';
-                  chunkTextToAppend = ''; // Xóa buffer tạm
-                  
-                  // Ép UI tắt trạng thái Thinking & Tắt cờ Race Condition
                   setIsThinking(false);
                   setIsStreaming(false);
                   isStreamingRef.current = false;
-                  
-                  // Ném lỗi để thoát thẳng ra Outer Catch, ngăn chặn khối if (done) hoặc AbortError đè lỗi
                   throw new Error('API_STREAM_ERROR');
               }
 
-              // Sử dụng Optional Chaining an toàn để lấy chuỗi Stream
-              const chunk = data?.choices?.[0]?.delta?.content || data?.content || data?.text || '';
-              console.log('--- STREAM CHUNK ---', chunk); // [TRAP 1] BẪY LƯỚI BỘ NHỚ
-              if (chunk) {
-                  chunkTextToAppend += chunk;
+              const contentStr = data?.choices?.[0]?.delta?.content || data?.content || data?.text || '';
+              if (contentStr) {
+                  chunkTextToAppend += contentStr;
               }
             } catch (parseError) {
-              console.error('--- [TRAP 1] JSON PARSE ERROR ---', parseError, 'PAYLOAD:', dataPayload); // [TRAP 1]
               console.warn('[Luồng Thép] Bỏ qua chunk vỡ ngầm:', dataPayload);
             }
           }
         }
 
         if (chunkTextToAppend) {
-          streamingTextRef.current += chunkTextToAppend;
-          const now = Date.now();
-          if (now - lastUpdateRef.current > 50) {
-            setStreamingText(streamingTextRef.current);
-            lastUpdateRef.current = now;
-          }
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastIndex = newMessages.length - 1;
+            if (lastIndex >= 0) {
+              newMessages[lastIndex] = {
+                ...newMessages[lastIndex],
+                content: (newMessages[lastIndex].content || '') + chunkTextToAppend
+              };
+            }
+            return newMessages;
+          });
         }
 
         if (done) {
@@ -237,65 +197,41 @@ export function useAIChatStream(options?: {
                   const finalParsed = JSON.parse(finalPayload);
                   const finalContent = finalParsed.content || finalParsed.text || finalParsed.choices?.[0]?.delta?.content || "";
                   if (finalContent) {
-                      streamingTextRef.current += finalContent;
+                      setMessages((prev) => {
+                          const newMsgs = [...prev];
+                          if (newMsgs.length > 0) {
+                              newMsgs[newMsgs.length - 1].content += finalContent;
+                          }
+                          return newMsgs;
+                      });
                   }
               } catch (e) {}
            }
-           
-           const finalContentToSave = streamingTextRef.current;
-           if (finalContentToSave.trim() !== '') {
-               const finalId = generateId();
-               setMessages((prev) => [
-                 ...prev,
-                 { id: finalId, role: 'assistant', content: finalContentToSave }
-               ]);
-           }
-           
-           setStreamingText('');
-           streamingTextRef.current = '';
-           
            break;
         }
       }
     } catch (error: any) {
-      console.error('--- [TRAP 1] OUTER CATCH STREAM ERROR ---', error); // [TRAP 1]
-      const generateId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `msg-${Date.now()}`;
-
-      // 1. NẾU LÀ LỖI HỆ THỐNG NỘI BỘ HOẶC BẮT ĐƯỢC TỪ [DONE_WITH_ERROR]
       if (error.message === 'SERVER_INTERNAL_ERROR') {
-          console.error('[Luồng Thép AI] Đã ngắt luồng do Server báo lỗi 500 (Internal Error).');
-          // Fallback UI bằng Error State thay vì lưu vào DB
-          if (!streamError) {
-              setStreamError("Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.");
-          }
-          setStreamingText('');
-          streamingTextRef.current = '';
-      }
-      // 1.5. NẾU BẮT ĐƯỢC LỖI TRỰC TIẾP TỪ OPENROUTER/API (Ném từ trong parse)
-      else if (error.message === 'API_STREAM_ERROR') {
-          console.error('[Luồng Thép AI] Ngắt luồng do API LLM trả về lỗi. Lỗi nguyên thủy đã được bảo tồn.');
-          // Đã gọi setStreamError ở trên, không làm gì thêm để bảo vệ thông báo lỗi.
-      }
-      // 2. CHỈ HIỂN THỊ "LỖI MẠNG / DDoS" KHI MẤT KẾT NỐI HOẶC BỊ RATE LIMIT THẬT SỰ
-      else if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message.includes('429') || error.message === 'Failed to fetch') {
-        if (isUserAbortedRef.current) {
-           console.warn('[Luồng Thép AI] Người dùng đã chủ động dừng tạo phản hồi (Normal Behavior).');
-        } else {
-           console.error('[Luồng Thép AI] Luồng Stream bị đứt kết nối ngầm do lỗi mạng hoặc Server Rate Limit (DDoS)!');
-           setStreamError('Lỗi gián đoạn kết nối do mạng không ổn định hoặc quá tải băng thông. Vui lòng thử lại sau giây lát.');
-           setStreamingText('');
-           streamingTextRef.current = '';
-        }
-      } 
-      // 3. CÁC LỖI KHÁC (Parse JSON lỗi, HTTP status lạ...)
-      else {
-        console.error('Stream processing error:', error);
+          if (!streamError) setStreamError("Sự cố hệ thống AI nội bộ (Error 500). Vui lòng liên hệ Admin.");
+      } else if (error.message === 'API_STREAM_ERROR') {
+          // Lỗi đã được setStreamError
+      } else if (error.name === 'AbortError' || error.name === 'CanceledError' || error.message?.includes('429') || error.message?.includes('Failed to fetch')) {
+         setStreamError('Lỗi gián đoạn kết nối do mạng không ổn định hoặc quá tải băng thông. Vui lòng thử lại sau giây lát.');
+         setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastIndex = newMessages.length - 1;
+            if (lastIndex >= 0) {
+                newMessages[lastIndex] = {
+                ...newMessages[lastIndex],
+                content: newMessages[lastIndex].content + '\n\n**[LỖI KẾT NỐI STREAM]**'
+                };
+            }
+            return newMessages;
+         });
+      } else {
         setStreamError('Mạng chập chờn, luồng AI bị ngắt quãng');
-        setStreamingText('');
-        streamingTextRef.current = '';
       }
       
-      // [BỌC THÉP UI]: Mở khóa cờ Race Condition và giải phóng giao diện ngay lập tức
       setIsThinking(false);
       setIsStreaming(false);
       isStreamingRef.current = false;
@@ -305,15 +241,14 @@ export function useAIChatStream(options?: {
         isStreamingRef.current = false;
         setIsStreaming(false);
         setIsThinking(false);
-        if (optionsRef.current?.onStreamComplete) optionsRef.current.onStreamComplete();
+        if (options?.onStreamComplete) options.onStreamComplete();
         abortControllerRef.current = null;
       }
     }
-  }, []);
+  }, [options]);
 
   const stopStream = useCallback(() => {
     if (abortControllerRef.current) {
-      isUserAbortedRef.current = true; // Lệnh Khóa: Khẳng định đây là hành động chủ ý của User
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
       isStreamingRef.current = false;
@@ -324,7 +259,6 @@ export function useAIChatStream(options?: {
 
   return {
     messages,
-    streamingText,
     streamError,
     sendMessage,
     isStreaming,
