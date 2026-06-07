@@ -28,7 +28,7 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
         params.push(status);
         baseWhere += ` AND t.status = $${params.length}`;
     } else {
-        baseWhere += ` AND (t.status != 'done' OR (t.status = 'done' AND t.updated_at >= date_trunc('month', CURRENT_DATE)))`;
+        baseWhere += ` AND t.status NOT IN ('revoked', 'deleted') AND (t.status != 'done' OR (t.status = 'done' AND t.updated_at >= date_trunc('month', CURRENT_DATE)))`;
     }
 
     if (start_date) {

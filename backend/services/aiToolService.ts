@@ -87,7 +87,7 @@ const executeGetFacilityKPISummary = async (pool: Pool, aiArgs: any, user: Reque
   const query = `
     SELECT status, COUNT(id) as total_tasks 
     FROM tasks 
-    WHERE facility_id = $1 
+    WHERE facility_id = $1 AND status NOT IN ('revoked', 'deleted')
     GROUP BY status
   `;
   const params = [targetFacility];
