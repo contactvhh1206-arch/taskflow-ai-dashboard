@@ -509,12 +509,13 @@ Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" 
             
             // [MỚI] BỘ NHỚ ĐỆM (CACHING) TRƯỚC VÒNG LẶP: Truy xuất toàn bộ nhân sự của Cơ sở gốc
             let cachedUsers = [];
-            const finalFacilityId = parseSafeFacilityId(facilityId) || (req.user && req.user.facility_id ? parseInt(req.user.facility_id, 10) : null);
-            if (finalFacilityId) {
+            const targetCacheFacility = parseSafeFacilityId(facilityId) || parseSafeFacilityId(req.user.facility_id);
+            
+            if (targetCacheFacility !== null) {
                 try {
                     const { rows: usersRows } = await pool.query(
                         'SELECT id, full_name, role_id FROM users WHERE facility_id = $1',
-                        [finalFacilityId]
+                        [targetCacheFacility]
                     );
                     cachedUsers = usersRows;
                 } catch (cacheErr) {

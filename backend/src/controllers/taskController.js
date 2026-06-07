@@ -114,8 +114,10 @@ const createTaskHandler = async (req, res) => {
                             || (userRole === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING');
 
         if (userRole === 'FACILITY_MANAGER') {
-            insert_facility_id = req.user.facility_id ? parseInt(req.user.facility_id, 10) : null;
-            if (isNaN(insert_facility_id)) insert_facility_id = null;
+            insert_facility_id = parseInt(req.user.facility_id, 10);
+            if (isNaN(insert_facility_id)) {
+                return res.status(403).json({ success: false, error: 'Lỗi Zero-Trust: Không xác định được ID Cơ sở của Quản lý.' });
+            }
             insert_dept_code = null;
         } 
         else if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(userRole) && !isAllAccess) {
