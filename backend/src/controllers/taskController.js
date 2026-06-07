@@ -1,4 +1,5 @@
 const taskService = require('../services/taskService');
+const pool = require('../config/db');
 
 const getTasksHandler = async (req, res) => {
     try {
@@ -113,7 +114,8 @@ const createTaskHandler = async (req, res) => {
                             || (userRole === 'DEPARTMENT_HEAD' && req.user.department_code === 'MARKETING');
 
         if (userRole === 'FACILITY_MANAGER') {
-            insert_facility_id = parseInt(req.user.facility_id, 10);
+            insert_facility_id = req.user.facility_id ? parseInt(req.user.facility_id, 10) : null;
+            if (isNaN(insert_facility_id)) insert_facility_id = null;
             insert_dept_code = null;
         } 
         else if (['DEPARTMENT_HEAD', 'FINANCE_DEPT', 'ADMIN'].includes(userRole) && !isAllAccess) {
@@ -211,4 +213,102 @@ const createTaskHandler = async (req, res) => {
     }
 };
 
-module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler };
+const updateTaskStatusHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, evidence } = req.body;
+    const updateQuery = 'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *';
+    const { rows } = await pool.query(updateQuery, [status, id]);
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
+  }
+};
+
+const deleteTaskHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Chỉ SUPER_ADMIN mới có quyền xóa vĩnh viễn công việc.' });
+    }
+    await pool.query('DELETE FROM task_comments WHERE task_id = $1', [id]);
+    const { rowCount } = await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
+    if (rowCount === 0) return res.status(404).json({ success: false, error: 'Không tìm thấy công việc.' });
+    res.json({ success: true, message: 'Đã xóa công việc vĩnh viễn.' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Lỗi server khi xóa công việc.' });
+  }
+};
+
+const updateTaskSupportHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateQuery = 'UPDATE tasks SET needs_support = true, updated_at = NOW() WHERE id = $1 RETURNING id, title, needs_support as "needsSupport"';
+    const { rows } = await pool.query(updateQuery, [id]);
+    res.json({ success: true, message: 'Đã gửi yêu cầu hỗ trợ', data: rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi máy chủ nội bộ' });
+  }
+};
+
+const restoreTaskHandler = async (req, res) => {
+  try {
+    const taskId = req.params.id;
+    const { deadline } = req.body;
+    if (!deadline) return res.status(400).json({ success: false, error: 'Bắt buộc phải có Deadline mới để khôi phục công việc.' });
+    
+    const updateQuery = "UPDATE tasks SET status = 'todo', deadline = $1, completed_at = NULL, updated_at = NOW() WHERE id = $2 RETURNING id, title, status, deadline";
+    const { rows: updatedRows } = await pool.query(updateQuery, [deadline, taskId]);
+    
+    await pool.query('INSERT INTO task_comments (task_id, user_id, content, created_at) VALUES ($1, $2, $3, NOW())', [taskId, req.user.id, `🔄 [HỆ THỐNG]: Công việc được KHÔI PHỤC về trạng thái TODO với Deadline gia hạn tới: ${deadline}`]);
+    res.json({ success: true, data: updatedRows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Lỗi máy chủ khi khôi phục công việc.' });
+  }
+};
+
+const getTaskCommentsHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await pool.query(`
+      SELECT c.*, u.full_name as user_name, r.name as user_role 
+      FROM task_comments c 
+      LEFT JOIN users u ON c.user_id = u.id 
+      LEFT JOIN roles r ON u.role_id = r.id
+      WHERE c.task_id = $1 
+      ORDER BY c.created_at ASC
+    `, [id]);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Lỗi tải bình luận: ' + err.message });
+  }
+};
+
+const addTaskCommentHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const comment = req.body.comment || req.body.content;
+    if (!comment) return res.status(400).json({ error: 'Nội dung bình luận trống' });
+    
+    const realUserId = req.user.id;
+    const { rows } = await pool.query('INSERT INTO task_comments (task_id, user_id, content) VALUES ($1, $2, $3) RETURNING *', [id, realUserId, comment]);
+    const newCommentId = rows[0]?.id;
+    
+    if (newCommentId) {
+      const fullComment = await pool.query(`
+        SELECT c.*, u.full_name as user_name, r.name as user_role 
+        FROM task_comments c 
+        LEFT JOIN users u ON c.user_id = u.id 
+        LEFT JOIN roles r ON u.role_id = r.id 
+        WHERE c.id = $1
+      `, [newCommentId]);
+      return res.json({ success: true, data: fullComment.rows[0] });
+    } else {
+      return res.status(500).json({ success: false, error: 'Không thể tạo bình luận' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Lỗi server khi tạo bình luận.' });
+  }
+};
+
+module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler, updateTaskStatusHandler, deleteTaskHandler, updateTaskSupportHandler, restoreTaskHandler, getTaskCommentsHandler, addTaskCommentHandler };

@@ -11,4 +11,11 @@ router.get('/history', authGuard, rbacGuard, taskController.getTasksHistoryHandl
 // [MỚI] Mở lại cổng POST để khởi tạo công việc
 router.post('/', authGuard, rbacGuard, taskController.createTaskHandler);
 
+router.put('/:id/status', authGuard, rbacGuard, taskController.updateTaskStatusHandler);
+router.delete('/:id', authGuard, rbacGuard, taskController.deleteTaskHandler);
+router.put('/:id/support', authGuard, rbacGuard, taskController.updateTaskSupportHandler);
+router.patch('/:id/restore', authGuard, rbacGuard, taskController.restoreTaskHandler);
+router.get('/:id/comments', authGuard, rbacGuard, taskController.getTaskCommentsHandler);
+router.post('/:id/comments', authGuard, rbacGuard, taskController.addTaskCommentHandler);
+
 module.exports = router;
