@@ -78,8 +78,29 @@ const chatStreamHandler = async (req, res) => {
         }
     }
 
+    // CHÈN DỮ LIỆU TỰ ĐỘNG (Pre-flight RAG) THAY VÌ TOOL CALLING THEO YÊU CẦU CỦA USER
+    let dbContextStr = "";
+    try {
+        const lowerMsg = message.toLowerCase();
+        if (lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || lowerMsg.includes('báo cáo')) {
+            const revData = await aiService.processToolCall('fetch_financial_reports', { limit: 30 }, userContext);
+            if (!revData.includes('Không có dữ liệu')) {
+                dbContextStr += "\n\n[DỮ LIỆU DOANH THU THỰC TẾ]:\n" + revData;
+            }
+        }
+        
+        if (lowerMsg.includes('công việc') || lowerMsg.includes('task') || lowerMsg.includes('tiến độ') || lowerMsg.includes('chưa làm')) {
+            const taskData = await aiService.processToolCall('fetch_kanban_tasks', { limit: 50 }, userContext);
+            if (!taskData.includes('Không có công việc nào')) {
+                dbContextStr += "\n\n[DỮ LIỆU CÔNG VIỆC HIỆN TẠI]:\n" + taskData;
+            }
+        }
+    } catch (e) {
+        console.error("Lỗi chèn RAG tự động:", e.message);
+    }
+
     // PROMPT HOÀNG KIM f4605ca
-    const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userContext.role}, ID Cơ sở: ${safeFacilityId || 'N/A'}.
+    const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userContext.role}, ID Cơ sở: ${safeFacilityId || 'N/A'}.${dbContextStr ? '\n\nSau đây là dữ liệu hệ thống tự động trích xuất theo ngữ cảnh câu hỏi của người dùng (Hãy dựa vào đây để trả lời chính xác, KHÔNG YÊU CẦU USER CUNG CẤP THÊM FILE nếu dữ liệu đã đủ):' + dbContextStr : ''}
 Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi một cách tự nhiên, chuyên nghiệp. Tuyệt đối tuân thủ phân quyền và RAG context.`;
 
     res.writeHead(200, {
