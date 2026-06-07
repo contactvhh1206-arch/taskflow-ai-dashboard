@@ -75,6 +75,7 @@ export default function AIAdvisor(props) {
   }, [user?.role]);
 
   const handleStreamComplete = () => {
+    isGeneratingRef.current = false; // [BỌC THÉP UI]: Mở khóa ngay khi luồng AI kết thúc (Thành công, Lỗi mạng, Lỗi Server)
     setTimeout(() => {
         if (inputRef.current) {
             inputRef.current.focus();
@@ -99,13 +100,14 @@ export default function AIAdvisor(props) {
   const lastMsg = messages[messages.length - 1];
   const isTyping = isStreaming && lastMsg?.role === 'assistant' && !lastMsg?.content;
 
-  const [isRecording, setIsRecording] = useState(false);
+  const isRecording = useState(false)[0]; // Removed unused setter to fix potential lints, or kept as is
   const [attachment, setAttachment] = useState(null);
   const fileInputRef = React.useRef(null);
   const isSessionCreatedByMeRef = React.useRef(false);
   const isFetchingHistory = React.useRef(false);
   const isStreamingRef = React.useRef(isStreaming);
   const isTypingRef = React.useRef(isTyping);
+  const isGeneratingRef = React.useRef(false); // [BỌC THÉP UI]: Biến đồng bộ khóa ngàm chống Spam Click
 
   React.useEffect(() => {
      isStreamingRef.current = isStreaming;
@@ -300,6 +302,12 @@ export default function AIAdvisor(props) {
   }, [externalQueryTrigger]);
 
   const handleAsk = async (overrideQuery) => {
+    // KHÓA CỨNG BẰNG REF (Synchronous Check - Chống Spam Click triệt để)
+    if (isGeneratingRef.current || isSwitchingSessionRef.current) {
+        console.warn("Chặn đúp request: AI đang xử lý hoặc phiên đang chuyển.");
+        return;
+    }
+
     isSessionCreatedByMeRef.current = true; 
 
     if (isStreaming || isThinking) {
@@ -324,6 +332,9 @@ export default function AIAdvisor(props) {
         return;
     }
     
+    // Kéo cầu dao khóa UI ngay lập tức trước khi gọi hàm
+    isGeneratingRef.current = true;
+
     const userQuery = actualQuery || 'Vui lòng phân tích tệp đính kèm này.';
     
     if (inputRef.current) {
@@ -338,27 +349,26 @@ export default function AIAdvisor(props) {
         const isForbidden = forbiddenKeywords.some(kw => userQuery.toLowerCase().includes(kw));
         
         if (isForbidden) {
-          const responseContent = `Xin lỗi, tôi là Cố vấn AI riêng của cơ sở ${facilityName || 'này'}. Tôi bị hạn chế quyền truy cập và KHÔNG ĐƯỢC PHÉP cung cấp thông tin của các cơ sở khác hay phòng ban khác. Yêu cầu truy cập trái phép này đã được ghi nhận và gửi về Ban Giám Đốc.`;
-          try {
-            const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
-            violations.push({
-              id: Date.now(),
-              timestamp: new Date().toISOString(),
-              userId: user?.username || user?.id,
-              facility: facilityName,
-              query: userQuery,
-              status: 'Violation'
-            });
-            localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
-          } catch {}
-          
-          setMessages(prev => [
-            ...prev, 
-            { id: Date.now().toString(), role: 'user', content: userQuery, attachment: currentAttachment },
-            { id: (Date.now()+1).toString(), role: 'assistant', content: responseContent }
-          ]);
-          isSessionCreatedByMeRef.current = false;
-          return;
+            isGeneratingRef.current = false; // Xả khóa nếu bị chặn bởi Filter
+            setMessages(prev => [
+                ...prev,
+                { role: 'user', content: userQuery, id: crypto.randomUUID() },
+                { role: 'ai', content: '❌ [TỪ CHỐI TRUY CẬP]: Yêu cầu của bạn đã vi phạm chính sách truy vấn chéo dữ liệu cơ sở của hệ thống HUBDB AI.\nHệ thống chỉ cho phép bạn tra cứu dữ liệu thuộc thẩm quyền của cơ sở hiện tại.\n\n⚠️ LƯU Ý: Hành vi này đã được lưu vết tự động vào hệ thống giám sát hành vi của Sếp!', id: crypto.randomUUID() }
+            ]);
+            try {
+              const violations = JSON.parse(localStorage.getItem('taskflow_ai_violations') || '[]');
+              violations.push({
+                id: Date.now(),
+                timestamp: new Date().toISOString(),
+                userId: user?.username || user?.id,
+                facility: facilityName,
+                query: userQuery,
+                status: 'Violation'
+              });
+              localStorage.setItem('taskflow_ai_violations', JSON.stringify(violations));
+            } catch {}
+            isSessionCreatedByMeRef.current = false;
+            return;
         }
     }
 

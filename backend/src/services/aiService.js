@@ -31,8 +31,7 @@ const AI_TOOLS = [
                         type: "number",
                         description: "Số lượng công việc tối đa cần lấy (max 1000)"
                     }
-                },
-                additionalProperties: false
+                }
             }
         }
     },
@@ -56,8 +55,7 @@ const AI_TOOLS = [
                         type: "number",
                         description: "Số lượng báo cáo tối đa cần lấy (max 1000)"
                     }
-                },
-                additionalProperties: false
+                }
             }
         }
     }

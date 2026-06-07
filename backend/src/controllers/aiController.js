@@ -89,10 +89,13 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
     const safeSystemPrompt = process.env.SAFE_SYSTEM_PROMPT || defaultPrompt;
 
     // 2. Khởi tạo Headers chuẩn SSE (Server-Sent Events)
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.setHeader('Connection', 'keep-alive');
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no', // Bắt buộc NGINX bypass, không gom cụm dữ liệu
+        'Access-Control-Allow-Origin': '*' // Chống nghẽn CORS trên Browser
+    });
     res.flushHeaders();
 
     // 2. KHẮC PHỤC BUG 2: CỜ TRẠNG THÁI VÀ HELPER LƯU DB BẤT TỬ
@@ -252,24 +255,27 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
 
         for (const msg of validHistory) {
             let roleToPush = msg.role;
-            let contentToPush = msg.content || " ";
+            let contentToPush = msg.content || "";
             let toolsToPush = msg.tool_calls || null;
             let reasoningToPush = msg.reasoning || null;
 
+            // KHÔNG GỘP TOOL VÀO ASSISTANT NỮA. Giữ nguyên chuẩn OpenAI để OpenRouter dịch sang Gemini chính xác.
+            // Chuẩn: user -> assistant (có tool_calls) -> tool (có tool_call_id) -> assistant (text) -> user
+            
             if (roleToPush === 'tool') {
-                roleToPush = 'assistant';
-                contentToPush = msg.content ? `[Kết quả tra cứu/hành động]:\n${msg.content}` : " ";
-            }
-
-            if (roleToPush === lastRoleL1) {
-                // Nối nội dung nếu cùng Role (chống lỗi Gemini Alternating Roles)
+                const parsedMeta = safeJsonParse(msg.tool_calls, {});
+                const newMsg = { 
+                    role: 'tool', 
+                    content: contentToPush,
+                    tool_call_id: parsedMeta.tool_call_id || null,
+                    name: parsedMeta.name || "unknown_tool"
+                };
+                flattenedL1Messages.push(newMsg);
+                lastRoleL1 = 'tool';
+            } else if (roleToPush === lastRoleL1 && !toolsToPush && !(flattenedL1Messages.length > 0 && flattenedL1Messages[flattenedL1Messages.length - 1].tool_calls)) {
+                // Chỉ nối nội dung các tin nhắn liên tiếp cùng role (user/assistant) NẾU KHÔNG dính dáng tới tool_calls
+                // Điều này tự động dọn rác lịch sử (ví dụ: user click gửi 3 lần liên tiếp) để OpenRouter không báo lỗi
                 flattenedL1Messages[flattenedL1Messages.length - 1].content += "\n\n" + contentToPush;
-                if (toolsToPush) {
-                    if (!flattenedL1Messages[flattenedL1Messages.length - 1].tool_calls) {
-                        flattenedL1Messages[flattenedL1Messages.length - 1].tool_calls = [];
-                    }
-                    flattenedL1Messages[flattenedL1Messages.length - 1].tool_calls.push(...toolsToPush);
-                }
             } else {
                 const newMsg = { role: roleToPush, content: contentToPush };
                 if (toolsToPush) newMsg.tool_calls = toolsToPush;
@@ -284,15 +290,15 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
         const aiModel = req.body.model || process.env.DEFAULT_AI_MODEL || "google/gemini-3.1-pro-preview";
 
         // Thêm câu hỏi hiện tại vào mảng đã làm phẳng
-        const currentUserContent = `(Phiên làm việc: ${sessionId})\n${message}`;
-        if (lastRoleL1 === 'user') {
-            if (flattenedL1Messages.length > 0) {
-                flattenedL1Messages[flattenedL1Messages.length - 1].content += "\n\n" + currentUserContent;
-            } else {
-                flattenedL1Messages.push({ role: 'user', content: currentUserContent });
-            }
+        // [KHẮC PHỤC BUG LẶP TIN NHẮN]: User message đã được insert vào DB ở line 141 và query lên ở line 158.
+        // Nên nó đã nằm sẵn ở cuối flattenedL1Messages. Không được push thêm lần nữa!
+        if (flattenedL1Messages.length > 0 && flattenedL1Messages[flattenedL1Messages.length - 1].role === 'user') {
+            const lastMsg = flattenedL1Messages[flattenedL1Messages.length - 1];
+            // Chỉ cần chèn thêm context vào đầu tin nhắn cuối để AI phân biệt được session
+            lastMsg.content = `(Phiên làm việc: ${sessionId})\n${lastMsg.content}`;
         } else {
-            flattenedL1Messages.push({ role: 'user', content: currentUserContent });
+            // Đề phòng trường hợp lịch sử trống
+            flattenedL1Messages.push({ role: 'user', content: `(Phiên làm việc: ${sessionId})\n${message}` });
         }
 
         const llmPayload = {
@@ -305,30 +311,45 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             tool_choice: "auto"
         };
 
+        // [CẮM TRẠM KIỂM SOÁT TỪ SẾP] - In toàn bộ Payload Lượt 1 ra Console để bắt quả tang rác
+        console.log("\n================ [DEBUG L1 PAYLOAD] ================\n");
+        // Loại bỏ in API key (nếu có) và in payload một cách an toàn
+        console.log(JSON.stringify(llmPayload, null, 2));
+        console.log("\n====================================================\n");
+
         const controller1 = new AbortController();
-        const timeoutId1 = setTimeout(() => controller1.abort(), 45000); // Hạ xuống 45 giây cho Lượt 1
+        const timeoutId1 = setTimeout(() => {
+            // Chủ động quăng lỗi Timeout để catch tổng bắt được và báo về Giao diện
+            controller1.abort(new Error("LLM_TIMEOUT"));
+        }, 45000); 
 
-        const signal1 = AbortSignal.any([
-            controller1.signal,
-            reqAbortController.signal
-        ]);
+        const onReqAbort1 = () => controller1.abort();
+        reqAbortController.signal.addEventListener('abort', onReqAbort1);
 
-        const response1 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${openRouterKey}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(llmPayload),
-            signal: signal1
-        });
-        clearTimeout(timeoutId1);
+        let data1;
+        try {
+            const response1 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${openRouterKey}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(llmPayload),
+                signal: controller1.signal
+            });
 
-        if (!response1.ok) {
-            const errText = await response1.text();
-            throw new Error(`API LLM (Lượt 1) lỗi ${response1.status}: ${errText}`);
+            if (!response1.ok) {
+                const errText = await response1.text();
+                throw new Error(`API LLM (Lượt 1) lỗi ${response1.status}: ${errText}`);
+            }
+            
+            data1 = await response1.json();
+        } finally {
+            // [KIẾN TRÚC THÉP]: Mọi thao tác gỡ mìn (timeout, listener) PHẢI nằm trong finally
+            // Đảm bảo không bao giờ Memory Leak kể cả khi thành công hay văng lỗi
+            clearTimeout(timeoutId1);
+            reqAbortController.signal.removeEventListener('abort', onReqAbort1);
         }
-        const data1 = await response1.json();
         const aiMessage = data1.choices[0].message;
 
         if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
@@ -455,6 +476,9 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
             const controller2 = new AbortController();
             const timeoutId2 = setTimeout(() => controller2.abort(), 60000); // Hạ xuống 60 giây cho luồng Stream
 
+            const onReqAbort2 = () => controller2.abort();
+            reqAbortController.signal.addEventListener('abort', onReqAbort2);
+
             const startTimeL2 = Date.now();
 
             const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -468,6 +492,8 @@ TƯ DUY CHIẾN LƯỢC: Kết thúc báo cáo, LUÔN đưa ra 1-2 nhận địn
                 body: JSON.stringify(llmStreamPayload),
                 signal: controller2.signal
             });
+            
+            reqAbortController.signal.removeEventListener('abort', onReqAbort2);
 
             if (!response2.ok) {
                 clearTimeout(timeoutId2);
