@@ -7,7 +7,7 @@ const authGuard = require('../middlewares/authGuard');
 
 const getSystemAIConfig = async () => {
     return {
-        aiModel: "anthropic/claude-3.5-sonnet",
+        aiModel: "google/gemini-3.1-pro-preview",
         apiKey: process.env.OPENROUTER_API_KEY
     };
 };
@@ -23,7 +23,7 @@ router.post('/extract-revenue', express.json({limit: '50mb'}), async (req, res) 
     const systemPrompt = `Đây là bảng doanh thu. Cột 1 là Thứ, Cột 2 là Ngày. Các cột tiếp theo là Doanh thu của DB41, ACE, PQ, PA, PAV, DB01. Hãy bỏ qua các hàng tiêu đề. Đọc từ hàng có chứa ngày tháng. Trả về mảng JSON: [{"date": "DD/MM/YYYY", "revenues": {"DUBAI 41": 100000, "DUBAI ACE": 200000, "DUBAI PHÚ QUỐC": 300000, "DUBAI PA": 400000, "DUBAI PAV": 500000, "DUBAI PAK": 600000}}]`;
 
     const payload = {
-      model: "anthropic/claude-3.5-sonnet",
+      model: "google/gemini-3.1-pro-preview",
       max_tokens: 4000,
       messages: [
         {
