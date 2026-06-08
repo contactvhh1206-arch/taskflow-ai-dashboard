@@ -56,7 +56,7 @@ export const streamAIChat = async (req: Request, res: Response) => {
         facility_id: facilityId, 
         department_code: (req as any).user?.department_code || '' 
       };
-      const ragResults = await ragService.searchKnowledgeBase(message, userContext, 3);
+      const ragResults = await ragService.searchKnowledgeBase(message, userContext, 50);
       if (ragResults && ragResults.length > 0) {
         const ragTexts = ragResults.filter((r: any) => r.content && !r.content.startsWith('Hệ thống từ chối')).map((r: any) => r.content);
         if (ragTexts.length > 0) {
@@ -76,7 +76,7 @@ export const streamAIChat = async (req: Request, res: Response) => {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'openai/gpt-3.5-turbo', 
+        model: 'google/gemini-3.1-pro-preview', 
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
