@@ -58,7 +58,10 @@ export const streamAIChat = async (req: Request, res: Response) => {
       };
       const ragResults = await ragService.searchKnowledgeBase(message, userContext, 50);
       if (ragResults && ragResults.length > 0) {
-        const ragTexts = ragResults.filter((r: any) => r.content && !r.content.startsWith('Hệ thống từ chối')).map((r: any) => `[Ngày tạo báo cáo: ${r.created_at ? new Date(r.created_at).toLocaleDateString('vi-VN') : 'Không rõ'}]\n${r.content}`);
+        const ragTexts = ragResults.filter((r: any) => r.content && !r.content.startsWith('Hệ thống từ chối')).map((r: any) => {
+            const fileName = typeof r.metadata === 'object' ? r.metadata?.filename : (r.metadata ? JSON.parse(r.metadata).filename : 'Không rõ');
+            return `[Nguồn tài liệu: ${fileName || 'Không rõ'}]\n${r.content}`;
+        });
         if (ragTexts.length > 0) {
             ragContextStr = '\n\n[DỮ LIỆU NỘI BỘ THAM KHẢO (RAG)]:\n' + ragTexts.join('\n---\n');
         }
