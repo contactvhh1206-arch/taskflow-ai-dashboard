@@ -22,7 +22,7 @@ function getAiPermissions(user) {
     const isGlobal = role === 'SUPER_ADMIN' || 
                      role === 'VICE_PRESIDENT' || 
                      role === 'FINANCE_DEPT' ||
-                     (role === 'DEPARTMENT_HEAD' && isMarketing);
+                     isMarketing;
                      
     return {
         isGlobal,
