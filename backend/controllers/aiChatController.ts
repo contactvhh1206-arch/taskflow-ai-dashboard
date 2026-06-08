@@ -79,7 +79,7 @@ export const streamAIChat = async (req: Request, res: Response) => {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'google/gemini-3.1-pro-preview', 
+        model: 'openai/gpt-3.5-turbo', 
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
