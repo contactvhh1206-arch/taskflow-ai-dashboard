@@ -6,8 +6,13 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
 
     // Filter theo Cơ sở (Do rbacGuard truyền xuống)
     if (facilityId) {
-        params.push(facilityId);
-        baseWhere += ` AND t.facility_id = $${params.length}`;
+        if (role === 'FACILITY_MANAGER') {
+            params.push(facilityId, userId);
+            baseWhere += ` AND (t.facility_id = $${params.length - 1} OR t.pic_id = $${params.length})`;
+        } else {
+            params.push(facilityId);
+            baseWhere += ` AND t.facility_id = $${params.length}`;
+        }
     }
 
     // Filter theo Phòng ban (Nếu không xem theo cơ sở)
@@ -97,8 +102,13 @@ const getTasksHistory = async ({ userId, role, facilityId, departmentCode, picId
     const params = [];
 
     if (facilityId && facilityId !== 'ALL') {
-        params.push(facilityId);
-        baseWhere += ` AND t.facility_id = $${params.length}`;
+        if (role === 'FACILITY_MANAGER') {
+            params.push(facilityId, userId);
+            baseWhere += ` AND (t.facility_id = $${params.length - 1} OR t.pic_id = $${params.length})`;
+        } else {
+            params.push(facilityId);
+            baseWhere += ` AND t.facility_id = $${params.length}`;
+        }
     }
 
     if (departmentCode && (!facilityId || facilityId === 'ALL')) {

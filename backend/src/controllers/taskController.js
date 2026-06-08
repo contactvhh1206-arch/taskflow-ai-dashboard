@@ -190,6 +190,10 @@ const createTaskHandler = async (req, res) => {
             }
             final_pic_id = foundPic.id;
             
+            if (isAllAccess && insert_facility_id === null && foundPic.facility_id) {
+                insert_facility_id = parseInt(foundPic.facility_id, 10);
+            }
+            
             if (!isAllAccess) {
                 if (req.user.facility_id) {
                     if (foundPic.facility_id !== parseInt(req.user.facility_id, 10)) {
