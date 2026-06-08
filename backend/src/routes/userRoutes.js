@@ -9,9 +9,12 @@ const bcrypt = require('bcryptjs');
 router.get('/', authGuard, rbacGuard, async (req, res) => {
     try {
         const query = `
-            SELECT u.id, u.email as username, u.full_name as name, u.facility_id, r.name as role, (u.status = 'ACTIVE') as is_active, u.status 
+            SELECT u.id, u.email as username, u.full_name as name, 
+                   COALESCE(u.managed_facilities, to_jsonb(f.name), to_jsonb('ALL'::text)) as facility_id, 
+                   r.name as role, (u.status = 'ACTIVE') as is_active, u.status 
             FROM users u
             LEFT JOIN roles r ON u.role_id = r.id
+            LEFT JOIN facilities f ON u.facility_id = f.id
             ORDER BY u.created_at DESC
         `;
         const { rows } = await pool.query(query);
@@ -40,10 +43,27 @@ router.post('/', authGuard, rbacGuard, async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        let finalFacilityId = null;
+        let managedFacilities = null;
+
+        if (facility_id === 'ALL' || Array.isArray(facility_id)) {
+            finalFacilityId = null;
+            managedFacilities = Array.isArray(facility_id) ? JSON.stringify(facility_id) : JSON.stringify([facility_id]);
+        } else if (facility_id) {
+            if (!isNaN(parseInt(facility_id)) && facility_id.toString() === parseInt(facility_id).toString()) {
+                finalFacilityId = parseInt(facility_id);
+            } else {
+                const facRes = await pool.query('SELECT id FROM facilities WHERE name = $1', [facility_id]);
+                if (facRes.rows.length > 0) {
+                    finalFacilityId = facRes.rows[0].id;
+                }
+            }
+        }
+
         const { rows } = await pool.query(
-            `INSERT INTO users (email, password_hash, full_name, role_id, facility_id) 
-             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-            [username.trim().toLowerCase(), hashedPassword, name, role_id, facility_id]
+            `INSERT INTO users (email, password_hash, full_name, role_id, facility_id, managed_facilities) 
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+            [username.trim().toLowerCase(), hashedPassword, name, role_id, finalFacilityId, managedFacilities]
         );
 
         res.json({ success: true, data: rows[0] });
@@ -107,18 +127,33 @@ router.put('/:id', authGuard, rbacGuard, async (req, res) => {
         const { rows: roleRows } = await pool.query('SELECT id FROM roles WHERE name = $1', [role]);
         const role_id = roleRows.length > 0 ? roleRows[0].id : null;
 
-        const facilityIdStr = Array.isArray(facility_id) ? JSON.stringify(facility_id) : facility_id;
+        let finalFacilityId = null;
+        let managedFacilities = null;
+
+        if (facility_id === 'ALL' || Array.isArray(facility_id)) {
+            finalFacilityId = null;
+            managedFacilities = Array.isArray(facility_id) ? JSON.stringify(facility_id) : JSON.stringify([facility_id]);
+        } else if (facility_id) {
+            if (!isNaN(parseInt(facility_id)) && facility_id.toString() === parseInt(facility_id).toString()) {
+                finalFacilityId = parseInt(facility_id);
+            } else {
+                const facRes = await pool.query('SELECT id FROM facilities WHERE name = $1', [facility_id]);
+                if (facRes.rows.length > 0) {
+                    finalFacilityId = facRes.rows[0].id;
+                }
+            }
+        }
 
         if (req.body.password) {
             const hashedPassword = await bcrypt.hash(req.body.password, 10);
             await pool.query(
-                `UPDATE users SET full_name = $1, role_id = $2, facility_id = $3, password_hash = $4 WHERE id = $5`,
-                [name, role_id, facilityIdStr, hashedPassword, id]
+                `UPDATE users SET full_name = $1, role_id = $2, facility_id = $3, managed_facilities = $4, password_hash = $5 WHERE id = $6`,
+                [name, role_id, finalFacilityId, managedFacilities, hashedPassword, id]
             );
         } else {
             await pool.query(
-                `UPDATE users SET full_name = $1, role_id = $2, facility_id = $3 WHERE id = $4`,
-                [name, role_id, facilityIdStr, id]
+                `UPDATE users SET full_name = $1, role_id = $2, facility_id = $3, managed_facilities = $4 WHERE id = $5`,
+                [name, role_id, finalFacilityId, managedFacilities, id]
             );
         }
         res.json({ success: true });
