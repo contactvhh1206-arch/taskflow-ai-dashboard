@@ -6,7 +6,7 @@ const app = express();
 
 // 1. Khởi tạo Middlewares Mặc định
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // 1.5 Đề nổ Động cơ Cron
 require('./src/cron/aiPingJob');
