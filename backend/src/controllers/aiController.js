@@ -516,68 +516,81 @@ Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" 
         
         if (Array.isArray(extractedTasks)) {
             
-            // [MỚI] BỘ NHỚ ĐỆM (CACHING) TRƯỚC VÒNG LẶP: Truy xuất toàn bộ nhân sự của Cơ sở gốc
+            // [MỚI] BỘ NHỚ ĐỆM (CACHING) TOÀN BỘ NHÂN SỰ ĐỂ HỖ TRỢ ĐIỀU PHỐI LIÊN CƠ SỞ (SUPER ADMIN)
             let cachedUsers = [];
-            const targetCacheFacility = parseSafeFacilityId(facilityId) || parseSafeFacilityId(req.user.facility_id);
-            
-            if (targetCacheFacility !== null) {
-                try {
-                    const { rows: usersRows } = await pool.query(
-                        'SELECT id, full_name, role_id FROM users WHERE facility_id = $1',
-                        [targetCacheFacility]
-                    );
-                    cachedUsers = usersRows;
-                } catch (cacheErr) {
-                    console.error("Lỗi khi load cache Users:", cacheErr.message);
-                }
+            try {
+                const { rows: usersRows } = await pool.query(
+                    'SELECT id, full_name, role_id, facility_id FROM users'
+                );
+                cachedUsers = usersRows;
+            } catch (cacheErr) {
+                console.error("Lỗi khi load cache Users:", cacheErr.message);
             }
 
             for (let t of extractedTasks) {
                // Xử lý cơ sở
-               let mappedFacilityId = facilityId;
+               let mappedFacilityId = parseSafeFacilityId(facilityId) || parseSafeFacilityId(req.user.facility_id);
                if (t.target_facility) {
                    const { rows } = await pool.query('SELECT id FROM facilities WHERE name ILIKE $1 LIMIT 1', [`%${t.target_facility}%`]);
                    if (rows.length > 0) {
                        mappedFacilityId = rows[0].id;
                    }
                }
-               t.facility_id = mappedFacilityId;
+               
+               // Fallback lại để tương thích Frontend nếu không parse được
+               t.facility_id = mappedFacilityId || facilityId; 
                t.priority_level = t.priority_level === 'URGENT' ? 'URGENT' : 'PRIORITY';
                t.created_by_role = req.user.role;
 
-               // --- [MỚI] THUẬT TOÁN ĐIỀU PHỐI PIC CÓ CACHING ---
+               // --- [MỚI] THUẬT TOÁN ĐIỀU PHỐI PIC LIÊN CƠ SỞ ---
                let finalPicId = null;
                let finalPicName = "";
+
+               // Lọc nhân sự theo cơ sở đích (nếu xác định được)
+               const facilityUsers = mappedFacilityId 
+                   ? cachedUsers.filter(u => u.facility_id == mappedFacilityId)
+                   : cachedUsers;
 
                // Khớp tên từ AI
                if (t.pic && typeof t.pic === 'string' && t.pic.trim() !== '') {
                    const normalizedInput = normalizeName(t.pic);
                    
-                   // Lọc tất cả nhân sự khớp tên
-                   const matchedUsers = cachedUsers.filter(u => 
+                   // Lọc tất cả nhân sự khớp tên trong cơ sở đích
+                   const matchedUsers = facilityUsers.filter(u => 
                        normalizeName(u.full_name).includes(normalizedInput)
                    );
 
-                   // Chỉ gán khi tìm thấy ĐÚNG 1 người (Đảm bảo độ chính xác tuyệt đối)
+                   // Chỉ gán khi tìm thấy ĐÚNG 1 người
                    if (matchedUsers.length === 1) {
                        finalPicId = matchedUsers[0].id;
                        finalPicName = matchedUsers[0].full_name;
+                   } else if (matchedUsers.length === 0 && mappedFacilityId) {
+                       // Mở rộng tìm kiếm toàn hệ thống nếu cơ sở đích không có (trường hợp Sếp gán việc chéo)
+                       const globalMatched = cachedUsers.filter(u => 
+                           normalizeName(u.full_name).includes(normalizedInput)
+                       );
+                       if (globalMatched.length === 1) {
+                           finalPicId = globalMatched[0].id;
+                           finalPicName = globalMatched[0].full_name;
+                       }
+                   } else if (matchedUsers.length > 1 && mappedFacilityId) {
+                       // Thêm logic: Nếu có nhiều người trùng tên trong cơ sở, ưu tiên người không phải quản lý nếu có, nhưng an toàn nhất là null
+                       // Tạm thời để null nếu không xác định được đích xác
                    }
                }
 
                // FALLBACK (Nếu AI không mò ra tên, hoặc Khớp tên thất bại)
                if (finalPicId === null) {
-                   // TAm th3ng Qun lA c sY (role_id = 6) trong bT nh> `m
-                   const facilityManager = cachedUsers.find(u => u.role_id === 6);
+                   // Tìm Quản lý cơ sở (role_id = 6) trong danh sách nhân sự khả dụng
+                   const facilityManager = facilityUsers.find(u => u.role_id === 6);
                    
                    if (facilityManager) {
                        finalPicId = facilityManager.id;
                        finalPicName = facilityManager.full_name;
                    } else {
-                       // T`i u ch`ng crash: C sY cha cA3 Qun lA
-                       console.warn(`[Auto-Tasking] Cnh bAo: C sY ${mappedFacilityId} khA'ng cA3 Facility Manager (role_id=6)`);
+                       console.warn(`[Auto-Tasking] Cảnh báo: Không có Facility Manager (role_id=6)`);
                        finalPicId = null; 
-                       finalPicName = t.pic || ""; // Gi_ nguyAn tAn g`c hoc ` tr`ng
+                       finalPicName = t.pic || ""; // Giữ nguyên tên gốc hoặc để trống
                    }
                }
 
