@@ -15,9 +15,25 @@ router.get('/', authGuard, async (req, res) => {
 
 router.post('/', authGuard, async (req, res) => {
     try {
-        const data = req.body;
-        // Mock save logic to prevent 500 errors if table isn't ready
-        res.json({ success: true, data: data });
+        const payload = req.body;
+        const query = `
+            INSERT INTO daily_financial_reports (id, date, total_revenue, data, created_by, timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (date) DO UPDATE 
+            SET total_revenue = EXCLUDED.total_revenue,
+                data = EXCLUDED.data,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING *;
+        `;
+        const { rows } = await pool.query(query, [
+            payload.id,
+            payload.date,
+            payload.totalRevenue,
+            JSON.stringify(payload.data),
+            payload.createdBy,
+            payload.timestamp
+        ]);
+        res.json({ success: true, data: rows[0] });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }

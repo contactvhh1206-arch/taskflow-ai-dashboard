@@ -23,4 +23,5 @@ router.use('/ai-ping', require('./aiPingRoutes'));
 router.use('/config', require('./configRoutes'));
 router.use('/users', require('./userRoutes'));
 router.use('/rag', require('./ragRoutes'));
+router.use('/internal', require('./internalRoutes'));
 module.exports = router;
