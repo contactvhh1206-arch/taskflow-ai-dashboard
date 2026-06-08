@@ -424,7 +424,12 @@ function MainDashboard() {
   const [cursorPosition, setCursorPosition] = useState(0);
 
   const [aiSessions, setAiSessions] = useState([]);
-  const [activeAiSessionId, setActiveAiSessionId] = useState(localStorage.getItem('taskflow_active_ai_session_id') || null);
+  const [activeAiSessionId, setActiveAiSessionId] = useState(() => {
+    if (user && ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD'].includes(user.role)) {
+       return null;
+    }
+    return localStorage.getItem('taskflow_active_ai_session_id') || null;
+  });
 
   React.useEffect(() => {
     if (activeAiSessionId) {
@@ -442,7 +447,10 @@ function MainDashboard() {
            setAiSessions(res.data);
            // Auto-Select: Nếu chưa có activeSessionId và có data, chọn cái đầu tiên (mới nhất)
            if (res.data.length > 0 && !activeAiSessionId) {
-               setActiveAiSessionId(res.data[0].id);
+               const isHighLevelRole = user && ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD'].includes(user.role);
+               if (!isHighLevelRole) {
+                   setActiveAiSessionId(res.data[0].id);
+               }
            }
         }
       } catch (err) {
@@ -1061,7 +1069,8 @@ function MainDashboard() {
                 fetchedTasks = fetchedTasks.filter(t => 
                     String(t.facilityRawId) === String(user.facility_id) || 
                     String(t.facilityId) === String(user.facility_id) || 
-                    String(t.facility) === String(user.facility_name)
+                    String(t.facility) === String(user.facility_name) ||
+                    String(t.pic_id) === String(user.id)
                 );
             } else if (isDeptHead && user.department_code) {
                 fetchedTasks = fetchedTasks.filter(t => filterTaskForDeptHead(t, user, user.department_code));
