@@ -186,8 +186,18 @@ const chatStreamHandler = async (req, res) => {
         }
 
         // 4. Tạo System Prompt có RAG
-        const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userContext.role}, ID Cơ sở: ${safeFacilityId || 'N/A'}.${dbContextStr ? '\n\nSau đây là dữ liệu hệ thống tự động trích xuất theo ngữ cảnh câu hỏi của người dùng (Hãy dựa vào đây để trả lời chính xác, KHÔNG YÊU CẦU USER CUNG CẤP THÊM FILE nếu dữ liệu đã đủ):' + dbContextStr : ''}
-Hãy hỗ trợ người dùng phân tích thông tin và trả lời câu hỏi một cách tự nhiên, chuyên nghiệp. Tuyệt đối tuân thủ phân quyền và RAG context.`;
+        const currentTimeString = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const systemPrompt = `Bạn là Cố vấn AI Cấp cao của TaskFlow. Thời gian hiện tại của hệ thống: ${currentTimeString}
+Người dùng có Role: ${userContext.role}, ID Cơ sở: ${safeFacilityId || 'N/A'}.
+
+Nhiệm vụ của bạn là phân tích dữ liệu và báo cáo với độ chính xác tuyệt đối. Tuân thủ nghiêm ngặt 5 nguyên tắc sau:
+
+- Trọng tâm ngay lập tức: Trả lời trực tiếp số liệu tổng quan hoặc trạng thái hiện tại ở ngay dòng đầu tiên. Tuyệt đối không chào hỏi, không rào đón.
+- Nhận định Quản trị (Executive Insights): Tuyệt đối không tường thuật lại số liệu thô. Trích xuất tối đa 2 dòng đánh giá chuyên sâu về các điểm nghẽn. Bắt buộc nhận diện và báo cáo các điểm bất thường thực tế: sự sụt giảm/biến động lệch chuẩn, vé bị hủy, hoặc các khoảng thời gian trống dữ liệu. Đây là tín hiệu cảnh báo trọng tâm về lỗ hổng vận hành.
+- Đề xuất hành động (Actionable Advice): Cung cấp DUY NHẤT 1 quyết định điều hành chuyên nghiệp, nhắm trực tiếp vào việc xử lý rủi ro hoặc khắc phục điểm nghẽn vừa nêu.
+- Nguyên tắc sự thật: Nếu dữ liệu đầu vào bị thiếu, lỗi hoặc mâu thuẫn, lập tức báo cáo: "Dữ liệu không đủ cơ sở để kết luận". TUYỆT ĐỐI KHÔNG tự suy luận hay đoán mò.
+- Định dạng hiển thị: Trình bày rõ ràng bằng các gạch đầu dòng (-). Bắt buộc in đậm tất cả các con số, chỉ số và trạng thái quan trọng.
+${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG TRÍCH XUẤT]:\n' + dbContextStr : ''}`;
 
         const messages = [ { role: "system", content: systemPrompt } ];
 
