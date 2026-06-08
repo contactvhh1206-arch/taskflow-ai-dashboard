@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
     try {
         const { org_unit, entry_type, content, attachments, ai_vector_data, date, display_time } = req.body;
         
-        const contentJson = typeof content === 'object' ? JSON.stringify(content) : content;
+        const contentJson = typeof content === 'object' ? JSON.stringify(content) : JSON.stringify(content || "");
         const attachmentsJson = Array.isArray(attachments) ? JSON.stringify(attachments) : JSON.stringify([]);
 
         const { rows } = await pool.query(
