@@ -56,7 +56,7 @@ export const streamAIChat = async (req: Request, res: Response) => {
         facility_id: facilityId, 
         department_code: (req as any).user?.department_code || '' 
       };
-      const ragResults = await ragService.searchKnowledgeBase(message, userContext, 50);
+      const ragResults = await ragService.searchKnowledgeBase(message, userContext, 20);
       if (ragResults && ragResults.length > 0) {
         const ragTexts = ragResults.filter((r: any) => r.content && !r.content.startsWith('Hệ thống từ chối')).map((r: any) => {
             const fileName = typeof r.metadata === 'object' ? r.metadata?.filename : (r.metadata ? JSON.parse(r.metadata).filename : 'Không rõ');
@@ -84,7 +84,8 @@ export const streamAIChat = async (req: Request, res: Response) => {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        stream: true
+        stream: true,
+        max_tokens: 4000
       }),
       signal: openRouterAbortController.signal
     });
