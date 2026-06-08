@@ -16,6 +16,9 @@ router.get('/', authGuard, async (req, res) => {
 router.post('/', authGuard, async (req, res) => {
     try {
         const payload = req.body;
+        const items = Array.isArray(payload) ? payload : [payload];
+        const results = [];
+
         const query = `
             INSERT INTO daily_financial_reports (id, date, total_revenue, data, created_by, timestamp)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -25,15 +28,22 @@ router.post('/', authGuard, async (req, res) => {
                 updated_at = CURRENT_TIMESTAMP
             RETURNING *;
         `;
-        const { rows } = await pool.query(query, [
-            payload.id,
-            payload.date,
-            payload.totalRevenue,
-            JSON.stringify(payload.data),
-            payload.createdBy,
-            payload.timestamp
-        ]);
-        res.json({ success: true, data: rows[0] });
+
+        for (const item of items) {
+            const { rows } = await pool.query(query, [
+                item.id,
+                item.date,
+                item.totalRevenue,
+                JSON.stringify(item.data),
+                item.createdBy,
+                item.timestamp
+            ]);
+            if (rows.length > 0) {
+                results.push(rows[0]);
+            }
+        }
+
+        res.json({ success: true, data: Array.isArray(payload) ? results : results[0] });
     } catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
