@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 router.get('/', authGuard, rbacGuard, async (req, res) => {
     try {
         const query = `
-            SELECT u.id, u.email as username, u.full_name as name, u.facility_id, r.name as role 
+            SELECT u.id, u.email as username, u.full_name as name, u.facility_id, r.name as role, u.is_active 
             FROM users u
             LEFT JOIN roles r ON u.role_id = r.id
             ORDER BY u.created_at DESC
@@ -71,12 +71,19 @@ router.put('/:id', authGuard, rbacGuard, async (req, res) => {
         const { id } = req.params;
         const { name, role, facility_id, is_active } = req.body;
 
+        if (is_active !== undefined && !name) {
+            await pool.query('UPDATE users SET is_active = $1 WHERE id = $2', [is_active, id]);
+            return res.json({ success: true });
+        }
+
         const { rows: roleRows } = await pool.query('SELECT id FROM roles WHERE name = $1', [role]);
         const role_id = roleRows.length > 0 ? roleRows[0].id : null;
 
+        const facilityIdStr = Array.isArray(facility_id) ? JSON.stringify(facility_id) : facility_id;
+
         await pool.query(
             `UPDATE users SET full_name = $1, role_id = $2, facility_id = $3 WHERE id = $4`,
-            [name, role_id, facility_id, id]
+            [name, role_id, facilityIdStr, id]
         );
         res.json({ success: true });
     } catch (error) {

@@ -145,7 +145,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                
                // 2. GỌI API ĐỂ XÓA SẠCH DỮ LIỆU TRONG POSTGRESQL (Backend)
                try {
-                   const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/system/reset', {
+                   const res = await fetch(`${import.meta.env.VITE_API_URL}/api/system/reset`, {
                        method: 'DELETE',
                        headers: {
                            'Content-Type': 'application/json',
@@ -371,7 +371,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         let finalName = editUserName;
         
         try {
-            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${editingUser.id}`, {
+            const res = await fetch(`/api/users/${editingUser.id}`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: finalName,
@@ -383,8 +383,13 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
             if (res.ok) {
                 await fetchUsers();
                 if (showToast) showToast(`Cập nhật thành công tài khoản ${editingUser.username}`);
+            } else {
+                if (showToast) showToast('❌ Lỗi cập nhật thông tin từ Server');
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            if (showToast) showToast('❌ Không thể kết nối tới Server');
+        }
         setEditingUser(null);
       };
 
@@ -396,14 +401,20 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         const targetUser = users.find(u => u.id === userId);
         if (!targetUser) return;
         try {
-            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${userId}`, {
+            const res = await fetch(`/api/users/${userId}`, {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isActive: !targetUser.isActive })
+                body: JSON.stringify({ is_active: !targetUser.is_active })
             });
             if (res.ok) {
                 await fetchUsers();
+                if (showToast) showToast(`Đã ${!targetUser.is_active ? 'mở khóa' : 'khóa'} tài khoản thành công!`);
+            } else {
+                if (showToast) showToast('❌ Lỗi cập nhật trạng thái trên Server!');
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            if (showToast) showToast('❌ Mất kết nối tới Server!');
+        }
       };
 
       return (
@@ -562,12 +573,12 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                               </td>
                               <td className="px-5 py-4"><span className="font-medium text-xs dark:text-gray-300">{Array.isArray(u?.facility_id) ? u.facility_id.join(', ') : u?.facility_id}</span></td>
                               <td className="px-5 py-4">
-                                {u?.isActive ? <span className="bg-success/10 text-success border border-success/20 px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-success"></span>Hoạt động</span> : <span className="bg-error/10 text-error border border-error/20 px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-error"></span>Đã Khóa</span>}
+                                {u?.is_active ? <span className="bg-success/10 text-success border border-success/20 px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-success"></span>Hoạt động</span> : <span className="bg-error/10 text-error border border-error/20 px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-error"></span>Đã Khóa</span>}
                               </td>
                               <td className="px-5 py-4 text-right">
                                   <div className="flex items-center justify-end gap-2 ml-auto">
-                                    <button onClick={() => toggleUserActive(u.id)} disabled={u.id === user?.id} className={`px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1 border ${u.isActive ? 'bg-error-container text-error border-error/30 hover:bg-red-200 dark:bg-red-900/20 dark:border-red-800/30 dark:hover:bg-red-900/40' : 'bg-success/10 text-success border-success/30 hover:bg-green-200 dark:bg-green-900/20 dark:border-green-800/30 dark:hover:bg-green-900/40'} ${u.id === user?.id ? 'opacity-30 cursor-not-allowed' : ''}`}>
-                                      {u.isActive ? <><span className="material-symbols-outlined text-[14px]">lock</span> Khóa</> : <><span className="material-symbols-outlined text-[14px]">lock_open</span> Mở khóa</>}
+                                    <button onClick={() => toggleUserActive(u.id)} disabled={u.id === user?.id} className={`px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1 border ${u.is_active ? 'bg-error-container text-error border-error/30 hover:bg-red-200 dark:bg-red-900/20 dark:border-red-800/30 dark:hover:bg-red-900/40' : 'bg-success/10 text-success border-success/30 hover:bg-green-200 dark:bg-green-900/20 dark:border-green-800/30 dark:hover:bg-green-900/40'} ${u.id === user?.id ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                      {u.is_active ? <><span className="material-symbols-outlined text-[14px]">lock</span> Khóa</> : <><span className="material-symbols-outlined text-[14px]">lock_open</span> Mở khóa</>}
                                     </button>
                                     <button onClick={() => {
                                       setEditingUser(u);
