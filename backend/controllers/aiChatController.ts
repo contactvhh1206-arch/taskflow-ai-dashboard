@@ -58,7 +58,7 @@ export const streamAIChat = async (req: Request, res: Response) => {
       };
       const ragResults = await ragService.searchKnowledgeBase(message, userContext, 50);
       if (ragResults && ragResults.length > 0) {
-        const ragTexts = ragResults.filter((r: any) => r.content && !r.content.startsWith('Hệ thống từ chối')).map((r: any) => r.content);
+        const ragTexts = ragResults.filter((r: any) => r.content && !r.content.startsWith('Hệ thống từ chối')).map((r: any) => `[Ngày tạo báo cáo: ${r.created_at ? new Date(r.created_at).toLocaleDateString('vi-VN') : 'Không rõ'}]\n${r.content}`);
         if (ragTexts.length > 0) {
             ragContextStr = '\n\n[DỮ LIỆU NỘI BỘ THAM KHẢO (RAG)]:\n' + ragTexts.join('\n---\n');
         }
@@ -67,7 +67,7 @@ export const streamAIChat = async (req: Request, res: Response) => {
       console.error('Lỗi khi truy vấn RAG:', e.message);
     }
 
-    const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userRole}, ID Cơ sở: ${facilityId}. Tuyệt đối tuân thủ phân quyền và RAG context.${ragContextStr}`;
+    const systemPrompt = `Bạn là AI Agent của TaskFlow. Người dùng có Role: ${userRole}, ID Cơ sở: ${facilityId}. Hôm nay là ngày ${new Date().toLocaleDateString('vi-VN')}. Tuyệt đối tuân thủ phân quyền và lưu ý mốc thời gian của từng báo cáo trong RAG context.${ragContextStr}`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
