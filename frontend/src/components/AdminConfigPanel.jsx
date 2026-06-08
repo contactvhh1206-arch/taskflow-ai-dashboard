@@ -371,8 +371,14 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         let finalName = editUserName;
         
         try {
-            const res = await fetch(`/api/users/${editingUser.id}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            const token = localStorage.getItem('taskflow_token');
+            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${editingUser.id}`, {
+                method: 'PUT', headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': token ? `Bearer ${token}` : '',
+                  'x-user-role': user?.role || '',
+                  'x-facility-id': user?.facility_id || 'ALL'
+                },
                 body: JSON.stringify({
                     name: finalName,
                     role: finalRole,
@@ -401,8 +407,14 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         const targetUser = users.find(u => u.id === userId);
         if (!targetUser) return;
         try {
-            const res = await fetch(`/api/users/${userId}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            const token = localStorage.getItem('taskflow_token');
+            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${userId}`, {
+                method: 'PUT', headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': token ? `Bearer ${token}` : '',
+                  'x-user-role': user?.role || '',
+                  'x-facility-id': user?.facility_id || 'ALL'
+                },
                 body: JSON.stringify({ is_active: !targetUser.is_active })
             });
             if (res.ok) {

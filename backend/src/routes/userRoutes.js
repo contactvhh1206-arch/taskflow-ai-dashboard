@@ -82,10 +82,18 @@ router.put('/:id', authGuard, rbacGuard, async (req, res) => {
 
         const facilityIdStr = Array.isArray(facility_id) ? JSON.stringify(facility_id) : facility_id;
 
-        await pool.query(
-            `UPDATE users SET full_name = $1, role_id = $2, facility_id = $3 WHERE id = $4`,
-            [name, role_id, facilityIdStr, id]
-        );
+        if (req.body.password) {
+            const hashedPassword = await bcrypt.hash(req.body.password, 10);
+            await pool.query(
+                `UPDATE users SET full_name = $1, role_id = $2, facility_id = $3, password_hash = $4 WHERE id = $5`,
+                [name, role_id, facilityIdStr, hashedPassword, id]
+            );
+        } else {
+            await pool.query(
+                `UPDATE users SET full_name = $1, role_id = $2, facility_id = $3 WHERE id = $4`,
+                [name, role_id, facilityIdStr, id]
+            );
+        }
         res.json({ success: true });
     } catch (error) {
         console.error('Lỗi PUT user:', error);
@@ -93,15 +101,25 @@ router.put('/:id', authGuard, rbacGuard, async (req, res) => {
     }
 });
 
-// POST change password (có thể không dùng rbacGuard cho endpoint này)
-router.post('/change-password', authGuard, async (req, res) => {
+// PUT change password (có thể không dùng rbacGuard cho endpoint này)
+router.put('/change-password', authGuard, async (req, res) => {
     try {
-        // Hỗ trợ đổi pass cho self hoặc cho user khác (nếu là admin)
-        const { userId, newPassword } = req.body;
-        const targetUserId = userId || req.user.id;
+        const { username, currentPassword, newPassword } = req.body;
+        
+        const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [username]);
+        if (userRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Người dùng không tồn tại' });
+        }
+        
+        const user = userRes.rows[0];
+        
+        const isMatch = await bcrypt.compare(currentPassword, user.password_hash || '');
+        if (!isMatch) {
+            return res.status(400).json({ success: false, error: 'Mật khẩu hiện tại không chính xác' });
+        }
         
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPassword, targetUserId]);
+        await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPassword, user.id]);
         
         res.json({ success: true });
     } catch (error) {
