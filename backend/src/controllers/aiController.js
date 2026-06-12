@@ -1,8 +1,40 @@
 const pool = require('../config/database');
 const aiService = require('../services/aiService');
-const crypto = require('crypto'); // KHẮC PHỤC BUG 1: Import độc lập
+const crypto = require('crypto');
 const ragService = require('../services/ragService');
-// UTILITY HELPER: Tiền xử lý Sanitization 
+
+// [FIX VẤN ĐỀ 4] Cache cấu hình AI từ DB (Singleton Pattern, TTL = 5 phút)
+// Tránh gọi DB mỗi request — chỉ tải lại khi cache hết hạn hoặc chưa có
+let _aiConfigCache = null;
+let _lastCacheTime = 0;
+const AI_CONFIG_TTL = 5 * 60 * 1000; // 5 phút
+
+const getAIConfig = async () => {
+    const now = Date.now();
+    if (_aiConfigCache && (now - _lastCacheTime < AI_CONFIG_TTL)) {
+        return _aiConfigCache;
+    }
+    try {
+        const { rows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
+        const raw = rows.length > 0 ? rows[0].data : {};
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+        _aiConfigCache = {
+            // Frontend lưu vưới key là 'aiModel' (ApiConfigPanel.jsx dòng 106)
+            model: parsed.aiModel || parsed.model || process.env.DEFAULT_AI_MODEL || 'google/gemini-3.1-pro-preview',
+            apiKey: parsed.apiKey || process.env.OPENROUTER_API_KEY
+        };
+        _lastCacheTime = now;
+        return _aiConfigCache;
+    } catch (err) {
+        console.error('[getAIConfig] Lỗi đọc DB, dùng fallback:', err.message);
+        return {
+            model: process.env.DEFAULT_AI_MODEL || 'google/gemini-3.1-pro-preview',
+            apiKey: process.env.OPENROUTER_API_KEY
+        };
+    }
+};
+
+// UTILITY HELPER: Tiền xử lý Sanitization
 const parseSafeFacilityId = (facilityId) => {
     if (facilityId === undefined || facilityId === null || facilityId === 'ALL' || facilityId === '') {
         return null;
@@ -152,25 +184,58 @@ const chatStreamHandler = async (req, res) => {
             const hasConfirmationKeyword = lowerMsg.includes('ok') || lowerMsg.includes('có') || lowerMsg.includes('đồng ý') || lowerMsg.includes('xem') || lowerMsg.includes('trích xuất');
 
             if (hasRevenueKeyword || (isRevenueContext && hasConfirmationKeyword)) {
+                // [FIX VẤN ĐỀ 1] Bước 1: Xác định đúng tháng mục tiêu
+                const now = new Date();
+                const currentMonth = now.getMonth() + 1; // 1-12
+                const currentYear = now.getFullYear();
+
                 let targetMonth = null;
+                let targetYear = currentYear;
+
+                // Ưu tiên 1: Trích xuất số tháng cụ thể (VD: "tháng 5", "tháng 12")
                 const monthMatch = lowerMsg.match(/tháng\s*(\d{1,2})/);
-                if (monthMatch) targetMonth = parseInt(monthMatch[1], 10);
-                
-                const revSummary = await aiService.processToolCall('fetch_revenue_summary', { month: targetMonth }, userContext);
-                if (!revSummary.includes('Không có dữ liệu')) {
+                if (monthMatch) {
+                    targetMonth = parseInt(monthMatch[1], 10);
+                }
+
+                // Ưu tiên 2: Nhận diện từ khóa mang nghĩa "tháng này" -> gán tháng hiện tại
+                const isCurrentMonthKeyword = lowerMsg.includes('tháng này') || lowerMsg.includes('tháng hiện tại') || lowerMsg.includes('trong tháng') || lowerMsg.includes('tháng hiện hành') || lowerMsg.includes('tháng nay');
+                if (!targetMonth && isCurrentMonthKeyword) {
+                    targetMonth = currentMonth;
+                }
+
+                // Ưu tiên 3: Không có từ khóa thời gian nào -> mặc định về tháng hiện tại
+                if (!targetMonth) {
+                    targetMonth = currentMonth;
+                }
+
+                // [FIX VẤN ĐỀ 1] Bước 2: Tính toán start_date/end_date chính xác cho tháng mục tiêu
+                const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
+                const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+                const fmt = (d) => d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
+                const targetStartDate = fmt(startOfMonth);
+                const targetEndDate = fmt(endOfMonth);
+
+                const revSummary = await aiService.processToolCall('fetch_revenue_summary', { month: targetMonth, year: targetYear }, userContext);
+                if (!revSummary.includes('Không có dữ liệu') && !revSummary.includes('không có dữ liệu')) {
                     dbContextStr += "\n\n[DỮ LIỆU TỔNG DOANH THU CHUẨN (TỪ DASHBOARD)]:\n" + revSummary;
                 }
 
-                const revDetails = await aiService.processToolCall('fetch_financial_reports', { limit: 1000 }, userContext);
-                if (!revDetails.includes('Không có dữ liệu')) {
+                // [FIX VẤN ĐỀ 1] Bước 3: Truyền đúng mốc thời gian vào fetch_financial_reports,
+                // tránh để trống khiến aiService quét toàn bộ DB rồi cộng dồn sai tháng
+                const revDetails = await aiService.processToolCall('fetch_financial_reports', { start_date: targetStartDate, end_date: targetEndDate, limit: 500 }, userContext);
+                if (!revDetails.includes('Không có dữ liệu') && !revDetails.includes('không có dữ liệu')) {
                     dbContextStr += "\n\n[CHI TIẾT DOANH THU THEO TỪNG NGÀY]:\n" + revDetails;
                 }
             }
             
-            if (lowerMsg.includes('công việc') || lowerMsg.includes('task') || lowerMsg.includes('tiến độ') || lowerMsg.includes('chưa làm')) {
-                const taskData = await aiService.processToolCall('fetch_kanban_tasks', { limit: 1000 }, userContext);
+            // [FIX VẤN ĐỀ 2] Mở rộng từ khóa kích hoạt để bao gồm cả nhật ký vận hành
+            const hasTaskKeyword = lowerMsg.includes('công việc') || lowerMsg.includes('task') || lowerMsg.includes('tiến độ') || lowerMsg.includes('chưa làm');
+            const hasOpsKeyword = lowerMsg.includes('nhật ký') || lowerMsg.includes('vận hành') || lowerMsg.includes('chuyên cần') || lowerMsg.includes('ca làm') || lowerMsg.includes('thiết bị') || lowerMsg.includes('sự cố') || lowerMsg.includes('vệ sinh') || lowerMsg.includes('ktv') || lowerMsg.includes('lễ tân') || lowerMsg.includes('chấm công') || lowerMsg.includes('tổng quan');
+            if (hasTaskKeyword || hasOpsKeyword) {
+                const taskData = await aiService.processToolCall('fetch_kanban_tasks', { limit: 500 }, userContext);
                 if (!taskData.includes('Không có công việc nào')) {
-                    dbContextStr += "\n\n[DỮ LIỆU CÔNG VIỆC HIỆN TẠI]:\n" + taskData;
+                    dbContextStr += "\n\n[DỮ LIỆU CÔNG VIỆC & NHẬT KÝ VẬN HÀNH]:\n" + taskData;
                 }
             }
 
@@ -188,17 +253,19 @@ const chatStreamHandler = async (req, res) => {
 
         // 4. Tạo System Prompt có RAG
         const currentTimeString = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-        const systemPrompt = `Bạn là Cố vấn AI Cấp cao của TaskFlow. Thời gian hiện tại của hệ thống: ${currentTimeString}
-Người dùng có Role: ${userContext.role}, ID Cơ sở: ${safeFacilityId || 'N/A'}.
+        // [FIX VẤN ĐỀ 3 - NGUYÊN NHÂN 1] Làm mềm ngôn ngữ System Prompt để tránh kích hoạt
+        // Safety Filter của Gemini — từ ngữ cực đoan ("lỗ hổng vận hành", "TUYỆT ĐỐI") khiến
+        // model tự kiểm duyệt và cắt stream giữa chừng mà không báo lỗi ra ngoài
+        const systemPrompt = `Bạn là Cố vấn AI Cấp cao của TaskFlow. Thời gian hiện tại: ${currentTimeString}. Role người dùng: ${userContext.role}, Cơ sở: ${safeFacilityId || 'N/A'}.
 
-Nhiệm vụ của bạn là phân tích dữ liệu và báo cáo với độ chính xác tuyệt đối. Tuân thủ nghiêm ngặt 5 nguyên tắc sau:
+Nhiệm vụ: Phân tích dữ liệu vận hành và báo cáo chính xác theo 5 nguyên tắc:
 
-- Trọng tâm ngay lập tức: Trả lời trực tiếp số liệu tổng quan hoặc trạng thái hiện tại ở ngay dòng đầu tiên. Tuyệt đối không chào hỏi, không rào đón.
-- Nhận định Quản trị (Executive Insights): Tuyệt đối không tường thuật lại số liệu thô. Trích xuất tối đa 2 dòng đánh giá chuyên sâu về các điểm nghẽn. Bắt buộc nhận diện và báo cáo các điểm bất thường thực tế: sự sụt giảm/biến động lệch chuẩn, vé bị hủy, hoặc các khoảng thời gian trống dữ liệu. Đây là tín hiệu cảnh báo trọng tâm về lỗ hổng vận hành.
-- Đề xuất hành động (Actionable Advice): Cung cấp DUY NHẤT 1 quyết định điều hành chuyên nghiệp, nhắm trực tiếp vào việc xử lý rủi ro hoặc khắc phục điểm nghẽn vừa nêu.
-- Nguyên tắc sự thật: Nếu dữ liệu đầu vào bị thiếu, lỗi hoặc mâu thuẫn, lập tức báo cáo: "Dữ liệu không đủ cơ sở để kết luận". TUYỆT ĐỐI KHÔNG tự suy luận hay đoán mò.
-- Định dạng hiển thị: Trình bày rõ ràng bằng các gạch đầu dòng (-). Bắt buộc in đậm tất cả các con số, chỉ số và trạng thái quan trọng.
-${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG TRÍCH XUẤT]:\n' + dbContextStr : ''}`;
+1. Trả lời trực tiếp vào số liệu quan trọng nhất ở dòng đầu tiên, không chào hỏi.
+2. Nhận định quản trị: Không tường thuật lại số liệu thô. Nêu tối đa 2 đánh giá chuyên sâu về điểm nghẽn hoặc biến động đáng chú ý (sụt giảm bất thường, dữ liệu bị thiếu...).
+3. Đề xuất hành động: Đưa ra đúng 1 khuyến nghị điều hành cụ thể để xử lý vấn đề vừa nêu.
+4. Nguyên tắc trung thực: Nếu dữ liệu không đủ để kết luận, hãy nói rõ: "Dữ liệu chưa đủ cơ sở để phân tích". Không tự suy luận khi không có căn cứ.
+5. Định dạng: Dùng gạch đầu dòng (-), in đậm các con số và chỉ số quan trọng.
+${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG]:\n' + dbContextStr : ''}`;
 
         const messages = [ { role: "system", content: systemPrompt } ];
 
@@ -270,14 +337,21 @@ ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG TRÍCH XUẤT]:\n' + dbContextSt
             res.write(`: heartbeat\n\n`);
         }
 
-        const openRouterKey = process.env.OPENROUTER_API_KEY;
-        const aiModel = req.body.model || process.env.DEFAULT_AI_MODEL || "google/gemini-3.1-pro-preview";
+        // [FIX VẤN ĐỀ 4] Đọc model và API key từ system_config DB (có cache 5 phút)
+        // Như vậy, bất kỳ thay đổi nào trên giao diện Cài đặt sẽ có hiệu lực sau tối đa 5 phút
+        const aiConfig = await getAIConfig();
+        // req.body.model chỉ được dùng nếu Frontend chủ động gửi xuống (gọi test API trực tiếp),
+        // mặc định là model từ DB
+        const aiModel = req.body.model || aiConfig.model;
+        const openRouterKey = aiConfig.apiKey;
 
+        // [FIX VẤN ĐỀ 3 - NGUYÊN NHÂN 2] Tăng max_tokens lên 4000 để tránh cắt ngang
+        // giữa câu khi phản hồi dài, gây ra hiện tượng văn bản đứt ở giữa ký tự
         const llmPayload = {
             model: aiModel,
             messages: messages,
             stream: true,
-            max_tokens: 2000
+            max_tokens: 4000
         };
 
         const controller = new AbortController();
@@ -333,10 +407,28 @@ ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG TRÍCH XUẤT]:\n' + dbContextSt
                             }
                             
                             if (data.choices && data.choices.length > 0) {
-                                const chunkText = data.choices[0].delta?.content || "";
+                                const choice = data.choices[0];
+                                const chunkText = choice.delta?.content || "";
                                 if (chunkText) {
                                     fullAiReply += chunkText;
                                     res.write(`data: ${JSON.stringify({ content: chunkText })}\n\n`);
+                                }
+
+                                // [FIX VẤN ĐỀ 3 - NGUYÊN NHÂN 3] Bắt finish_reason để thông báo
+                                // rõ ràng ra Frontend thay vì im lặng cắt stream giữa chừng
+                                const finishReason = choice.finish_reason;
+                                if (finishReason && finishReason !== 'stop' && finishReason !== 'end_turn') {
+                                    let warningMsg = '';
+                                    if (finishReason === 'length') {
+                                        warningMsg = '\n\n⚠️ *(Phản hồi bị giới hạn độ dài. Bạn có thể hỏi tiếp để AI trình bày thêm.)*';
+                                    } else if (finishReason === 'content_filter' || finishReason === 'safety') {
+                                        warningMsg = '\n\n⚠️ *(Phần nội dung này bị bộ lọc an toàn của mô hình kiểm duyệt. Vui lòng thử diễn đạt lại câu hỏi.)*';
+                                    }
+                                    if (warningMsg) {
+                                        fullAiReply += warningMsg;
+                                        res.write(`data: ${JSON.stringify({ content: warningMsg })}\n\n`);
+                                    }
+                                    console.warn(`[AI Stream] finish_reason: ${finishReason} — Model dừng sớm.`);
                                 }
                             }
                         } catch (e) {
@@ -648,5 +740,11 @@ module.exports = {
     getMessagesHandler,
     testKeyHandler,
     getAuditLogsHandler,
-    autoTaskingHandler
+    autoTaskingHandler,
+    // [FIX VẤN ĐỀ 4] Hàm xóa cache — gọi từ configRoutes khi admin lưu config mới
+    invalidateAIConfigCache: () => {
+        _aiConfigCache = null;
+        _lastCacheTime = 0;
+        console.log('[getAIConfig] Cache đã bị xóa — model mới sẽ được tải từ DB ở request tiếp theo.');
+    }
 };

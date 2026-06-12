@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const authGuard = require('../middlewares/authGuard');
+// [FIX VẤN ĐỀ 4] Import hàm invalidate cache để xóa cache ngay khi admin lưu config mới
+const { invalidateAIConfigCache } = require('../controllers/aiController');
 
 router.get('/', authGuard, async (req, res) => {
     try {
@@ -40,6 +42,10 @@ router.post('/', authGuard, async (req, res) => {
 
         if (ai_config) await upsertConfig('taskflow_ai_config', ai_config);
         if (system_prompts) await upsertConfig('taskflow_system_prompts', system_prompts);
+
+        // [FIX VẤN ĐỀ 4] Xóa cache ngay lập tức sau khi lưu thành công
+        // → Request chat tiếp theo sẽ đọc lại từ DB và dùng model mới ngay
+        if (ai_config && invalidateAIConfigCache) invalidateAIConfigCache();
 
         res.json({ success: true });
     } catch (error) {

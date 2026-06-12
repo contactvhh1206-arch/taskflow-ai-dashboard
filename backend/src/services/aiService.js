@@ -106,12 +106,33 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 return "Hệ thống báo cáo: Không có công việc nào thỏa mãn điều kiện.";
             }
 
-            // TINH GỌN RAG: Bổ sung các trường sinh tử
+            // [FIX VẤN ĐỀ 2] TINH GỌN RAG: Bổ sung đầy đủ trường nhật ký vận hành
             const simplifiedData = rows.map(t => {
                 const assignee = t.assignee_name || t.pic || "Chưa giao";
                 const dueDate = t.deadline ? new Date(t.deadline).toLocaleDateString('vi-VN') : "Không có";
                 const isUrgent = t.urgent ? "[KHẨN]" : "";
-                return `[ID: ${t.id}] ${isUrgent} ${t.title} - Status: ${t.status} - Phụ trách: ${assignee} - Hạn chót: ${dueDate}`;
+                let base = `[ID: ${t.id}] ${isUrgent} ${t.title} - Status: ${t.status} - Phụ trách: ${assignee} - Hạn chót: ${dueDate}`;
+
+                // Đính kèm nhật ký vận hành nếu task có dữ liệu từ bảng task_operations
+                const ops = [];
+                if (t.shift)                    ops.push(`Ca: ${t.shift}`);
+                if (t.clocker_present != null)  ops.push(`Lễ tân có mặt: ${t.clocker_present}`);
+                if (t.clocker_absent_unexcused != null && t.clocker_absent_unexcused > 0)
+                                                ops.push(`Lễ tân vắng không phép: ${t.clocker_absent_unexcused}`);
+                if (t.ktv_present != null)       ops.push(`KTV có mặt: ${t.ktv_present}`);
+                if (t.ktv_absent_unexcused != null && t.ktv_absent_unexcused > 0)
+                                                ops.push(`KTV vắng không phép: ${t.ktv_absent_unexcused}`);
+                if (t.machinery_ok === false)    ops.push(`⚠️ Thiết bị có sự cố`);
+                if (t.repair_needed === true)    ops.push(`⚠️ Cần sửa chữa`);
+                if (t.cleaning_done === false)   ops.push(`⚠️ Vệ sinh chưa hoàn thành`);
+                if (t.incidents && t.incidents.trim() !== '')
+                                                ops.push(`Sự cố: ${t.incidents}`);
+
+                if (ops.length > 0) {
+                    base += ` | [NHẬT KÝ VẬN HÀNH: ${ops.join(', ')}]`;
+                }
+
+                return base;
             }).join('\n');
             
             return simplifiedData;
@@ -128,8 +149,12 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                     startDate = new Date(targetYear, month - 1, 1);
                     endDate = new Date(targetYear, month, 0, 23, 59, 59, 999);
                 } else {
-                    startDate = new Date(targetYear, 0, 1);
-                    endDate = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+                    // [FIX VẤN ĐỀ 1] Fallback an toàn: Mặc định về tháng hiện tại
+                    // thay vì lấy toàn bộ năm (1/1 - 31/12) gây cộng dồn sai
+                    const nowFallback = new Date();
+                    const fallbackMonth = nowFallback.getMonth() + 1;
+                    startDate = new Date(targetYear, fallbackMonth - 1, 1);
+                    endDate = new Date(targetYear, fallbackMonth, 0, 23, 59, 59, 999);
                 }
 
                 const facRes = await pool.query('SELECT * FROM facilities');
@@ -175,14 +200,15 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                     }
                 });
 
-                let resultStr = `[TỔNG DOANH THU THÁNG ${month ? month + '/' + targetYear : targetYear}]\n`;
+                const displayMonth = month || (new Date().getMonth() + 1);
+                let resultStr = `[TỔNG DOANH THU THÁNG ${displayMonth}/${targetYear}]\n`;
                 for (const fac of Object.values(aggregated)) {
                     if (fac.revenue > 0) {
                         resultStr += `- Cơ sở: ${fac.name} | TỔNG DOANH THU: ${fac.revenue} VNĐ\n`;
                     }
                 }
                 
-                if (resultStr === `[TỔNG DOANH THU THÁNG ${month ? month + '/' + targetYear : targetYear}]\n`) {
+                if (resultStr === `[TỔNG DOANH THU THÁNG ${displayMonth}/${targetYear}]\n`) {
                     return "Hệ thống không có dữ liệu doanh thu cho thời gian này.";
                 }
                 return resultStr;
