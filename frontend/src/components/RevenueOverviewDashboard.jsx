@@ -1,6 +1,7 @@
 import React from 'react';
 import HeatmapKPI from './HeatmapKPI';
 import AIBatchPreviewModal from './AIBatchPreviewModal';
+import supabase from '../utils/supabaseClient';
 
 export default function RevenueOverviewDashboard({ user, facilityList }) {
       const [selectedMonth, setSelectedMonth] = React.useState(new Date().toISOString().substring(0, 7));
@@ -28,17 +29,18 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
             let contentData = '';
 
             if (isImage) {
-               contentData = await new Promise((resolve) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result);
-                  reader.readAsDataURL(file);
-               });
+               // Upload file to Supabase first
+               const fileName = `revenue_${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name}`;
+               const { error: uploadError } = await supabase.storage.from('attachments').upload(fileName, file, { contentType: file.type });
+               if (uploadError) throw uploadError;
+               const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
+
                const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/internal/extract-revenue', {
                   method: 'POST',
                   headers: {
                      'Content-Type': 'application/json'
                   },
-                  body: JSON.stringify({ imageBase64: contentData })
+                  body: JSON.stringify({ imageUrl: publicUrl })
                });
                
                if (!response.ok) throw new Error("API Request Failed");

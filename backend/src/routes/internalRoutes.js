@@ -14,10 +14,12 @@ const getSystemAIConfig = async () => {
 
 router.post('/extract-revenue', express.json({limit: '50mb'}), async (req, res) => {
   try {
-    const { imageBase64 } = req.body;
+    const { imageBase64, imageUrl } = req.body;
     
-    if (!imageBase64) {
-      return res.status(400).json({ error: 'Thiếu dữ liệu hình ảnh (Base64).' });
+    const targetUrl = imageUrl || imageBase64;
+    
+    if (!targetUrl) {
+      return res.status(400).json({ error: 'Thiếu dữ liệu hình ảnh (URL hoặc Base64).' });
     }
 
     const systemPrompt = `Đây là bảng doanh thu. Cột 1 là Thứ, Cột 2 là Ngày. Các cột tiếp theo là Doanh thu của DB41, ACE, PQ, PA, PAV, DB01. Hãy bỏ qua các hàng tiêu đề. Đọc từ hàng có chứa ngày tháng. Trả về mảng JSON: [{"date": "DD/MM/YYYY", "revenues": {"DUBAI 41": 100000, "DUBAI ACE": 200000, "DUBAI PHÚ QUỐC": 300000, "DUBAI PA": 400000, "DUBAI PAV": 500000, "DUBAI PAK": 600000}}]`;
@@ -30,7 +32,7 @@ router.post('/extract-revenue', express.json({limit: '50mb'}), async (req, res) 
           role: "user",
           content: [
             { type: "text", text: systemPrompt },
-            { type: "image_url", image_url: { url: imageBase64 } }
+            { type: "image_url", image_url: { url: targetUrl } }
           ]
         }
       ]

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext.jsx';
 import { saveData, fetchHistory } from '../services/dataService.js';
+import { supabase } from '../utils/supabaseClient.js';
 
 export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const { user } = useContext(AuthContext);
@@ -80,9 +81,10 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         date: item.date,
         timestamp: item.displayTime,
         content: typeof item.content === 'object' ? '' : item.content,
-        image: (item.attachments || []).find(a => typeof a === 'string' && a.startsWith('data:image')) || null,
-        audio: (item.attachments || []).find(a => typeof a === 'string' && a.startsWith('data:audio')) || null,
+        image: (item.attachments || []).find(a => typeof a === 'string' && (a.startsWith('data:image') || a.includes('image_') || a.includes('.jpg'))) || null,
+        audio: (item.attachments || []).find(a => typeof a === 'string' && (a.startsWith('data:audio') || a.includes('audio_') || a.includes('.webm'))) || null,
         aiVectorData: item.aiVectorData
+
       })));
     };
     fetchAll();
@@ -189,41 +191,78 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const handleAddLog = async () => {
     if (!logContent.trim() && !logImage && !logAudio) return;
     
-    const now = new Date();
-    const timestamp = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    
-    let mediaStr = [];
-    if (logImage) mediaStr.push('ẢNH');
-    if (logAudio) mediaStr.push('GHI ÂM');
-
-    const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | NHẬT KÝ: ${logContent.trim() || 'Không có nội dung'} ${mediaStr.length ? `| CÓ ĐÍNH KÈM ${mediaStr.join(', ')}` : ''}`;
-    
-    const attachments = [logImage, logAudio].filter(Boolean);
-
-    const newRecord = await saveData({
-      org_unit: user.facility_id,
-      entry_type: 'Operation_Log',
-      content: logContent.trim() || ' ',
-      attachments: attachments,
-      aiVectorData
-    });
-    
-    if (newRecord) {
-      const mappedLog = {
-        id: newRecord.id,
-        facility_id: newRecord.org_unit,
-        date: newRecord.date,
-        timestamp: newRecord.displayTime,
-        content: typeof newRecord.content === 'object' ? '' : newRecord.content,
-        image: attachments.find(a => typeof a === 'string' && a.startsWith('data:image')) || null,
-        audio: attachments.find(a => typeof a === 'string' && a.startsWith('data:audio')) || null,
-        aiVectorData: newRecord.aiVectorData
-      };
+    setLoading(true);
+    try {
+      const finalAttachments = [];
       
-      setLogs([mappedLog, ...logs]);
-      setLogContent('');
-      setLogImage(null);
-      setLogAudio(null);
+      // Upload image to Supabase if exists
+      if (logImage) {
+        try {
+          const res = await fetch(logImage);
+          const blob = await res.blob();
+          const fileName = `image_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+          const { data, error } = await supabase.storage.from('attachments').upload(fileName, blob, { contentType: 'image/jpeg' });
+          if (error) throw error;
+          const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
+          finalAttachments.push(publicUrl);
+        } catch (err) {
+          console.error("Lỗi upload ảnh lên Supabase:", err);
+          if (showToast) showToast('Lỗi upload ảnh lên server');
+        }
+      }
+
+      // Upload audio to Supabase if exists
+      if (logAudio) {
+        try {
+          const res = await fetch(logAudio);
+          const blob = await res.blob();
+          const fileName = `audio_${Date.now()}_${Math.random().toString(36).substring(7)}.webm`;
+          const { data, error } = await supabase.storage.from('attachments').upload(fileName, blob, { contentType: 'audio/webm' });
+          if (error) throw error;
+          const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
+          finalAttachments.push(publicUrl);
+        } catch (err) {
+          console.error("Lỗi upload ghi âm lên Supabase:", err);
+          if (showToast) showToast('Lỗi upload ghi âm lên server');
+        }
+      }
+
+      const now = new Date();
+      const timestamp = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      
+      let mediaStr = [];
+      if (logImage) mediaStr.push('ẢNH');
+      if (logAudio) mediaStr.push('GHI ÂM');
+
+      const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | NHẬT KÝ: ${logContent.trim() || 'Không có nội dung'} ${mediaStr.length ? `| CÓ ĐÍNH KÈM ${mediaStr.join(', ')}` : ''}`;
+
+      const newRecord = await saveData({
+        org_unit: user.facility_id,
+        entry_type: 'Operation_Log',
+        content: logContent.trim() || ' ',
+        attachments: finalAttachments,
+        aiVectorData
+      });
+      
+      if (newRecord) {
+        const mappedLog = {
+          id: newRecord.id,
+          facility_id: newRecord.org_unit,
+          date: newRecord.date,
+          timestamp: newRecord.displayTime,
+          content: typeof newRecord.content === 'object' ? '' : newRecord.content,
+          image: finalAttachments.find(a => typeof a === 'string' && (a.includes('image_') || a.includes('.jpg'))) || null,
+          audio: finalAttachments.find(a => typeof a === 'string' && (a.includes('audio_') || a.includes('.webm'))) || null,
+          aiVectorData: newRecord.aiVectorData
+        };
+        
+        setLogs([mappedLog, ...logs]);
+        setLogContent('');
+        setLogImage(null);
+        setLogAudio(null);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 

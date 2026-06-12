@@ -57,6 +57,7 @@ const normalizeName = (str) => {
 
 const chatStreamHandler = async (req, res) => {
     const message = req.body.message;
+    const attachment = req.body.attachment;
     let { sessionId, session_id } = req.body;
     sessionId = sessionId || session_id;
     const userContext = req.user;
@@ -218,11 +219,27 @@ ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG TRÍCH XUẤT]:\n' + dbContextSt
         
         // FIX BUG 2: Chống Double Coding ghép dính chữ User vào mảng gửi LLM
         // Đảm bảo tin nhắn hiện tại có trong mảng (phòng hờ historyRows thiếu)
-        if (messages.length === 1 || !messages[messages.length - 1].content.includes(message)) {
-            if (messages[messages.length - 1].role === 'user') {
-                messages[messages.length - 1].content += "\n\n" + message;
+        let lastUserMsgContent = message;
+        let isContentArray = false;
+        
+        // Xử lý đính kèm nếu có
+        if (attachment) {
+            if (attachment.isDoc && attachment.extractedText) {
+                lastUserMsgContent += `\n\n[DỮ LIỆU TỪ TỆP ĐÍNH KÈM ${attachment.name}]:\n${attachment.extractedText}`;
+            } else if (attachment.url && (attachment.type?.startsWith('image/') || attachment.type?.startsWith('image'))) {
+                lastUserMsgContent = [
+                    { type: "text", text: message },
+                    { type: "image_url", image_url: { url: attachment.url } }
+                ];
+                isContentArray = true;
+            }
+        }
+
+        if (messages.length === 1 || (typeof messages[messages.length - 1].content === 'string' && !messages[messages.length - 1].content.includes(message))) {
+            if (messages[messages.length - 1].role === 'user' && !isContentArray && typeof messages[messages.length - 1].content === 'string') {
+                messages[messages.length - 1].content += "\n\n" + lastUserMsgContent;
             } else {
-                messages.push({ role: 'user', content: message });
+                messages.push({ role: 'user', content: lastUserMsgContent });
             }
         }
 

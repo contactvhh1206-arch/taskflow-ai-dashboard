@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext, useRef, useCallback } from 'react';
 import axiosClient from './api/axiosClient.js';
+import supabase from './utils/supabaseClient';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -540,6 +541,7 @@ function MainDashboard() {
   const [showAITaskModal, setShowAITaskModal] = useState(false);
   const [showClosureConfirm, setShowClosureConfirm] = useState(false);
   const [evidenceFile, setEvidenceFile] = useState(null);
+  const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalStatus, setCreateModalStatus] = useState('todo');
   const [toastMessage, setToastMessage] = useState('');
@@ -1739,8 +1741,41 @@ function MainDashboard() {
                               <input type="file" className="hidden" onChange={(e) => setEvidenceFile(e.target.files[0])} />
                             </label>
                             <div className="flex gap-2 pt-2">
-                              <button onClick={() => { setShowClosureConfirm(false); setEvidenceFile(null); }} className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white">Hủy</button>
-                              <button onClick={() => { handleUpdateTaskStatus(selectedTask.id, 'done', evidenceFile ? evidenceFile.name : null); setShowClosureConfirm(false); setEvidenceFile(null); }} className="flex-[2] bg-success hover:bg-success/90 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"><span className="material-symbols-outlined text-[18px]">done_all</span> Xác nhận đóng</button>
+                              <button onClick={() => { setShowClosureConfirm(false); setEvidenceFile(null); }} className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white" disabled={isUploadingEvidence}>Hủy</button>
+                              <button 
+                                onClick={async () => { 
+                                  if (evidenceFile) {
+                                    setIsUploadingEvidence(true);
+                                    try {
+                                      const fileName = `evidence_${Date.now()}_${Math.random().toString(36).substring(7)}_${evidenceFile.name}`;
+                                      const { error } = await supabase.storage.from('attachments').upload(fileName, evidenceFile, {
+                                        contentType: evidenceFile.type || 'application/octet-stream'
+                                      });
+                                      if (error) throw error;
+                                      const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
+                                      handleUpdateTaskStatus(selectedTask.id, 'done', publicUrl);
+                                    } catch (err) {
+                                      console.error("Lỗi upload evidence:", err);
+                                      alert("Lỗi tải lên bằng chứng: " + err.message);
+                                      setIsUploadingEvidence(false);
+                                      return; // Dừng lại nếu lỗi
+                                    }
+                                    setIsUploadingEvidence(false);
+                                  } else {
+                                    handleUpdateTaskStatus(selectedTask.id, 'done', null);
+                                  }
+                                  setShowClosureConfirm(false); 
+                                  setEvidenceFile(null); 
+                                }} 
+                                disabled={isUploadingEvidence}
+                                className={`flex-[2] ${isUploadingEvidence ? 'bg-gray-400 cursor-wait' : 'bg-success hover:bg-success/90'} text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
+                              >
+                                {isUploadingEvidence ? (
+                                  <><span className="material-symbols-outlined text-[18px] animate-spin">sync</span> Đang tải lên...</>
+                                ) : (
+                                  <><span className="material-symbols-outlined text-[18px]">done_all</span> Xác nhận đóng</>
+                                )}
+                              </button>
                             </div>
                           </div>
                         )

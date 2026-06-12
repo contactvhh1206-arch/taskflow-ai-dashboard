@@ -5,7 +5,7 @@ const pool = require('../config/database');
 const authGuard = require('../middlewares/authGuard');
 const rbacGuard = require('../middlewares/rbacGuard');
 const ragService = require('../services/ragService');
-// Setup Multer (chỉ cho phép .txt tối đa 500KB)
+// Setup Multer (chỉ cho phép .txt tối đa 500KB) - Giờ không cần dùng nữa nhưng giữ lại phòng hờ API cũ
 const storage = multer.memoryStorage();
 const upload = multer({ 
     storage,
@@ -17,6 +17,8 @@ const upload = multer({
         cb(null, true);
     }
 });
+
+const fetch = global.fetch || require('node-fetch');
 
 // Hàm tiện ích: Tự động tạo bảng rag_documents nếu chưa có
 const initRagTable = async () => {
@@ -45,15 +47,23 @@ router.get('/documents', authGuard, rbacGuard, async (req, res) => {
 });
 
 // Upload tài liệu mới
-router.post('/upload', authGuard, rbacGuard, upload.single('file'), async (req, res) => {
+router.post('/upload', authGuard, rbacGuard, express.json(), async (req, res) => {
     try {
         await initRagTable();
-        if (!req.file) {
-            return res.status(400).json({ success: false, error: 'Không tìm thấy tệp' });
+        const { fileUrl, fileName, fileSize } = req.body;
+        
+        if (!fileUrl) {
+            return res.status(400).json({ success: false, error: 'Thiếu đường dẫn fileUrl' });
         }
 
+        // Tải nội dung text từ URL của Supabase
+        const fileResponse = await fetch(fileUrl);
+        if (!fileResponse.ok) {
+            throw new Error(`Không thể tải file từ Supabase: ${fileResponse.statusText}`);
+        }
+        const textContent = await fileResponse.text();
+
         // Quá trình Chunking & Embedding thực tế
-        const textContent = req.file.buffer.toString('utf8');
         const chunkSize = 1000;
         const chunks = [];
         for (let i = 0; i < textContent.length; i += chunkSize) {
@@ -65,7 +75,7 @@ router.post('/upload', authGuard, rbacGuard, upload.single('file'), async (req, 
         const { rows } = await pool.query(
             `INSERT INTO rag_documents (file_name, file_size, chunk_count) 
              VALUES ($1, $2, $3) RETURNING id`,
-            [req.file.originalname, req.file.size, chunkCount]
+            [fileName || 'unknown.txt', fileSize || textContent.length, chunkCount]
         );
 
         // Lưu nội dung và vector vào company_knowledge_base
@@ -73,7 +83,7 @@ router.post('/upload', authGuard, rbacGuard, upload.single('file'), async (req, 
         for (let i = 0; i < chunks.length; i++) {
             try {
                 await ragService.saveToKnowledgeBase(chunks[i], 'DOCUMENT_UPLOAD', {
-                    filename: req.file.originalname,
+                    filename: fileName || 'unknown.txt',
                     chunk_index: i,
                     total_chunks: chunkCount,
                     department_code: req.user.department_code || 'GLOBAL',

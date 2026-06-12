@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import supabase from '../utils/supabaseClient';
 import axiosClient from '../api/axiosClient';
 import { fetchHistory, fetchAiSessions, saveAiSession, streamAIChat } from '../services/dataService.js';
 import { useAIChatStream } from '../hooks/useAIChatStream';
@@ -102,6 +103,7 @@ export default function AIAdvisor(props) {
 
   const isRecording = useState(false)[0]; // Removed unused setter to fix potential lints, or kept as is
   const [attachment, setAttachment] = useState(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const fileInputRef = React.useRef(null);
   const isSessionCreatedByMeRef = React.useRef(false);
   const isFetchingHistory = React.useRef(false);
@@ -232,7 +234,7 @@ export default function AIAdvisor(props) {
                  extractedText += `\n... (Đã lược bớt các sheet còn lại để tối ưu bộ nhớ API)`;
              }
 
-             setAttachment({ name: file.name, type: file.type || ext, url: null, extractedText, isDoc: true });
+             setAttachment({ name: file.name, type: file.type || ext, url: null, extractedText, file: file, isDoc: true });
           } catch (err) {
              console.error('Lỗi đọc file bảng tính:', err.message);
           }
@@ -258,7 +260,7 @@ export default function AIAdvisor(props) {
              }
            }
            
-         setAttachment({ name: file.name, type: mimeType, url: base64Url, isDoc: false });
+         setAttachment({ name: file.name, type: mimeType, url: base64Url, file: file, isDoc: false });
        };
        reader.readAsDataURL(file);
     }
@@ -342,8 +344,35 @@ export default function AIAdvisor(props) {
         inputRef.current.value = '';
     }
     
-    const currentAttachment = attachment;
+    let currentAttachment = attachment;
     setAttachment(null);
+    
+    if (currentAttachment && currentAttachment.file) {
+        setIsUploadingFile(true);
+        try {
+            const file = currentAttachment.file;
+            const fileName = `chat_${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name}`;
+            const { error } = await supabase.storage.from('attachments').upload(fileName, file, {
+                contentType: file.type || 'application/octet-stream'
+            });
+            if (error) throw error;
+            const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
+            
+            // Cập nhật lại attachment với publicUrl từ Supabase và xóa base64 cũ để tiết kiệm băng thông
+            currentAttachment = {
+                ...currentAttachment,
+                url: publicUrl,
+                file: null
+            };
+        } catch (err) {
+            console.error("Lỗi upload đính kèm chat:", err);
+            if (window.showToast) window.showToast('Lỗi tải lên đính kèm: ' + err.message, 'error');
+            isGeneratingRef.current = false;
+            setIsUploadingFile(false);
+            return;
+        }
+        setIsUploadingFile(false);
+    }
 
     let sessionId = props.activeSessionId || null;
     sendMessage(userQuery, { sessionId: sessionId, attachment: currentAttachment });
@@ -481,8 +510,9 @@ export default function AIAdvisor(props) {
              </button>
           ) : (
              <>
-               <button onClick={handleAsk} disabled={isStreaming || isThinking} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
-                 <span className="material-symbols-outlined">send</span> <span className="hidden sm:inline">Gửi</span>
+               <button onClick={handleAsk} disabled={isStreaming || isThinking || isUploadingFile} className="bg-secondary hover:bg-secondary/90 disabled:opacity-50 text-white px-4 md:px-6 shrink-0 rounded-xl shadow-md shadow-secondary/20 transition-all flex items-center justify-center gap-1 md:gap-2 font-bold">
+                 {isStreaming || isThinking || isUploadingFile ? <span className="material-symbols-outlined animate-spin text-[20px]">sync</span> : <span className="material-symbols-outlined text-[20px]">send</span>}
+                 <span className="hidden md:inline">{isUploadingFile ? 'Đang tải file...' : 'Gửi'}</span>
                </button>
                {user && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) && (
                  <button 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import supabase from '../utils/supabaseClient';
 
 export default function RAGManagerPanel({ showToast }) {
       const [documents, setDocuments] = useState([]);
@@ -74,17 +75,23 @@ export default function RAGManagerPanel({ showToast }) {
             return;
         }
 
-        const formData = new FormData();
-        formData.append('file', file);
-        
         setIsUploading(true);
 
         try {
+            // Upload file to Supabase first
+            const sbFileName = `rag_${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name}`;
+            const { error: uploadError } = await supabase.storage.from('attachments').upload(sbFileName, file, { contentType: 'text/plain' });
+            if (uploadError) throw uploadError;
+            const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(sbFileName);
+
             const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
             const response = await fetch(`${API_BASE_URL}/api/rag/upload`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('taskflow_token')}` },
-                body: formData
+                headers: { 
+                  'Authorization': `Bearer ${localStorage.getItem('taskflow_token')}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ fileUrl: publicUrl, fileName: file.name, fileSize: file.size })
             });
 
             if (!response.ok) {
