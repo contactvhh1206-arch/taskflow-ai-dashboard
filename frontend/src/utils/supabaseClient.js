@@ -7,4 +7,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Missing Supabase env variables. Please check your .env file.');
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+export default supabase;
