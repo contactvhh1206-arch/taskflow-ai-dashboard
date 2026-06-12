@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext.jsx';
 import { saveData, fetchHistory } from '../services/dataService.js';
-import { supabase } from '../utils/supabaseClient.js';
+import supabase from '../utils/supabaseClient.js';
 
 export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const { user } = useContext(AuthContext);
