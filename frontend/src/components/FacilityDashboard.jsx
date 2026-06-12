@@ -131,6 +131,9 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             const getCompletedTime = (t) => {
               if (t?.completedAtReal) return new Date(t.completedAtReal).getTime();
               if (t?.completedAt) return new Date(t.completedAt).getTime();
+              // Nếu task đã ở trạng thái done/review nhưng chưa có completedAt,
+              // dùng thời điểm hiện tại để bộ lọc "Hôm nay" bắt được đúng.
+              if (t?.status === 'done' || t?.status === 'review') return now.getTime();
               return t?.deadline ? new Date(t.deadline).getTime() : now.getTime();
             };
 
@@ -142,13 +145,15 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             };
 
             const openCount = myTasks.filter(t => {
-              if (t?.status === 'done' || t?.status === 'revoked') return false;
+              // Loại trừ cả trạng thái 'review' (Nghiệm thu) - không tính là task đang mở
+              if (t?.status === 'done' || t?.status === 'review' || t?.status === 'revoked') return false;
               const cTime = getCreatedTime(t);
               return cTime >= startMs && cTime <= endMs;
             }).length;
 
             const closedCount = myTasks.filter(t => {
-              if (t?.status !== 'done') return false;
+              // Tính cả 'review' (Nghiệm thu) là trạng thái đã hoàn thành
+              if (t?.status !== 'done' && t?.status !== 'review') return false;
               const compTime = getCompletedTime(t);
               return compTime >= startMs && compTime <= endMs;
             }).length;
@@ -171,7 +176,8 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             setStats({ open: openCount ?? 0, closed: closedCount ?? 0, overdue: overdueCount ?? 0, total: myTasks.length });
 
             const todayStr = new Date().toISOString().split('T')[0];
-            const urgent = myTasks.filter(t => t?.status !== 'done' && t?.status !== 'revoked' && (t?.urgent || t?.pinned || (t?.deadline && t.deadline <= todayStr)));
+            // Loại trừ thêm 'review' khỏi danh sách khẩn cấp - task đang nghiệm thu không cần báo động
+            const urgent = myTasks.filter(t => t?.status !== 'done' && t?.status !== 'review' && t?.status !== 'revoked' && (t?.urgent || t?.pinned || (t?.deadline && t.deadline <= todayStr)));
             setUrgentTasks(urgent || []);
 
             // AI Pings now handled by a separate useEffect with useRef lock to call Node API

@@ -1005,16 +1005,22 @@ function MainDashboard() {
       
       const data = await res.json();
       if (data.success) {
-        setTasks(tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence} : t));
-        setSelectedTask({...selectedTask, status: newStatus, evidence: evidenceName || selectedTask.evidence});
+        const isDoneStatus = newStatus === 'done' || newStatus === 'review';
+        const completedAtNow = isDoneStatus ? new Date().toISOString() : undefined;
+        const completedPatch = isDoneStatus ? { completedAt: completedAtNow } : {};
+        setTasks(tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence, ...completedPatch} : t));
+        setSelectedTask({...selectedTask, status: newStatus, evidence: evidenceName || selectedTask.evidence, ...completedPatch});
+
       } else {
         throw new Error('Lỗi server');
       }
     } catch (e) {
       console.error("Fallback offline update status:", e);
-      const updatedTasks = tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence} : t);
+      const isDoneStatusFallback = newStatus === 'done' || newStatus === 'review';
+      const completedPatchFallback = isDoneStatusFallback ? { completedAt: new Date().toISOString() } : {};
+      const updatedTasks = tasks.map(t => t.id === taskId ? {...t, status: newStatus, evidence: evidenceName || t.evidence, ...completedPatchFallback} : t);
       setTasks(updatedTasks);
-      setSelectedTask({...selectedTask, status: newStatus, evidence: evidenceName || selectedTask.evidence});
+      setSelectedTask({...selectedTask, status: newStatus, evidence: evidenceName || selectedTask.evidence, ...completedPatchFallback});
       
       // Update local storage for offline persistence
       const localTasks = JSON.parse(localStorage.getItem('taskflow_tasks') || '[]');
