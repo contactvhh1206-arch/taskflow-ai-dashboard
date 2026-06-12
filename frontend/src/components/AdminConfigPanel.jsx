@@ -190,7 +190,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const fetchUsers = async () => {
         try {
           const token = localStorage.getItem('taskflow_token');
-          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users`, {
             headers: {
               'Authorization': token ? `Bearer ${token}` : '',
               'x-user-role': user?.role || '',
@@ -207,7 +207,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const fetchFacilities = async () => {
         try {
           const token = localStorage.getItem('taskflow_token');
-          const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities', {
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/facilities`, {
             headers: {
               'Authorization': token ? `Bearer ${token}` : '',
               'x-user-role': user?.role || '',
@@ -236,7 +236,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         setIsAddingFac(true);
         try {
            const token = localStorage.getItem('taskflow_token');
-           const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/facilities', {
+           const res = await fetch(`${import.meta.env.VITE_API_URL}/api/facilities`, {
                method: 'POST', headers: { 
                  'Content-Type': 'application/json',
                  'Authorization': token ? `Bearer ${token}` : '',
@@ -263,7 +263,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         
         try {
             const token = localStorage.getItem('taskflow_token');
-            const res = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users', {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users`, {
                 method: 'POST', headers: { 
                   'Content-Type': 'application/json',
                   'Authorization': token ? `Bearer ${token}` : '',
@@ -301,7 +301,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         if (!editingFac) return;
         setIsUpdatingFac(true);
         try {
-            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${editingFac.id}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/facilities/${editingFac.id}`, {
                 method: 'PUT',
                 headers: { 
                   'Content-Type': 'application/json',
@@ -333,7 +333,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const handleDeleteFacility = async () => {
         if (!deletingFac) return;
         try {
-          const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${deletingFac.id}`, { method: 'DELETE' });
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/facilities/${deletingFac.id}`, { method: 'DELETE' });
           if (res.ok) {
             await fetchFacilities();
             if (showToast) showToast(`Đã xóa cơ sở ${deletingFac.name}`);
@@ -352,7 +352,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
            return;
         }
         try {
-          const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${deletingUser.id}`, { method: 'DELETE' });
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${deletingUser.id}`, { method: 'DELETE' });
           if (res.ok) {
             await fetchUsers();
             if (showToast) showToast(`Đã xóa tài khoản ${deletingUser.username}`);
@@ -372,7 +372,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         
         try {
             const token = localStorage.getItem('taskflow_token');
-            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${editingUser.id}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${editingUser.id}`, {
                 method: 'PUT', headers: { 
                   'Content-Type': 'application/json',
                   'Authorization': token ? `Bearer ${token}` : '',
@@ -408,7 +408,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         if (!targetUser) return;
         try {
             const token = localStorage.getItem('taskflow_token');
-            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/users/${userId}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${userId}`, {
                 method: 'PUT', headers: { 
                   'Content-Type': 'application/json',
                   'Authorization': token ? `Bearer ${token}` : '',
