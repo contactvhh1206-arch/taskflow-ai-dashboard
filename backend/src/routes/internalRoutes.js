@@ -12,7 +12,7 @@ const getSystemAIConfig = async () => {
     };
 };
 
-router.post('/extract-revenue', express.json({limit: '50mb'}), async (req, res) => {
+router.post('/extract-revenue', authGuard, express.json({limit: '50mb'}), async (req, res) => {
   try {
     const { imageBase64, imageUrl } = req.body;
     
@@ -250,6 +250,52 @@ router.get('/storage/used-urls', authGuard, async (req, res) => {
   } catch (error) {
     console.error('[storage/used-urls] Lỗi:', error);
     res.status(500).json({ error: 'Lỗi server khi quét attachment URLs.' });
+  }
+});
+
+// Ghi nhận lịch sử sử dụng AI token sau mỗi lần trích xuất doanh thu
+router.post('/log-tokens', authGuard, async (req, res) => {
+  try {
+    const { username, prompt_tokens, completion_tokens, total_tokens } = req.body;
+    const userId = req.user?.id || null;
+    const userRole = req.user?.role || req.headers['x-user-role'] || 'unknown';
+
+    const pool = require('../config/database');
+
+    // Tạo bảng nếu chưa tồn tại
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_token_usage_logs (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        username TEXT,
+        user_role TEXT,
+        feature TEXT DEFAULT 'extract-revenue',
+        prompt_tokens INTEGER DEFAULT 0,
+        completion_tokens INTEGER DEFAULT 0,
+        total_tokens INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await pool.query(
+      `INSERT INTO ai_token_usage_logs
+        (user_id, username, user_role, feature, prompt_tokens, completion_tokens, total_tokens)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        userId,
+        username || req.user?.name || req.user?.username || 'unknown',
+        userRole,
+        'extract-revenue',
+        prompt_tokens || 0,
+        completion_tokens || 0,
+        total_tokens || 0
+      ]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[log-tokens] Lỗi ghi token usage:', error);
+    res.status(500).json({ error: 'Lỗi khi ghi nhận token usage.' });
   }
 });
 

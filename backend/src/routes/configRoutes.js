@@ -14,6 +14,27 @@ router.get('/', authGuard, async (req, res) => {
             const v = row.value !== undefined ? row.value : (row.data !== undefined ? row.data : (row.config_value !== undefined ? row.config_value : row.setting_value));
             if (k) data[k] = v;
         });
+
+        // [BẢO MẬT] Che API key trong response — không bao giờ trả key thật về frontend
+        // Frontend chỉ cần biết key đã được cấu hình hay chưa, không cần giá trị thật
+        if (data.taskflow_ai_config) {
+            try {
+                let aiCfg = data.taskflow_ai_config;
+                if (typeof aiCfg === 'string') aiCfg = JSON.parse(aiCfg);
+                const hasKey = !!(aiCfg.apiKey && aiCfg.apiKey.length > 0);
+                // Chỉ trả về model và trạng thái key, không trả key thật
+                data.taskflow_ai_config = JSON.stringify({
+                    aiModel: aiCfg.aiModel || '',
+                    webhookUrl: aiCfg.webhookUrl || '',
+                    apiKey: hasKey ? '***CONFIGURED***' : '',
+                    hasApiKey: hasKey
+                });
+            } catch (e) {
+                // Nếu parse lỗi, xóa luôn để an toàn
+                data.taskflow_ai_config = JSON.stringify({ apiKey: '', hasApiKey: false });
+            }
+        }
+
         res.json({ success: true, data });
     } catch (error) {
         console.error('Lỗi khi lấy config:', error);

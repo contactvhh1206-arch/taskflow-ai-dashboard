@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function ApiConfigPanel({ showToast }) {
       const [apiKey, setApiKey] = useState('');
+      const [isKeyConfigured, setIsKeyConfigured] = useState(false); // Key đã cấu hình trên server
       const [aiModel, setAiModel] = useState('anthropic/claude-3-opus');
       const [webhookUrl, setWebhookUrl] = useState('');
       const [isSaving, setIsSaving] = useState(false);
@@ -9,7 +10,7 @@ export default function ApiConfigPanel({ showToast }) {
 
       const testOpenRouterConnection = async (e) => {
         if (e) e.preventDefault();
-        if (!apiKey.trim()) {
+        if (!apiKey.trim() && !isKeyConfigured) {
           if (showToast) showToast('❌ Lỗi: Vui lòng nhập API Key trước khi kiểm tra!');
           return;
         }
@@ -18,8 +19,15 @@ export default function ApiConfigPanel({ showToast }) {
           return;
         }
 
-        if (!apiKey.trim().startsWith('sk-or-v1-')) {
-          if (showToast) showToast(`❌ Lỗi: Key không hợp lệ! (Bạn đang gửi: "${apiKey.trim().substring(0, 15)}..."). Vui lòng copy đúng key từ OpenRouter.`);
+        // Nếu user chưa nhập key mới nhưng key đã cấu hình trên server → test bằng key trên server
+        const keyToTest = apiKey.trim();
+        if (!keyToTest && isKeyConfigured) {
+          if (showToast) showToast('ℹ️ Key đang được lưu trên server. Để kiểm tra, hãy nhập lại key.');
+          return;
+        }
+
+        if (!keyToTest.startsWith('sk-or-v1-')) {
+          if (showToast) showToast(`❌ Lỗi: Key không hợp lệ! (Bạn đang gửi: "${keyToTest.substring(0, 15)}..."). Vui lòng copy đúng key từ OpenRouter.`);
           return;
         }
 
@@ -35,7 +43,7 @@ export default function ApiConfigPanel({ showToast }) {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              apiKey: apiKey.trim(),
+              apiKey: keyToTest,
               model: aiModel.trim()
             })
           });
@@ -84,10 +92,29 @@ export default function ApiConfigPanel({ showToast }) {
                             ? JSON.parse(resData.data.taskflow_system_prompts) 
                             : (resData.data.taskflow_system_prompts || null);
                         
-                        if (aiConfig.apiKey) setApiKey(aiConfig.apiKey);
+                        // [BẢO MẬT] Không đưa key thật vào state/localStorage.
+                        // Backend trả về '***CONFIGURED***' nếu đã có key, nếu không thì rỗng.
+                        if (aiConfig.hasApiKey || aiConfig.apiKey === '***CONFIGURED***') {
+                            setIsKeyConfigured(true);
+                            setApiKey(''); // Không điền key vào input
+                        } else if (aiConfig.apiKey && aiConfig.apiKey !== '***CONFIGURED***') {
+                            // Trường hợp cũ chưa patch backend, key thật vẫn lọt qua
+                            setApiKey(aiConfig.apiKey);
+                        }
                         if (aiConfig.aiModel) setAiModel(aiConfig.aiModel);
                         if (aiConfig.webhookUrl) setWebhookUrl(aiConfig.webhookUrl);
                         if (sysPrompts) setPrompts({ ...DEFAULT_PROMPTS, ...sysPrompts });
+                        
+                        // [BẢO MẬT] Xóa key khỏi localStorage nếu tồn tại từ phiên cũ
+                        const oldConfig = localStorage.getItem('taskflow_ai_config');
+                        if (oldConfig) {
+                            try {
+                                const parsed = JSON.parse(oldConfig);
+                                if (parsed.apiKey) {
+                                    localStorage.removeItem('taskflow_ai_config');
+                                }
+                            } catch { localStorage.removeItem('taskflow_ai_config'); }
+                        }
                     }
                 }
             } catch (err) {
@@ -103,7 +130,16 @@ export default function ApiConfigPanel({ showToast }) {
         const cleanModel = aiModel.trim();
         setAiModel(cleanModel);
         
-        const aiConfigPayload = { apiKey: apiKey.trim(), aiModel: cleanModel, webhookUrl };
+        // [BẢO MẬT] Chỉ gửi apiKey mới nếu user thực sự nhập vào form.
+        // Nếu bỏ trống (vì key đã có trên server), không đưa vào payload.
+        const aiConfigPayload = {
+            aiModel: cleanModel,
+            webhookUrl
+        };
+        const newKey = apiKey.trim();
+        if (newKey && newKey !== '***CONFIGURED***') {
+            aiConfigPayload.apiKey = newKey;
+        }
 
         const finalPrompts = {
           autoTask: prompts.autoTask?.trim() || DEFAULT_PROMPTS.autoTask,
@@ -158,9 +194,28 @@ export default function ApiConfigPanel({ showToast }) {
           </div>
           <form onSubmit={handleSave} className="p-8 space-y-6 flex-1 max-w-4xl mx-auto w-full">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">OpenRouter API Key *</label>
-              <input required type="text" autoComplete="off" placeholder="sk-or-v1-..." value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full px-4 py-3 bg-surface-container dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary dark:text-white transition-colors" />
-              <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">lock</span> Khóa API được mã hóa và lưu trữ cục bộ an toàn.</p>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                OpenRouter API Key *
+                {isKeyConfigured && (
+                  <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                    <span className="material-symbols-outlined text-[12px]">check_circle</span> Đã cấu hình
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                autoComplete="off"
+                placeholder={isKeyConfigured ? '⭐ Key đã được lưu bảo mật. Nhập key mới để cập nhật...' : 'sk-or-v1-...'}
+                value={apiKey}
+                onChange={e => { setApiKey(e.target.value); if (e.target.value) setIsKeyConfigured(false); }}
+                className="w-full px-4 py-3 bg-surface-container dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary dark:text-white transition-colors"
+              />
+              <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">lock</span>
+                {isKeyConfigured
+                  ? 'Key API được lưu an toàn trên server, không lưu trên trình duyệt.'
+                  : 'Key API sẽ được lưu bảo mật trên server.'}
+              </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

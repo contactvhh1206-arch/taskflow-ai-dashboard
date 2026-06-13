@@ -729,9 +729,8 @@ function MainDashboard() {
            let content = configLog.content;
            if (typeof content === 'string') content = JSON.parse(content);
            
-           if (content.ai_config) {
-             localStorage.setItem('taskflow_ai_config', JSON.stringify(content.ai_config));
-           }
+           // [BẢO MẬT] Không lưu ai_config (có chứa API key) vào localStorage
+           // ai_config chỉ được đọc trực tiếp từ /api/config có xác thực
            if (content.system_prompts) {
              localStorage.setItem('taskflow_system_prompts', JSON.stringify(content.system_prompts));
            }

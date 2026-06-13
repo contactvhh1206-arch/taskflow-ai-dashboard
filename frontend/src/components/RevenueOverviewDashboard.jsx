@@ -150,10 +150,12 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                }
 
                if (responseJson.usage) {
+                  const token = localStorage.getItem('taskflow_token');
                   fetch('https://taskflow-ai-dashboard.onrender.com/api/internal/log-tokens', {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
                       'x-user-role': user?.role || '',
                       'x-facility-id': user?.facility_id || ''
                     },
