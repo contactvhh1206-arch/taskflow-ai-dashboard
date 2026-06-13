@@ -1781,7 +1781,16 @@ function MainDashboard() {
                             <label className="flex items-center justify-center gap-2 w-full border-2 border-dashed border-outline-variant dark:border-gray-600 rounded-lg p-4 cursor-pointer hover:bg-surface-container-high transition-colors">
                               <span className="material-symbols-outlined text-gray-400">upload_file</span>
                               <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{evidenceFile ? evidenceFile.name : 'Chọn ảnh/tài liệu...'}</span>
-                              <input type="file" className="hidden" onChange={(e) => setEvidenceFile(e.target.files[0])} />
+                              <input type="file" className="hidden" accept="image/*, .pdf, .doc, .docx" onChange={(e) => {
+                                const f = e.target.files[0];
+                                if (!f) return;
+                                if (f.size > 10 * 1024 * 1024) {
+                                  if (window.showToast) window.showToast('File bằng chứng vượt quá 10MB. Vui lòng chọn file nhỏ hơn.', 'error');
+                                  e.target.value = '';
+                                  return;
+                                }
+                                setEvidenceFile(f);
+                              }} />
                             </label>
                             <div className="flex gap-2 pt-2">
                               <button onClick={() => { setShowClosureConfirm(false); setEvidenceFile(null); }} className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white" disabled={isUploadingEvidence}>Hủy</button>

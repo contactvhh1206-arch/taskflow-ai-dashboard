@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ErrorBoundary from './ErrorBoundary.jsx';
 import { fetchAiSessions } from '../services/dataService.js';
+import supabase from '../utils/supabaseClient';
 
 const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'];
 
@@ -77,6 +78,74 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const [resetPassword, setResetPassword] = useState('');
       const [isResetting, setIsResetting] = useState(false);
       const isProduction = false;
+
+      // === STORAGE CLEANUP STATE ===
+      const [storageCleanupStatus, setStorageCleanupStatus] = useState(null); // null | 'scanning' | 'preview' | 'deleting' | 'done'
+      const [storageOrphans, setStorageOrphans] = useState([]); // danh sách file rác
+      const [storageCleanupResult, setStorageCleanupResult] = useState(null); // kết quả
+
+      const handleStorageCleanup = async () => {
+        setStorageCleanupStatus('scanning');
+        setStorageOrphans([]);
+        setStorageCleanupResult(null);
+        try {
+          const token = localStorage.getItem('taskflow_token');
+          const API_BASE = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
+
+          // Bước 1: Lấy danh sách URLs đang dùng từ DB
+          const urlsRes = await fetch(`${API_BASE}/api/internal/storage/used-urls`, {
+            headers: { 'Authorization': token ? `Bearer ${token}` : '', 'x-user-role': user?.role || '' }
+          });
+          if (!urlsRes.ok) throw new Error('Không thể lấy danh sách URLs từ server.');
+          const { urls: usedUrls } = await urlsRes.json();
+
+          // Trích xuất tên file từ URL (phần sau /attachments/)
+          const usedFileNames = new Set(
+            usedUrls.map(url => {
+              try { return decodeURIComponent(url.split('/attachments/')[1]?.split('?')[0] || ''); }
+              catch { return ''; }
+            }).filter(Boolean)
+          );
+
+          // Bước 2: Liệt kê tất cả file trong bucket attachments
+          const { data: allFiles, error: listError } = await supabase.storage.from('attachments').list('', { limit: 1000, offset: 0 });
+          if (listError) throw new Error('Không thể liệt kê file trong Storage: ' + listError.message);
+
+          // Bước 3: Tìm orphan files (file không được dùng)
+          const orphans = (allFiles || []).filter(file => !usedFileNames.has(file.name));
+          setStorageOrphans(orphans);
+          setStorageCleanupStatus('preview');
+        } catch (err) {
+          console.error('[Storage Cleanup]', err);
+          if (showToast) showToast('Lỗi quét Storage: ' + err.message, 'error');
+          setStorageCleanupStatus(null);
+        }
+      };
+
+      const handleDeleteOrphans = async () => {
+        if (!storageOrphans.length) return;
+        setStorageCleanupStatus('deleting');
+        try {
+          const fileNames = storageOrphans.map(f => f.name);
+          // Xóa theo batch 100 file một lần
+          const BATCH_SIZE = 100;
+          let totalDeleted = 0;
+          for (let i = 0; i < fileNames.length; i += BATCH_SIZE) {
+            const batch = fileNames.slice(i, i + BATCH_SIZE);
+            const { error } = await supabase.storage.from('attachments').remove(batch);
+            if (error) throw error;
+            totalDeleted += batch.length;
+          }
+          setStorageCleanupResult({ deleted: totalDeleted });
+          setStorageOrphans([]);
+          setStorageCleanupStatus('done');
+          if (showToast) showToast(`Đã xóa thành công ${totalDeleted} file rác khỏi Storage!`);
+        } catch (err) {
+          console.error('[Storage Cleanup Delete]', err);
+          if (showToast) showToast('Lỗi khi xóa file: ' + err.message, 'error');
+          setStorageCleanupStatus('preview');
+        }
+      };
 
       const handleLearnFromChat = async (chatLogData) => {
           if (!chatLogData) return;
@@ -681,6 +750,100 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                      )}
                    </div>
                  </div>
+
+                {/* === STORAGE CLEANUP CARD === */}
+                <div className="bg-surface-container-low dark:bg-[#252525] p-5 rounded-xl border border-orange-200 dark:border-orange-900/50">
+                  <h3 className="font-bold mb-1 dark:text-white flex items-center gap-2">
+                    <span className="material-symbols-outlined text-orange-500">delete_sweep</span>
+                    Dọn dẹp Storage (Orphan Files)
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Quét và xóa các file trong bucket <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-xs">attachments</code> không còn được tham chiếu trong database. An toàn — chỉ xóa file không ai dùng.
+                  </p>
+
+                  {storageCleanupStatus === null && (
+                    <button
+                      onClick={handleStorageCleanup}
+                      className="px-5 py-2.5 rounded-lg font-bold border-2 border-orange-400 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-all flex items-center gap-2 bg-transparent"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">manage_search</span>
+                      Quét tìm file rác
+                    </button>
+                  )}
+
+                  {storageCleanupStatus === 'scanning' && (
+                    <div className="flex items-center gap-3 text-orange-600 dark:text-orange-400 font-medium">
+                      <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+                      Đang quét Storage và database...
+                    </div>
+                  )}
+
+                  {storageCleanupStatus === 'preview' && (
+                    <div className="space-y-4">
+                      {storageOrphans.length === 0 ? (
+                        <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-medium p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                          <span className="material-symbols-outlined">check_circle</span>
+                          Storage sạch! Không có file rác nào.
+                        </div>
+                      ) : (
+                        <>
+                          <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                            <p className="text-sm font-bold text-orange-700 dark:text-orange-400 mb-1">
+                              Tìm thấy <span className="text-lg">{storageOrphans.length}</span> file rác
+                              &nbsp;—&nbsp;
+                              tổng: {(storageOrphans.reduce((s, f) => s + (f.metadata?.size || 0), 0) / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                            <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-1">
+                              {storageOrphans.map(f => (
+                                <div key={f.name} className="text-xs text-orange-600 dark:text-orange-300 font-mono truncate">
+                                  {f.name} &nbsp;<span className="opacity-60">({((f.metadata?.size || 0) / 1024).toFixed(1)} KB)</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => { setStorageCleanupStatus(null); setStorageOrphans([]); }}
+                              className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 dark:text-gray-300 transition-colors"
+                            >
+                              Hủy
+                            </button>
+                            <button
+                              onClick={handleDeleteOrphans}
+                              className="px-5 py-2 rounded-lg font-bold bg-orange-500 hover:bg-orange-600 text-white flex items-center gap-2 transition-all shadow-md shadow-orange-500/20"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                              Xóa {storageOrphans.length} file rác
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      <button onClick={handleStorageCleanup} className="text-xs text-gray-500 hover:text-primary underline">↺ Quét lại</button>
+                    </div>
+                  )}
+
+                  {storageCleanupStatus === 'deleting' && (
+                    <div className="flex items-center gap-3 text-orange-600 dark:text-orange-400 font-medium">
+                      <span className="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+                      Đang xóa {storageOrphans.length} file...
+                    </div>
+                  )}
+
+                  {storageCleanupStatus === 'done' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-medium p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <span className="material-symbols-outlined">check_circle</span>
+                        Đã xóa thành công {storageCleanupResult?.deleted || 0} file rác!
+                      </div>
+                      <button
+                        onClick={() => { setStorageCleanupStatus(null); setStorageCleanupResult(null); }}
+                        className="text-xs text-gray-500 hover:text-primary underline"
+                      >
+                        ↺ Quét lại
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : null}
           </div>

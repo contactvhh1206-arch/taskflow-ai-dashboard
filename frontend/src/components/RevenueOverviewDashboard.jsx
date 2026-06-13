@@ -21,8 +21,13 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
       const processAIExtract = async (e) => {
          const file = e.target.files?.[0];
          if (!file) return;
+
+         if (file.size > 10 * 1024 * 1024) {
+            setAiError('File vượt quá 10MB. Vui lòng chọn file nhỏ hơn.');
+            e.target.value = '';
+            return;
+         }
          
-         setAiLoading(true);
          setAiError('');
          try {
             const isImage = file.type.startsWith('image/');

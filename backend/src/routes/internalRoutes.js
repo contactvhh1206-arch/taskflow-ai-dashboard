@@ -181,4 +181,76 @@ Your entire response must be parseable by JSON.parse() immediately.
   }
 });
 
+// [ADMIN] Lấy tất cả attachment URLs đang được dùng trong database
+// Dùng cho tính năng "Dọn Storage" trong Admin Panel
+router.get('/storage/used-urls', authGuard, async (req, res) => {
+  // Chỉ cho ADMIN
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Không có quyền truy cập.' });
+  }
+  try {
+    const pool = require('../config/database');
+    const usedUrls = new Set();
+
+    // 1. Thu thập từ daily_logs.attachments (JSON array of URLs)
+    try {
+      const logsResult = await pool.query(
+        `SELECT attachments FROM daily_logs WHERE attachments IS NOT NULL AND attachments != '[]' AND attachments != 'null'`
+      );
+      for (const row of logsResult.rows) {
+        let arr = row.attachments;
+        if (typeof arr === 'string') {
+          try { arr = JSON.parse(arr); } catch { continue; }
+        }
+        if (Array.isArray(arr)) {
+          arr.forEach(url => { if (typeof url === 'string' && url.includes('/attachments/')) usedUrls.add(url); });
+        }
+      }
+    } catch (e) {
+      console.warn('[storage/used-urls] Không đọc được daily_logs.attachments:', e.message);
+    }
+
+    // 2. Thu thập từ tasks.evidence_url
+    try {
+      const tasksResult = await pool.query(
+        `SELECT evidence_url FROM tasks WHERE evidence_url IS NOT NULL AND evidence_url != ''`
+      );
+      for (const row of tasksResult.rows) {
+        if (row.evidence_url && row.evidence_url.includes('/attachments/')) {
+          usedUrls.add(row.evidence_url);
+        }
+      }
+    } catch (e) {
+      console.warn('[storage/used-urls] Không đọc được tasks.evidence_url:', e.message);
+    }
+
+    // 3. Thu thập từ ai_sessions (chat messages có attachment url)
+    try {
+      const sessionsResult = await pool.query(
+        `SELECT chat_log FROM ai_sessions WHERE chat_log IS NOT NULL`
+      );
+      for (const row of sessionsResult.rows) {
+        let log = row.chat_log;
+        if (typeof log === 'string') {
+          try { log = JSON.parse(log); } catch { continue; }
+        }
+        if (Array.isArray(log)) {
+          log.forEach(msg => {
+            if (msg && msg.attachment && msg.attachment.url && msg.attachment.url.includes('/attachments/')) {
+              usedUrls.add(msg.attachment.url);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[storage/used-urls] Không đọc được ai_sessions:', e.message);
+    }
+
+    res.json({ success: true, urls: Array.from(usedUrls), count: usedUrls.size });
+  } catch (error) {
+    console.error('[storage/used-urls] Lỗi:', error);
+    res.status(500).json({ error: 'Lỗi server khi quét attachment URLs.' });
+  }
+});
+
 module.exports = router;

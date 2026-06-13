@@ -118,8 +118,10 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
           
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-          resolve(dataUrl);
+          // Tạo blob trực tiếp thay vì data URL — tiết kiệm RAM, tránh convert vòng
+          canvas.toBlob((blob) => {
+            resolve(blob);
+          }, 'image/jpeg', 0.8);
         };
         img.src = e.target.result;
       };
@@ -134,8 +136,10 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
         if (showToast) showToast('File ảnh quá lớn (Tối đa 15MB)');
         return;
       }
-      const compressedDataUrl = await compressImage(file);
-      setLogImage(compressedDataUrl);
+      const compressedBlob = await compressImage(file);
+      // Lưu blob trực tiếp, tạo objectURL chỉ để hiển thị preview
+      const previewUrl = URL.createObjectURL(compressedBlob);
+      setLogImage({ blob: compressedBlob, previewUrl });
     }
   };
 
@@ -154,19 +158,34 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setLogAudio(reader.result);
-        };
-        reader.readAsDataURL(audioBlob);
+        // Kiểm tra dợ lượng blob trước khi lưu
+        if (audioBlob.size > 5 * 1024 * 1024) {
+          if (showToast) showToast('Ghi âm quá lớn (> 5MB). Vui lòng ghi ngắn lại.');
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+        // Lưu blob trực tiếp, tạo objectURL chỉ để hiển thị (nếu có audio player)
+        setLogAudio({ blob: audioBlob, previewUrl: URL.createObjectURL(audioBlob) });
         stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+      const MAX_RECORDING_SECONDS = 120; // 2 phút
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime(prev => {
+          if (prev + 1 >= MAX_RECORDING_SECONDS) {
+            // Tự động dừng sau 2 phút
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              mediaRecorderRef.current.stop();
+              clearInterval(timerRef.current);
+              setIsRecording(false);
+              if (showToast) showToast('Đã đạt giới hạn ghi âm 2 phút.');
+            }
+          }
+          return prev + 1;
+        });
       }, 1000);
     } catch (err) {
       console.error("Error accessing microphone:", err);
@@ -198,13 +217,14 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       // Upload image to Supabase if exists
       if (logImage) {
         try {
-          const res = await fetch(logImage);
-          const blob = await res.blob();
+          // Dùng blob trực tiếp, không cần fetch/convert base64 nữa
           const fileName = `image_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-          const { data, error } = await supabase.storage.from('attachments').upload(fileName, blob, { contentType: 'image/jpeg' });
+          const { data, error } = await supabase.storage.from('attachments').upload(fileName, logImage.blob, { contentType: 'image/jpeg' });
           if (error) throw error;
           const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
           finalAttachments.push(publicUrl);
+          // Giải phóng object URL đã tạo tạm
+          URL.revokeObjectURL(logImage.previewUrl);
         } catch (err) {
           console.error("Lỗi upload ảnh lên Supabase:", err);
           if (showToast) showToast('Lỗi upload ảnh lên server');
@@ -214,13 +234,14 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
       // Upload audio to Supabase if exists
       if (logAudio) {
         try {
-          const res = await fetch(logAudio);
-          const blob = await res.blob();
+          // Dùng blob trực tiếp, không cần fetch/convert base64 nữa
           const fileName = `audio_${Date.now()}_${Math.random().toString(36).substring(7)}.webm`;
-          const { data, error } = await supabase.storage.from('attachments').upload(fileName, blob, { contentType: 'audio/webm' });
+          const { data, error } = await supabase.storage.from('attachments').upload(fileName, logAudio.blob, { contentType: 'audio/webm' });
           if (error) throw error;
           const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
           finalAttachments.push(publicUrl);
+          // Giải phóng object URL đã tạo tạm
+          URL.revokeObjectURL(logAudio.previewUrl);
         } catch (err) {
           console.error("Lỗi upload ghi âm lên Supabase:", err);
           if (showToast) showToast('Lỗi upload ghi âm lên server');
@@ -551,16 +572,16 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
           />
           {logImage && (
             <div className="relative w-max mt-2">
-              <img src={logImage} alt="Preview" className="h-24 rounded-lg border border-gray-200 dark:border-gray-700 object-cover" />
-              <button onClick={() => setLogImage(null)} className="absolute -top-2 -right-2 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center hover:bg-error/90 shadow-sm z-10">
+              <img src={logImage.previewUrl} alt="Preview" className="h-24 rounded-lg border border-gray-200 dark:border-gray-700 object-cover" />
+              <button onClick={() => { URL.revokeObjectURL(logImage.previewUrl); setLogImage(null); }} className="absolute -top-2 -right-2 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center hover:bg-error/90 shadow-sm z-10">
                 <span className="material-symbols-outlined text-[14px]">close</span>
               </button>
             </div>
           )}
           {logAudio && (
             <div className="relative w-full max-w-sm mt-2">
-              <audio controls src={logAudio} className="w-full h-10" />
-              <button onClick={() => setLogAudio(null)} className="absolute -top-2 -right-2 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center hover:bg-error/90 shadow-sm z-10">
+              <audio controls src={logAudio.previewUrl} className="w-full h-10" />
+              <button onClick={() => { URL.revokeObjectURL(logAudio.previewUrl); setLogAudio(null); }} className="absolute -top-2 -right-2 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center hover:bg-error/90 shadow-sm z-10">
                 <span className="material-symbols-outlined text-[14px]">close</span>
               </button>
             </div>
