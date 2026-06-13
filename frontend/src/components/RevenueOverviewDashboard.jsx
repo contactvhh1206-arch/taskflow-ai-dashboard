@@ -29,6 +29,7 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
          }
          
          setAiError('');
+         setAiLoading(true);
          try {
             const isImage = file.type.startsWith('image/');
             let contentData = '';

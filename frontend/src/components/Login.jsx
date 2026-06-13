@@ -28,50 +28,17 @@ export default function Login() {
           login(data.user, data.token);
           return;
         } else {
-          throw new Error(data.error || 'Lỗi đăng nhập');
+          setError(data.error || 'Tài khoản hoặc mật khẩu không chính xác.');
         }
+      } else if (response.status === 401) {
+        setError('Tài khoản hoặc mật khẩu không chính xác.');
       } else {
-        throw new Error('Backend down, fallback to local');
+        // Backend lỗi server (5xx) hoặc mạng
+        setError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.');
       }
     } catch {
-      // Check localStorage first
-      const trimmedUser = username.trim();
-      const trimmedPass = password.trim();
-      
-      try {
-        const users = JSON.parse(localStorage.getItem('taskflow_users') || '[]');
-        const foundUser = users.find(u => u.username.trim() === trimmedUser && (u.password === trimmedPass || u.password === btoa(trimmedPass)));
-        
-        if (foundUser) {
-          if (foundUser.isActive === false) {
-            setError('Tài khoản này đã bị khóa!');
-            return;
-          }
-          let facId = foundUser.facility_id;
-          if (!facId) {
-            facId = foundUser.role === 'FACILITY_MANAGER' ? (foundUser.name || foundUser.username) : 'ALL';
-          }
-          localStorage.setItem('facility_id', facId);
-          login(foundUser, 'mock-token-' + foundUser.username);
-          return;
-        }
-      } catch (e) {
-        console.error("Local storage auth error:", e);
-      }
-
-      // Hardcoded fallback
-      if (trimmedUser === 'admin' && trimmedPass === 'admin123') {
-        localStorage.setItem('facility_id', 'ALL');
-        login({ name: 'Sếp Tổng', role: 'SUPER_ADMIN', facility_id: 'ALL' }, 'mock-admin');
-      } else if (trimmedUser === 'manager1' && trimmedPass === 'manager123') {
-        localStorage.setItem('facility_id', 'Cơ sở 1');
-        login({ name: 'Quản lý Cơ sở 1', role: 'FACILITY_MANAGER', facility_id: 'Cơ sở 1' }, 'mock-manager');
-      } else if (trimmedUser === 'sysadmin' && trimmedPass === 'admin123') {
-        localStorage.setItem('facility_id', 'ALL');
-        login({ name: 'Quản trị viên Hệ thống (IT)', role: 'ADMIN', facility_id: 'ALL' }, 'mock-sysadmin');
-      } else {
-        setError('Tài khoản hoặc mật khẩu không chính xác.');
-      }
+      // Lỗi mạng (server hoàn toàn không phản hồi)
+      setError('Máy chủ đang không phản hồi. Vui lòng thử lại sau ít phút.');
     } finally {
       setLoading(false);
     }
