@@ -124,17 +124,42 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                   const match = t.historyLog[0]?.time?.match(/(\d+):(\d+) - (\d+)\/(\d+)\/(\d+)/);
                   if (match) return new Date(match[5], match[4] - 1, match[3], match[1], match[2]).getTime();
                 }
+                // Fallback sang createdAt thay vì now() để tránh task cũ bị gom vào filter "Hôm nay"
+                if (t?.createdAt) {
+                  const parsed = new Date(t.createdAt);
+                  if (!isNaN(parsed.getTime())) return parsed.getTime();
+                }
               } catch (e) { }
-              return now.getTime();
+              // Nếu không có bất kỳ thông tin ngày nào, trả về 0 để task bị loại khỏi mọi filter
+              return 0;
+            };
+
+            // Helper: parse chuỗi ngày tháng, hỗ trợ cả ISO 8601 và DD/MM/YYYY HH:mm (định dạng backend VN)
+            const parseDateSafe = (dateStr) => {
+              if (!dateStr) return NaN;
+              // Thử parse ISO trực tiếp trước
+              const direct = new Date(dateStr);
+              if (!isNaN(direct.getTime())) return direct.getTime();
+              // Fallback: parse thủ công định dạng DD/MM/YYYY HH:mm hoặc DD/MM/YYYY
+              const matchDMY = String(dateStr).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[\s,T]+(\d{1,2}):(\d{2}))?/);
+              if (matchDMY) {
+                const [, d, m, y, h = '0', min = '0'] = matchDMY;
+                const parsed = new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(min));
+                if (!isNaN(parsed.getTime())) return parsed.getTime();
+              }
+              return NaN;
             };
 
             const getCompletedTime = (t) => {
-              if (t?.completedAtReal) return new Date(t.completedAtReal).getTime();
-              if (t?.completedAt) return new Date(t.completedAt).getTime();
+              const realTime = parseDateSafe(t?.completedAtReal);
+              if (!isNaN(realTime)) return realTime;
+              const compTime = parseDateSafe(t?.completedAt);
+              if (!isNaN(compTime)) return compTime;
               // Nếu task đã ở trạng thái done/review nhưng chưa có completedAt,
               // dùng thời điểm hiện tại để bộ lọc "Hôm nay" bắt được đúng.
               if (t?.status === 'done' || t?.status === 'review') return now.getTime();
-              return t?.deadline ? new Date(t.deadline).getTime() : now.getTime();
+              const deadlineTime = parseDateSafe(t?.deadline);
+              return !isNaN(deadlineTime) ? deadlineTime : now.getTime();
             };
 
             const getDeadlineTime = (t) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useRef, useCallback } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef, useCallback, useMemo } from 'react';
 import axiosClient from './api/axiosClient.js';
 import supabase from './utils/supabaseClient';
 import Login from './components/Login.jsx';
@@ -533,7 +533,43 @@ function MainDashboard() {
      return true;
   });
 
-
+  // [FIX] Đồng bộ cột "Hoàn thành" Kanban với bộ lọc timeFilter của Dashboard.
+  // Chỉ hiển thị task 'done' hoàn thành trong khung thời gian đang chọn (tuần/tháng).
+  // Các cột Cần làm / Đang tiến hành / Nghiệm thu không bị ảnh hưởng.
+  const filteredTasksDone = useMemo(() => {
+    const doneTasks = filteredTasks.filter(t => t?.status === 'done');
+    const now = new Date();
+    let startMs, endMs;
+    if (timeFilter === 'week') {
+      const day = now.getDay() || 7;
+      const start = new Date(now);
+      start.setDate(now.getDate() - day + 1);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      startMs = start.getTime();
+      endMs = end.getTime();
+    } else {
+      // month
+      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      startMs = start.getTime();
+      endMs = end.getTime();
+    }
+    const parseSafe = (str) => {
+      if (!str) return NaN;
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) return d.getTime();
+      const m = String(str).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[\s,T]+(\d{1,2}):(\d{2}))?/);
+      if (m) { const r = new Date(Number(m[3]), Number(m[2])-1, Number(m[1]), Number(m[4]||0), Number(m[5]||0)); return isNaN(r.getTime()) ? NaN : r.getTime(); }
+      return NaN;
+    };
+    return doneTasks.filter(t => {
+      const ct = parseSafe(t?.completedAtReal) || parseSafe(t?.completedAt) || now.getTime();
+      return ct >= startMs && ct <= endMs;
+    });
+  }, [filteredTasks, timeFilter]);
 
   const [facilityStatuses, setFacilityStatuses] = useState([]);
   const [isCheckinCompleted, setIsCheckinCompleted] = useState(false);
@@ -1646,7 +1682,7 @@ function MainDashboard() {
                     <KanbanColumn title="Cần làm" status="todo" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} readOnly={isReadOnlyView} />
                     <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} readOnly={isReadOnlyView} />
                     <KanbanColumn title="Nghiệm thu" status="review" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} readOnly={isReadOnlyView} />
-                    <KanbanColumn title="Hoàn thành" status="done" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Hoàn thành" status="done" tasks={filteredTasksDone} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} readOnly={isReadOnlyView} />
                   </div>
                 ) : (
                   <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 overflow-hidden"><div className="overflow-x-auto custom-scrollbar"><table className="w-full text-sm text-left"><thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-400"><tr><th className="px-6 py-4">Task</th><th className="px-6 py-4">PIC</th><th className="px-6 py-4">Deadline</th><th className="px-6 py-4">Trạng thái</th></tr></thead><tbody>
