@@ -118,22 +118,6 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             const startMs = startOfFrame.getTime();
             const endMs = endOfFrame.getTime();
 
-            const getCreatedTime = (t) => {
-              try {
-                if (t?.historyLog?.length > 0) {
-                  const match = t.historyLog[0]?.time?.match(/(\d+):(\d+) - (\d+)\/(\d+)\/(\d+)/);
-                  if (match) return new Date(match[5], match[4] - 1, match[3], match[1], match[2]).getTime();
-                }
-                // Fallback sang createdAt thay vì now() để tránh task cũ bị gom vào filter "Hôm nay"
-                if (t?.createdAt) {
-                  const parsed = new Date(t.createdAt);
-                  if (!isNaN(parsed.getTime())) return parsed.getTime();
-                }
-              } catch (e) { }
-              // Nếu không có bất kỳ thông tin ngày nào, trả về 0 để task bị loại khỏi mọi filter
-              return 0;
-            };
-
             // Helper: parse chuỗi ngày tháng, hỗ trợ cả ISO 8601 và DD/MM/YYYY HH:mm (định dạng backend VN)
             const parseDateSafe = (dateStr) => {
               if (!dateStr) return NaN;
@@ -169,11 +153,11 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
               return new Date(y, m - 1, d, 23, 59, 59).getTime();
             };
 
+            // [FIX] Công việc Mở = tất cả task chưa xong, BẤT KỂ ngày tạo.
+            // Không lọc theo thời gian vì task tạo hôm qua vẫn cần hiển thị nếu chưa xử lý.
             const openCount = myTasks.filter(t => {
-              // Loại trừ cả trạng thái 'review' (Nghiệm thu) - không tính là task đang mở
               if (t?.status === 'done' || t?.status === 'review' || t?.status === 'revoked') return false;
-              const cTime = getCreatedTime(t);
-              return cTime >= startMs && cTime <= endMs;
+              return true;
             }).length;
 
             const closedCount = myTasks.filter(t => {
