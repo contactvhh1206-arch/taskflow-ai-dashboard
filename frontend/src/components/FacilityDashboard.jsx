@@ -160,12 +160,12 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
               return true;
             }).length;
 
-            const closedCount = myTasks.filter(t => {
-              // Tính cả 'review' (Nghiệm thu) là trạng thái đã hoàn thành
-              if (t?.status !== 'done' && t?.status !== 'review') return false;
-              const compTime = getCompletedTime(t);
-              return compTime >= startMs && compTime <= endMs;
-            }).length;
+            // [FIX] Backend đã lọc task 'done' trong tháng hiện tại (updated_at >= date_trunc('month')).
+            // completedAt từ API thực chất là updated_at (không phải ngày hoàn thành thực sự).
+            // Không filter thêm theo thời gian ở frontend để tránh loại nhầm task đã hoàn thành.
+            const closedCount = myTasks.filter(t =>
+              t?.status === 'done' || t?.status === 'review'
+            ).length;
 
             const overdueCount = myTasks.filter(t => {
               const dTime = getDeadlineTime(t);
