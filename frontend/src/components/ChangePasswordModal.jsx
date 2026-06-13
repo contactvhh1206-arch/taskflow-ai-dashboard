@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 export default function ChangePasswordModal({ user, onClose, onSuccess }) {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -71,7 +71,7 @@ export default function ChangePasswordModal({ user, onClose, onSuccess }) {
       }
 
       // Fallback: Gọi API cho users hệ thống thực
-      const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/users/change-password', {
+      const response = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/users/change-password', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -13,7 +13,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
       const hasPingedAI = useRef(false); // 1. Tạo cờ khóa vĩnh viễn cho session hiện tại
       const handleRequestSupport = async (taskId) => {
         try {
-          const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/support`, {
+          const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/support`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -235,15 +235,14 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
           hasPingedAI.current = true; 
           
           try {
-            console.log("[OpenRouter API Call] System Prompt Ping...");
-            
+
             const topUrgent = tasks.filter(t => t?.status !== 'done' && t?.status !== 'revoked' && (t?.urgent || t?.pinned)).slice(0, 3);
             if (topUrgent.length === 0) return;
             
             const taskIds = topUrgent.map(t => t.id);
             const token = localStorage.getItem('token') || localStorage.getItem('taskflow_token');
             
-            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/ai/ping-batch`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/ai/ping-batch`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

@@ -6,7 +6,7 @@ export default function ArchivedFacilitiesDashboard({ facilityList, showToast, r
        const handleRestore = async (fac) => {
           try {
              const token = localStorage.getItem('taskflow_token');
-             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${fac.id}/restore`, { 
+             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities/${fac.id}/restore`, { 
                 method: 'PUT',
                 headers: { 
                    'Authorization': `Bearer ${token}`,

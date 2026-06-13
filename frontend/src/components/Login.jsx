@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+﻿import React, { useState, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext.jsx';
 
 export default function Login() {
@@ -15,7 +15,7 @@ export default function Login() {
 
     try {
       const safeUsername = username ? username.trim().toLowerCase() : '';
-      const response = await fetch('https://taskflow-ai-dashboard.onrender.com/api/auth/login', {
+      const response = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: safeUsername, password })
