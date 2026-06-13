@@ -41,7 +41,7 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                if (uploadError) throw uploadError;
                const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
 
-               const response = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/internal/extract-revenue', {
+               const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/internal/extract-revenue`, {
                   method: 'POST',
                   headers: {
                      'Content-Type': 'application/json'
@@ -89,7 +89,7 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                const systemPrompt = `Bạn là trợ lý kế toán. Hãy quét file Excel/CSV được cung cấp và bóc tách số liệu doanh thu. LƯU Ý RẤT QUAN TRỌNG: Dữ liệu này thuộc về THÁNG ${monthStr} NĂM ${yearStr}. Nếu trong file chỉ ghi ngày mà không ghi tháng/năm, bạn BẮT BUỘC phải tự động nội suy và điền đúng "${yearStr}-${monthStr}-DD" vào trường date. Hãy KHỚP CHÍNH XÁC số liệu vào các chi nhánh hiện có sau đây của hệ thống: [${facNames}]. Tuyệt đối không tự bịa ra tên chi nhánh khác. Trả về đúng định dạng JSON: { "data": [ { "date": "YYYY-MM-DD", "revenues": { "TenChiNhanh": SỐ_TIỀN_INT } } ] }`;
                
                const token = localStorage.getItem('taskflow_token');
-               const response = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/internal/extract-revenue-text', {
+               const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/internal/extract-revenue-text`, {
                   method: 'POST',
                   headers: {
                      'Authorization': `Bearer ${token}`,
@@ -152,7 +152,7 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
 
                if (responseJson.usage) {
                   const token = localStorage.getItem('taskflow_token');
-                  fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/internal/log-tokens', {
+                  fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/internal/log-tokens`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',

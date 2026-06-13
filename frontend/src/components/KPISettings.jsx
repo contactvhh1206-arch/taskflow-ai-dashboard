@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 export default function KPISettings({ user, facilityList, showToast, refreshFacilities }) {
        const [kpis, setKpis] = React.useState({});
@@ -19,7 +19,7 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
              const token = localStorage.getItem('taskflow_token');
              let savedKpis = {};
              try {
-                const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi', {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi`, {
                    headers: { 
                       'Authorization': `Bearer ${token}`,
                       'x-user-role': user?.role || '',
@@ -77,7 +77,7 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
           
           try {
              const token = localStorage.getItem('taskflow_token');
-             const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi', {
+             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi`, {
                 method: 'POST',
                 headers: { 
                    'Authorization': `Bearer ${token}`,
@@ -115,7 +115,7 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
 
           try {
              const token = localStorage.getItem('taskflow_token');
-             const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/facilities/${facId}/archive`, { 
+             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities/${facId}/archive`, { 
                 method: 'PUT',
                 headers: { 
                    'Authorization': `Bearer ${token}`,
@@ -150,7 +150,7 @@ export default function KPISettings({ user, facilityList, showToast, refreshFaci
           setIsAddingFac(true);
           try {
              const token = localStorage.getItem('taskflow_token');
-             const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities', {
+             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities`, {
                 method: 'POST',
                 headers: { 
                    'Content-Type': 'application/json',

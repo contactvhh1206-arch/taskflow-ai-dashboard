@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, createContext, useContext, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef, useCallback, useMemo } from 'react';
 import axiosClient from './api/axiosClient.js';
 import supabase from './utils/supabaseClient';
 import Login from './components/Login.jsx';
@@ -174,7 +174,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
     const fetchUsers = async () => {
       try {
         const token = localStorage.getItem('taskflow_token');
-        const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/users', {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/users`, {
           headers: {
             'Authorization': token ? `Bearer ${token}` : '',
             'x-user-role': user?.role || '',
@@ -553,7 +553,7 @@ function MainDashboard() {
         setSelectedTaskComments([]); // Chống rò rỉ State
         const fetchComments = async () => {
           try {
-            const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/comments`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/comments`, {
               headers: { 
                 'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
                 'x-user-id': user?.id,
@@ -638,7 +638,7 @@ function MainDashboard() {
   const fetchFacilities = async () => {
     try {
       const token = localStorage.getItem('taskflow_token');
-      const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -692,7 +692,7 @@ function MainDashboard() {
       const token = auth ? auth.token : '';
       const user = auth ? auth.user : null;
       
-      const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'x-user-role': user?.role || '',
@@ -721,7 +721,7 @@ function MainDashboard() {
 
   const fetchSystemConfig = async () => {
     try {
-      const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/logs');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/logs`);
       const data = await res.json();
       if (data.success && data.data) {
         const configLog = data.data.find(log => log.entry_type === 'SYSTEM_CONFIG');
@@ -887,7 +887,7 @@ function MainDashboard() {
     let allUsers = [];
     try {
       const token = localStorage.getItem('taskflow_token');
-      const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/users', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/users`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'x-user-role': user?.role || '',
@@ -1027,7 +1027,7 @@ function MainDashboard() {
 
   const handleUpdateTaskStatus = async (taskId, newStatus, evidenceName = null) => {
     try {
-      const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/status`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1068,7 +1068,7 @@ function MainDashboard() {
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa vĩnh viễn task này không? Hành động này không thể hoàn tác!')) return;
     try {
-      const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -1194,7 +1194,7 @@ function MainDashboard() {
 
   const fetchFacilityStatuses = async () => {
     try {
-      const response = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/checkin/status', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/checkin/status`, {
         headers: { 'x-user-role': user.role, 'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL' }
       });
       if (response.ok) {
@@ -1944,7 +1944,7 @@ function MainDashboard() {
                       }
                       
                       try {
-                        const res = await fetch(`https://taskflow-ai-dashboard.onrender.com/api/tasks/${taskId}/comments`, {
+                        const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/comments`, {
                           method: 'POST',
                           headers: {
                             'Content-Type': 'application/json',

@@ -23,7 +23,7 @@ export default function AIUsageLogs() {
         const fetchAuditLogs = async () => {
           try {
             const token = localStorage.getItem('token') || '';
-            const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/ai/audit-logs', {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/ai/audit-logs`, {
               headers: {
                 'Authorization': `Bearer ${token}`
               },
@@ -60,7 +60,7 @@ export default function AIUsageLogs() {
 
         const fetchViolations = async () => {
           try {
-            const res = await fetch(${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/logs', {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/logs`, {
               headers: {
                 'x-user-role': 'ADMIN',
                 'x-facility-id': 'ALL'
