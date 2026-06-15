@@ -776,29 +776,14 @@ function MainDashboard() {
   const [dashboardStats, setDashboardStats] = useState({ open: 0, completed: 0, overdue: 0 });
   const [isStatsLoading, setIsStatsLoading] = useState(false);
 
-  // [FIX] Đồng bộ cột "Hoàn thành" Kanban với bộ lọc timeFilter của Dashboard.
-  // Đặt SAU khai báo timeFilter để tránh lỗi TDZ (Cannot access before initialization).
+  // [FIX] Cột "Hoàn thành" Kanban LUÔN hiển thị tất cả task done trong THÁNG hiện tại,
+  // không phụ thuộc vào timeFilter (Tuần này/Tháng này). Backend đã lọc done trong tháng rồi.
   const filteredTasksDone = useMemo(() => {
     const doneTasks = filteredTasks.filter(t => t?.status === 'done');
     const now = new Date();
-    let startMs, endMs;
-    if (timeFilter === 'week') {
-      const day = now.getDay() || 7;
-      const start = new Date(now);
-      start.setDate(now.getDate() - day + 1);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 6);
-      end.setHours(23, 59, 59, 999);
-      startMs = start.getTime();
-      endMs = end.getTime();
-    } else {
-      // month
-      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-      startMs = start.getTime();
-      endMs = end.getTime();
-    }
+    // Luôn dùng khung tháng hiện tại
+    const startMs = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+    const endMs = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
     const parseSafe = (str) => {
       if (!str) return NaN;
       const d = new Date(str);
@@ -811,7 +796,7 @@ function MainDashboard() {
       const ct = parseSafe(t?.completedAtReal) || parseSafe(t?.completedAt) || now.getTime();
       return ct >= startMs && ct <= endMs;
     });
-  }, [filteredTasks, timeFilter]);
+  }, [filteredTasks]);
 
 
   const fetchDashboardStats = (filter) => {
