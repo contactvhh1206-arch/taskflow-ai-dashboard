@@ -1689,7 +1689,7 @@ function MainDashboard() {
                     }`}
                   >
                     <span className="material-symbols-outlined text-[16px]">schedule</span>
-                    Sắp hạn
+                    Sắp đến hạn
                   </button>
                 </div>
 
