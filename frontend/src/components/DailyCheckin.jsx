@@ -8,10 +8,16 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const getFormattedDate = (dateObj) => {
     return `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
   };
-  const today = getFormattedDate(new Date());
+  // Ca làm việc 9h sáng đến 3h khuya hôm sau — nếu giờ < 4h sáng thì vẫn thuộc ngày hôm trước
+  const getWorkDay = () => {
+    const d = new Date();
+    if (d.getHours() < 4) d.setDate(d.getDate() - 1);
+    return d;
+  };
+  const today = getFormattedDate(getWorkDay());
   
   const getLocalISODate = () => {
-    const d = new Date();
+    const d = getWorkDay();
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
   };
   
