@@ -1011,7 +1011,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
               
               const checkinsForDate = checkins.filter(c => c.date === formattedFilterDate);
               
-              if (filteredLogs.length === 0) {
+              if (filteredLogs.length === 0 && checkinsForDate.length === 0) {
                 return (
                   <div className="text-center py-10 flex flex-col items-center justify-center opacity-60">
                     <span className="material-symbols-outlined text-4xl mb-2 text-gray-400">inbox</span>
