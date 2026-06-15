@@ -71,6 +71,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const [editFacPic, setEditFacPic] = useState('');
       const [isUpdatingFac, setIsUpdatingFac] = useState(false);
       const [editFinanceFacilities, setEditFinanceFacilities] = useState(['ALL']);
+      const [editSupervisorFacilities, setEditSupervisorFacilities] = useState([]);
 
       const [deletingFac, setDeletingFac] = useState(null);
       const [deletingUser, setDeletingUser] = useState(null);
@@ -457,7 +458,11 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                 body: JSON.stringify({
                     name: finalName,
                     role: finalRole,
-                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(editUserRole) ? editFinanceFacilities : HIGH_LEVEL_ROLES.includes(editUserRole) ? 'ALL' : editUserFacility,
+                     facility_id: editUserRole === 'SUPERVISOR'
+                       ? editSupervisorFacilities
+                       : ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(editUserRole)
+                         ? editFinanceFacilities
+                         : HIGH_LEVEL_ROLES.includes(editUserRole) ? 'ALL' : editUserFacility,
                     password: editUserPassword ? editUserPassword.trim() : null
                 })
             });
@@ -688,6 +693,14 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                                       setEditUserRole(u.role);
                                       setEditUserFacility(u.facility_id);
                                       setEditFinanceFacilities(Array.isArray(u?.facility_id) ? u.facility_id : (u?.facility_id ? [u.facility_id] : ['ALL']));
+                                      // Khởi tạo danh sách cơ sở SUPERVISOR từ managed_facilities
+                                      if (u.role === 'SUPERVISOR') {
+                                        const mf = u.facility_id; // API trả về managed_facilities qua cột facility_id
+                                        const arr = Array.isArray(mf) ? mf : (mf ? [mf] : []);
+                                        setEditSupervisorFacilities(arr.filter(x => x !== 'ALL'));
+                                      } else {
+                                        setEditSupervisorFacilities([]);
+                                      }
                                       setEditUserPassword('');
                                     }} className="px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition-all flex items-center justify-center border bg-blue-100 text-blue-600 border-blue-300 hover:bg-blue-200 dark:bg-blue-900/20 dark:border-blue-800/30 dark:hover:bg-blue-900/40">
                                       <span className="material-symbols-outlined text-[16px]">edit</span>
@@ -1037,6 +1050,27 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                             </label>
                           ))}
                         </div>
+                      </div>
+                    ) : editUserRole === 'SUPERVISOR' ? (
+                      <div className="col-span-2">
+                        <label className="block text-sm font-medium text-amber-600 mb-1">⚠️ Cơ sở được phép giám sát</label>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 border border-amber-300 dark:border-amber-700 rounded-lg p-3 max-h-[120px] overflow-y-auto custom-scrollbar bg-amber-50 dark:bg-amber-900/10">
+                          {(facilities || []).map(f => (
+                            <label key={f.id} className="flex items-center gap-1.5 text-sm font-medium dark:text-white cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                className="accent-amber-500 w-4 h-4"
+                                checked={editSupervisorFacilities.includes(f.name)}
+                                onChange={e => {
+                                  if (e.target.checked) setEditSupervisorFacilities(prev => [...prev, f.name]);
+                                  else setEditSupervisorFacilities(prev => prev.filter(x => x !== f.name));
+                                }}
+                              />
+                              {f.name}
+                            </label>
+                          ))}
+                        </div>
+                        <p className="text-xs text-amber-600 mt-1">Đã chọn: {editSupervisorFacilities.length > 0 ? editSupervisorFacilities.join(', ') : 'Chưa chọn cơ sở nào'}</p>
                       </div>
                     ) : (
                       <div>
