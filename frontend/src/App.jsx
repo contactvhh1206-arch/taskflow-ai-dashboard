@@ -772,7 +772,7 @@ function MainDashboard() {
   }, []);
   
   // Dashboard time filter and stats
-  const [timeFilter, setTimeFilter] = useState('week'); // 'week' | 'month'
+  const [taskFilter, setTaskFilter] = useState('all'); // 'all' | 'urgent' | 'deadline'
   const [dashboardStats, setDashboardStats] = useState({ open: 0, completed: 0, overdue: 0 });
   const [isStatsLoading, setIsStatsLoading] = useState(false);
 
@@ -875,9 +875,9 @@ function MainDashboard() {
 
   useEffect(() => {
     if (user) {
-      fetchDashboardStats(timeFilter);
+      fetchDashboardStats('month');
     }
-  }, [user?.id, timeFilter]); // Fetch when timeFilter changes
+  }, [user?.id]); // Fetch on mount
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -1667,27 +1667,29 @@ function MainDashboard() {
                   </div>
                 </div>
 
-                {/* Segmented Control: Time Filter */}
+                {/* Segmented Control: Task Filter */}
                 <div className="flex items-center bg-surface-container-high dark:bg-[#252525] rounded-lg p-1 w-fit mb-6 shadow-inner border border-outline-variant dark:border-gray-800">
                   <button
-                    onClick={() => setTimeFilter('week')}
-                    className={`px-5 py-1.5 text-sm font-medium rounded-md transition-all duration-300 ${
-                      timeFilter === 'week'
-                        ? 'bg-primary text-white shadow-md'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-primary dark:hover:text-white'
+                    onClick={() => setTaskFilter(taskFilter === 'urgent' ? 'all' : 'urgent')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-300 flex items-center gap-1.5 ${
+                      taskFilter === 'urgent'
+                        ? 'bg-red-500 text-white shadow-md'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-red-500 dark:hover:text-red-400'
                     }`}
                   >
-                    Tuần này
+                    <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
+                    Khẩn cấp
                   </button>
                   <button
-                    onClick={() => setTimeFilter('month')}
-                    className={`px-5 py-1.5 text-sm font-medium rounded-md transition-all duration-300 ${
-                      timeFilter === 'month'
-                        ? 'bg-primary text-white shadow-md'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-primary dark:hover:text-white'
+                    onClick={() => setTaskFilter(taskFilter === 'deadline' ? 'all' : 'deadline')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-300 flex items-center gap-1.5 ${
+                      taskFilter === 'deadline'
+                        ? 'bg-amber-500 text-white shadow-md'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-amber-500 dark:hover:text-amber-400'
                     }`}
                   >
-                    Tháng này
+                    <span className="material-symbols-outlined text-[16px]">schedule</span>
+                    Sắp hạn
                   </button>
                 </div>
 
@@ -1724,9 +1726,9 @@ function MainDashboard() {
 
                 {viewMode === 'kanban' ? (
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Cần làm" status="todo" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} readOnly={isReadOnlyView} />
-                    <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} readOnly={isReadOnlyView} />
-                    <KanbanColumn title="Nghiệm thu" status="review" tasks={filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Cần làm" status="todo" tasks={taskFilter === 'urgent' ? filteredTasks.filter(t => t.urgent || t.priority_stars >= 3) : taskFilter === 'deadline' ? filteredTasks.filter(t => { if (t.status === 'done' || t.status === 'review' || !t.deadline) return false; const dl = new Date(t.deadline).getTime(); const now = Date.now(); return dl > 0 && dl - now <= 3 * 24 * 60 * 60 * 1000; }) : filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'todo'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Đang tiến hành" status="in_progress" tasks={taskFilter === 'urgent' ? filteredTasks.filter(t => t.urgent || t.priority_stars >= 3) : taskFilter === 'deadline' ? filteredTasks.filter(t => { if (t.status === 'done' || t.status === 'review' || !t.deadline) return false; const dl = new Date(t.deadline).getTime(); const now = Date.now(); return dl > 0 && dl - now <= 3 * 24 * 60 * 60 * 1000; }) : filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'in_progress'})} readOnly={isReadOnlyView} />
+                    <KanbanColumn title="Nghiệm thu" status="review" tasks={taskFilter === 'urgent' ? filteredTasks.filter(t => t.urgent || t.priority_stars >= 3) : taskFilter === 'deadline' ? filteredTasks.filter(t => { if (t.status === 'done' || t.status === 'review' || !t.deadline) return false; const dl = new Date(t.deadline).getTime(); const now = Date.now(); return dl > 0 && dl - now <= 3 * 24 * 60 * 60 * 1000; }) : filteredTasks} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'review'})} readOnly={isReadOnlyView} />
                     <KanbanColumn title="Hoàn thành" status="done" tasks={filteredTasksDone} setSelectedTask={setSelectedTask} onOpenCreateModal={(s) => { setCreateModalStatus(s); setShowCreateModal(true); }} onQuickAdd={(t) => handleCreateTask({...t, status: 'done'})} readOnly={isReadOnlyView} />
                   </div>
                 ) : (
