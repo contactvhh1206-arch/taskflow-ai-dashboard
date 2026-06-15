@@ -498,7 +498,7 @@ function MainDashboard() {
   const isVPGlobal = user?.role === 'VICE_PRESIDENT';
   const isDeptHeadGlobal = ['DEPARTMENT_HEAD'].includes(user?.role);
   const deptIdGlobal = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVPGlobal ? 'BGD' : 'MARKETING'));
-  const isReadOnlyView = isDeptHeadGlobal && globalFacilityFilter !== deptIdGlobal && deptIdGlobal !== 'MARKETING';
+  const isReadOnlyView = (isDeptHeadGlobal && globalFacilityFilter !== deptIdGlobal && deptIdGlobal !== 'MARKETING') || user?.role === 'SUPERVISOR';
 
   // Derived state for filtering tasks
 
@@ -507,6 +507,14 @@ function MainDashboard() {
      const isVP = user?.role === 'VICE_PRESIDENT';
      const isDeptHead = ['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) || isVP;
      const deptId = user?.department_id || (user?.username === 'marketing' ? 'MARKETING' : (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (isVP ? 'BGD' : 'MARKETING')));
+
+     // SUPERVISOR: filter theo cơ sở đang chọn trên dropdown
+     if (user?.role === 'SUPERVISOR') {
+         if (!globalFacilityFilter || globalFacilityFilter === 'ALL') return true;
+         const filterLower = String(globalFacilityFilter).toLowerCase();
+         const tFacName = String(t?.facilityId || t?.facility || '').toLowerCase();
+         return tFacName.includes(filterLower);
+     }
 
      // 🚨 BỨC TƯỜNG TIN TƯỜNG BACKEND (TRUST THE BACKEND) 🚨
      // Nhóm Quản lý Cơ sở (FACILITY_MANAGER) và Nhân viên (LOCAL) đã được Backend lọc 100% chuẩn xác.
@@ -1350,6 +1358,7 @@ function MainDashboard() {
           {user.role === 'SUPERVISOR' && (
             <>
               <NavItem icon="fact_check" label="Điểm danh (Xem)" active={activeTab === 'checkin'} onClick={() => setActiveTab('checkin')} />
+              <NavItem icon="assignment" label="Công việc (Xem)" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
               <NavItem icon="dashboard" label="Tổng quan" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
             </>
