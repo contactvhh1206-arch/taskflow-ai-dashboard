@@ -607,7 +607,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
               )}
             </div>
             <button onClick={handleAddLog} disabled={!logContent.trim() && !logImage && !logAudio} className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2 shrink-0">
-              <span className="material-symbols-outlined text-[18px]">send</span> Ghi nhật ký
+              <span className="material-symbols-outlined text-[18px]">send</span> Gửi
             </button>
           </div>
         </div>
