@@ -416,6 +416,7 @@ function MainDashboard() {
     if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD'].includes(user.role)) return 'ai-advisor';
     if (user.role === 'FINANCE_DEPT') return 'dashboard';
     if (user.role === 'FACILITY_MANAGER') return 'checkin';
+    if (user.role === 'SUPERVISOR') return 'checkin';
     return 'tasks';
   });
   const [chatInput, setChatInput] = useState('');
@@ -461,8 +462,23 @@ function MainDashboard() {
     fetchSessions();
   }, []); // Gọi 1 lần lúc khởi tạo app
   const [tasks, setTasks] = useState([]);
+  // Parse managed_facilities cho SUPERVISOR (lưu theo tên cơ sở)
+  const supervisorFacilities = React.useMemo(() => {
+    if (user?.role !== 'SUPERVISOR') return [];
+    const mf = user?.managed_facilities;
+    if (!mf) return [];
+    if (Array.isArray(mf)) return mf;
+    try { return JSON.parse(mf); } catch { return []; }
+  }, [user?.role, user?.managed_facilities]);
+
   const [globalFacilityFilter, setGlobalFacilityFilter] = useState(() => {
-    return user?.role === 'FACILITY_MANAGER' ? (user?.facility_code || user?.facility_id || '') : 'ALL';
+    if (user?.role === 'FACILITY_MANAGER') return (user?.facility_code || user?.facility_id || '');
+    if (user?.role === 'SUPERVISOR') {
+      const mf = user?.managed_facilities;
+      const arr = Array.isArray(mf) ? mf : (() => { try { return JSON.parse(mf || '[]'); } catch { return []; } })();
+      return arr[0] || 'ALL';
+    }
+    return 'ALL';
   });
   const [facilitiesList, setFacilitiesList] = useState([]);
   
@@ -822,6 +838,8 @@ function MainDashboard() {
       let userTasks = INITIAL_TASKS;
       if (user.role === 'FACILITY_MANAGER') {
         userTasks = INITIAL_TASKS.filter(t => t.facility === user.facility_id);
+      } else if (user.role === 'SUPERVISOR') {
+        userTasks = INITIAL_TASKS.filter(t => supervisorFacilities.includes(t.facility));
       }
       
       let open = 0;
@@ -1105,6 +1123,7 @@ function MainDashboard() {
         if (res.success) {
             let fetchedTasks = res.data || [];
             const isManager = user.role === 'FACILITY_MANAGER';
+            const isSupervisor = user.role === 'SUPERVISOR';
             const isDeptHead = user.role === 'DEPARTMENT_HEAD';
             const isBoss = user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT';
             const isFinance = user.role === 'FINANCE_DEPT';
@@ -1115,6 +1134,14 @@ function MainDashboard() {
                     String(t.facilityId) === String(user.facility_id) || 
                     String(t.facility) === String(user.facility_name) ||
                     String(t.pic_id) === String(user.id)
+                );
+            } else if (isSupervisor && supervisorFacilities.length > 0) {
+                // SUPERVISOR thấy tasks của tất cả cơ sở trong managed_facilities
+                fetchedTasks = fetchedTasks.filter(t =>
+                    supervisorFacilities.some(fac =>
+                        String(t.facility) === String(fac) ||
+                        String(t.facilityId) === String(fac)
+                    )
                 );
             } else if (isDeptHead && user.department_code) {
                 fetchedTasks = fetchedTasks.filter(t => filterTaskForDeptHead(t, user, user.department_code));
@@ -1244,7 +1271,7 @@ function MainDashboard() {
          // Tự động set activeSessionId bằng ID của session vừa tạo
          setActiveAiSessionId(newSession.id);
          
-         if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) {
+         if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'SUPERVISOR', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) {
              setActiveTab('ai-advisor');
          } else {
              setShowAITaskModal(true);
@@ -1320,6 +1347,13 @@ function MainDashboard() {
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
             </>
           )}
+          {user.role === 'SUPERVISOR' && (
+            <>
+              <NavItem icon="fact_check" label="Điểm danh (Xem)" active={activeTab === 'checkin'} onClick={() => setActiveTab('checkin')} />
+              <NavItem icon="dashboard" label="Tổng quan" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
+              <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
+            </>
+          )}
           {user.role === 'SUPER_ADMIN' && (
               <>
                 <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
@@ -1352,7 +1386,7 @@ function MainDashboard() {
                             key={session.id} 
                             onClick={() => { 
                                setActiveAiSessionId(session.id); 
-                               if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor');
+                               if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'FACILITY_MANAGER', 'SUPERVISOR', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user.role)) { setActiveTab('ai-advisor');
                                } else {
                                   setShowAITaskModal(true);
                                }
@@ -1396,20 +1430,35 @@ function MainDashboard() {
             >
               <span className="material-symbols-outlined">menu</span>
             </button>
-            <div className="relative w-full max-w-sm">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
-              <select 
-                value={globalFacilityFilter} 
-                onChange={(e) => setGlobalFacilityFilter(e.target.value)} 
-                disabled={user.role === 'FACILITY_MANAGER'}
-                className="w-full bg-surface-container dark:bg-gray-800 border-transparent focus:border-primary focus:ring-1 focus:ring-primary rounded-full pl-10 pr-4 py-2 text-sm outline-none transition-all dark:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="ALL">Tất cả cơ sở</option>
-                {facilitiesList.map(f => (
-                  <option key={f.id} value={f.filterValue || f.name}>{f.name}</option>
-                ))}
-              </select>
-            </div>
+            {user.role === 'SUPERVISOR' ? (
+              <div className="relative w-full max-w-sm">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 text-[18px]">swap_horiz</span>
+                <select
+                  value={globalFacilityFilter}
+                  onChange={(e) => setGlobalFacilityFilter(e.target.value)}
+                  className="w-full bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 rounded-full pl-10 pr-4 py-2 text-sm outline-none transition-all dark:text-white cursor-pointer font-medium"
+                >
+                  {supervisorFacilities.map(fac => (
+                    <option key={fac} value={fac}>{fac}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="relative w-full max-w-sm">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">corporate_fare</span>
+                <select 
+                  value={globalFacilityFilter} 
+                  onChange={(e) => setGlobalFacilityFilter(e.target.value)} 
+                  disabled={user.role === 'FACILITY_MANAGER'}
+                  className="w-full bg-surface-container dark:bg-gray-800 border-transparent focus:border-primary focus:ring-1 focus:ring-primary rounded-full pl-10 pr-4 py-2 text-sm outline-none transition-all dark:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="ALL">Tất cả cơ sở</option>
+                  {facilitiesList.map(f => (
+                    <option key={f.id} value={f.filterValue || f.name}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-surface-variant dark:hover:bg-gray-800 text-gray-500 transition-colors">
@@ -1472,7 +1521,9 @@ function MainDashboard() {
             {activeTab === 'checkin' ? (
               <ErrorBoundary>
                 <DailyCheckin 
-                  showToast={showToast} 
+                  showToast={showToast}
+                  supervisorFacilityId={user.role === 'SUPERVISOR' ? globalFacilityFilter : null}
+                  key={user.role === 'SUPERVISOR' ? globalFacilityFilter : 'default'}
                   onCheckinSuccess={() => {
                     setIsCheckinCompleted(true);
                     fetchFacilityStatuses();
@@ -1550,7 +1601,7 @@ function MainDashboard() {
               <ErrorBoundary>
                 <RAGManagerPanel showToast={showToast} />
               </ErrorBoundary>
-            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || ['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
+            ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || user.role === 'SUPERVISOR' || ['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
               <ErrorBoundary>
                 <FacilityDashboard user={user} tasks={tasks} onOpenTask={(task) => setSelectedTask(task)} globalFacilityFilter={globalFacilityFilter} />
               </ErrorBoundary>

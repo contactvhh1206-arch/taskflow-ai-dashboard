@@ -35,7 +35,8 @@ const authGuard = (req, res, next) => {
             role: payload.role,
             facility_id: facilityIdParsed,
             department_code: payload.department_code || null,
-            is_global_access: isGlobalAccess
+            is_global_access: isGlobalAccess,
+            managed_facilities: payload.managed_facilities || null
         };
 
         next();

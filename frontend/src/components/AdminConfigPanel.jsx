@@ -7,6 +7,7 @@ const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'];
 
 const SYSTEM_ROLES = [
   { value: 'FACILITY_MANAGER', label: 'Quản lý cơ sở' },
+  { value: 'SUPERVISOR', label: 'Giám sát (Xem nhiều cơ sở)' },
   { value: 'DEPARTMENT_HEAD', label: 'Bộ phận Truyền thông' },
   { value: 'FINANCE_DEPT', label: 'Bộ phận Tài chính - Kế toán' },
   { value: 'VICE_PRESIDENT', label: 'Vice' },
@@ -62,6 +63,7 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const [newRole, setNewRole] = useState('FACILITY_MANAGER');
       const [newFacilityId, setNewFacilityId] = useState('Cơ sở 1');
       const [newFinanceFacilities, setNewFinanceFacilities] = useState(['ALL']);
+      const [newSupervisorFacilities, setNewSupervisorFacilities] = useState([]);
 
       const [editingFac, setEditingFac] = useState(null);
       const [editFacName, setEditFacName] = useState('');
@@ -344,7 +346,11 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                     password: newPassword.trim(),
                     name: finalName,
                     role: finalRole,
-                    facility_id: ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(newRole) ? newFinanceFacilities : HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId
+                    facility_id: newRole === 'SUPERVISOR'
+                      ? newSupervisorFacilities
+                      : ['FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(newRole)
+                        ? newFinanceFacilities
+                        : HIGH_LEVEL_ROLES.includes(newRole) ? 'ALL' : newFacilityId
                 })
             });
             if (res.ok) {
@@ -608,6 +614,21 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
                                 } else {
                                   setNewFinanceFacilities(newFinanceFacilities.filter(x => x !== 'ALL' && x !== f.name));
                                 }
+                              }} />
+                              {f.name}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : newRole === 'SUPERVISOR' ? (
+                      <div>
+                        <label className="block text-xs font-medium text-amber-600 mb-1">⚠️ Cơ sở được phép giám sát</label>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 border border-amber-300 dark:border-amber-700 rounded-lg p-2 max-h-[80px] overflow-y-auto custom-scrollbar bg-amber-50 dark:bg-amber-900/10">
+                          {(facilities || []).map(f => (
+                            <label key={f.id} className="flex items-center gap-1.5 text-xs font-medium dark:text-white cursor-pointer select-none">
+                              <input type="checkbox" className="accent-amber-500 w-3.5 h-3.5" checked={newSupervisorFacilities.includes(f.name)} onChange={e => {
+                                if (e.target.checked) setNewSupervisorFacilities(prev => [...prev, f.name]);
+                                else setNewSupervisorFacilities(prev => prev.filter(x => x !== f.name));
                               }} />
                               {f.name}
                             </label>

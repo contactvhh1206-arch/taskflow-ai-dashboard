@@ -21,9 +21,9 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
         baseWhere += ` AND t.department_code = $${params.length}`;
     }
 
-    // Nhân viên cục bộ chỉ thấy task của mình (Nếu không phải Global Roles / Quản lý cơ sở)
+    // Nhân viên cục bộ chỉ thấy task của mình (Nếu không phải Global Roles / Quản lý cơ sở / Giám sát)
     const globalRoles = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'ADMIN'];
-    if (!globalRoles.includes(role) && role !== 'FACILITY_MANAGER') {
+    if (!globalRoles.includes(role) && role !== 'FACILITY_MANAGER' && role !== 'SUPERVISOR') {
         params.push(userId, userId);
         baseWhere += ` AND (t.created_by = $${params.length - 1} OR t.pic_id = $${params.length})`;
     }

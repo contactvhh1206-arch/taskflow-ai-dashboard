@@ -5,6 +5,17 @@ const rbacGuard = (req, res, next) => {
             return next();
         }
 
+        // 1.5. SUPERVISOR: Chỉ cho phép XEM (GET), chặn cứng mọi thao tác ghi
+        if (req.user && req.user.role === 'SUPERVISOR') {
+            if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+                return res.status(403).json({
+                    success: false,
+                    message: "RBAC_VIOLATION: Tài khoản Giám sát chỉ có quyền xem, không được phép thêm/sửa/xóa."
+                });
+            }
+            return next();
+        }
+
         // 2. Trích xuất facility_id từ Request
         const method = req.method;
         let passedFacilityId = null;

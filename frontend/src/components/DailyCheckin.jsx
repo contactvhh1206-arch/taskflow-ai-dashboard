@@ -3,8 +3,9 @@ import { AuthContext } from '../contexts/AuthContext.jsx';
 import { saveData, fetchHistory } from '../services/dataService.js';
 import supabase from '../utils/supabaseClient.js';
 
-export default function DailyCheckin({ onCheckinSuccess, showToast }) {
+export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFacilityId }) {
   const { user } = useContext(AuthContext);
+  const isSupervisor = user?.role === 'SUPERVISOR';
   const getFormattedDate = (dateObj) => {
     return `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
   };
@@ -27,7 +28,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
   const [selectedShift, setSelectedShift] = useState('Ca 1');
   const [checkins, setCheckins] = useState([]);
   
-  const [activeTab, setActiveTab] = useState('checkin');
+  const [activeTab, setActiveTab] = useState(isSupervisor ? 'history' : 'checkin');
 
   
   const [logs, setLogs] = useState([]);
@@ -67,7 +68,15 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
 
   useEffect(() => {
     const fetchAll = async () => {
-      const orgUnitFilter = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role) ? {} : { org_unit: user?.facility_id };
+      // SUPERVISOR: lọc theo cơ sở đang chọn từ dropdown header
+      // FACILITY_MANAGER: lọc theo cơ sở của mình
+      // Global roles: xem tất cả
+      let orgUnitFilter = {};
+      if (isSupervisor) {
+        orgUnitFilter = supervisorFacilityId ? { org_unit: supervisorFacilityId } : {};
+      } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)) {
+        orgUnitFilter = { org_unit: user?.facility_id };
+      }
       
       const attendanceData = await fetchHistory({ entry_type: 'Attendance', ...orgUnitFilter });
       setCheckins(attendanceData.map(item => ({
@@ -501,13 +510,16 @@ export default function DailyCheckin({ onCheckinSuccess, showToast }) {
     <div className="w-full max-w-4xl mx-auto flex flex-col gap-6 mt-6">
       {/* Tabs */}
       <div className="flex flex-wrap sm:flex-nowrap justify-center gap-1 sm:gap-2 p-1.5 sm:p-1 bg-surface-container-low dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 w-full sm:w-fit mx-auto shadow-sm">
-        <button 
-          onClick={() => setActiveTab('checkin')} 
-          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg font-bold text-xs sm:text-sm transition-all whitespace-nowrap flex-1 sm:flex-none ${activeTab === 'checkin' ? 'bg-white dark:bg-[#2a2a2a] text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-        >
-          <span className="material-symbols-outlined text-[16px] sm:text-[20px]">fact_check</span>
-          Điểm Danh Hàng Ngày
-        </button>
+        {/* Tab Điểm Danh chỉ hiển thị khi KHÔNG phải SUPERVISOR */}
+        {!isSupervisor && (
+          <button 
+            onClick={() => setActiveTab('checkin')} 
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg font-bold text-xs sm:text-sm transition-all whitespace-nowrap flex-1 sm:flex-none ${activeTab === 'checkin' ? 'bg-white dark:bg-[#2a2a2a] text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
+            <span className="material-symbols-outlined text-[16px] sm:text-[20px]">fact_check</span>
+            Điểm Danh Hàng Ngày
+          </button>
+        )}
         <button 
           onClick={() => setActiveTab('history')} 
           className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg font-bold text-xs sm:text-sm transition-all whitespace-nowrap flex-1 sm:flex-none ${activeTab === 'history' ? 'bg-white dark:bg-[#2a2a2a] text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
