@@ -73,10 +73,19 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
       // Global roles: xem tất cả
       let orgUnitFilter = {};
       if (isSupervisor) {
-        orgUnitFilter = supervisorFacilityId ? { org_unit: supervisorFacilityId } : {};
+        if (supervisorFacilityId && supervisorFacilityId !== 'ALL') {
+          // daily_logs.org_unit lưu facility ID (số), không phải tên
+          // Cần dịch tên cơ sở → ID để query đúng
+          const facilitiesCache = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
+          const matched = facilitiesCache.find(f => f.name === supervisorFacilityId);
+          const resolvedId = matched ? String(matched.id) : supervisorFacilityId;
+          orgUnitFilter = { org_unit: resolvedId };
+        }
+        // Nếu 'ALL' hoặc không có → không filter, lấy tất cả
       } else if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)) {
         orgUnitFilter = { org_unit: user?.facility_id };
       }
+
       
       const attendanceData = await fetchHistory({ entry_type: 'Attendance', ...orgUnitFilter });
       setCheckins(attendanceData.map(item => ({
