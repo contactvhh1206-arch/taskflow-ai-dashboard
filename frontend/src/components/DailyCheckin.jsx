@@ -188,6 +188,19 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
     }
   };
 
+  const handleAudioFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        if (showToast) showToast('File ghi âm quá lớn (Tối đa 10MB)');
+        e.target.value = '';
+        return;
+      }
+      const previewUrl = URL.createObjectURL(file);
+      setLogAudio({ blob: file, previewUrl });
+    }
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -274,7 +287,9 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
       // Upload ghi âm qua backend proxy (service_role key, bypass RLS)
       if (logAudio) {
         try {
-          const publicUrl = await uploadFileViaBackend(logAudio.blob, 'audio/webm', 'webm');
+          const audioMime = logAudio.blob.type || 'audio/webm';
+          const audioExt = (audioMime.split('/')[1] || 'webm').replace('mpeg', 'mp3').split(';')[0];
+          const publicUrl = await uploadFileViaBackend(logAudio.blob, audioMime, audioExt);
           finalAttachments.push(publicUrl);
           URL.revokeObjectURL(logAudio.previewUrl);
         } catch (err) {
@@ -308,7 +323,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
           timestamp: newRecord.displayTime,
           content: typeof newRecord.content === 'object' ? '' : newRecord.content,
           image: finalAttachments.find(a => typeof a === 'string' && (a.includes('image_') || a.includes('.jpg'))) || null,
-          audio: finalAttachments.find(a => typeof a === 'string' && (a.includes('audio_') || a.includes('.webm'))) || null,
+          audio: finalAttachments.find(a => typeof a === 'string' && (a.includes('audio_') || a.includes('.webm') || a.includes('.mp3') || a.includes('.m4a') || a.includes('.wav') || a.includes('.ogg') || a.includes('.aac'))) || null,
           aiVectorData: newRecord.aiVectorData
         };
         
@@ -643,6 +658,10 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
                   <span className="material-symbols-outlined text-[18px]">mic</span> Ghi âm
                 </button>
               )}
+              <label className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl cursor-pointer transition-colors text-sm font-semibold">
+                <span className="material-symbols-outlined text-[18px]">upload_file</span> Tải file ghi âm
+                <input type="file" accept="audio/*" onChange={handleAudioFileUpload} className="hidden" />
+              </label>
             </div>
             <button onClick={handleAddLog} disabled={!logContent.trim() && !logImage && !logAudio} className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center gap-2 shrink-0">
               <span className="material-symbols-outlined text-[18px]">send</span> Gửi
