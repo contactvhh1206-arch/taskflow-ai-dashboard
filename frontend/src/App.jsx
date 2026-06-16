@@ -1670,6 +1670,17 @@ function MainDashboard() {
                 {/* Segmented Control: Task Filter */}
                 <div className="flex items-center bg-surface-container-high dark:bg-[#252525] rounded-lg p-1 w-fit mb-6 shadow-inner border border-outline-variant dark:border-gray-800">
                   <button
+                    onClick={() => setTaskFilter('all')}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-300 flex items-center gap-1.5 ${
+                      taskFilter === 'all'
+                        ? 'bg-primary text-white shadow-md'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-primary dark:hover:text-white'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">apps</span>
+                    Tất cả
+                  </button>
+                  <button
                     onClick={() => setTaskFilter(taskFilter === 'urgent' ? 'all' : 'urgent')}
                     className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-300 flex items-center gap-1.5 ${
                       taskFilter === 'urgent'
