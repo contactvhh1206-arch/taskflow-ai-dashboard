@@ -277,6 +277,10 @@ router.post('/log-tokens', authGuard, async (req, res) => {
       )
     `);
 
+    // Migration: Thêm cột còn thiếu nếu bảng đã tồn tại với schema cũ (cột "role" thay vì "user_role")
+    await pool.query(`ALTER TABLE ai_token_usage_logs ADD COLUMN IF NOT EXISTS user_role TEXT`);
+    await pool.query(`ALTER TABLE ai_token_usage_logs ADD COLUMN IF NOT EXISTS feature TEXT DEFAULT 'extract-revenue'`);
+
     await pool.query(
       `INSERT INTO ai_token_usage_logs
         (user_id, username, user_role, feature, prompt_tokens, completion_tokens, total_tokens)
