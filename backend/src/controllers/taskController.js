@@ -269,12 +269,79 @@ const deleteTaskHandler = async (req, res) => {
     if (!req.user || req.user.role !== 'SUPER_ADMIN') {
       return res.status(403).json({ success: false, error: 'Chỉ SUPER_ADMIN mới có quyền xóa vĩnh viễn công việc.' });
     }
+
+    // 1. Lấy snapshot task đầy đủ (kèm tên cơ sở, tên PIC) trước khi xóa
+    const { rows: taskRows } = await pool.query(`
+      SELECT t.*, u.full_name as pic_name, f.name as facility_name
+      FROM tasks t
+      LEFT JOIN users u ON t.pic_id = u.id
+      LEFT JOIN facilities f ON t.facility_id = f.id
+      WHERE t.id = $1
+    `, [id]);
+    if (taskRows.length === 0) return res.status(404).json({ success: false, error: 'Không tìm thấy công việc.' });
+
+    // 2. Ghi audit log (lưu toàn bộ snapshot trước khi xóa)
+    await pool.query(
+      'INSERT INTO task_audit_logs (task_id, action, deleted_by, deleted_by_role, task_snapshot) VALUES ($1, $2, $3, $4, $5)',
+      [id, 'DELETED', req.user.id, req.user.role, JSON.stringify(taskRows[0])]
+    );
+
+    // 3. Xóa dữ liệu con (đảm bảo không vi phạm FK)
     await pool.query('DELETE FROM task_comments WHERE task_id = $1', [id]);
+    await pool.query('DELETE FROM task_operations WHERE task_id = $1', [id]);
+
+    // 4. Xóa cứng task
     const { rowCount } = await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
     if (rowCount === 0) return res.status(404).json({ success: false, error: 'Không tìm thấy công việc.' });
+
     res.json({ success: true, message: 'Đã xóa công việc vĩnh viễn.' });
   } catch (error) {
+    console.error('[Controller Error - deleteTaskHandler]:', error.message);
     res.status(500).json({ success: false, error: 'Lỗi server khi xóa công việc.' });
+  }
+};
+
+const getDeletedTasksHandler = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: 'Chỉ SUPER_ADMIN mới có quyền xem lịch sử xóa.' });
+    }
+
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const offset = (page - 1) * limit;
+
+    const countRes = await pool.query('SELECT COUNT(*) as total FROM task_audit_logs');
+    const totalRecords = parseInt(countRes.rows[0].total, 10);
+
+    const { rows } = await pool.query(`
+      SELECT
+        al.id,
+        al.task_id,
+        al.action,
+        al.deleted_by_role,
+        al.task_snapshot,
+        al.created_at as deleted_at,
+        u.full_name as deleted_by_name
+      FROM task_audit_logs al
+      LEFT JOIN users u ON al.deleted_by = u.id
+      ORDER BY al.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    return res.status(200).json({
+      success: true,
+      data: rows,
+      meta: {
+        total: totalRecords,
+        page,
+        limit,
+        total_pages: Math.ceil(totalRecords / limit)
+      }
+    });
+  } catch (error) {
+    console.error('[Controller Error - getDeletedTasksHandler]:', error.message);
+    res.status(500).json({ success: false, error: 'Lỗi server khi tải lịch sử xóa.' });
   }
 };
 
@@ -349,4 +416,4 @@ const addTaskCommentHandler = async (req, res) => {
   }
 };
 
-module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler, updateTaskStatusHandler, deleteTaskHandler, updateTaskSupportHandler, restoreTaskHandler, getTaskCommentsHandler, addTaskCommentHandler };
+module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler, updateTaskStatusHandler, deleteTaskHandler, updateTaskSupportHandler, restoreTaskHandler, getTaskCommentsHandler, addTaskCommentHandler, getDeletedTasksHandler };

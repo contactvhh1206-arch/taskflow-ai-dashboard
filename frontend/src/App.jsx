@@ -19,6 +19,7 @@ import RevenueLog from './components/RevenueLog.jsx';
 import KPISettings from './components/KPISettings.jsx';
 import ArchivedFacilitiesDashboard from './components/ArchivedFacilitiesDashboard.jsx';
 import TaskHistory from './components/TaskHistory.jsx';
+import DeletedTasksHistory from './components/DeletedTasksHistory.jsx';
 import { AIChatBox } from './components/AIChatBox.tsx';
 // --- GLOBAL FETCH INTERCEPTOR (VÁ BỞI HUBDB 333) ---
 // File: src/App.jsx
@@ -1351,7 +1352,8 @@ function MainDashboard() {
           {user.role === 'SUPER_ADMIN' && (
               <>
                 <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
-            </>
+                <NavItem icon="delete_sweep" label="Lịch sử xóa Task" active={activeTab === 'deleted-history'} onClick={() => setActiveTab('deleted-history')} />
+              </>
           )}
           {user.role === 'ADMIN' && (
             <>
@@ -1634,6 +1636,10 @@ function MainDashboard() {
                 <RevenueLog user={user} showToast={showToast} />
               </ErrorBoundary>
 
+            ) : activeTab === 'deleted-history' && user.role === 'SUPER_ADMIN' ? (
+              <ErrorBoundary>
+                <DeletedTasksHistory user={user} showToast={showToast} />
+              </ErrorBoundary>
             ) : (
               <>
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
