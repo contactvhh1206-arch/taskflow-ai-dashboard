@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const ws = require('ws');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ipmghlsjkuxsftymsvzz.supabase.co';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -8,7 +9,8 @@ if (!SERVICE_ROLE_KEY) {
 }
 
 const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || '', {
-    auth: { autoRefreshToken: false, persistSession: false }
+    auth: { autoRefreshToken: false, persistSession: false },
+    realtime: { transport: ws }
 });
 
 /**
