@@ -1,7 +1,28 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext.jsx';
 import { saveData, fetchHistory } from '../services/dataService.js';
-import supabase from '../utils/supabaseClient.js';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
+
+/**
+ * Upload file lên backend proxy (backend dùng service_role key → Supabase Storage)
+ * Trả về publicUrl string, hoặc throw Error nếu thất bại
+ */
+const uploadFileViaBackend = async (blob, mimeType, ext) => {
+  const token = localStorage.getItem('taskflow_token');
+  const formData = new FormData();
+  const fileName = `upload_${Date.now()}.${ext}`;
+  formData.append('file', new File([blob], fileName, { type: mimeType }));
+
+  const res = await fetch(`${API_BASE_URL}/api/upload/attachment`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.message || 'Upload thất bại');
+  return json.url;
+};
 
 export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFacilityId }) {
   const { user } = useContext(AuthContext);
@@ -238,37 +259,27 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
     try {
       const finalAttachments = [];
       
-      // Upload image to Supabase if exists
+      // Upload ảnh qua backend proxy (service_role key, bypass RLS)
       if (logImage) {
         try {
-          // Dùng blob trực tiếp, không cần fetch/convert base64 nữa
-          const fileName = `image_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-          const { data, error } = await supabase.storage.from('attachments').upload(fileName, logImage.blob, { contentType: 'image/jpeg' });
-          if (error) throw error;
-          const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
+          const publicUrl = await uploadFileViaBackend(logImage.blob, 'image/jpeg', 'jpg');
           finalAttachments.push(publicUrl);
-          // Giải phóng object URL đã tạo tạm
           URL.revokeObjectURL(logImage.previewUrl);
         } catch (err) {
-          console.error("Lỗi upload ảnh lên Supabase:", err);
-          if (showToast) showToast('Lỗi upload ảnh lên server');
+          console.error("Lỗi upload ảnh:", err);
+          if (showToast) showToast('Lỗi upload ảnh: ' + err.message);
         }
       }
 
-      // Upload audio to Supabase if exists
+      // Upload ghi âm qua backend proxy (service_role key, bypass RLS)
       if (logAudio) {
         try {
-          // Dùng blob trực tiếp, không cần fetch/convert base64 nữa
-          const fileName = `audio_${Date.now()}_${Math.random().toString(36).substring(7)}.webm`;
-          const { data, error } = await supabase.storage.from('attachments').upload(fileName, logAudio.blob, { contentType: 'audio/webm' });
-          if (error) throw error;
-          const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
+          const publicUrl = await uploadFileViaBackend(logAudio.blob, 'audio/webm', 'webm');
           finalAttachments.push(publicUrl);
-          // Giải phóng object URL đã tạo tạm
           URL.revokeObjectURL(logAudio.previewUrl);
         } catch (err) {
-          console.error("Lỗi upload ghi âm lên Supabase:", err);
-          if (showToast) showToast('Lỗi upload ghi âm lên server');
+          console.error("Lỗi upload ghi âm:", err);
+          if (showToast) showToast('Lỗi upload ghi âm: ' + err.message);
         }
       }
 
