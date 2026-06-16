@@ -27,6 +27,7 @@ const uploadFileViaBackend = async (blob, mimeType, ext) => {
 export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFacilityId }) {
   const { user } = useContext(AuthContext);
   const isSupervisor = user?.role === 'SUPERVISOR';
+  const [previewImageUrl, setPreviewImageUrl] = useState(null);
   const getFormattedDate = (dateObj) => {
     return `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
   };
@@ -625,7 +626,13 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
           />
           {logImage && (
             <div className="relative w-max mt-2">
-              <img src={logImage.previewUrl} alt="Preview" className="h-24 rounded-lg border border-gray-200 dark:border-gray-700 object-cover" />
+              <img
+                src={logImage.previewUrl}
+                alt="Preview"
+                className="h-24 rounded-lg border border-gray-200 dark:border-gray-700 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setPreviewImageUrl(logImage.previewUrl)}
+                title="Nhấn để phóng to"
+              />
               <button onClick={() => { URL.revokeObjectURL(logImage.previewUrl); setLogImage(null); }} className="absolute -top-2 -right-2 w-6 h-6 bg-error text-white rounded-full flex items-center justify-center hover:bg-error/90 shadow-sm z-10">
                 <span className="material-symbols-outlined text-[14px]">close</span>
               </button>
@@ -684,7 +691,13 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
                     {log.content}
                     {log.image && (
                       <div className="mt-3">
-                        <img src={log.image} alt="Log Attachment" className="max-h-40 rounded-lg border border-gray-200 dark:border-gray-700 object-cover" />
+                        <img
+                          src={log.image}
+                          alt="Log Attachment"
+                          className="max-h-40 rounded-lg border border-gray-200 dark:border-gray-700 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setPreviewImageUrl(log.image)}
+                          title="Nhấn để phóng to"
+                        />
                       </div>
                     )}
                     {log.audio && (
@@ -1089,7 +1102,13 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
                             <p className="whitespace-pre-line">{log.content}</p>
                             {log.image && (
                               <div className="mt-3">
-                                <img src={log.image} alt="Log Attachment" className="max-h-48 rounded-lg border border-gray-200 dark:border-gray-600 object-cover" />
+                                <img
+                                  src={log.image}
+                                  alt="Log Attachment"
+                                  className="max-h-48 rounded-lg border border-gray-200 dark:border-gray-600 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => setPreviewImageUrl(log.image)}
+                                  title="Nhấn để phóng to"
+                                />
                               </div>
                             )}
                             {log.audio && (
@@ -1169,6 +1188,38 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
               );
             })()}
           </div>
+        </div>
+      )}
+
+      {/* ===== Image Preview Modal (Lightbox) ===== */}
+      {previewImageUrl && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          onClick={() => setPreviewImageUrl(null)}
+          onKeyDown={(e) => e.key === 'Escape' && setPreviewImageUrl(null)}
+          tabIndex={-1}
+          style={{ animation: 'fadeIn 0.18s ease' }}
+        >
+          {/* Close button */}
+          <button
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white transition-colors z-10"
+            onClick={(e) => { e.stopPropagation(); setPreviewImageUrl(null); }}
+            title="Đóng (ESC)"
+          >
+            <span className="material-symbols-outlined text-2xl">close</span>
+          </button>
+          {/* Image */}
+          <img
+            src={previewImageUrl}
+            alt="Preview phóng to"
+            className="max-w-[92vw] max-h-[90vh] rounded-xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+            style={{ animation: 'scaleIn 0.18s ease' }}
+          />
+          <style>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes scaleIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+          `}</style>
         </div>
       )}
 
