@@ -574,6 +574,7 @@ function MainDashboard() {
   const [showAITaskModal, setShowAITaskModal] = useState(false);
   const [showClosureConfirm, setShowClosureConfirm] = useState(false);
   const [evidenceFile, setEvidenceFile] = useState(null);
+  const [closureNote, setClosureNote] = useState('');
   const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalStatus, setCreateModalStatus] = useState('todo');
@@ -1850,6 +1851,12 @@ function MainDashboard() {
                         ) : (
                           <div className="space-y-3">
                             <p className="text-sm font-bold text-gray-700 dark:text-gray-200">Xác nhận hoàn thành?</p>
+                            <textarea 
+                              value={closureNote} 
+                              onChange={(e) => setClosureNote(e.target.value)} 
+                              placeholder="Ghi chú khi đóng task (không bắt buộc)..." 
+                              className="w-full h-20 px-3 py-2 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-lg text-sm focus:ring-2 focus:ring-success/50 outline-none transition-all dark:text-white resize-none" 
+                            />
                             <label className="flex items-center justify-center gap-2 w-full border-2 border-dashed border-outline-variant dark:border-gray-600 rounded-lg p-4 cursor-pointer hover:bg-surface-container-high transition-colors">
                               <span className="material-symbols-outlined text-gray-400">upload_file</span>
                               <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{evidenceFile ? evidenceFile.name : 'Chọn ảnh/tài liệu...'}</span>
@@ -1865,9 +1872,22 @@ function MainDashboard() {
                               }} />
                             </label>
                             <div className="flex gap-2 pt-2">
-                              <button onClick={() => { setShowClosureConfirm(false); setEvidenceFile(null); }} className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white" disabled={isUploadingEvidence}>Hủy</button>
+                              <button onClick={() => { setShowClosureConfirm(false); setEvidenceFile(null); setClosureNote(''); }} className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white" disabled={isUploadingEvidence}>Hủy</button>
                               <button 
                                 onClick={async () => { 
+                                  // Gửi ghi chú đóng task (nếu có) dưới dạng comment
+                                  if (closureNote.trim()) {
+                                    try {
+                                      const taskId = selectedTask.id || selectedTask.task_id;
+                                      await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/comments`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ comment: `✅ [GHI CHÚ ĐÓNG TASK]: ${closureNote.trim()}` })
+                                      });
+                                    } catch (err) {
+                                      console.error('Lỗi gửi ghi chú đóng task:', err);
+                                    }
+                                  }
                                   if (evidenceFile) {
                                     setIsUploadingEvidence(true);
                                     try {
@@ -1889,7 +1909,8 @@ function MainDashboard() {
                                     handleUpdateTaskStatus(selectedTask.id, 'done', null);
                                   }
                                   setShowClosureConfirm(false); 
-                                  setEvidenceFile(null); 
+                                  setEvidenceFile(null);
+                                  setClosureNote(''); 
                                 }} 
                                 disabled={isUploadingEvidence}
                                 className={`flex-[2] ${isUploadingEvidence ? 'bg-gray-400 cursor-wait' : 'bg-success hover:bg-success/90'} text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
