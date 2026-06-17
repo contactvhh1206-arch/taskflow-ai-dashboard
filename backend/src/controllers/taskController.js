@@ -268,8 +268,11 @@ const updateTaskStatusHandler = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, evidence } = req.body;
-    const updateQuery = 'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *';
-    const { rows } = await pool.query(updateQuery, [status, id]);
+    const updateQuery = evidence
+      ? 'UPDATE tasks SET status = $1, evidence_url = $2, updated_at = NOW() WHERE id = $3 RETURNING *'
+      : 'UPDATE tasks SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *';
+    const params = evidence ? [status, evidence, id] : [status, id];
+    const { rows } = await pool.query(updateQuery, params);
     res.json({ success: true, data: rows[0] });
   } catch (error) {
     res.status(500).json({ error: 'Lỗi server khi cập nhật trạng thái.' });
