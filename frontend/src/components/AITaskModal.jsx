@@ -45,20 +45,28 @@ export default function AITaskModal({ onClose, onConfirm, user, initialText = ''
       }
 
       // Map Dữ liệu (Hydration)
-      const mappedTasks = parsedTasks.map(task => ({
-        id: Date.now() + Math.random(),
-        title: task.task_title || task.title || 'Task mới',
-        desc: task.description || '',
-        pic: typeof task.pic === 'string' ? task.pic : user.name,
-        pic_id: task.pic_id,
-        deadline: task.deadline || new Date().toISOString().split('T')[0],
-        status: 'todo', // Gán mặc định status: "Cần làm"
-        urgent: task.priority_level === 'URGENT' || task.priority === 'Cao',
-        facility: task.facility_id || localStorage.getItem('facility_id') || (user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id),
-        // MỞ ỐNG NƯỚC: HỨNG DỮ LIỆU ĐỊNH TUYẾN PHÒNG BAN TỪ BACKEND
-        department_code: task.department_code || null,
-        createdAt: new Date().toISOString().split('T')[0]
-      }));
+      const todayStr = new Date().toISOString().split('T')[0];
+      const mappedTasks = parsedTasks.map(task => {
+        // Chặn deadline quá khứ từ AI — tự động đổi thành hôm nay
+        let safeDeadline = task.deadline || todayStr;
+        if (safeDeadline < todayStr) {
+          safeDeadline = todayStr;
+        }
+        return {
+          id: Date.now() + Math.random(),
+          title: task.task_title || task.title || 'Task mới',
+          desc: task.description || '',
+          pic: typeof task.pic === 'string' ? task.pic : user.name,
+          pic_id: task.pic_id,
+          deadline: safeDeadline,
+          status: 'todo', // Gán mặc định status: "Cần làm"
+          urgent: task.priority_level === 'URGENT' || task.priority === 'Cao',
+          facility: task.facility_id || localStorage.getItem('facility_id') || (user.role === 'SUPER_ADMIN' ? 'HQ' : user.facility_id),
+          // MỞ ỐNG NƯỚC: HỨNG DỮ LIỆU ĐỊNH TUYẾN PHÒNG BAN TỪ BACKEND
+          department_code: task.department_code || null,
+          createdAt: new Date().toISOString().split('T')[0]
+        };
+      });
 
       // Cập nhật State & Lưu trữ: Nối (Concat) mảng task mới
       onConfirm(mappedTasks);

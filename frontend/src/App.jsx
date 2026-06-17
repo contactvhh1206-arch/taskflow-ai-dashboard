@@ -225,6 +225,15 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    // Chặn deadline quá khứ (cho phép cùng ngày hôm nay)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadlineDate = new Date(formData.deadline);
+    deadlineDate.setHours(0, 0, 0, 0);
+    if (deadlineDate < today) {
+      alert('⚠️ Deadline không được nằm trong quá khứ!');
+      return;
+    }
     onSave({
       id: Date.now(),
       ...formData,
@@ -336,7 +345,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Deadline</label>
             <div className="flex gap-2 items-center md:w-3/4">
-              <input required type="date" value={formData.deadline.slice(0,10)} onChange={(e) => setFormData({...formData, deadline: e.target.value + 'T' + formData.deadline.slice(11)})} className="flex-1 min-w-0 px-2 md:px-3 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
+              <input required type="date" min={new Date().toISOString().slice(0, 10)} value={formData.deadline.slice(0,10)} onChange={(e) => setFormData({...formData, deadline: e.target.value + 'T' + formData.deadline.slice(11)})} className="flex-1 min-w-0 px-2 md:px-3 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white" />
               <select value={formData.deadline.slice(11,13)} onChange={(e) => setFormData({...formData, deadline: formData.deadline.slice(0,11) + e.target.value + formData.deadline.slice(13)})} className="w-[52px] md:w-16 shrink-0 px-1 md:px-2 py-2.5 bg-surface-container-low dark:bg-[#252525] border border-outline-variant dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary outline-none transition-all dark:text-white">
                 {Array.from({length:24}).map((_, i) => { const h = i.toString().padStart(2, '0'); return <option key={h} value={h}>{h}</option>; })}
               </select>

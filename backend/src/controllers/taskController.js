@@ -104,6 +104,19 @@ const createTaskHandler = async (req, res) => {
     try {
         const { title, desc, pic_id, picId, pic, deadline, status, urgent, facility, facilityId, department_code, facility_id } = req.body;
         
+        // --- VALIDATION: CHẶN DEADLINE QUÁ KHỨ ---
+        if (deadline) {
+          const deadlineDate = new Date(deadline);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (deadlineDate < today) {
+            return res.status(400).json({
+              success: false,
+              error: 'Deadline không được nằm trong quá khứ.'
+            });
+          }
+        }
+        
         // --- 1. ÉP KIỂU STRICT (INT4) & CHUẨN HOÁ DỮ LIỆU ---
         let rawFacility = facility_id || facilityId || facility;
         let insert_facility_id = parseInt(rawFacility, 10);
@@ -361,6 +374,14 @@ const restoreTaskHandler = async (req, res) => {
     const taskId = req.params.id;
     const { deadline } = req.body;
     if (!deadline) return res.status(400).json({ success: false, error: 'Bắt buộc phải có Deadline mới để khôi phục công việc.' });
+    
+    // Chặn khôi phục với deadline quá khứ
+    const restoreDeadline = new Date(deadline);
+    const todayRestore = new Date();
+    todayRestore.setHours(0, 0, 0, 0);
+    if (restoreDeadline < todayRestore) {
+      return res.status(400).json({ success: false, error: 'Deadline gia hạn không được nằm trong quá khứ.' });
+    }
     
     const updateQuery = "UPDATE tasks SET status = 'todo', deadline = $1, completed_at = NULL, updated_at = NOW() WHERE id = $2 RETURNING id, title, status, deadline";
     const { rows: updatedRows } = await pool.query(updateQuery, [deadline, taskId]);
