@@ -249,6 +249,7 @@ const createTaskHandler = async (req, res) => {
                    f.name as facility, f.code as "facilityId",
                    pt.facility_id as "facilityRawId",
                    pt.department_code as "department_tag",
+                   pt.evidence_url as evidence,
                    0 as comment_count
             FROM tasks pt
             LEFT JOIN users u ON pt.pic_id = u.id

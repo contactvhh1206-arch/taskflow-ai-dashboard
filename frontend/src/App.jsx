@@ -1929,9 +1929,22 @@ function MainDashboard() {
                       )}
                     </div>
                   ) : (
-                    <div className="bg-success/10 text-success p-4 rounded-xl flex items-center gap-3 border border-success/20">
-                      <span className="material-symbols-outlined text-2xl">verified</span>
-                      <div><p className="font-bold text-sm">Đã đóng thành công</p><p className="text-xs opacity-80">{selectedTask.evidence ? `Có đính kèm: ${selectedTask.evidence}` : 'Không có bằng chứng đính kèm'}</p></div>
+                    <div className="bg-success/10 text-success p-4 rounded-xl border border-success/20">
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-2xl">verified</span>
+                        <div><p className="font-bold text-sm">Đã đóng thành công</p><p className="text-xs opacity-80">{selectedTask.evidence ? 'Có bằng chứng đính kèm' : 'Không có bằng chứng đính kèm'}</p></div>
+                      </div>
+                      {selectedTask.evidence && (() => {
+                        const url = selectedTask.evidence;
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+                        return isImage ? (
+                          <img src={url} alt="Bằng chứng đính kèm" className="mt-3 w-full max-h-60 object-contain rounded-lg border border-success/20 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => window.open(url, '_blank')} />
+                        ) : (
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="mt-3 flex items-center gap-2 text-xs underline hover:opacity-70 transition-opacity">
+                            <span className="material-symbols-outlined text-[16px]">attach_file</span> Xem tài liệu đính kèm
+                          </a>
+                        );
+                      })()}
                     </div>
                   )}
                   
