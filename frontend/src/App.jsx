@@ -2314,13 +2314,13 @@ function KanbanColumn({ title, status, tasks, setSelectedTask, onOpenCreateModal
 
         {columnTasks.length === 0 && !showQuickAdd && <div className="text-center p-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-gray-400 text-xs">Trống</div>}
         
-        {showQuickAdd && !readOnly && (
+        {showQuickAdd && !readOnly && status === 'todo' && (
           <div className="bg-white dark:bg-[#252525] p-3 rounded-lg shadow-sm border border-primary dark:border-blue-500">
             <input ref={inputRef} type="text" value={quickTitle} onChange={e => setQuickTitle(e.target.value)} onKeyDown={handleKeyDown} onBlur={() => quickTitle.trim() ? handleQuickSubmit() : setShowQuickAdd(false)} placeholder="Nhập tiêu đề (Enter để lưu)..." className="w-full text-sm outline-none bg-transparent dark:text-white" />
           </div>
         )}
 
-        {!showQuickAdd && !readOnly && (
+        {!showQuickAdd && !readOnly && status === 'todo' && (
           <div className="flex gap-2 mt-2">
             <button onClick={() => setShowQuickAdd(true)} className="flex-1 py-2 flex items-center justify-center text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors border border-dashed border-gray-300 dark:border-gray-700" title="Quick Add">
               <span className="material-symbols-outlined text-[18px]">bolt</span>

@@ -111,7 +111,7 @@ export function GlobalKanbanColumn({ title, status, tasks, setSelectedTask, onOp
 
         {columnTasks.length === 0 && !showQuickAdd && <div className="text-center p-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-gray-400 text-xs mt-2 shrink-0">Trống</div>}
 
-        {showQuickAdd && status !== 'done' && (
+        {showQuickAdd && status === 'todo' && (
           <div className="bg-white dark:bg-[#252525] p-3 rounded-lg shadow-sm border border-primary dark:border-blue-500 mt-2 shrink-0">
             <input ref={inputRef} type="text" value={quickTitle} onChange={e => setQuickTitle(e.target.value)} onKeyDown={handleKeyDown} onBlur={() => quickTitle.trim() ? handleQuickSubmit() : setShowQuickAdd(false)} placeholder="Nhập tiêu đề (Enter để lưu)..." className="w-full text-sm outline-none bg-transparent dark:text-white" />
           </div>
@@ -120,7 +120,7 @@ export function GlobalKanbanColumn({ title, status, tasks, setSelectedTask, onOp
       </div>
 
       {/* Footer Ghim Cố Định */}
-      {status !== 'done' && (
+      {status === 'todo' && (
         <div className="mt-2 shrink-0 pt-3 border-t border-outline-variant dark:border-gray-800/50">
           {!showQuickAdd && (
             <div className="flex gap-2">
