@@ -115,7 +115,7 @@ function TaskCreationModal({ onClose, onSave, defaultStatus, user }) {
     pic_id: user.id || '',
     pic: user.name,
     facility: '',
-    deadline: new Date().toISOString().slice(0, 16),
+    deadline: new Date().toISOString().slice(0, 10) + 'T23:00',
     status: defaultStatus || 'todo',
     urgent: false
   });
