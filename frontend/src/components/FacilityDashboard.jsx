@@ -6,6 +6,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
       const [urgentTasks, setUrgentTasks] = useState([]);
       const [aiPings, setAiPings] = useState([]);
       const [recentLogs, setRecentLogs] = useState([]);
+      const [checkinAlerts, setCheckinAlerts] = useState({ support: [], incidents: [] });
       const [timeFilter, setTimeFilter] = useState('today');
       const [isLoading, setIsLoading] = useState(false);
       const [localFacFilter, setLocalFacFilter] = useState('ALL');
@@ -225,6 +226,98 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
          loadRecentLogs();
       }, [user?.id, user?.role, user?.department_id, user?.username, user?.facility_id, globalFacilityFilter]);
 
+      // --- FETCH DỮ LIỆU ĐIỂM DANH: HỖ TRỢ NHÂN SỰ & SỰ CỐ THIẾT BỊ ---
+      useEffect(() => {
+        const loadCheckinAlerts = async () => {
+          if (!window.DataService) return;
+          // Chỉ hiển thị cho SUPER_ADMIN, VICE_PRESIDENT, ADMIN
+          if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user?.role)) {
+            setCheckinAlerts({ support: [], incidents: [] });
+            return;
+          }
+          try {
+            const now = new Date();
+            const workDay = new Date(now);
+            if (now.getHours() < 6) workDay.setDate(workDay.getDate() - 1);
+            const todayStr = `${workDay.getDate().toString().padStart(2, '0')}/${(workDay.getMonth() + 1).toString().padStart(2, '0')}/${workDay.getFullYear()}`;
+
+            const logs = await window.DataService.fetchHistory({ entry_type: 'Attendance' });
+            const todayLogs = logs.filter(l => l.date === todayStr);
+
+            // Lọc theo cơ sở nếu có filter
+            let filteredLogs = todayLogs;
+            if (globalFacilityFilter && globalFacilityFilter !== 'ALL') {
+              filteredLogs = todayLogs.filter(l => {
+                const orgLower = String(l.org_unit || '').toLowerCase();
+                const filterLower = globalFacilityFilter.toLowerCase();
+                return orgLower === filterLower || orgLower.includes(filterLower);
+              });
+            }
+
+            const support = [];
+            const incidents = [];
+            const hrLabels = { hr_letan: 'Lễ tân', hr_baove: 'Bảo vệ', hr_clocker: 'Clocker', hr_ktv: 'KTV' };
+            const eqLabels = { eq_camera: 'Camera', eq_maytinh: 'Máy tính', eq_den: 'Đèn bảng hiệu', eq_maylanh: 'Máy lạnh' };
+
+            filteredLogs.forEach(log => {
+              let c = log.content;
+              if (typeof c === 'string') { try { c = JSON.parse(c); } catch { return; } }
+              if (!c) return;
+              const shift = c.shift || '';
+              const facilityName = facilitiesList.find(f => String(f.id) === String(log.org_unit))?.name || log.org_unit || '';
+
+              // Hỗ trợ nhân sự
+              Object.entries(hrLabels).forEach(([key, label]) => {
+                if (c[key]?.status === 'thieu') {
+                  support.push({
+                    id: `${log.id}-${key}`,
+                    facility: facilityName,
+                    facilityCode: log.org_unit,
+                    shift,
+                    position: label,
+                    note: c[key]?.note || '',
+                    time: log.display_time || log.displayTime || ''
+                  });
+                }
+              });
+
+              // Sự cố thiết bị
+              Object.entries(eqLabels).forEach(([key, label]) => {
+                if (c[key] === 'su_co') {
+                  incidents.push({
+                    id: `${log.id}-${key}`,
+                    facility: facilityName,
+                    facilityCode: log.org_unit,
+                    shift,
+                    equipment: label,
+                    note: c[key + '_note'] || '',
+                    time: log.display_time || log.displayTime || ''
+                  });
+                }
+              });
+
+              // Ghi chú thiết bị khác
+              if (c.eq_other && String(c.eq_other).trim()) {
+                incidents.push({
+                  id: `${log.id}-eq_other`,
+                  facility: facilityName,
+                  facilityCode: log.org_unit,
+                  shift,
+                  equipment: 'Khác',
+                  note: String(c.eq_other).trim(),
+                  time: log.display_time || log.displayTime || ''
+                });
+              }
+            });
+
+            setCheckinAlerts({ support, incidents });
+          } catch (e) {
+            console.error('Error loading checkin alerts:', e);
+          }
+        };
+        loadCheckinAlerts();
+      }, [user?.id, user?.role, globalFacilityFilter]);
+
       // --- BƯỚC 1 & 2: ENGINE AI PING GỌI BATCH API VỀ NODE.JS ---
       useEffect(() => {
         // 2. Kiểm tra điều kiện: Nếu chưa có tasks, user, hoặc ĐÃ PING RỒI thì dừng ngay!
@@ -412,6 +505,76 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                   </div>
                 </div>
               </div>
+
+              {/* === SECTION: CẦN HỖ TRỢ NHÂN SỰ === */}
+              {checkinAlerts.support.length > 0 && (
+                <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border border-orange-200 dark:border-orange-800/40 overflow-hidden mt-6">
+                  <div className="p-4 border-b border-orange-200 dark:border-orange-800/40 bg-orange-50 dark:bg-orange-900/20">
+                    <h3 className="font-bold text-orange-700 dark:text-orange-300 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-orange-500">support_agent</span>
+                      Cần Hỗ Trợ Nhân Sự
+                      <span className="ml-auto px-2.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full shadow-sm">{checkinAlerts.support.length}</span>
+                    </h3>
+                  </div>
+                  <div className="p-0 max-h-72 overflow-y-auto custom-scrollbar">
+                    <ul className="divide-y divide-orange-100 dark:divide-orange-900/30">
+                      {checkinAlerts.support.map(item => (
+                        <li key={item.id} className="p-4 hover:bg-orange-50/50 dark:hover:bg-orange-900/10 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 mt-0.5 shadow-sm font-bold text-xs">
+                              {item.facilityCode ? String(item.facilityCode).substring(0, 2).toUpperCase() : '??'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{item.facility}</span>
+                                <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-[10px] font-medium">{item.shift}</span>
+                                <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-[10px] font-bold">{item.position}</span>
+                              </div>
+                              {item.note && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{item.note}</p>}
+                              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">schedule</span> {item.time}</p>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* === SECTION: SỰ CỐ THIẾT BỊ === */}
+              {checkinAlerts.incidents.length > 0 && (
+                <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border border-red-200 dark:border-red-800/40 overflow-hidden mt-6">
+                  <div className="p-4 border-b border-red-200 dark:border-red-800/40 bg-red-50 dark:bg-red-900/20">
+                    <h3 className="font-bold text-red-700 dark:text-red-300 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-red-500">report_problem</span>
+                      Sự Cố Thiết Bị & CSVC
+                      <span className="ml-auto px-2.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-sm">{checkinAlerts.incidents.length}</span>
+                    </h3>
+                  </div>
+                  <div className="p-0 max-h-72 overflow-y-auto custom-scrollbar">
+                    <ul className="divide-y divide-red-100 dark:divide-red-900/30">
+                      {checkinAlerts.incidents.map(item => (
+                        <li key={item.id} className="p-4 hover:bg-red-50/50 dark:hover:bg-red-900/10 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0 mt-0.5 shadow-sm font-bold text-xs">
+                              {item.facilityCode ? String(item.facilityCode).substring(0, 2).toUpperCase() : '??'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-sm text-gray-800 dark:text-gray-200">{item.facility}</span>
+                                <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-[10px] font-medium">{item.shift}</span>
+                                <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-[10px] font-bold">{item.equipment}</span>
+                              </div>
+                              {item.note && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{item.note}</p>}
+                              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">schedule</span> {item.time}</p>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
 
               {/* Lịch sử hoạt động (Newsfeed) */}
               {recentLogs.length > 0 && (
