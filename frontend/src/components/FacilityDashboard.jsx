@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AIAdvisor from './AIAdvisor';
+import { fetchHistory } from '../services/dataService';
 
 export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacilityFilter }) {
       const [stats, setStats] = useState({ open: 0, closed: 0, overdue: 0, total: -1, error: false });
@@ -206,9 +207,8 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
       // --- TÁCH LUỒNG API ĐỂ TRÁNH INFINITE LOOP ---
       useEffect(() => {
          const loadRecentLogs = async () => {
-            if (window.DataService) {
               try {
-                const history = await window.DataService.fetchHistory({ entry_type: 'Operation_Log' });
+                const history = await fetchHistory({ entry_type: 'Operation_Log' });
                 let filteredLogs = history;
                 if (['DEPARTMENT_HEAD', 'FINANCE_DEPT'].includes(user?.role)) {
                    const deptId = user?.department_id || (user?.role === 'FINANCE_DEPT' ? 'FINANCE' : (user?.username === 'marketing' ? 'MARKETING' : 'ALL'));
@@ -221,7 +221,6 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
               } catch (e) {
                 console.error("Error loading logs", e);
               }
-            }
          };
          loadRecentLogs();
       }, [user?.id, user?.role, user?.department_id, user?.username, user?.facility_id, globalFacilityFilter]);
@@ -229,7 +228,6 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
       // --- FETCH DỮ LIỆU ĐIỂM DANH: HỖ TRỢ NHÂN SỰ & SỰ CỐ THIẾT BỊ ---
       useEffect(() => {
         const loadCheckinAlerts = async () => {
-          if (!window.DataService) return;
           // Chỉ hiển thị cho SUPER_ADMIN, VICE_PRESIDENT, ADMIN
           if (!['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'].includes(user?.role)) {
             setCheckinAlerts({ support: [], incidents: [] });
@@ -241,7 +239,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
             if (now.getHours() < 6) workDay.setDate(workDay.getDate() - 1);
             const todayStr = `${workDay.getDate().toString().padStart(2, '0')}/${(workDay.getMonth() + 1).toString().padStart(2, '0')}/${workDay.getFullYear()}`;
 
-            const logs = await window.DataService.fetchHistory({ entry_type: 'Attendance' });
+            const logs = await fetchHistory({ entry_type: 'Attendance' });
             const todayLogs = logs.filter(l => l.date === todayStr);
 
             // Lọc theo cơ sở nếu có filter
