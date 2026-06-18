@@ -584,19 +584,22 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                   </div>
                   <div className="p-0 max-h-96 overflow-y-auto custom-scrollbar">
                     <ul className="divide-y divide-outline-variant dark:divide-gray-800">
-                      {recentLogs.map((log, idx) => (
+                      {recentLogs.map((log, idx) => {
+                        const facName = facilitiesList.find(f => String(f.id) === String(log.org_unit))?.name || log.org_unit || '';
+                        return (
                         <li key={log.id || idx} className="p-4 hover:bg-gray-50 dark:hover:bg-[#252525] flex justify-between items-start transition-colors">
                           <div className="flex items-start gap-3">
                             <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5 shadow-sm font-bold text-xs">
-                              {log.org_unit ? log.org_unit.substring(0, 2).toUpperCase() : 'ALL'}
+                              {facName ? facName.substring(0, 2).toUpperCase() : 'ALL'}
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{log.content}</p>
-                              <p className="text-xs text-gray-500 mt-1">{log.displayTime} - {log.date} {log.org_unit && `| ${log.org_unit}`}</p>
+                              <p className="text-xs text-gray-500 mt-1">{log.displayTime} - {log.date} {facName && `| ${facName}`}</p>
                             </div>
                           </div>
                         </li>
-                      ))}
+                        );
+                      })}
                     </ul>
                   </div>
                 </div>
