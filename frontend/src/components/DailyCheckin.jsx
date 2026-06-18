@@ -31,10 +31,10 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
   const getFormattedDate = (dateObj) => {
     return `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
   };
-  // Ca làm việc 9h sáng đến 3h khuya hôm sau — nếu giờ < 4h sáng thì vẫn thuộc ngày hôm trước
+  // Ca làm việc 9h sáng đến 3h khuya hôm sau — nếu giờ < 6h sáng thì vẫn thuộc ngày hôm trước
   const getWorkDay = () => {
     const d = new Date();
-    if (d.getHours() < 4) d.setDate(d.getDate() - 1);
+    if (d.getHours() < 6) d.setDate(d.getDate() - 1);
     return d;
   };
   const today = getFormattedDate(getWorkDay());
