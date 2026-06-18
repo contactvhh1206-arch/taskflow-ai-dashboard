@@ -586,11 +586,12 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                     <ul className="divide-y divide-outline-variant dark:divide-gray-800">
                       {recentLogs.map((log, idx) => {
                         const facName = facilitiesList.find(f => String(f.id) === String(log.org_unit))?.name || log.org_unit || '';
+                        const facShort = facName.replace(/^DUBAI\s*/i, '').trim() || facName;
                         return (
                         <li key={log.id || idx} className="p-4 hover:bg-gray-50 dark:hover:bg-[#252525] flex justify-between items-start transition-colors">
                           <div className="flex items-start gap-3">
                             <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5 shadow-sm font-bold text-xs">
-                              {facName ? facName.substring(0, 2).toUpperCase() : 'ALL'}
+                              {facShort || 'ALL'}
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{log.content}</p>
