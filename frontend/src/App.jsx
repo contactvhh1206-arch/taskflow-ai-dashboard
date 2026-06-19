@@ -1816,6 +1816,14 @@ function MainDashboard() {
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Cơ sở</span>
                     <span className="text-sm font-bold dark:text-white">{selectedTask.facility}</span>
                   </div>
+                  <div className="flex items-center justify-between p-3 bg-surface-container-low dark:bg-[#252525] rounded-xl">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Thời gian tạo</span>
+                    <span className="text-sm font-bold dark:text-white">
+                      {selectedTask.createdAt
+                        ? new Date(selectedTask.createdAt).toLocaleString('vi-VN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(',', ' lúc')
+                        : 'Không xác định'}
+                    </span>
+                  </div>
                   <div className="flex items-center justify-between p-3 bg-error-container/50 dark:bg-red-900/10 rounded-xl border border-error/20">
                     <span className="text-sm font-medium text-error">Hạn chót</span>
                     <span className="text-sm font-bold text-error">{selectedTask.deadline ? selectedTask.deadline.replace('T', ' lúc ') : ''}</span>
