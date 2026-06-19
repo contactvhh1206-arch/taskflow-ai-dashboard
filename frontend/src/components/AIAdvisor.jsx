@@ -416,7 +416,7 @@ export default function AIAdvisor(props) {
           <div key={idx} className={`flex w-full mb-4 ${msg?.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
               msg?.role === 'user' 
-                ? 'bg-blue-600 text-white rounded-br-none shadow-md' 
+                ? 'bg-white text-gray-900 rounded-br-none shadow-md border border-gray-200 dark:bg-gray-100 dark:text-gray-900' 
                 : (msg?.isError ? 'bg-red-50 text-red-600 border border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:text-red-400 rounded-bl-none' : 'bg-gray-100 text-gray-800 rounded-bl-none border border-gray-200 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700')
             }`}>
               {msg?.attachment && (
