@@ -13,7 +13,7 @@ app.use(express.json({ limit: '50mb' }));
 
 // 1.1 Auto-run Migrations khi server khởi động
 (async () => {
-    const migrationFiles = ['001_create_ai_chat_messages.sql', '002_task_audit_logs.sql'];
+    const migrationFiles = ['001_create_ai_chat_messages.sql', '002_task_audit_logs.sql', '003_task_extension_request.sql'];
     for (const file of migrationFiles) {
         const migPath = path.join(__dirname, 'migrations', file);
         if (fs.existsSync(migPath)) {

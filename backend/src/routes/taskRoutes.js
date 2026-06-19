@@ -15,6 +15,7 @@ router.put('/:id/status', authGuard, rbacGuard, taskController.updateTaskStatusH
 router.delete('/:id', authGuard, rbacGuard, taskController.deleteTaskHandler);
 router.get('/deleted-history', authGuard, taskController.getDeletedTasksHandler);
 router.put('/:id/support', authGuard, rbacGuard, taskController.updateTaskSupportHandler);
+router.put('/:id/extension', authGuard, rbacGuard, taskController.updateTaskExtensionHandler);
 router.patch('/:id/restore', authGuard, rbacGuard, taskController.restoreTaskHandler);
 router.get('/:id/comments', authGuard, rbacGuard, taskController.getTaskCommentsHandler);
 router.post('/:id/comments', authGuard, rbacGuard, taskController.addTaskCommentHandler);

@@ -441,4 +441,45 @@ const addTaskCommentHandler = async (req, res) => {
   }
 };
 
-module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler, updateTaskStatusHandler, deleteTaskHandler, updateTaskSupportHandler, restoreTaskHandler, getTaskCommentsHandler, addTaskCommentHandler, getDeletedTasksHandler };
+const updateTaskExtensionHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ success: false, error: 'Vui lòng nhập nguyên nhân xin gia hạn.' });
+    }
+
+    // Cập nhật cờ xin gia hạn và lý do
+    const updateQuery = `
+      UPDATE tasks
+      SET extension_requested = true,
+          extension_reason = $1,
+          updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, title, extension_requested as "extensionRequested", extension_reason as "extensionReason"
+    `;
+    const { rows } = await pool.query(updateQuery, [reason.trim(), id]);
+
+    if (!rows[0]) {
+      return res.status(404).json({ success: false, error: 'Không tìm thấy task.' });
+    }
+
+    // Ghi nhật ký comment hệ thống để có audit trail
+    try {
+      await pool.query(
+        'INSERT INTO task_comments (task_id, user_id, content, created_at) VALUES ($1, $2, $3, NOW())',
+        [id, req.user.id, `⏳ [XIN GIA HẠN]: ${reason.trim()}`]
+      );
+    } catch (commentErr) {
+      console.warn('[Extension] Ghi comment thất bại (không nghiêm trọng):', commentErr.message);
+    }
+
+    res.json({ success: true, message: 'Đã gửi yêu cầu gia hạn thành công', data: rows[0] });
+  } catch (error) {
+    console.error('[Controller Error - updateTaskExtensionHandler]:', error.message);
+    res.status(500).json({ success: false, error: 'Lỗi máy chủ nội bộ' });
+  }
+};
+
+module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler, updateTaskStatusHandler, deleteTaskHandler, updateTaskSupportHandler, restoreTaskHandler, getTaskCommentsHandler, addTaskCommentHandler, getDeletedTasksHandler, updateTaskExtensionHandler };

@@ -574,6 +574,56 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                 </div>
               )}
 
+              {/* === SECTION: XIN GIA HẠN CHỜ DUYỆT === */}
+              {['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user?.role) && (() => {
+                const extensionTasks = (Array.isArray(tasks) ? tasks : []).filter(t => t?.extensionRequested === true && t?.status !== 'done' && t?.status !== 'revoked');
+                if (extensionTasks.length === 0) return null;
+                return (
+                  <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border border-amber-200 dark:border-amber-800/40 overflow-hidden mt-6">
+                    <div className="p-4 border-b border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/20">
+                      <h3 className="font-bold text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-amber-500">event_upcoming</span>
+                        Công việc xin gia hạn chờ duyệt
+                        <span className="ml-auto px-2.5 py-0.5 bg-amber-500 text-white text-xs font-bold rounded-full shadow-sm">{extensionTasks.length}</span>
+                      </h3>
+                    </div>
+                    <div className="p-0 max-h-72 overflow-y-auto custom-scrollbar">
+                      <ul className="divide-y divide-amber-100 dark:divide-amber-900/30">
+                        {extensionTasks.map(task => (
+                          <li
+                            key={task.id}
+                            onClick={() => onOpenTask && onOpenTask(task)}
+                            className="p-4 hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                <span className="material-symbols-outlined text-[18px]">hourglass_top</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate">{task.title}</p>
+                                <div className="flex items-center gap-2 flex-wrap mt-1">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">PIC: <span className="font-medium text-gray-700 dark:text-gray-300">{task.pic || 'Chưa giao'}</span></span>
+                                  <span className="text-gray-300 dark:text-gray-600">•</span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">Cơ sở: <span className="font-medium text-gray-700 dark:text-gray-300">{task.facility || '—'}</span></span>
+                                  <span className="text-gray-300 dark:text-gray-600">•</span>
+                                  <span className="text-xs text-red-500 dark:text-red-400 font-medium">Deadline: {task.deadline ? task.deadline.replace('T', ' lúc ') : '—'}</span>
+                                </div>
+                                {task.extensionReason && (
+                                  <div className="mt-2 flex items-start gap-1.5">
+                                    <span className="material-symbols-outlined text-amber-400 text-[14px] shrink-0 mt-0.5">chat_bubble</span>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 italic">"{task.extensionReason}"</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Lịch sử hoạt động (Newsfeed) */}
               {recentLogs.length > 0 && (
                 <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border border-outline-variant dark:border-gray-800 overflow-hidden mt-6">

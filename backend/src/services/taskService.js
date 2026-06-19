@@ -57,7 +57,7 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
     params.push(limit, offset);
     const dataQuery = `
         WITH paginated_tasks AS (
-            SELECT id, title, description, status, urgency, deadline, created_at, updated_at, needs_support, priority_level, pic_id, facility_id, department_code, created_by, created_by_role, evidence_url
+            SELECT id, title, description, status, urgency, deadline, created_at, updated_at, needs_support, priority_level, pic_id, facility_id, department_code, created_by, created_by_role, evidence_url, extension_requested, extension_reason
             FROM tasks t
             WHERE ${baseWhere}
             ORDER BY t.updated_at DESC
@@ -74,6 +74,8 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
                pt.facility_id as "facilityRawId",
                pt.department_code as "department_tag",
                pt.evidence_url as evidence,
+               pt.extension_requested as "extensionRequested",
+               pt.extension_reason as "extensionReason",
                top.clocker_present, top.clocker_absent_excused, top.clocker_absent_unexcused,
                top.ktv_present, top.ktv_ids_present, top.ktv_absent_excused, top.ktv_ids_absent_excused,
                top.ktv_absent_unexcused, top.ktv_ids_absent_unexcused, top.machinery_ok, 
@@ -84,7 +86,7 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
         LEFT JOIN facilities f ON pt.facility_id = f.id
         LEFT JOIN task_operations top ON pt.id = top.task_id
         LEFT JOIN task_comments tc ON pt.id = tc.task_id
-        GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, pt.priority_level, pt.pic_id, pt.created_by, pt.created_by_role, pt.evidence_url,
+        GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, pt.priority_level, pt.pic_id, pt.created_by, pt.created_by_role, pt.evidence_url, pt.extension_requested, pt.extension_reason,
                  u.full_name, u.email, f.name, f.code, pt.facility_id, pt.department_code,
                  top.clocker_present, top.clocker_absent_excused, top.clocker_absent_unexcused,
                  top.ktv_present, top.ktv_ids_present, top.ktv_absent_excused, top.ktv_ids_absent_excused,

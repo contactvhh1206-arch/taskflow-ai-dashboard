@@ -576,6 +576,9 @@ function MainDashboard() {
   const [evidenceFiles, setEvidenceFiles] = useState([]);
   const [closureNote, setClosureNote] = useState('');
   const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
+  const [showExtensionForm, setShowExtensionForm] = useState(false);
+  const [extensionReason, setExtensionReason] = useState('');
+  const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalStatus, setCreateModalStatus] = useState('todo');
   const [toastMessage, setToastMessage] = useState('');
@@ -587,6 +590,8 @@ function MainDashboard() {
       if (taskId) {
         setSelectedTaskComments([]); // Chống rò rỉ State
         setChatInput(''); // Reset nội dung đang soạn khi chuyển task
+        setShowExtensionForm(false); // Reset form gia hạn
+        setExtensionReason(''); // Reset lý do gia hạn
         const fetchComments = async () => {
           try {
             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/comments`, {
@@ -610,6 +615,8 @@ function MainDashboard() {
     } else {
       setSelectedTaskComments([]);
       setChatInput(''); // Reset nội dung đang soạn khi đóng task
+      setShowExtensionForm(false); // Reset form gia hạn
+      setExtensionReason(''); // Reset lý do gia hạn
     }
   }, [selectedTask?.id, selectedTask?.task_id, user]);
   
@@ -1836,7 +1843,7 @@ function MainDashboard() {
                   {selectedTask.status !== 'done' ? (
                     <div className="bg-surface-container dark:bg-[#252525] p-4 rounded-xl border border-dashed border-outline-variant dark:border-gray-700">
                       {user && (user.name === selectedTask.pic) ? (
-                        !showClosureConfirm ? (
+                        !showClosureConfirm && !showExtensionForm ? (
                           <>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                               Bạn là PIC của công việc này.
@@ -1854,10 +1861,105 @@ function MainDashboard() {
                               </button>
                             )}
 
+                            {/* Nút Xin gia hạn - Chỉ hiện khi task chưa xong và chưa có yêu cầu đang chờ */}
+                            {selectedTask.status !== 'done' && !selectedTask.extensionRequested && (
+                              <button
+                                onClick={() => { setShowExtensionForm(true); setExtensionReason(''); }}
+                                className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mb-2"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">event_upcoming</span> Xin gia hạn
+                              </button>
+                            )}
+                            {/* Hiển thị trạng thái đang chờ duyệt nếu đã xin gia hạn */}
+                            {selectedTask.extensionRequested && (
+                              <div className="w-full flex items-center justify-center gap-2 px-4 py-2 mb-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg text-amber-700 dark:text-amber-300 text-sm font-medium">
+                                <span className="material-symbols-outlined text-[18px] animate-pulse">hourglass_top</span>
+                                Đang chờ BĐH duyệt gia hạn
+                              </div>
+                            )}
+
                             <button onClick={() => setShowClosureConfirm(true)} className="w-full bg-success hover:bg-success/90 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
                               <span className="material-symbols-outlined text-[18px]">check_circle</span> Đóng Task (Hoàn thành)
                             </button>
                           </>
+                        ) : showExtensionForm ? (
+                          /* --- FORM XIN GIA HẠN --- */
+                          <div className="space-y-3">
+                            <p className="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                              <span className="material-symbols-outlined text-amber-500 text-[18px]">event_upcoming</span>
+                              Xin gia hạn deadline
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Lý do của bạn sẽ được gửi tới Ban Giám Đốc để xem xét và phê duyệt.
+                            </p>
+                            <textarea
+                              autoFocus
+                              value={extensionReason}
+                              onChange={(e) => setExtensionReason(e.target.value)}
+                              placeholder="Nhập nguyên nhân xin gia hạn... (bắt buộc)"
+                              className="w-full h-24 px-3 py-2 bg-surface-container-low dark:bg-[#252525] border border-amber-400 dark:border-amber-600 rounded-lg text-sm focus:ring-2 focus:ring-amber-400/50 outline-none transition-all dark:text-white resize-none"
+                            />
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                onClick={() => { setShowExtensionForm(false); setExtensionReason(''); }}
+                                disabled={isSubmittingExtension}
+                                className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white"
+                              >
+                                Hủy
+                              </button>
+                              <button
+                                disabled={!extensionReason.trim() || isSubmittingExtension}
+                                onClick={async () => {
+                                  if (!extensionReason.trim()) return;
+                                  setIsSubmittingExtension(true);
+                                  try {
+                                    const taskId = selectedTask.id || selectedTask.task_id;
+                                    const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/extension`, {
+                                      method: 'PUT',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'x-user-role': user.role,
+                                        'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL'
+                                      },
+                                      body: JSON.stringify({ reason: extensionReason.trim() })
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                      // Cập nhật state local
+                                      const patch = { extensionRequested: true, extensionReason: extensionReason.trim() };
+                                      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch } : t));
+                                      setSelectedTask(prev => ({ ...prev, ...patch }));
+                                      setShowExtensionForm(false);
+                                      setExtensionReason('');
+                                      showToast('✅ Đã gửi yêu cầu gia hạn tới Ban Giám Đốc!');
+                                      // Thêm comment hiển thị trong thread chat
+                                      setSelectedTaskComments(prev => [...prev, {
+                                        id: `ext-${Date.now()}`,
+                                        content: `⏳ [XIN GIA HẠN]: ${extensionReason.trim()}`,
+                                        user_name: user.name,
+                                        user_role: user.role,
+                                        created_at: new Date().toISOString()
+                                      }]);
+                                    } else {
+                                      showToast('❌ ' + (data.error || 'Lỗi gửi yêu cầu gia hạn'));
+                                    }
+                                  } catch (err) {
+                                    console.error('Lỗi xin gia hạn:', err);
+                                    showToast('❌ Lỗi kết nối máy chủ');
+                                  } finally {
+                                    setIsSubmittingExtension(false);
+                                  }
+                                }}
+                                className={`flex-[2] ${(!extensionReason.trim() || isSubmittingExtension) ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
+                              >
+                                {isSubmittingExtension ? (
+                                  <><span className="material-symbols-outlined text-[18px] animate-spin">sync</span> Đang gửi...</>
+                                ) : (
+                                  <><span className="material-symbols-outlined text-[18px]">send</span> Gửi yêu cầu</>
+                                )}
+                              </button>
+                            </div>
+                          </div>
                         ) : (
                           <div className="space-y-3">
                             <p className="text-sm font-bold text-gray-700 dark:text-gray-200">Xác nhận hoàn thành?</p>
