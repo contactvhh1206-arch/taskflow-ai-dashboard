@@ -2046,24 +2046,33 @@ function MainDashboard() {
                         ];
                         const allOptions = [...specialMentions, ...dbUsers];
                         return allOptions
-                          .filter(u => u.full_name && (u.full_name.toLowerCase().includes(mentionFilter) || (u.email && u.email.toLowerCase().includes(mentionFilter))))
-                          .map((u, idx) => (
-                            <div key={u.user_id || idx} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer rounded-lg text-sm dark:text-white" onClick={() => {
+                          .filter(u => {
+                            const displayName = u.full_name || u.name;
+                            const emailLogin = u.email || u.username;
+                            return displayName && (displayName.toLowerCase().includes(mentionFilter) || (emailLogin && emailLogin.toLowerCase().includes(mentionFilter)));
+                          })
+                          .map((u, idx) => {
+                            const displayName = u.full_name || u.name;
+                            const emailLogin = u.email || u.username;
+                            const userId = u.user_id || u.id;
+                            return (
+                            <div key={userId || idx} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer rounded-lg text-sm dark:text-white" onClick={() => {
                               const textBeforeCursor = chatInput.substring(0, cursorPosition);
                               const textAfterCursor = chatInput.substring(cursorPosition);
                               const match = textBeforeCursor.match(/@([^@]*)$/);
                               if (match) {
                                   const replaceStart = cursorPosition - match[0].length;
-                                  const newText = chatInput.substring(0, replaceStart) + '@' + (u.user_id === 'all' ? 'all' : u.full_name) + ' ' + textAfterCursor;
+                                  const newText = chatInput.substring(0, replaceStart) + '@' + (u.user_id === 'all' ? 'all' : displayName) + ' ' + textAfterCursor;
                                   setChatInput(newText);
                               }
                               setShowMentionMenu(false);
                               setTimeout(() => document.getElementById('task-chat-input')?.focus(), 0);
                             }}>
-                              <div className="font-medium text-primary">{u.full_name}</div>
-                              <div className="text-xs text-gray-500">{u.email}</div>
+                              <div className="font-medium text-primary">{displayName}</div>
+                              <div className="text-xs text-gray-500">{emailLogin}</div>
                             </div>
-                          ));
+                            );
+                          });
                       })()}
                     </div>
                   )}
