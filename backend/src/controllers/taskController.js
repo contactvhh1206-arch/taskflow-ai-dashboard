@@ -5,10 +5,13 @@ const getTasksHandler = async (req, res) => {
     try {
         // Thu thập tham số đầu vào. Mọi lỗ hổng phân quyền facility_id ĐÃ BỊ GUARD CHẶN TỪ TRƯỚC.
         let facilityId = req.query.facility_id || null;
-        let departmentCode = req.user.department_code || null;
+        let departmentCode = req.query.department_code || req.user.department_code || null;
         const status = req.query.status || null;
         
-        if (req.user.role === 'FACILITY_MANAGER') {
+        const globalRolesForView = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'];
+        if (globalRolesForView.includes(req.user.role)) {
+            departmentCode = req.query.department_code || null; // Cho phép xem toàn bộ nếu không filter cụ thể
+        } else if (req.user.role === 'FACILITY_MANAGER') {
             facilityId = req.user.facility_id || facilityId;
             departmentCode = null;
         }
@@ -54,12 +57,15 @@ const getTasksHandler = async (req, res) => {
 const getTasksHistoryHandler = async (req, res) => {
     try {
         let facilityId = req.query.facility_id || null;
-        let departmentCode = req.user.department_code || null;
+        let departmentCode = req.query.department_code || req.user.department_code || null;
         const picId = req.query.pic_id || null;
         const dateFrom = req.query.date_from || null;
         const dateTo = req.query.date_to || null;
 
-        if (req.user.role === 'FACILITY_MANAGER') {
+        const globalRolesForView = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'];
+        if (globalRolesForView.includes(req.user.role)) {
+            departmentCode = req.query.department_code || null; // Cho phép xem toàn bộ nếu không filter cụ thể
+        } else if (req.user.role === 'FACILITY_MANAGER') {
             facilityId = req.user.facility_id || facilityId;
             departmentCode = null;
         }
@@ -148,9 +154,18 @@ const createTaskHandler = async (req, res) => {
             insert_dept_code = req.user.department_code;
         }
         else if (isAllAccess) {
-            const upperFacility = rawFacility ? String(rawFacility).toUpperCase() : '';
+            const upperFacility = rawFacility ? String(rawFacility).toUpperCase().trim() : '';
             if (GLOBAL_DEPTS.includes(upperFacility)) {
                 insert_dept_code = upperFacility;
+                insert_facility_id = null;
+            } else if (upperFacility === 'PHÒNG TRUYỀN THÔNG' || upperFacility === 'TRUYỀN THÔNG') {
+                insert_dept_code = 'MARKETING';
+                insert_facility_id = null;
+            } else if (upperFacility === 'PHÒNG KẾ TOÁN' || upperFacility === 'KẾ TOÁN') {
+                insert_dept_code = 'FINANCE';
+                insert_facility_id = null;
+            } else if (upperFacility === 'BAN GIÁM ĐỐC' || upperFacility === 'BGD') {
+                insert_dept_code = 'BGD';
                 insert_facility_id = null;
             } else {
                 if (insert_facility_id === null && rawFacility && rawFacility !== 'ALL' && rawFacility !== 'HQ') {
