@@ -49,5 +49,31 @@ router.post('/', async (req, res) => {
     }
 });
 
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { content, attachments, ai_vector_data, display_time } = req.body;
+        
+        const contentJson = typeof content === 'object' ? JSON.stringify(content) : JSON.stringify(content || "");
+        const attachmentsJson = Array.isArray(attachments) ? JSON.stringify(attachments) : JSON.stringify([]);
+
+        const { rows } = await pool.query(
+            `UPDATE daily_logs 
+             SET content = $1, attachments = $2, ai_vector_data = $3, display_time = $4
+             WHERE id = $5 RETURNING *`,
+            [contentJson, attachmentsJson, ai_vector_data || '', display_time, id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Log not found' });
+        }
+
+        res.json({ success: true, data: rows[0] });
+    } catch (e) {
+        console.error("Lỗi PUT /api/logs/:id:", e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 module.exports = router;
 

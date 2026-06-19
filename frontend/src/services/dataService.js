@@ -28,6 +28,27 @@ export const saveData = async ({ org_unit, entry_type, content, attachments = []
   return null;
 };
 
+export const updateData = async (id, { content, attachments = [], aiVectorData = '' }) => {
+  const now = new Date();
+  const displayTime = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+  try {
+    const result = await axiosClient.put(`/api/logs/${id}`, {
+        content,
+        attachments,
+        ai_vector_data: aiVectorData,
+        display_time: displayTime
+    });
+    
+    if (result.success) {
+      return { ...result.data, displayTime: result.data.display_time, aiVectorData: result.data.ai_vector_data };
+    }
+  } catch (error) {
+    console.error('Lỗi khi cập nhật data:', error);
+  }
+  return null;
+};
+
 export const fetchHistory = async (filters = {}) => {
   try {
     const query = new URLSearchParams(filters).toString();

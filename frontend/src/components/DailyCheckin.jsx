@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext.jsx';
-import { saveData, fetchHistory } from '../services/dataService.js';
+import { saveData, updateData, fetchHistory } from '../services/dataService.js';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
 
 /**
@@ -430,13 +430,25 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
 
       const aiVectorData = `[${timestamp}] CƠ SỞ ${user.facility_id} | CA ${selectedShift} | NGHỈ: ${currentSumManual} (${leaveNotesStr}) | HỖ TRỢ: ${getNotes() || 'Không có'} | SỰ CỐ: ${eqNotesStr || 'Không có'}`;
 
-      const newRecord = await saveData({
-        org_unit: user.facility_id,
-        entry_type: 'Attendance',
-        content: { ...formData, shift: selectedShift },
-        attachments: [],
-        aiVectorData
-      });
+      const existingCheckin = checkins.find(c => String(c.org_unit) === String(user.facility_id) && c.date === today && c.shift === selectedShift);
+      const recordIdToUpdate = existingCheckin ? existingCheckin.id : null;
+
+      let newRecord;
+      if (recordIdToUpdate) {
+        newRecord = await updateData(recordIdToUpdate, {
+          content: { ...formData, shift: selectedShift },
+          attachments: [],
+          aiVectorData
+        });
+      } else {
+        newRecord = await saveData({
+          org_unit: user.facility_id,
+          entry_type: 'Attendance',
+          content: { ...formData, shift: selectedShift },
+          attachments: [],
+          aiVectorData
+        });
+      }
       
       if (newRecord) {
         const newCheckin = {
@@ -872,8 +884,8 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
             </div>
           ) : (
             <button type="submit" onClick={handleSubmit} disabled={loading || !isFormValid} className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-primary/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-              {loading ? <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> : <span className="material-symbols-outlined text-[18px]">how_to_reg</span>}
-              Xác nhận Check-in
+              {loading ? <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> : <span className="material-symbols-outlined text-[18px]">{checkins.some(c => String(c.org_unit) === String(user.facility_id) && c.date === today && c.shift === selectedShift) ? 'update' : 'how_to_reg'}</span>}
+              {checkins.some(c => String(c.org_unit) === String(user.facility_id) && c.date === today && c.shift === selectedShift) ? 'Cập nhật thông tin' : 'Xác nhận Check-in'}
             </button>
           )}
         </div>
