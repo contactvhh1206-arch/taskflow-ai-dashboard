@@ -482,4 +482,73 @@ const updateTaskExtensionHandler = async (req, res) => {
   }
 };
 
-module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler, updateTaskStatusHandler, deleteTaskHandler, updateTaskSupportHandler, restoreTaskHandler, getTaskCommentsHandler, addTaskCommentHandler, getDeletedTasksHandler, updateTaskExtensionHandler };
+const resolveTaskExtensionHandler = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, newDeadline } = req.body; // action: 'approve' | 'reject'
+
+    // Chỉ SUPER_ADMIN và VICE_PRESIDENT mới được gọi API này
+    if (!['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Bạn không có quyền thực hiện thao tác này.' });
+    }
+
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'Hành động không hợp lệ. Phải là approve hoặc reject.' });
+    }
+    if (action === 'approve' && !newDeadline) {
+      return res.status(400).json({ success: false, error: 'Vui lòng chọn deadline mới khi duyệt gia hạn.' });
+    }
+
+    let updateQuery, queryParams;
+    if (action === 'approve') {
+      updateQuery = `
+        UPDATE tasks
+        SET extension_requested = false,
+            extension_reason = NULL,
+            deadline = $1,
+            updated_at = NOW()
+        WHERE id = $2
+        RETURNING id, title, deadline, extension_requested as "extensionRequested", extension_reason as "extensionReason"
+      `;
+      queryParams = [newDeadline, id];
+    } else {
+      updateQuery = `
+        UPDATE tasks
+        SET extension_requested = false,
+            extension_reason = NULL,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, title, deadline, extension_requested as "extensionRequested", extension_reason as "extensionReason"
+      `;
+      queryParams = [id];
+    }
+
+    const { rows } = await pool.query(updateQuery, queryParams);
+    if (!rows[0]) {
+      return res.status(404).json({ success: false, error: 'Không tìm thấy task.' });
+    }
+
+    // Ghi log comment hệ thống
+    try {
+      const logContent = action === 'approve'
+        ? `✅ [ĐÃ DUYỆT GIA HẠN] Deadline mới: ${new Date(newDeadline).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} — Phê duyệt bởi ${req.user.name || req.user.username}`
+        : `❌ [TỪ CHỐI GIA HẠN] — Từ chối bởi ${req.user.name || req.user.username}`;
+      await pool.query(
+        'INSERT INTO task_comments (task_id, user_id, content, created_at) VALUES ($1, $2, $3, NOW())',
+        [id, req.user.id, logContent]
+      );
+    } catch (commentErr) {
+      console.warn('[ResolveExtension] Ghi comment thất bại:', commentErr.message);
+    }
+
+    const message = action === 'approve'
+      ? `✅ Đã duyệt gia hạn deadline thành công`
+      : `❌ Đã từ chối yêu cầu gia hạn`;
+    res.json({ success: true, message, data: rows[0] });
+  } catch (error) {
+    console.error('[Controller Error - resolveTaskExtensionHandler]:', error.message);
+    res.status(500).json({ success: false, error: 'Lỗi máy chủ nội bộ' });
+  }
+};
+
+module.exports = { getTasksHandler, getTasksHistoryHandler, createTaskHandler, updateTaskStatusHandler, deleteTaskHandler, updateTaskSupportHandler, restoreTaskHandler, getTaskCommentsHandler, addTaskCommentHandler, getDeletedTasksHandler, updateTaskExtensionHandler, resolveTaskExtensionHandler };

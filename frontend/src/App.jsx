@@ -579,6 +579,10 @@ function MainDashboard() {
   const [showExtensionForm, setShowExtensionForm] = useState(false);
   const [extensionReason, setExtensionReason] = useState('');
   const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
+  const [showExtensionApproveInput, setShowExtensionApproveInput] = useState(false);
+  const [newExtensionDeadline, setNewExtensionDeadline] = useState('');
+  const [isResolvingExtension, setIsResolvingExtension] = useState(false);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalStatus, setCreateModalStatus] = useState('todo');
   const [toastMessage, setToastMessage] = useState('');
@@ -592,6 +596,8 @@ function MainDashboard() {
         setChatInput(''); // Reset nội dung đang soạn khi chuyển task
         setShowExtensionForm(false); // Reset form gia hạn
         setExtensionReason(''); // Reset lý do gia hạn
+        setShowExtensionApproveInput(false); // Reset UI duyệt gia hạn
+        setNewExtensionDeadline(''); // Reset deadline mới
         const fetchComments = async () => {
           try {
             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/comments`, {
@@ -617,6 +623,8 @@ function MainDashboard() {
       setChatInput(''); // Reset nội dung đang soạn khi đóng task
       setShowExtensionForm(false); // Reset form gia hạn
       setExtensionReason(''); // Reset lý do gia hạn
+      setShowExtensionApproveInput(false); // Reset UI duyệt gia hạn
+      setNewExtensionDeadline(''); // Reset deadline mới
     }
   }, [selectedTask?.id, selectedTask?.task_id, user]);
   
@@ -1871,10 +1879,125 @@ function MainDashboard() {
                               </button>
                             )}
                             {/* Hiển thị trạng thái đang chờ duyệt nếu đã xin gia hạn */}
-                            {selectedTask.extensionRequested && (
+                            {selectedTask.extensionRequested && !['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user?.role) && (
                               <div className="w-full flex items-center justify-center gap-2 px-4 py-2 mb-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg text-amber-700 dark:text-amber-300 text-sm font-medium">
                                 <span className="material-symbols-outlined text-[18px] animate-pulse">hourglass_top</span>
                                 Đang chờ BĐH duyệt gia hạn
+                              </div>
+                            )}
+
+                            {/* === BLOCK DUYỆT GIA HẠN — Chỉ hiện với SUPER_ADMIN / VICE_PRESIDENT === */}
+                            {selectedTask.extensionRequested && ['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user?.role) && (
+                              <div className="w-full mb-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl space-y-2">
+                                <p className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[16px] animate-pulse">hourglass_top</span>
+                                  Yêu cầu xin gia hạn deadline
+                                </p>
+                                {selectedTask.extensionReason && (
+                                  <p className="text-xs text-gray-600 dark:text-gray-300 italic bg-white dark:bg-gray-800 rounded-lg px-3 py-2 border border-amber-200 dark:border-amber-800">
+                                    "{selectedTask.extensionReason}"
+                                  </p>
+                                )}
+                                {/* Chọn deadline mới (hiện khi bấm nút Duyệt) */}
+                                {showExtensionApproveInput && (
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Deadline mới:</label>
+                                    <input
+                                      type="datetime-local"
+                                      value={newExtensionDeadline}
+                                      onChange={(e) => setNewExtensionDeadline(e.target.value)}
+                                      className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-amber-400 dark:border-amber-600 rounded-lg focus:ring-2 focus:ring-amber-400/50 outline-none dark:text-white"
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex gap-2 pt-1">
+                                  {/* Nút Từ chối */}
+                                  <button
+                                    disabled={isResolvingExtension}
+                                    onClick={async () => {
+                                      if (!confirm('Xác nhận TỪ CHỐI yêu cầu gia hạn này?')) return;
+                                      setIsResolvingExtension(true);
+                                      try {
+                                        const taskId = selectedTask.id || selectedTask.task_id;
+                                        const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/extension-resolve`, {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json', 'x-user-role': user.role, 'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL' },
+                                          body: JSON.stringify({ action: 'reject' })
+                                        });
+                                        const data = await res.json();
+                                        if (data.success) {
+                                          const patch = { extensionRequested: false, extensionReason: null };
+                                          setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch } : t));
+                                          setSelectedTask(prev => ({ ...prev, ...patch }));
+                                          setShowExtensionApproveInput(false);
+                                          setNewExtensionDeadline('');
+                                          showToast('❌ Đã từ chối yêu cầu gia hạn');
+                                          setSelectedTaskComments(prev => [...prev, { id: `rej-${Date.now()}`, content: `❌ [TỪ CHỐI GIA HẠN] — Từ chối bởi ${user.name}`, user_name: user.name, user_role: user.role, created_at: new Date().toISOString() }]);
+                                        } else {
+                                          showToast('❌ ' + (data.error || 'Lỗi khi từ chối'));
+                                        }
+                                      } catch (err) {
+                                        console.error('Lỗi từ chối gia hạn:', err);
+                                        showToast('❌ Lỗi kết nối máy chủ');
+                                      } finally {
+                                        setIsResolvingExtension(false);
+                                      }
+                                    }}
+                                    className={`flex-1 text-xs font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1 ${isResolvingExtension ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700'}`}
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">cancel</span> Từ chối
+                                  </button>
+                                  {/* Nút Duyệt */}
+                                  {!showExtensionApproveInput ? (
+                                    <button
+                                      onClick={() => { setShowExtensionApproveInput(true); setNewExtensionDeadline(''); }}
+                                      className="flex-[2] text-xs font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1 bg-green-500 hover:bg-green-600 text-white"
+                                    >
+                                      <span className="material-symbols-outlined text-[15px]">check_circle</span> Duyệt gia hạn
+                                    </button>
+                                  ) : (
+                                    <button
+                                      disabled={!newExtensionDeadline || isResolvingExtension}
+                                      onClick={async () => {
+                                        if (!newExtensionDeadline) { showToast('⚠️ Vui lòng chọn deadline mới'); return; }
+                                        setIsResolvingExtension(true);
+                                        try {
+                                          const taskId = selectedTask.id || selectedTask.task_id;
+                                          const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/extension-resolve`, {
+                                            method: 'PUT',
+                                            headers: { 'Content-Type': 'application/json', 'x-user-role': user.role, 'x-facility-id': localStorage.getItem('facility_id') || user.facility_id || 'ALL' },
+                                            body: JSON.stringify({ action: 'approve', newDeadline: newExtensionDeadline })
+                                          });
+                                          const data = await res.json();
+                                          if (data.success) {
+                                            const newDL = data.data?.deadline || newExtensionDeadline;
+                                            const patch = { extensionRequested: false, extensionReason: null, deadline: newDL };
+                                            setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch } : t));
+                                            setSelectedTask(prev => ({ ...prev, ...patch }));
+                                            setShowExtensionApproveInput(false);
+                                            setNewExtensionDeadline('');
+                                            showToast('✅ Đã duyệt gia hạn deadline thành công!');
+                                            setSelectedTaskComments(prev => [...prev, { id: `apv-${Date.now()}`, content: `✅ [ĐÃ DUYỆT GIA HẠN] Deadline mới: ${new Date(newDL).toLocaleString('vi-VN')} — Bởi ${user.name}`, user_name: user.name, user_role: user.role, created_at: new Date().toISOString() }]);
+                                          } else {
+                                            showToast('❌ ' + (data.error || 'Lỗi khi duyệt gia hạn'));
+                                          }
+                                        } catch (err) {
+                                          console.error('Lỗi duyệt gia hạn:', err);
+                                          showToast('❌ Lỗi kết nối máy chủ');
+                                        } finally {
+                                          setIsResolvingExtension(false);
+                                        }
+                                      }}
+                                      className={`flex-[2] text-xs font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1 ${(!newExtensionDeadline || isResolvingExtension) ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                                    >
+                                      {isResolvingExtension ? (
+                                        <><span className="material-symbols-outlined text-[15px] animate-spin">sync</span> Đang lưu...</>
+                                      ) : (
+                                        <><span className="material-symbols-outlined text-[15px]">save</span> Xác nhận duyệt</>
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             )}
 
