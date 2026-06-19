@@ -5,6 +5,7 @@ import { fetchHistory } from '../services/dataService';
 export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacilityFilter }) {
       const [stats, setStats] = useState({ open: 0, closed: 0, overdue: 0, total: -1, error: false });
       const [urgentTasks, setUrgentTasks] = useState([]);
+      const [overdueTasksList, setOverdueTasksList] = useState([]);
       const [aiPings, setAiPings] = useState([]);
       const [recentLogs, setRecentLogs] = useState([]);
       const [checkinAlerts, setCheckinAlerts] = useState({ support: [], incidents: [] });
@@ -186,10 +187,27 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
 
             setStats({ open: openCount ?? 0, closed: closedCount ?? 0, overdue: overdueCount ?? 0, total: myTasks.length });
 
-            const todayStr = new Date().toISOString().split('T')[0];
-            // Loại trừ thêm 'review' khỏi danh sách khẩn cấp - task đang nghiệm thu không cần báo động
-            const urgent = myTasks.filter(t => t?.status !== 'done' && t?.status !== 'review' && t?.status !== 'revoked' && (t?.urgent || t?.pinned || (t?.deadline && t.deadline <= todayStr)));
-            setUrgentTasks(urgent || []);
+            const nowTime = now.getTime();
+            const msIn48h = 48 * 60 * 60 * 1000;
+
+            // Chỉ tính các task đang còn mở (chưa hoàn thành / chưa nghiệm thu / chưa thu hồi)
+            const activeTasks = myTasks.filter(t => t?.status !== 'done' && t?.status !== 'review' && t?.status !== 'revoked');
+
+            // 1. Công việc QUÁ HẠN: deadline đã qua hiện tại
+            const overdueList = activeTasks.filter(t => {
+              const dTime = getDeadlineTime(t);
+              return dTime > 0 && dTime < nowTime;
+            });
+            setOverdueTasksList(overdueList || []);
+
+            // 2. Công việc KHẨN CẤP: deadline còn lại <= 48h (hoặc được ghim/đánh dấu urgent mà chưa quá hạn)
+            const urgentList = activeTasks.filter(t => {
+              const dTime = getDeadlineTime(t);
+              const isExpiringSoon = dTime > nowTime && (dTime - nowTime) <= msIn48h;
+              const isPinnedNotOverdue = (t?.urgent || t?.pinned) && (dTime === 0 || dTime >= nowTime);
+              return isExpiringSoon || isPinnedNotOverdue;
+            });
+            setUrgentTasks(urgentList || []);
 
             // AI Pings now handled by a separate useEffect with useRef lock to call Node API
 
@@ -699,15 +717,64 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                 </div>
               )}
 
+              {/* === SECTION: CÔNG VIỆC QUÁ HẠN === */}
+              {overdueTasksList.length > 0 && (
+                <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border-2 border-red-500 dark:border-red-600 overflow-hidden mt-6">
+                  <div className="p-4 border-b border-red-400 dark:border-red-700 bg-red-50 dark:bg-red-950/50">
+                    <h3 className="font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-red-600 animate-pulse">error</span>
+                      Công việc quá hạn
+                      <span className="ml-auto px-2.5 py-0.5 bg-red-600 text-white text-xs font-bold rounded-full shadow-sm">{overdueTasksList.length}</span>
+                    </h3>
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-1 font-semibold">⚠️ Cảnh báo: Các công việc dưới đây đã vượt quá thời hạn cho phép!</p>
+                  </div>
+                  <div className="p-0 max-h-96 overflow-y-auto custom-scrollbar">
+                    <ul className="divide-y divide-red-100 dark:divide-red-900/30">
+                      {overdueTasksList.map(t => (
+                        <li
+                          key={t.id}
+                          onClick={() => onOpenTask && onOpenTask(t)}
+                          className="p-4 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/10 flex justify-between items-center transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-red-700 dark:text-red-300 flex items-center gap-2">
+                              <span className="material-symbols-outlined text-red-500 text-[18px]">schedule</span>
+                              {t.title}
+                              {t.priority_stars > 0 && (
+                                <span className="relative group/star flex items-center justify-center">
+                                  {Array.from({ length: t.priority_stars }).map((_, i) => (
+                                    <span key={i} className="material-symbols-outlined text-yellow-400 text-[16px] drop-shadow-sm" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                                  ))}
+                                </span>
+                              )}
+                              {t.needsSupport && (
+                                <span className="px-2 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-md text-[10px] font-bold flex items-center gap-1 border border-red-200 dark:border-red-800/50">
+                                  <span className="material-symbols-outlined text-[12px]">support_agent</span> Cần hỗ trợ
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-red-500 dark:text-red-400 mt-1 font-medium">PIC: {(t.pic || 'Chưa phân công')} | Deadline: {t.deadline}</p>
+                          </div>
+                          <span className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-bold ml-3 whitespace-nowrap shadow-sm">QUÁ HẠN</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* === SECTION: CÔNG VIỆC CẦN CHÚ Ý KHẨN CẤP (gần hết hạn trong 48h) === */}
               <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm border border-outline-variant dark:border-gray-800 overflow-hidden mt-6">
                 <div className="p-4 border-b border-outline-variant dark:border-gray-800 bg-surface-container-low dark:bg-[#121212]">
                   <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
                     <span className="material-symbols-outlined text-orange-500">local_fire_department</span> Công việc cần chú ý khẩn cấp
+                    <span className="ml-2 text-xs text-orange-500 font-normal">(gần hết hạn trong 48 giờ)</span>
+                    {urgentTasks.length > 0 && <span className="ml-auto px-2.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full shadow-sm">{urgentTasks.length}</span>}
                   </h3>
                 </div>
                 <div className="p-0 max-h-96 overflow-y-auto custom-scrollbar">
                   {urgentTasks.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">Tuyệt vời! Không có công việc nào khẩn cấp hoặc trễ hạn.</div>
+                    <div className="p-8 text-center text-gray-500">Tuyệt vời! Không có công việc nào sắp hết hạn trong 48 giờ tới.</div>
                   ) : (
                     <ul className="divide-y divide-outline-variant dark:divide-gray-800">
                       {urgentTasks.map(t => (
