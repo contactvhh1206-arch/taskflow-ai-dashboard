@@ -151,9 +151,16 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
 
             const getDeadlineTime = (t) => {
               if (!t?.deadline || typeof t.deadline !== 'string') return 0;
+              // Nếu deadline có chứa giờ phút (chứa T hoặc khoảng trắng)
+              if (t.deadline.includes('T') || t.deadline.includes(' ')) {
+                const parsed = new Date(t.deadline).getTime();
+                if (!isNaN(parsed)) return parsed;
+              }
+              // Nếu chỉ có ngày tháng năm, gán mặc định hạn chót là cuối ngày đó 23:59:59
               const [y, m, d] = t.deadline.split('-');
               if (!y || !m || !d) return 0;
-              return new Date(y, m - 1, d, 23, 59, 59).getTime();
+              const cleanD = parseInt(d, 10);
+              return new Date(y, m - 1, cleanD, 23, 59, 59).getTime();
             };
 
             // [FIX] Công việc Mở = tất cả task chưa xong, BẤT KỂ ngày tạo.
