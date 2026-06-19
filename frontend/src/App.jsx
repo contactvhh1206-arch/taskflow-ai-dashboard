@@ -1815,7 +1815,7 @@ function MainDashboard() {
                     </span>
                   )}
                 </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">{selectedTask.desc}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 whitespace-pre-wrap">{selectedTask.desc}</p>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-3 bg-surface-container-low dark:bg-[#252525] rounded-xl">
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Người phụ trách (PIC)</span>
@@ -2125,7 +2125,7 @@ function MainDashboard() {
                             <span className="font-bold text-[11px]">{c.user_name ? c.user_name : 'Người dùng hệ thống'}</span>
                             {c.user_role && <span className="text-[9px] bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded-full text-gray-700 dark:text-gray-300">{c.user_role}</span>}
                           </div>
-                          <div className="break-words leading-relaxed text-[13px]">{c.content}</div>
+                          <div className="break-words leading-relaxed text-[13px] whitespace-pre-wrap">{c.content}</div>
                           <span className="text-[9px] opacity-60 block mt-1 text-right">
                             {new Date(c.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }).replace(', ', ' - ')}
                           </span>
