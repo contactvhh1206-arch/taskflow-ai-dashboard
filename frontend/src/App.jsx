@@ -573,7 +573,7 @@ function MainDashboard() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [showAITaskModal, setShowAITaskModal] = useState(false);
   const [showClosureConfirm, setShowClosureConfirm] = useState(false);
-  const [evidenceFile, setEvidenceFile] = useState(null);
+  const [evidenceFiles, setEvidenceFiles] = useState([]);
   const [closureNote, setClosureNote] = useState('');
   const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -1859,20 +1859,44 @@ function MainDashboard() {
                             />
                             <label className="flex items-center justify-center gap-2 w-full border-2 border-dashed border-outline-variant dark:border-gray-600 rounded-lg p-4 cursor-pointer hover:bg-surface-container-high transition-colors">
                               <span className="material-symbols-outlined text-gray-400">upload_file</span>
-                              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{evidenceFile ? evidenceFile.name : 'Chọn ảnh/tài liệu...'}</span>
-                              <input type="file" className="hidden" accept="image/*, .pdf, .doc, .docx" onChange={(e) => {
-                                const f = e.target.files[0];
-                                if (!f) return;
-                                if (f.size > 10 * 1024 * 1024) {
-                                  if (window.showToast) window.showToast('File bằng chứng vượt quá 10MB. Vui lòng chọn file nhỏ hơn.', 'error');
-                                  e.target.value = '';
-                                  return;
-                                }
-                                setEvidenceFile(f);
+                              <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                                {evidenceFiles.length > 0 ? `Đã chọn ${evidenceFiles.length} file — Nhấn để thêm` : 'Chọn ảnh/tài liệu (có thể chọn nhiều)...'}
+                              </span>
+                              <input type="file" multiple className="hidden" accept="image/*, .pdf, .doc, .docx" onChange={(e) => {
+                                const files = Array.from(e.target.files);
+                                const validFiles = files.filter(f => {
+                                  if (f.size > 10 * 1024 * 1024) {
+                                    if (window.showToast) window.showToast(`File "${f.name}" vượt quá 10MB. Vui lòng chọn file nhỏ hơn.`, 'error');
+                                    return false;
+                                  }
+                                  return true;
+                                });
+                                setEvidenceFiles(prev => [...prev, ...validFiles]);
+                                e.target.value = '';
                               }} />
                             </label>
+                            {evidenceFiles.length > 0 && (
+                              <div className="mt-2 space-y-1 max-h-36 overflow-y-auto pr-1">
+                                {evidenceFiles.map((file, idx) => (
+                                  <div key={idx} className="flex items-center justify-between px-3 py-1.5 bg-surface-container-high dark:bg-gray-800 rounded-lg text-sm border border-outline-variant dark:border-gray-700">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="material-symbols-outlined text-[16px] text-gray-400 shrink-0">insert_drive_file</span>
+                                      <span className="truncate dark:text-gray-300">{file.name}</span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEvidenceFiles(prev => prev.filter((_, i) => i !== idx))}
+                                      className="ml-2 shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full p-0.5 transition-colors"
+                                      title="Xóa file này"
+                                    >
+                                      <span className="material-symbols-outlined text-[18px]">close</span>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             <div className="flex gap-2 pt-2">
-                              <button onClick={() => { setShowClosureConfirm(false); setEvidenceFile(null); setClosureNote(''); }} className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white" disabled={isUploadingEvidence}>Hủy</button>
+                              <button onClick={() => { setShowClosureConfirm(false); setEvidenceFiles([]); setClosureNote(''); }} className="flex-1 bg-surface-container-highest dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium py-2 rounded-lg transition-colors dark:text-white" disabled={isUploadingEvidence}>Hủy</button>
                               <button 
                                 onClick={async () => { 
                                   // Gửi ghi chú đóng task (nếu có) dưới dạng comment
@@ -1888,28 +1912,32 @@ function MainDashboard() {
                                       console.error('Lỗi gửi ghi chú đóng task:', err);
                                     }
                                   }
-                                  if (evidenceFile) {
+                                  if (evidenceFiles.length > 0) {
                                     setIsUploadingEvidence(true);
                                     try {
-                                      const fileName = `evidence_${Date.now()}_${Math.random().toString(36).substring(7)}_${evidenceFile.name}`;
-                                      const { error } = await supabase.storage.from('attachments').upload(fileName, evidenceFile, {
-                                        contentType: evidenceFile.type || 'application/octet-stream'
-                                      });
-                                      if (error) throw error;
-                                      const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
-                                      handleUpdateTaskStatus(selectedTask.id, 'done', publicUrl);
+                                      const uploadedUrls = [];
+                                      for (const file of evidenceFiles) {
+                                        const fileName = `evidence_${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name}`;
+                                        const { error } = await supabase.storage.from('attachments').upload(fileName, file, {
+                                          contentType: file.type || 'application/octet-stream'
+                                        });
+                                        if (error) throw error;
+                                        const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
+                                        uploadedUrls.push(publicUrl);
+                                      }
+                                      handleUpdateTaskStatus(selectedTask.id, 'done', JSON.stringify(uploadedUrls));
                                     } catch (err) {
                                       console.error("Lỗi upload evidence:", err);
                                       alert("Lỗi tải lên bằng chứng: " + err.message);
                                       setIsUploadingEvidence(false);
-                                      return; // Dừng lại nếu lỗi
+                                      return;
                                     }
                                     setIsUploadingEvidence(false);
                                   } else {
                                     handleUpdateTaskStatus(selectedTask.id, 'done', null);
                                   }
                                   setShowClosureConfirm(false); 
-                                  setEvidenceFile(null);
+                                  setEvidenceFiles([]);
                                   setClosureNote(''); 
                                 }} 
                                 disabled={isUploadingEvidence}
@@ -1935,14 +1963,26 @@ function MainDashboard() {
                         <div><p className="font-bold text-sm">Đã đóng thành công</p><p className="text-xs opacity-80">{selectedTask.evidence ? 'Có bằng chứng đính kèm' : 'Không có bằng chứng đính kèm'}</p></div>
                       </div>
                       {selectedTask.evidence && (() => {
-                        const url = selectedTask.evidence;
-                        const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
-                        return isImage ? (
-                          <img src={url} alt="Bằng chứng đính kèm" className="mt-3 w-full max-h-60 object-contain rounded-lg border border-success/20 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => window.open(url, '_blank')} />
-                        ) : (
-                          <a href={url} target="_blank" rel="noopener noreferrer" className="mt-3 flex items-center gap-2 text-xs underline hover:opacity-70 transition-opacity">
-                            <span className="material-symbols-outlined text-[16px]">attach_file</span> Xem tài liệu đính kèm
-                          </a>
+                        let urls = [];
+                        try {
+                          const parsed = JSON.parse(selectedTask.evidence);
+                          urls = Array.isArray(parsed) ? parsed : [selectedTask.evidence];
+                        } catch (e) {
+                          urls = [selectedTask.evidence];
+                        }
+                        return (
+                          <div className="mt-3 flex flex-col gap-2">
+                            {urls.map((url, idx) => {
+                              const isImage = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?.*)?$/i.test(url);
+                              return isImage ? (
+                                <img key={idx} src={url} alt={`Bằng chứng đính kèm ${idx + 1}`} className="w-full max-h-60 object-contain rounded-lg border border-success/20 cursor-pointer hover:opacity-80 transition-opacity bg-black/5 dark:bg-white/5" onClick={() => window.open(url, '_blank')} />
+                              ) : (
+                                <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs underline hover:opacity-70 transition-opacity">
+                                  <span className="material-symbols-outlined text-[16px]">attach_file</span> Xem tài liệu đính kèm {urls.length > 1 ? idx + 1 : ''}
+                                </a>
+                              );
+                            })}
+                          </div>
                         );
                       })()}
                     </div>
