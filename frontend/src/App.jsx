@@ -586,6 +586,7 @@ function MainDashboard() {
       const taskId = selectedTask.id || selectedTask.task_id;
       if (taskId) {
         setSelectedTaskComments([]); // Chống rò rỉ State
+        setChatInput(''); // Reset nội dung đang soạn khi chuyển task
         const fetchComments = async () => {
           try {
             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/tasks/${taskId}/comments`, {
@@ -608,6 +609,7 @@ function MainDashboard() {
       }
     } else {
       setSelectedTaskComments([]);
+      setChatInput(''); // Reset nội dung đang soạn khi đóng task
     }
   }, [selectedTask?.id, selectedTask?.task_id, user]);
   
