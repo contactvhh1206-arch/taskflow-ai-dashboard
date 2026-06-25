@@ -538,8 +538,9 @@ function MainDashboard() {
          const tTitle = String(t.title || '').toLowerCase();
          const tFacName = String(t?.facilityId || t?.facility || '').toLowerCase();
          const tDeptTag = String(t?.department_tag || '').toLowerCase();
+         const tPicDept = String(t?.pic_department_code || '').toLowerCase();
          const filterLower = String(globalFacilityFilter).toLowerCase();
-         return tFacName.includes(filterLower) || tTitle.includes(filterLower) || tDeptTag === filterLower;
+         return tFacName.includes(filterLower) || tTitle.includes(filterLower) || tDeptTag === filterLower || tPicDept === filterLower;
      }
      
      if (isDeptHead) {

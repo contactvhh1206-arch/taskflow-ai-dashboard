@@ -73,8 +73,9 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                    const tTitle = (t.title || '').toLowerCase();
                    const tFacName = (t?.facilityId || t?.facility || '').toLowerCase();
                    const tDeptTag = (t?.department_tag || '').toLowerCase();
+                   const tPicDept = (t?.pic_department_code || '').toLowerCase();
                    const filterLower = globalFacilityFilter.toLowerCase();
-                   return tFacName.includes(filterLower) || tTitle.includes(filterLower) || tDeptTag === filterLower;
+                   return tFacName.includes(filterLower) || tTitle.includes(filterLower) || tDeptTag === filterLower || tPicDept === filterLower;
                }
                
                if (isDeptHead) {

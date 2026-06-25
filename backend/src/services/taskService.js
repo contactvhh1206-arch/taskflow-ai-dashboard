@@ -69,6 +69,7 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
                pt.needs_support as "needsSupport",
                CASE WHEN pt.priority_level = 'CRITICAL' THEN 5 WHEN pt.priority_level = 'HIGH' THEN 3 WHEN pt.priority_level = '5' OR pt.priority_level = '3' THEN 5 WHEN pt.priority_level = '2' THEN 3 ELSE 0 END as priority_stars,
                u.full_name as pic, u.email as "picId", pt.pic_id,
+               u.department_code as "pic_department_code",
                pt.created_by as "createdBy", pt.created_by_role as "creator_role",
                f.name as facility, f.code as "facilityId",
                pt.facility_id as "facilityRawId",
@@ -87,7 +88,7 @@ const getTasksList = async ({ userId, role, facilityId, departmentCode, status, 
         LEFT JOIN task_operations top ON pt.id = top.task_id
         LEFT JOIN task_comments tc ON pt.id = tc.task_id
         GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, pt.priority_level, pt.pic_id, pt.created_by, pt.created_by_role, pt.evidence_url, pt.extension_requested, pt.extension_reason,
-                 u.full_name, u.email, f.name, f.code, pt.facility_id, pt.department_code,
+                 u.full_name, u.email, u.department_code, f.name, f.code, pt.facility_id, pt.department_code,
                  top.clocker_present, top.clocker_absent_excused, top.clocker_absent_unexcused,
                  top.ktv_present, top.ktv_ids_present, top.ktv_absent_excused, top.ktv_ids_absent_excused,
                  top.ktv_absent_unexcused, top.ktv_ids_absent_unexcused, top.machinery_ok, 
@@ -151,7 +152,7 @@ const getTasksHistory = async ({ userId, role, facilityId, departmentCode, picId
     params.push(limit, offset);
     const dataQuery = `
         WITH paginated_tasks AS (
-            SELECT t.id, t.title, t.description, t.status, t.urgency, t.deadline, t.created_at, t.updated_at, t.needs_support, t.priority_level, t.pic_id, t.facility_id, t.department_code, u.full_name, u.email, t.evidence_url
+            SELECT t.id, t.title, t.description, t.status, t.urgency, t.deadline, t.created_at, t.updated_at, t.needs_support, t.priority_level, t.pic_id, t.facility_id, t.department_code, u.full_name, u.email, u.department_code as u_department_code, t.evidence_url
             FROM tasks t
             LEFT JOIN users u ON t.pic_id = u.id
             WHERE ${baseWhere}
@@ -164,6 +165,7 @@ const getTasksHistory = async ({ userId, role, facilityId, departmentCode, picId
                pt.needs_support as "needsSupport",
                CASE WHEN pt.priority_level = 'CRITICAL' THEN 5 WHEN pt.priority_level = 'HIGH' THEN 3 WHEN pt.priority_level = '5' OR pt.priority_level = '3' THEN 5 WHEN pt.priority_level = '2' THEN 3 ELSE 0 END as priority_stars,
                pt.full_name as pic, pt.email as "picId",
+               pt.u_department_code as "pic_department_code",
                f.name as facility, f.code as "facilityId",
                pt.facility_id as "facilityRawId",
                pt.department_code as "department_tag",
@@ -173,7 +175,7 @@ const getTasksHistory = async ({ userId, role, facilityId, departmentCode, picId
         LEFT JOIN facilities f ON pt.facility_id = f.id
         LEFT JOIN task_comments tc ON pt.id = tc.task_id
         GROUP BY pt.id, pt.title, pt.description, pt.status, pt.urgency, pt.deadline, pt.created_at, pt.updated_at, pt.needs_support, pt.priority_level, 
-                 pt.full_name, pt.email, f.name, f.code, pt.facility_id, pt.department_code, pt.evidence_url
+                 pt.full_name, pt.email, pt.u_department_code, f.name, f.code, pt.facility_id, pt.department_code, pt.evidence_url
         ORDER BY pt.updated_at DESC
     `;
     const { rows } = await pool.query(dataQuery, params);
