@@ -28,7 +28,7 @@ export const saveData = async ({ org_unit, entry_type, content, attachments = []
   return null;
 };
 
-export const updateData = async (id, { content, attachments = [], aiVectorData = '' }) => {
+export const updateData = async (id, { content, attachments = [], aiVectorData = '', edit_history = [] }) => {
   const now = new Date();
   const displayTime = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
@@ -37,7 +37,8 @@ export const updateData = async (id, { content, attachments = [], aiVectorData =
         content,
         attachments,
         ai_vector_data: aiVectorData,
-        display_time: displayTime
+        display_time: displayTime,
+        edit_history
     });
     
     if (result.success) {
@@ -57,7 +58,8 @@ export const fetchHistory = async (filters = {}) => {
       let filtered = result.data.map(item => ({
         ...item,
         displayTime: item.display_time,
-        aiVectorData: item.ai_vector_data
+        aiVectorData: item.ai_vector_data,
+        editHistory: item.edit_history || []
       }));
       
       // Keep client-side fallback just in case backend doesn't filter perfectly yet

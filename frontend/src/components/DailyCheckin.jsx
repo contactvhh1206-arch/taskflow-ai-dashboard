@@ -58,6 +58,10 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
   const [logImage, setLogImage] = useState(null);
   const [logAudio, setLogAudio] = useState(null);
 
+  const [editingLogId, setEditingLogId] = useState(null);
+  const [editingLogContent, setEditingLogContent] = useState('');
+  const [viewingHistoryLog, setViewingHistoryLog] = useState(null);
+
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = React.useRef(null);
@@ -264,6 +268,56 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
     const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
     const secs = (seconds % 60).toString().padStart(2, '0');
     return `${mins}:${secs}`;
+  };
+
+  const handleUpdateLog = async (logToEdit) => {
+    if (!editingLogContent.trim() || editingLogContent === logToEdit.content) {
+      setEditingLogId(null);
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const now = new Date();
+      const currentTimeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      const oldVersion = {
+        content: logToEdit.content,
+        timestamp: logToEdit.timestamp,
+        editedAt: currentTimeStr,
+        editedBy: user?.username || 'Quản lý cơ sở'
+      };
+      
+      const newEditHistory = [...(logToEdit.editHistory || []), oldVersion];
+      
+      let mediaStr = [];
+      if (logToEdit.image) mediaStr.push('ẢNH');
+      if (logToEdit.audio) mediaStr.push('GHI ÂM');
+
+      const currentContentLine = `NHẬT KÝ HIỆN TẠI (ĐÃ CHỈNH SỬA LÚC ${currentTimeStr}): ${editingLogContent.trim()}`;
+      const historyStr = newEditHistory.map((h, i) => `Lần ${i+1} (${h.editedAt}) sửa từ "${h.content}"`).join(' | ');
+
+      const aiVectorData = `[${logToEdit.timestamp}] CƠ SỞ ${user.facility_id} | ${currentContentLine} | LỊCH SỬ CHỈNH SỬA: ${historyStr} ${mediaStr.length ? `| CÓ ĐÍNH KÈM ${mediaStr.join(', ')}` : ''}`;
+
+      const updatedRecord = await updateData(logToEdit.id, {
+        content: editingLogContent.trim(),
+        attachments: [logToEdit.image, logToEdit.audio].filter(Boolean),
+        aiVectorData,
+        edit_history: newEditHistory
+      });
+      
+      if (updatedRecord) {
+        setLogs(prevLogs => prevLogs.map(l => l.id === logToEdit.id ? { 
+          ...l, 
+          content: editingLogContent.trim(), 
+          editHistory: newEditHistory,
+          aiVectorData
+        } : l));
+        if (showToast) showToast('Đã lưu chỉnh sửa nhật ký');
+      }
+    } finally {
+      setLoading(false);
+      setEditingLogId(null);
+    }
   };
 
   const handleAddLog = async () => {
@@ -692,30 +746,65 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
         {logs.filter(l => l.date === today).length > 0 && (
           <div className="flex flex-col gap-4 mt-2 border-t border-gray-100 dark:border-gray-800 pt-5">
             {logs.filter(l => l.date === today).map((log, i, arr) => (
-              <div key={log.id} className="flex gap-4 items-start relative">
+              <div key={log.id} className="flex gap-4 items-start relative group">
                 {i !== arr.length - 1 && (
                   <div className="absolute left-2 top-8 bottom-[-20px] w-[2px] bg-gray-200 dark:bg-gray-700"></div>
                 )}
                 <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1 z-10 shadow-[0_0_0_4px_rgba(255,255,255,1)] dark:shadow-[0_0_0_4px_#1e1e1e]"></div>
                 <div className="flex flex-col gap-2 pb-2 w-full">
-                  <span className="text-xs font-bold text-primary">{log.timestamp}</span>
-                  <div className="bg-gray-50 dark:bg-[#252525] p-3.5 rounded-xl border border-gray-100 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 break-words">
-                    {log.content}
-                    {log.image && (
-                      <div className="mt-3">
-                        <img
-                          src={log.image}
-                          alt="Log Attachment"
-                          className="max-h-40 rounded-lg border border-gray-200 dark:border-gray-700 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => setPreviewImageUrl(log.image)}
-                          title="Nhấn để phóng to"
-                        />
-                      </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-primary">{log.timestamp}</span>
+                    {log.editHistory && log.editHistory.length > 0 && (
+                      <button onClick={() => setViewingHistoryLog(log)} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium italic transition-colors">
+                        (Đã chỉnh sửa)
+                      </button>
                     )}
-                    {log.audio && (
-                      <div className="mt-3">
-                        <audio controls src={log.audio} className="w-full max-w-sm h-10" />
+                    {String(user?.facility_id) === String(log.org_unit) && (
+                      <button 
+                        onClick={() => {
+                          setEditingLogId(log.id);
+                          setEditingLogContent(log.content);
+                        }} 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto text-gray-400 hover:text-primary p-1"
+                        title="Chỉnh sửa nhật ký"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="bg-gray-50 dark:bg-[#252525] p-3.5 rounded-xl border border-gray-100 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 break-words relative">
+                    {editingLogId === log.id ? (
+                      <div className="flex flex-col gap-2">
+                        <textarea 
+                          value={editingLogContent}
+                          onChange={(e) => setEditingLogContent(e.target.value)}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-[#1a1a1a] border border-primary rounded-lg outline-none min-h-[60px]"
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setEditingLogId(null)} className="px-3 py-1 text-xs font-bold text-gray-500 hover:text-gray-700">Hủy</button>
+                          <button onClick={() => handleUpdateLog(log)} className="px-3 py-1 text-xs font-bold bg-primary text-white rounded-md hover:bg-primary/90">Lưu</button>
+                        </div>
                       </div>
+                    ) : (
+                      <>
+                        {log.content}
+                        {log.image && (
+                          <div className="mt-3">
+                            <img
+                              src={log.image}
+                              alt="Log Attachment"
+                              className="max-h-40 rounded-lg border border-gray-200 dark:border-gray-700 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => setPreviewImageUrl(log.image)}
+                              title="Nhấn để phóng to"
+                            />
+                          </div>
+                        )}
+                        {log.audio && (
+                          <div className="mt-3">
+                            <audio controls src={log.audio} className="w-full max-w-sm h-10" />
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1232,6 +1321,40 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
             @keyframes scaleIn { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
           `}</style>
+        </div>
+      )}
+
+      {/* ===== Edit History Modal ===== */}
+      {viewingHistoryLog && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setViewingHistoryLog(null)}>
+          <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl max-w-md w-full shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-[#252525]">
+              <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[20px]">history</span> Lịch sử chỉnh sửa
+              </h3>
+              <button onClick={() => setViewingHistoryLog(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="p-4 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
+              {viewingHistoryLog.editHistory.map((historyItem, idx) => (
+                <div key={idx} className="flex flex-col gap-1.5 p-3 rounded-lg bg-gray-50 dark:bg-[#252525] border border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-center text-xs text-gray-500">
+                    <span className="font-bold">Phiên bản {idx === 0 ? 'gốc' : `lần ${idx}`}</span>
+                    <span>{historyItem.editedAt || historyItem.timestamp}</span>
+                  </div>
+                  <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{historyItem.content}</div>
+                </div>
+              ))}
+              <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <div className="flex justify-between items-center text-xs text-primary">
+                  <span className="font-bold">Phiên bản hiện tại</span>
+                  <span>{viewingHistoryLog.editHistory[viewingHistoryLog.editHistory.length-1]?.editedAt || viewingHistoryLog.timestamp}</span>
+                </div>
+                <div className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{viewingHistoryLog.content}</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

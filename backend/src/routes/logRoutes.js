@@ -52,16 +52,17 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { content, attachments, ai_vector_data, display_time } = req.body;
+        const { content, attachments, ai_vector_data, display_time, edit_history } = req.body;
         
         const contentJson = typeof content === 'object' ? JSON.stringify(content) : JSON.stringify(content || "");
         const attachmentsJson = Array.isArray(attachments) ? JSON.stringify(attachments) : JSON.stringify([]);
+        const editHistoryJson = Array.isArray(edit_history) ? JSON.stringify(edit_history) : JSON.stringify([]);
 
         const { rows } = await pool.query(
             `UPDATE daily_logs 
-             SET content = $1, attachments = $2, ai_vector_data = $3, display_time = $4
-             WHERE id = $5 RETURNING *`,
-            [contentJson, attachmentsJson, ai_vector_data || '', display_time, id]
+             SET content = $1, attachments = $2, ai_vector_data = $3, display_time = $4, edit_history = $5
+             WHERE id = $6 RETURNING *`,
+            [contentJson, attachmentsJson, ai_vector_data || '', display_time, editHistoryJson, id]
         );
 
         if (rows.length === 0) {
