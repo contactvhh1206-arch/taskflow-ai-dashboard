@@ -78,6 +78,30 @@ const AI_TOOLS = [
                 }
             }
         }
+    },
+    {
+        type: "function",
+        function: {
+            name: "fetch_daily_logs",
+            description: "Lấy nhật ký vận hành và báo cáo ca làm việc hằng ngày (Attendance & Operation_Log) từ bảng daily_logs. Dùng khi User hỏi về ca làm, nhật ký vận hành, KTV, lễ tân, nhân sự trực ca, thiết bị, vệ sinh, sự cố vận hành.",
+            parameters: {
+                type: "object",
+                properties: {
+                    start_date: {
+                        type: "string",
+                        description: "Ngày bắt đầu lọc (YYYY-MM-DD). Mặc định là 3 ngày gần nhất."
+                    },
+                    end_date: {
+                        type: "string",
+                        description: "Ngày kết thúc lọc (YYYY-MM-DD)"
+                    },
+                    entry_type: {
+                        type: "string",
+                        description: "Loại dữ liệu: 'Attendance' (báo cáo ca), 'Operation_Log' (nhật ký vận hành). Bỏ trống để lấy cả 2."
+                    }
+                }
+            }
+        }
     }
 ];
 
@@ -280,6 +304,55 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             }
 
             return resultLines.join('\n');
+        }
+
+        if (functionName === 'fetch_daily_logs') {
+            const { start_date, end_date, entry_type } = functionArgs || {};
+
+            // Phân quyền: Global roles thấy tất cả, còn lại chỉ thấy cơ sở của mình
+            const isGlobal = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(userContext.role);
+
+            // Mặc định lấy 3 ngày gần nhất nếu không truyền start_date
+            const defaultStart = new Date();
+            defaultStart.setDate(defaultStart.getDate() - 3);
+            const fmt = (d) => d.toISOString().split('T')[0];
+            const effectiveStart = start_date || fmt(defaultStart);
+            const effectiveEnd = end_date || fmt(new Date());
+
+            let query = `
+                SELECT org_unit, entry_type, date, display_time, ai_vector_data
+                FROM daily_logs
+                WHERE date >= $1 AND date <= $2
+            `;
+            const params = [effectiveStart, effectiveEnd];
+
+            if (!isGlobal && userContext.facility_id) {
+                params.push(String(userContext.facility_id));
+                query += ` AND org_unit = $${params.length}`;
+            }
+
+            if (entry_type) {
+                params.push(entry_type);
+                query += ` AND entry_type = $${params.length}`;
+            }
+
+            query += ` ORDER BY date DESC, display_time DESC LIMIT 200`;
+
+            const { rows } = await pool.query(query, params);
+
+            if (!rows || rows.length === 0) {
+                return `Không có dữ liệu nhật ký/báo cáo ca trong khoảng ${effectiveStart} → ${effectiveEnd}.`;
+            }
+
+            const resultLines = rows
+                .filter(r => r.ai_vector_data && r.ai_vector_data.trim() !== '')
+                .map(r => `[${r.date}] ${r.ai_vector_data}`);
+
+            if (resultLines.length === 0) {
+                return `Có bản ghi nhưng trường ai_vector_data rỗng trong khoảng ${effectiveStart} → ${effectiveEnd}.`;
+            }
+
+            return `[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA (${effectiveStart} → ${effectiveEnd})]:\n` + resultLines.join('\n');
         }
 
         return "Hệ thống từ chối: Tool không được hỗ trợ.";

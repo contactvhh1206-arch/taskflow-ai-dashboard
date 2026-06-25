@@ -231,11 +231,42 @@ const chatStreamHandler = async (req, res) => {
             
             // [FIX VẤN ĐỀ 2] Mở rộng từ khóa kích hoạt để bao gồm cả nhật ký vận hành
             const hasTaskKeyword = lowerMsg.includes('công việc') || lowerMsg.includes('task') || lowerMsg.includes('tiến độ') || lowerMsg.includes('chưa làm');
-            const hasOpsKeyword = lowerMsg.includes('nhật ký') || lowerMsg.includes('vận hành') || lowerMsg.includes('chuyên cần') || lowerMsg.includes('ca làm') || lowerMsg.includes('thiết bị') || lowerMsg.includes('sự cố') || lowerMsg.includes('vệ sinh') || lowerMsg.includes('ktv') || lowerMsg.includes('lễ tân') || lowerMsg.includes('chấm công') || lowerMsg.includes('tổng quan');
-            if (hasTaskKeyword || hasOpsKeyword) {
+            const hasOpsKeyword = lowerMsg.includes('nhật ký') || lowerMsg.includes('vận hành') || lowerMsg.includes('chuyên cần') || lowerMsg.includes('ca làm') || lowerMsg.includes('thiết bị') || lowerMsg.includes('sự cố') || lowerMsg.includes('vệ sinh') || lowerMsg.includes('ktv') || lowerMsg.includes('lễ tân') || lowerMsg.includes('chấm công') || lowerMsg.includes('tổng quan') || lowerMsg.includes('nhân sự') || lowerMsg.includes('check in') || lowerMsg.includes('checkin') || lowerMsg.includes('báo cáo ca') || lowerMsg.includes('trực ca');
+            if (hasTaskKeyword) {
                 const taskData = await aiService.processToolCall('fetch_kanban_tasks', { limit: 500 }, userContext);
                 if (!taskData.includes('Không có công việc nào')) {
-                    dbContextStr += "\n\n[DỮ LIỆU CÔNG VIỆC & NHẬT KÝ VẬN HÀNH]:\n" + taskData;
+                    dbContextStr += "\n\n[DỮ LIỆU CÔNG VIỆC KANBAN]:\n" + taskData;
+                }
+            }
+            if (hasOpsKeyword) {
+                // Xác định khoảng ngày truy vấn: ưu tiên ngày người dùng đề cập, mặc định 7 ngày gần nhất
+                const now = new Date();
+                const fmtDate = (d) => d.toISOString().split('T')[0];
+                let opsStartDate = fmtDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7));
+                let opsEndDate = fmtDate(now);
+
+                // Trích xuất ngày cụ thể nếu người dùng đề cập (VD: "ngày 19/06", "hôm qua"...)
+                const dateMatch = lowerMsg.match(/ng[àa]y\s*(\d{1,2})[\/\-](\d{1,2})/);
+                if (dateMatch) {
+                    const d = parseInt(dateMatch[1]);
+                    const m = parseInt(dateMatch[2]);
+                    const specificDate = new Date(now.getFullYear(), m - 1, d);
+                    opsStartDate = fmtDate(specificDate);
+                    opsEndDate = fmtDate(specificDate);
+                } else if (lowerMsg.includes('hôm nay') || lowerMsg.includes('hom nay')) {
+                    opsStartDate = fmtDate(now);
+                    opsEndDate = fmtDate(now);
+                } else if (lowerMsg.includes('hôm qua') || lowerMsg.includes('hom qua')) {
+                    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+                    opsStartDate = fmtDate(yesterday);
+                    opsEndDate = fmtDate(yesterday);
+                } else if (lowerMsg.includes('3 ngày') || lowerMsg.includes('ba ngày')) {
+                    opsStartDate = fmtDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 3));
+                }
+
+                const dailyLogsData = await aiService.processToolCall('fetch_daily_logs', { start_date: opsStartDate, end_date: opsEndDate }, userContext);
+                if (dailyLogsData && !dailyLogsData.includes('Không có dữ liệu')) {
+                    dbContextStr += "\n\n[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA LÀM VIỆC THỰC TẾ]:\n" + dailyLogsData;
                 }
             }
 
