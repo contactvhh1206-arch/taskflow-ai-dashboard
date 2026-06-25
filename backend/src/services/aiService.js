@@ -313,16 +313,18 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             const isGlobal = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(userContext.role);
 
             // Mặc định lấy 3 ngày gần nhất nếu không truyền start_date
+            // Định dạng ngày DD/MM/YYYY cho khớp với dữ liệu thực tế trong cột date của bảng daily_logs
             const defaultStart = new Date();
             defaultStart.setDate(defaultStart.getDate() - 3);
-            const fmt = (d) => d.toISOString().split('T')[0];
+            const fmt = (d) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
             const effectiveStart = start_date || fmt(defaultStart);
             const effectiveEnd = end_date || fmt(new Date());
 
             let query = `
                 SELECT org_unit, entry_type, date, display_time, ai_vector_data
                 FROM daily_logs
-                WHERE date >= $1 AND date <= $2
+                WHERE TO_DATE(date, 'DD/MM/YYYY') >= TO_DATE($1, 'DD/MM/YYYY')
+                  AND TO_DATE(date, 'DD/MM/YYYY') <= TO_DATE($2, 'DD/MM/YYYY')
             `;
             const params = [effectiveStart, effectiveEnd];
 

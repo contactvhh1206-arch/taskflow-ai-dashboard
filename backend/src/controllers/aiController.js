@@ -240,17 +240,19 @@ const chatStreamHandler = async (req, res) => {
             }
             if (hasOpsKeyword) {
                 // Xác định khoảng ngày truy vấn: ưu tiên ngày người dùng đề cập, mặc định 7 ngày gần nhất
+                // Định dạng DD/MM/YYYY cho khớp cột date của bảng daily_logs
                 const now = new Date();
-                const fmtDate = (d) => d.toISOString().split('T')[0];
+                const fmtDate = (d) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
                 let opsStartDate = fmtDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7));
                 let opsEndDate = fmtDate(now);
 
-                // Trích xuất ngày cụ thể nếu người dùng đề cập (VD: "ngày 19/06", "hôm qua"...)
-                const dateMatch = lowerMsg.match(/ng[àa]y\s*(\d{1,2})[\/\-](\d{1,2})/);
+                // Trích xuất ngày cụ thể nếu người dùng đề cập (VD: "ngày 19/06", "24/06", "24/06/2026"...)
+                const dateMatch = lowerMsg.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
                 if (dateMatch) {
                     const d = parseInt(dateMatch[1]);
                     const m = parseInt(dateMatch[2]);
-                    const specificDate = new Date(now.getFullYear(), m - 1, d);
+                    const y = dateMatch[3] ? (dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3]) : parseInt(dateMatch[3])) : now.getFullYear();
+                    const specificDate = new Date(y, m - 1, d);
                     opsStartDate = fmtDate(specificDate);
                     opsEndDate = fmtDate(specificDate);
                 } else if (lowerMsg.includes('hôm nay') || lowerMsg.includes('hom nay')) {
