@@ -178,19 +178,14 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
               t?.status === 'done' || t?.status === 'review'
             ).length;
 
+            // [FIX] Công việc Trễ hạn = task đang mở có deadline đã qua, KHÔNG lọc theo timeframe
+            // để đồng bộ với danh sách "Công việc quá hạn" phía dưới.
+            const nowTime_stat = now.getTime();
             const overdueCount = myTasks.filter(t => {
               const dTime = getDeadlineTime(t);
               if (dTime === 0) return false;
-              if (dTime < startMs || dTime > endMs) return false;
-
-              if (t?.status !== 'done' && t?.status !== 'revoked') {
-                return dTime < now.getTime();
-              }
-              if (t?.status === 'done') {
-                const compTime = getCompletedTime(t);
-                return compTime > dTime;
-              }
-              return false;
+              if (t?.status === 'done' || t?.status === 'revoked') return false;
+              return dTime < nowTime_stat;
             }).length;
 
             setStats({ open: openCount ?? 0, closed: closedCount ?? 0, overdue: overdueCount ?? 0, total: myTasks.length });

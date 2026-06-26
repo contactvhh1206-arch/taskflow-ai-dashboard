@@ -884,16 +884,10 @@ function MainDashboard() {
           completed++;
         }
         
-        // Công việc Trễ hạn: Đếm tổng task có Deadline rơi vào Timeframe 
-        // nhưng hiện tại chưa hoàn thành hoặc hoàn thành sau deadline
-        if (deadline >= start && deadline <= end) {
-          if (!isDone) {
-            // Unfinished: check if deadline has passed compared to NOW
-            if (now > deadline) overdue++;
-          } else if (completedAt && completedAt > deadline) {
-            // Finished but completed after the deadline
-            overdue++;
-          }
+        // Công việc Trễ hạn: Đếm tất cả task chưa hoàn thành có deadline đã qua
+        // KHÔNG lọc theo Timeframe để đồng bộ với danh sách quá hạn
+        if (!isDone) {
+          if (now > deadline) overdue++;
         }
       });
       
