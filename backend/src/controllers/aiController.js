@@ -272,6 +272,30 @@ const chatStreamHandler = async (req, res) => {
                 }
             }
 
+            // [KPI] Kích hoạt phân tích KPI khi có từ khóa liên quan
+            const hasKpiKeyword = lowerMsg.includes('kpi') || lowerMsg.includes('chỉ tiêu') || lowerMsg.includes('chi tieu') ||
+                lowerMsg.includes('mục tiêu') || lowerMsg.includes('muc tieu') || lowerMsg.includes('hiệu suất') ||
+                lowerMsg.includes('hieu suat') || lowerMsg.includes('phương án kinh doanh') || lowerMsg.includes('phuong an') ||
+                lowerMsg.includes('đạt chỉ tiêu') || lowerMsg.includes('đạt kpi') || lowerMsg.includes('dat kpi') ||
+                lowerMsg.includes('tư vấn doanh thu') || lowerMsg.includes('target') || lowerMsg.includes('đánh giá cơ sở') ||
+                lowerMsg.includes('cơ sở nào tốt') || lowerMsg.includes('cơ sở nào yếu') || lowerMsg.includes('so sánh cơ sở') ||
+                lowerMsg.includes('cải thiện doanh thu') || lowerMsg.includes('giải pháp doanh thu') || lowerMsg.includes('chiến lược');
+            if (hasKpiKeyword) {
+                // Trích xuất tháng/năm từ câu hỏi nếu có (tái dụng logic từ block revenue)
+                const now = new Date();
+                let kpiMonth = now.getMonth() + 1;
+                let kpiYear = now.getFullYear();
+                const kpiMonthMatch = lowerMsg.match(/tháng\s*(\d{1,2})/);
+                if (kpiMonthMatch) kpiMonth = parseInt(kpiMonthMatch[1]);
+                const kpiYearMatch = lowerMsg.match(/\b(202\d)\b/);
+                if (kpiYearMatch) kpiYear = parseInt(kpiYearMatch[1]);
+
+                const kpiAnalysisData = await aiService.processToolCall('fetch_kpi_analysis', { month: kpiMonth, year: kpiYear }, userContext);
+                if (kpiAnalysisData && !kpiAnalysisData.includes('gặp lỗi') && !kpiAnalysisData.includes('Chưa có cấu hình')) {
+                    dbContextStr += "\n\n[PHÂN TÍCH KPI & HIỆU SUẤT CƠ SỞ]:\n" + kpiAnalysisData;
+                }
+            }
+
             // [MỚI] TRUY VẤN RAG TÀI LIỆU (TỪ DATABASE CHUẨN)
             const ragResults = await ragService.searchKnowledgeBase(message, userContext, 3);
             if (ragResults && ragResults.length > 0) {
@@ -338,6 +362,17 @@ Dữ liệu nhật ký có 2 loại:
 Khi sếp hỏi nhân viên đi làm hoặc danh sách nhân sự:
 → Trích xuất TẤT CẢ tên người từ Operation_Log (Sáng/Tối/Ca...) VÀ số liệu nghỉ từ Attendance.
 → Tổ chức lại thành danh sách rõ ràng theo vị trí và ca làm.
+
+## HƯỚNG DẪN PHÂN TÍCH KPI VÀ ĐỀ XUẤT PHƯƠNG ÁN KINH DOANH
+Khi có dữ liệu [PHÂN TÍCH KPI & HIỆU SUẤT CƠ SỞ]:
+- **TUYỆT ĐỐI không chỉ đọc lại số liệu**. Phải phân tích, nhận định và đề xuất hành động cụ thể.
+- So sánh doanh thu thực tế vs chỉ tiêu → nhận xét xu hướng, cảnh báo rủi ro.
+- **Nếu cơ sở đang ĐỎ (dưới chỉ tiêu nguy hiểm)**: Đề xuất ngay tối thiểu 3 phương án: tăng ca giờ cao điểm, chạy flash deal / combo khuyến mãi ngắn hạn, điều nhân sự từ cơ sở đang dư sang, rà soát lý do vắng khách (thiết bị, vệ sinh, nhân sự...).
+- **Nếu cơ sở đang VÀNG (cần cố gắng)**: Đề xuất 2-3 phương án thúc đẩy nhẹ: tối ưu khung giờ cao điểm, upsell dịch vụ, tăng cường chăm sóc khách cũ.
+- **Nếu cơ sở đang XANH hoặc vượt KPI**: Khen và phân tích yếu tố đang hoạt động tốt, cảnh báo nếu tốc độ đang có xu hướng giảm.
+- **Khi có nhiều cơ sở**: So sánh tổng thể, xếp hạng hiệu suất, chỉ ra cơ sở cần ưu tiên hỗ trợ nhất.
+- **Dự báo cuối tháng**: Dựa vào tốc độ TB hiện tại và ngày còn lại để tính dự báo doanh thu cuối tháng.
+- Kết thúc bằng **1 hành động cần làm ngay trong 24h** cho từng cơ sở đang cần cải thiện.
 ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG]:\n' + dbContextStr : ''}`;
 
         const messages = [ { role: "system", content: systemPrompt } ];

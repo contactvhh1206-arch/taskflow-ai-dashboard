@@ -102,6 +102,26 @@ const AI_TOOLS = [
                 }
             }
         }
+    },
+    {
+        type: "function",
+        function: {
+            name: "fetch_kpi_analysis",
+            description: "Lấy chỉ tiêu KPI doanh thu (ngày thường & cuối tuần) của từng cơ sở và tự động đối chiếu với doanh thu thực tế để phân tích hiệu suất, tính % hoàn thành, dự báo và đề xuất phương án kinh doanh. Dùng khi User hỏi về KPI, chỉ tiêu, mục tiêu doanh thu, hiệu suất cơ sở, phương án kinh doanh, đánh giá cơ sở, cơ sở có đạt chỉ tiêu không, tư vấn doanh thu.",
+            parameters: {
+                type: "object",
+                properties: {
+                    month: {
+                        type: "number",
+                        description: "Tháng cần phân tích (1-12). Mặc định là tháng hiện tại."
+                    },
+                    year: {
+                        type: "number",
+                        description: "Năm cần phân tích. Mặc định là năm hiện tại."
+                    }
+                }
+            }
+        }
     }
 ];
 
@@ -355,6 +375,160 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             }
 
             return `[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA (${effectiveStart} → ${effectiveEnd})]:\n` + resultLines.join('\n');
+        }
+
+        if (functionName === 'fetch_kpi_analysis') {
+            try {
+                const now = new Date();
+                const targetMonth = (functionArgs && functionArgs.month) ? Number(functionArgs.month) : (now.getMonth() + 1);
+                const targetYear = (functionArgs && functionArgs.year) ? Number(functionArgs.year) : now.getFullYear();
+                const applyMonthStr = `${targetMonth}/${targetYear}`;
+
+                // 1. Lấy KPI settings theo tháng
+                const kpiRes = await pool.query(
+                    'SELECT data FROM kpi_settings WHERE apply_month = $1 LIMIT 1',
+                    [applyMonthStr]
+                );
+
+                if (!kpiRes.rows || kpiRes.rows.length === 0) {
+                    return `Hệ thống báo cáo: Chưa có cấu hình KPI cho tháng ${applyMonthStr}. Vui lòng yêu cầu bộ phận phụ trách thiết lập chỉ tiêu.`;
+                }
+
+                const kpiData = typeof kpiRes.rows[0].data === 'string'
+                    ? JSON.parse(kpiRes.rows[0].data)
+                    : kpiRes.rows[0].data;
+
+                // 2. Phân quyền: Lãnh đạo thấy tất cả, quản lý cơ sở chỉ thấy của mình
+                const isGlobal = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(userContext.role);
+                const userFacilityId = userContext.facility_id ? String(userContext.facility_id) : null;
+
+                // Lọc danh sách cơ sở được phép xem
+                const allowedFacilities = Object.values(kpiData).filter(fac => {
+                    if (isGlobal) return true;
+                    return String(fac.facility_id) === userFacilityId;
+                });
+
+                if (allowedFacilities.length === 0) {
+                    return `Hệ thống báo cáo: Không tìm thấy dữ liệu KPI phù hợp với cơ sở của bạn trong tháng ${applyMonthStr}.`;
+                }
+
+                // 3. Lấy doanh thu thực tế cùng tháng
+                const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
+                const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+                const fmtISO = (d) => d.toISOString().split('T')[0];
+
+                const revRes = await pool.query(
+                    'SELECT * FROM daily_financial_reports ORDER BY created_at DESC LIMIT 500'
+                );
+                const allReports = revRes.rows;
+
+                // Tính doanh thu thực tế theo từng cơ sở trong tháng
+                const revenueByFacility = {};
+                const timeFiltered = allReports.filter(r => {
+                    if (!r.date) return false;
+                    const parts = r.date.split('-');
+                    const rDate = new Date(parts[0], parts[1] - 1, parts[2]);
+                    return rDate >= startOfMonth && rDate <= endOfMonth;
+                });
+
+                timeFiltered.forEach(r => {
+                    const rData = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+                    if (rData && Array.isArray(rData)) {
+                        rData.forEach(facData => {
+                            const key = String(facData.id || facData.name || '');
+                            if (!revenueByFacility[key]) revenueByFacility[key] = 0;
+                            revenueByFacility[key] += Number(facData.revenue || 0);
+                            // Cũng index theo tên để ghép dễ hơn
+                            const nameKey = String(facData.name || '');
+                            if (nameKey && nameKey !== key) {
+                                if (!revenueByFacility[nameKey]) revenueByFacility[nameKey] = 0;
+                                revenueByFacility[nameKey] += Number(facData.revenue || 0);
+                            }
+                        });
+                    }
+                });
+
+                // 4. Tính toán số ngày trong tháng, ngày đã qua, ngày còn lại
+                const totalDaysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+                const todayDate = now.getDate();
+                const currentMonthCheck = (now.getMonth() + 1 === targetMonth && now.getFullYear() === targetYear);
+                const daysPassed = currentMonthCheck ? Math.min(todayDate, totalDaysInMonth) : totalDaysInMonth;
+                const daysRemaining = currentMonthCheck ? Math.max(totalDaysInMonth - todayDate, 0) : 0;
+
+                // Đếm ngày thường và cuối tuần trong tháng
+                let weekdayCount = 0;
+                let weekendCount = 0;
+                for (let d = 1; d <= totalDaysInMonth; d++) {
+                    const dow = new Date(targetYear, targetMonth - 1, d).getDay();
+                    if (dow === 0 || dow === 6) weekendCount++;
+                    else weekdayCount++;
+                }
+
+                // 5. Tổng hợp phân tích
+                const resultLines = [`[PHÂN TÍCH KPI DOANH THU THÁNG ${applyMonthStr}]`,
+                    `Tổng số ngày trong tháng: ${totalDaysInMonth} (Ngày thường: ${weekdayCount} | Cuối tuần: ${weekendCount})`,
+                    `Ngày đã qua: ${daysPassed} | Ngày còn lại: ${daysRemaining}`,
+                    `---`
+                ];
+
+                for (const fac of allowedFacilities) {
+                    const facName = fac.name || `Cơ sở ${fac.facility_id}`;
+                    const weekdayTarget = Number(fac.weekday_target || 0);
+                    const weekendTarget = Number(fac.weekend_target || 0);
+
+                    // Ước tính KPI tháng = (weekday_target * số ngày thường) + (weekend_target * số ngày cuối tuần)
+                    const monthlyKpiEstimate = (weekdayTarget * weekdayCount) + (weekendTarget * weekendCount);
+
+                    // Doanh thu thực tế (thử ghép theo id rồi fallback theo tên)
+                    const actualRevenue = revenueByFacility[String(fac.facility_id)] ||
+                        revenueByFacility[facName] || 0;
+
+                    const completionPct = monthlyKpiEstimate > 0
+                        ? ((actualRevenue / monthlyKpiEstimate) * 100).toFixed(1)
+                        : 'N/A';
+
+                    const avgPerDayActual = daysPassed > 0 ? Math.round(actualRevenue / daysPassed) : 0;
+                    const remainingKpi = Math.max(monthlyKpiEstimate - actualRevenue, 0);
+                    const neededPerDay = daysRemaining > 0 ? Math.round(remainingKpi / daysRemaining) : null;
+
+                    // Đánh giá trạng thái
+                    let status = '';
+                    let statusEmoji = '';
+                    const pct = parseFloat(completionPct);
+                    if (completionPct === 'N/A') {
+                        status = 'KHÔNG CÓ DỮ LIỆU KPI';
+                        statusEmoji = '⚪';
+                    } else if (!currentMonthCheck) {
+                        // Tháng đã qua — đánh giá kết quả cuối
+                        if (pct >= 100) { status = 'ĐẠT KPI'; statusEmoji = '✅'; }
+                        else if (pct >= 85) { status = 'GẦN ĐẠT KPI'; statusEmoji = '🟡'; }
+                        else { status = 'KHÔNG ĐẠT KPI'; statusEmoji = '🔴'; }
+                    } else {
+                        // Tháng hiện tại — dự báo
+                        const projectedRevenue = daysPassed > 0 ? Math.round((actualRevenue / daysPassed) * totalDaysInMonth) : 0;
+                        const projectedPct = monthlyKpiEstimate > 0 ? ((projectedRevenue / monthlyKpiEstimate) * 100).toFixed(1) : 'N/A';
+                        if (pct >= 100) { status = `ĐÃ VƯỢT KPI | Dự báo cuối tháng: ${projectedPct}%`; statusEmoji = '✅'; }
+                        else if (neededPerDay && neededPerDay <= weekdayTarget) { status = `ĐANG THEO KỊP | Cần ${neededPerDay.toLocaleString('vi-VN')}/ngày còn lại`; statusEmoji = '🟢'; }
+                        else if (neededPerDay && neededPerDay <= weekdayTarget * 1.3) { status = `CẦN CỐ GẮNG | Cần ${neededPerDay.toLocaleString('vi-VN')}/ngày còn lại`; statusEmoji = '🟡'; }
+                        else { status = `NGUY HIỂM — DƯỚI CHỈ TIÊU | Cần ${neededPerDay ? neededPerDay.toLocaleString('vi-VN') : 'N/A'}/ngày còn lại`; statusEmoji = '🔴'; }
+                    }
+
+                    resultLines.push(`\n${statusEmoji} ${facName}`);
+                    resultLines.push(`  Chỉ tiêu/ngày: Ngày thường ${weekdayTarget.toLocaleString('vi-VN')} | Cuối tuần ${weekendTarget.toLocaleString('vi-VN')}`);
+                    resultLines.push(`  KPI ước tính cả tháng: ${monthlyKpiEstimate.toLocaleString('vi-VN')} VNĐ`);
+                    resultLines.push(`  Doanh thu thực tế: ${actualRevenue.toLocaleString('vi-VN')} VNĐ (${completionPct}% KPI)`);
+                    resultLines.push(`  Tốc độ TB hiện tại: ${avgPerDayActual.toLocaleString('vi-VN')}/ngày`);
+                    resultLines.push(`  Trạng thái: ${status}`);
+                }
+
+                resultLines.push(`\n---`);
+                resultLines.push(`[LƯU Ý CHO AI] Dựa vào số liệu trên, hãy phân tích sâu và đề xuất phương án kinh doanh cụ thể cho từng cơ sở: tăng ca, điều chỉnh dịch vụ, khuyến mãi, điều phối nhân sự hoặc các giải pháp vận hành phù hợp. Không được chỉ đọc số — phải đưa ra hành động.`);
+
+                return resultLines.join('\n');
+            } catch (e) {
+                console.error('Lỗi fetch_kpi_analysis:', e);
+                return 'Hệ thống gặp lỗi khi phân tích KPI. Vui lòng thử lại.';
+            }
         }
 
         return "Hệ thống từ chối: Tool không được hỗ trợ.";
