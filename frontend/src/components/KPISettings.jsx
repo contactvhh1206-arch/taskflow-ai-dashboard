@@ -1,297 +1,410 @@
 import React from 'react';
 
+// Sinh danh sách tháng: 3 tháng trước → tháng hiện tại → 12 tháng tới
+function generateMonthOptions(extraMonth) {
+	const options = [];
+	const now = new Date();
+	const start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+	const end = new Date(now.getFullYear(), now.getMonth() + 13, 1);
+	for (let d = new Date(start); d < end; d.setMonth(d.getMonth() + 1)) {
+		options.push(`${d.getMonth() + 1}/${d.getFullYear()}`);
+	}
+	// Thêm tháng cũ từ DB nếu chưa có trong danh sách (VD: kpi từ tháng 5 khi đang ở tháng 12)
+	if (extraMonth && !options.includes(extraMonth)) {
+		options.unshift(extraMonth);
+	}
+	return options;
+}
+
 export default function KPISettings({ user, facilityList, showToast, refreshFacilities }) {
-       const [kpis, setKpis] = React.useState({});
-       const [applyMonth, setApplyMonth] = React.useState('');
-       const [showAddFacModal, setShowAddFacModal] = React.useState(false);
-       const [newFacName, setNewFacName] = React.useState('');
-       const [isAddingFac, setIsAddingFac] = React.useState(false);
-       
-       const activeFacs = facilityList.filter(f => f.is_active !== false);
-       const defaultFacs = activeFacs.length > 0 ? activeFacs : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
+	const [kpis, setKpis] = React.useState({});
+	const [applyMonth, setApplyMonth] = React.useState('');
+	const [monthOptions, setMonthOptions] = React.useState(() => generateMonthOptions());
+	const [isLoadingMonth, setIsLoadingMonth] = React.useState(false);
+	const [showAddFacModal, setShowAddFacModal] = React.useState(false);
+	const [newFacName, setNewFacName] = React.useState('');
+	const [isAddingFac, setIsAddingFac] = React.useState(false);
 
-       React.useEffect(() => {
-          const now = new Date();
-          const currentMonth = `${now.getMonth() + 1}/${now.getFullYear()}`;
-          setApplyMonth(currentMonth);
+	const activeFacs = facilityList.filter(f => f.is_active !== false);
+	const defaultFacs = activeFacs.length > 0 ? activeFacs : Array.from({length: 6}, (_, i) => ({id: `f${i+1}`, name: `Cơ sở ${i+1}`}));
 
-          const loadKpis = async () => {
-             const token = localStorage.getItem('taskflow_token');
-             let savedKpis = {};
-             try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi`, {
-                   headers: { 
-                      'Authorization': `Bearer ${token}`,
-                      'x-user-role': user?.role || '',
-                      'x-facility-id': user?.facility_id || ''
-                   }
-                });
-                const responseJson = await res.json();
-                if (responseJson.success && responseJson.data) {
-                   let kpiData = responseJson.data.data;
-                   let depth = 0;
-                   while (typeof kpiData === 'string' && depth < 5) {
-                      try {
-                         kpiData = JSON.parse(kpiData);
-                         depth++;
-                      } catch(e) {
-                         break;
-                      }
-                   }
-                   savedKpis = kpiData || {};
-                   if (responseJson.data.apply_month) setApplyMonth(responseJson.data.apply_month);
-                } else {
-                   savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');
-                }
-             } catch (e) {
-                console.error('Lỗi lấy KPI từ máy chủ:', e);
-                savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');
-             }
-             
-             const initialKpis = {};
-             defaultFacs.forEach(f => {
-                initialKpis[f.id] = savedKpis[f.id] || {
-                   facility_id: f.id,
-                   name: f.name,
-                   weekday_target: 5000000,
-                   weekend_target: 8000000,
-                };
-             });
-             setKpis(initialKpis);
-          };
-          
-          loadKpis();
-       }, [facilityList]);
+	React.useEffect(() => {
+		const now = new Date();
+		const currentMonth = `${now.getMonth() + 1}/${now.getFullYear()}`;
+		setApplyMonth(currentMonth);
 
-       const handleSave = async () => {
-          const dataToSave = {};
-          Object.entries(kpis).forEach(([facId, k]) => {
-             dataToSave[facId] = {
-                ...k,
-                facility_id: facId,
-                apply_month: applyMonth,
-                updated_at: Date.now(),
-                updated_by: user.name
-             };
-          });
-          
-          try {
-             const token = localStorage.getItem('taskflow_token');
-             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi`, {
-                method: 'POST',
-                headers: { 
-                   'Authorization': `Bearer ${token}`,
-                   'x-user-role': user?.role || '',
-                   'x-facility-id': user?.facility_id || '',
-                   'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({ apply_month: applyMonth, data: dataToSave })
-             });
-             const data = await res.json();
-             if (data.success) {
-                showToast('✅ Đã đồng bộ cấu hình KPI lên Server thành công!');
-                localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
-                window.dispatchEvent(new Event('taskflow_kpis_updated'));
-             } else {
-                showToast('❌ Lỗi lưu KPI: ' + data.error);
-             }
-          } catch (e) {
-             console.error(e);
-             localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
-             window.dispatchEvent(new Event('taskflow_kpis_updated'));
-             showToast('✅ Đã lưu cấu hình KPI (Local - Không kết nối được Server)!');
-          }
-       };
+		const loadKpis = async () => {
+			const token = localStorage.getItem('taskflow_token');
+			let savedKpis = {};
+			let serverMonth = currentMonth;
+			try {
+				// Lấy KPI mới nhất từ server (không filter tháng — lấy record mới nhất)
+				const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi`, {
+					headers: {
+						'Authorization': `Bearer ${token}`,
+						'x-user-role': user?.role || '',
+						'x-facility-id': user?.facility_id || ''
+					}
+				});
+				const responseJson = await res.json();
+				if (responseJson.success && responseJson.data) {
+					let kpiData = responseJson.data.data;
+					let depth = 0;
+					while (typeof kpiData === 'string' && depth < 5) {
+						try { kpiData = JSON.parse(kpiData); depth++; } catch(e) { break; }
+					}
+					savedKpis = kpiData || {};
+					if (responseJson.data.apply_month) {
+						serverMonth = responseJson.data.apply_month;
+					}
+				} else {
+					savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');
+				}
 
-       const handleArchiveFacility = async (fac) => {
-          const facId = fac.facility_id || fac.id;
-          if (!window.confirm(`Bạn có chắc muốn lưu trữ cơ sở "${fac.name}"? Dữ liệu lịch sử vẫn sẽ được giữ nguyên.`)) return;
+				// Lấy danh sách tháng đã có KPI trong DB để bổ sung vào monthOptions
+				try {
+					const mRes = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi/months`, {
+						headers: {
+							'Authorization': `Bearer ${token}`,
+							'x-user-role': user?.role || '',
+							'x-facility-id': user?.facility_id || ''
+						}
+					});
+					const mJson = await mRes.json();
+					if (mJson.success && Array.isArray(mJson.data)) {
+						// Hợp nhất tháng từ DB vào danh sách động, tránh trùng lặp
+						const base = generateMonthOptions(serverMonth);
+						const merged = [...new Set([...mJson.data, ...base])];
+						// Sắp xếp theo thời gian tăng dần (M/YYYY)
+						merged.sort((a, b) => {
+							const [am, ay] = a.split('/').map(Number);
+							const [bm, by] = b.split('/').map(Number);
+							return ay !== by ? ay - by : am - bm;
+						});
+						setMonthOptions(merged);
+					} else {
+						setMonthOptions(generateMonthOptions(serverMonth));
+					}
+				} catch (me) {
+					console.warn('Không lấy được danh sách tháng KPI:', me);
+					setMonthOptions(generateMonthOptions(serverMonth));
+				}
+			} catch (e) {
+				console.error('Lỗi lấy KPI từ máy chủ:', e);
+				savedKpis = JSON.parse(localStorage.getItem('taskflow_facility_kpis') || '{}');
+				setMonthOptions(generateMonthOptions(currentMonth));
+			}
 
-          setKpis(prev => {
-             const next = { ...prev };
-             delete next[facId];
-             return next;
-          });
+			// Đặt tháng hiển thị = tháng từ server (hoặc tháng hiện tại nếu chưa có)
+			setApplyMonth(serverMonth);
 
-          try {
-             const token = localStorage.getItem('taskflow_token');
-             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities/${facId}/archive`, { 
-                method: 'PUT',
-                headers: { 
-                   'Authorization': `Bearer ${token}`,
-                   'x-user-role': user?.role || '',
-                   'x-facility-id': user?.facility_id || ''
-                }
-             });
-             const data = await res.json();
-             if (data.success) {
-                showToast('✅ Đã lưu trữ cơ sở thành công!');
-                if (refreshFacilities) refreshFacilities();
-             } else {
-                showToast('❌ Lỗi: ' + data.error);
-             }
-          } catch {
-             const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
-             const facIndex = localFacs.findIndex(f => f.id === facId);
-             if (facIndex > -1) {
-                localFacs[facIndex].is_active = false;
-                localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
-                showToast('✅ Đã lưu trữ cơ sở thành công (Offline)!');
-                if (refreshFacilities) refreshFacilities();
-             }
-          }
-       };
+			const initialKpis = {};
+			defaultFacs.forEach(f => {
+				initialKpis[f.id] = savedKpis[f.id] || {
+					facility_id: f.id,
+					name: f.name,
+					weekday_target: 5000000,
+					weekend_target: 8000000,
+				};
+			});
+			setKpis(initialKpis);
+		};
 
-       const handleAddFacility = async () => {
-          if (!newFacName.trim()) {
-             showToast('⚠️ Vui lòng nhập tên cơ sở!');
-             return;
-          }
-          setIsAddingFac(true);
-          try {
-             const token = localStorage.getItem('taskflow_token');
-             const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities`, {
-                method: 'POST',
-                headers: { 
-                   'Content-Type': 'application/json',
-                   'Authorization': `Bearer ${token}`,
-                   'x-user-role': user?.role || '',
-                   'x-facility-id': user?.facility_id || ''
-                },
-                body: JSON.stringify({ name: newFacName })
-             });
-             const data = await res.json();
-             if (data.success) {
-                showToast('✅ Thêm cơ sở thành công!');
-                setNewFacName('');
-                setShowAddFacModal(false);
-                if (refreshFacilities) refreshFacilities();
-             } else {
-                showToast('❌ Lỗi: ' + data.error);
-             }
-          } catch {
-             const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
-             const newFac = { id: 'f' + Date.now(), name: newFacName.trim().toUpperCase() };
-             localFacs.push(newFac);
-             localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
-             showToast('✅ Thêm cơ sở thành công (Offline)!');
-             setNewFacName('');
-             setShowAddFacModal(false);
-             if (refreshFacilities) refreshFacilities();
-          }
-          setIsAddingFac(false);
-       };
+		loadKpis();
+	}, [facilityList]);
 
-       const handleInputChange = (id, field, value) => {
-          const numValue = Number(value.replace(/\D/g, '')) || 0;
-          setKpis(prev => ({
-             ...prev,
-             [id]: { ...prev[id], [field]: numValue }
-          }));
-       };
+	// Khi user chọn tháng khác trong dropdown → load KPI tháng đó từ server
+	const handleMonthChange = async (newMonth) => {
+		setApplyMonth(newMonth);
+		setIsLoadingMonth(true);
+		const token = localStorage.getItem('taskflow_token');
+		try {
+			const res = await fetch(
+				`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi?month=${encodeURIComponent(newMonth)}`,
+				{
+					headers: {
+						'Authorization': `Bearer ${token}`,
+						'x-user-role': user?.role || '',
+						'x-facility-id': user?.facility_id || ''
+					}
+				}
+			);
+			const responseJson = await res.json();
+			let savedKpis = {};
+			if (responseJson.success && responseJson.data && responseJson.data.data) {
+				let kpiData = responseJson.data.data;
+				let depth = 0;
+				while (typeof kpiData === 'string' && depth < 5) {
+					try { kpiData = JSON.parse(kpiData); depth++; } catch(e) { break; }
+				}
+				savedKpis = kpiData || {};
+			}
+			// Điền dữ liệu vào bảng (nếu tháng chưa có → dùng giá trị mặc định)
+			const newKpis = {};
+			defaultFacs.forEach(f => {
+				newKpis[f.id] = savedKpis[f.id] || {
+					facility_id: f.id,
+					name: f.name,
+					weekday_target: 5000000,
+					weekend_target: 8000000,
+				};
+			});
+			setKpis(newKpis);
+		} catch (e) {
+			console.error('Lỗi load KPI theo tháng:', e);
+			showToast('⚠️ Không thể tải KPI cho tháng ' + newMonth);
+		} finally {
+			setIsLoadingMonth(false);
+		}
+	};
 
-       const formatNum = (val) => new Intl.NumberFormat('vi-VN').format(val);
+	const handleSave = async () => {
+		const dataToSave = {};
+		Object.entries(kpis).forEach(([facId, k]) => {
+			dataToSave[facId] = {
+				...k,
+				facility_id: facId,
+				apply_month: applyMonth,
+				updated_at: Date.now(),
+				updated_by: user.name
+			};
+		});
 
-       return (
-          <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-y-auto custom-scrollbar h-[calc(100vh-120px)] animate-fade-in">
-             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
-                <div>
-                   <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                     <span className="material-symbols-outlined text-teal-600">track_changes</span> Cài đặt Chỉ tiêu KPI Doanh Thu
-                   </h2>
-                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Cấu hình doanh thu kỳ vọng cho Ngày thường và Cuối tuần</p>
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
-                     <div className="flex items-center justify-between sm:justify-start gap-2 mb-2 sm:mb-0">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Áp dụng từ:</span>
-                        <select 
-                           value={applyMonth} 
-                           onChange={e => setApplyMonth(e.target.value)}
-                           className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg pl-3 pr-8 py-1.5 min-w-[120px] outline-none focus:border-teal-500 text-sm font-medium dark:text-white"
-                        >
-                           <option value={applyMonth}>{applyMonth}</option>
-                        </select>
-                     </div>
-                    <button onClick={() => setShowAddFacModal(true)} className="bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 px-4 py-2 rounded-lg text-sm font-medium flex justify-center items-center gap-2 transition-colors whitespace-nowrap w-full sm:w-auto">
-                       <span className="material-symbols-outlined text-[18px]">add</span> Thêm Cơ Sở Mới
-                    </button>
-                    <button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex justify-center items-center gap-2 transition-colors whitespace-nowrap w-full sm:w-auto">
-                       <span className="material-symbols-outlined text-[18px]">save</span> Lưu Cấu Hình
-                    </button>
-                </div>
-             </div>
+		try {
+			const token = localStorage.getItem('taskflow_token');
+			const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/kpi`, {
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${token}`,
+					'x-user-role': user?.role || '',
+					'x-facility-id': user?.facility_id || '',
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ apply_month: applyMonth, data: dataToSave })
+			});
+			const data = await res.json();
+			if (data.success) {
+				showToast('✅ Đã đồng bộ cấu hình KPI lên Server thành công!');
+				localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
+				window.dispatchEvent(new Event('taskflow_kpis_updated'));
+				// Cập nhật monthOptions nếu tháng mới chưa có trong danh sách
+				setMonthOptions(prev => {
+					if (!prev.includes(applyMonth)) {
+						const updated = [...prev, applyMonth].sort((a, b) => {
+							const [am, ay] = a.split('/').map(Number);
+							const [bm, by] = b.split('/').map(Number);
+							return ay !== by ? ay - by : am - bm;
+						});
+						return updated;
+					}
+					return prev;
+				});
+			} else {
+				showToast('❌ Lỗi lưu KPI: ' + data.error);
+			}
+		} catch (e) {
+			console.error(e);
+			localStorage.setItem('taskflow_facility_kpis', JSON.stringify(dataToSave));
+			window.dispatchEvent(new Event('taskflow_kpis_updated'));
+			showToast('✅ Đã lưu cấu hình KPI (Local - Không kết nối được Server)!');
+		}
+	};
 
-             <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                <table className="w-full text-sm text-left min-w-[700px]">
-                   <thead className="bg-gray-50 dark:bg-[#252525] text-gray-700 dark:text-gray-300">
-                      <tr>
-                         <th className="px-6 py-4 font-bold w-1/3">Tên Cơ Sở</th>
-                         <th className="px-6 py-4 font-bold text-center">KPI Ngày thường (CN - T5)</th>
-                         <th className="px-6 py-4 font-bold text-center">KPI Cuối tuần (T6 - T7)</th>
-                         <th className="px-6 py-4 font-bold text-center w-20">Thao tác</th>
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                      {Object.values(kpis).map(k => (
-                         <tr key={k.facility_id} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors">
-                            <td className="px-6 py-4 font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                               <span className="w-2 h-2 rounded-full bg-teal-500"></span>
-                               {k.name}
-                            </td>
-                            <td className="px-6 py-4">
-                               <div className="relative max-w-[200px] mx-auto">
-                                  <input 
-                                     type="text" 
-                                     value={formatNum(k.weekday_target)}
-                                     onChange={e => handleInputChange(k.facility_id, 'weekday_target', e.target.value)}
-                                     className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-right outline-none focus:border-teal-500 font-medium text-gray-900 dark:text-white"
-                                     maxLength="15"
-                                  />
-                               </div>
-                            </td>
-                            <td className="px-6 py-4">
-                               <div className="relative max-w-[200px] mx-auto">
-                                  <input 
-                                     type="text" 
-                                     value={formatNum(k.weekend_target)}
-                                     onChange={e => handleInputChange(k.facility_id, 'weekend_target', e.target.value)}
-                                     className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-right outline-none focus:border-teal-500 font-medium text-gray-900 dark:text-white"
-                                     maxLength="15"
-                                  />
-                               </div>
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                               <button onClick={() => handleArchiveFacility(k)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Lưu trữ cơ sở">
-                                  <span className="material-symbols-outlined text-[20px]">archive</span>
-                               </button>
-                            </td>
-                         </tr>
-                      ))}
-                   </tbody>
-                </table>
-             </div>
+	const handleArchiveFacility = async (fac) => {
+		const facId = fac.facility_id || fac.id;
+		if (!window.confirm(`Bạn có chắc muốn lưu trữ cơ sở "${fac.name}"? Dữ liệu lịch sử vẫn sẽ được giữ nguyên.`)) return;
 
-             {showAddFacModal && (
-                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-                   <div className="bg-white dark:bg-[#1e1e1e] rounded-xl shadow-2xl w-full max-w-sm p-6 animate-fade-in border border-gray-200 dark:border-gray-800">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Thêm Cơ Sở Mới</h3>
-                      <input 
-                         type="text" 
-                         autoFocus
-                         value={newFacName}
-                         onChange={e => setNewFacName(e.target.value)}
-                         placeholder="Nhập tên cơ sở (VD: DUBAI 88)"
-                         className="w-full bg-gray-50 dark:bg-[#252525] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 outline-none focus:border-teal-500 font-medium text-gray-900 dark:text-white mb-6 uppercase"
-                      />
-                      <div className="flex gap-3 justify-end">
-                         <button onClick={() => setShowAddFacModal(false)} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition">Hủy</button>
-                         <button onClick={handleAddFacility} disabled={isAddingFac} className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-bold transition flex items-center gap-2">
-                            {isAddingFac ? 'Đang thêm...' : 'Lưu Cơ Sở'}
-                         </button>
-                      </div>
-                   </div>
-                </div>
-             )}
-          </div>
-       );
-    }
+		setKpis(prev => {
+			const next = { ...prev };
+			delete next[facId];
+			return next;
+		});
+
+		try {
+			const token = localStorage.getItem('taskflow_token');
+			const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities/${facId}/archive`, {
+				method: 'PUT',
+				headers: {
+					'Authorization': `Bearer ${token}`,
+					'x-user-role': user?.role || '',
+					'x-facility-id': user?.facility_id || ''
+				}
+			});
+			const data = await res.json();
+			if (data.success) {
+				showToast('✅ Đã lưu trữ cơ sở thành công!');
+				if (refreshFacilities) refreshFacilities();
+			} else {
+				showToast('❌ Lỗi: ' + data.error);
+			}
+		} catch {
+			const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
+			const facIndex = localFacs.findIndex(f => f.id === facId);
+			if (facIndex > -1) {
+				localFacs[facIndex].is_active = false;
+				localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
+				showToast('✅ Đã lưu trữ cơ sở thành công (Offline)!');
+				if (refreshFacilities) refreshFacilities();
+			}
+		}
+	};
+
+	const handleAddFacility = async () => {
+		if (!newFacName.trim()) {
+			showToast('⚠️ Vui lòng nhập tên cơ sở!');
+			return;
+		}
+		setIsAddingFac(true);
+		try {
+			const token = localStorage.getItem('taskflow_token');
+			const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com'}/api/facilities`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${token}`,
+					'x-user-role': user?.role || '',
+					'x-facility-id': user?.facility_id || ''
+				},
+				body: JSON.stringify({ name: newFacName })
+			});
+			const data = await res.json();
+			if (data.success) {
+				showToast('✅ Thêm cơ sở thành công!');
+				setNewFacName('');
+				setShowAddFacModal(false);
+				if (refreshFacilities) refreshFacilities();
+			} else {
+				showToast('❌ Lỗi: ' + data.error);
+			}
+		} catch {
+			const localFacs = JSON.parse(localStorage.getItem('taskflow_facilities') || '[]');
+			const newFac = { id: 'f' + Date.now(), name: newFacName.trim().toUpperCase() };
+			localFacs.push(newFac);
+			localStorage.setItem('taskflow_facilities', JSON.stringify(localFacs));
+			showToast('✅ Thêm cơ sở thành công (Offline)!');
+			setNewFacName('');
+			setShowAddFacModal(false);
+			if (refreshFacilities) refreshFacilities();
+		}
+		setIsAddingFac(false);
+	};
+
+	const handleInputChange = (id, field, value) => {
+		const numValue = Number(value.replace(/\D/g, '')) || 0;
+		setKpis(prev => ({
+			...prev,
+			[id]: { ...prev[id], [field]: numValue }
+		}));
+	};
+
+	const formatNum = (val) => new Intl.NumberFormat('vi-VN').format(val);
+
+	return (
+		<div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-y-auto custom-scrollbar h-[calc(100vh-120px)] animate-fade-in">
+			<div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
+				<div>
+					<h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+						<span className="material-symbols-outlined text-teal-600">track_changes</span> Cài đặt Chỉ tiêu KPI Doanh Thu
+					</h2>
+					<p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Cấu hình doanh thu kỳ vọng cho Ngày thường và Cuối tuần</p>
+				</div>
+				<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
+					<div className="flex items-center justify-between sm:justify-start gap-2 mb-2 sm:mb-0">
+						<span className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Áp dụng từ:</span>
+						<select
+							value={applyMonth}
+							onChange={e => handleMonthChange(e.target.value)}
+							disabled={isLoadingMonth}
+							className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg pl-3 pr-8 py-1.5 min-w-[120px] outline-none focus:border-teal-500 text-sm font-medium dark:text-white disabled:opacity-60 disabled:cursor-wait"
+						>
+							{monthOptions.map(m => (
+								<option key={m} value={m}>{m}</option>
+							))}
+						</select>
+						{isLoadingMonth && (
+							<span className="text-xs text-teal-500 animate-pulse ml-1">Đang tải...</span>
+						)}
+					</div>
+					<button onClick={() => setShowAddFacModal(true)} className="bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 px-4 py-2 rounded-lg text-sm font-medium flex justify-center items-center gap-2 transition-colors whitespace-nowrap w-full sm:w-auto">
+						<span className="material-symbols-outlined text-[18px]">add</span> Thêm Cơ Sở Mới
+					</button>
+					<button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex justify-center items-center gap-2 transition-colors whitespace-nowrap w-full sm:w-auto">
+						<span className="material-symbols-outlined text-[18px]">save</span> Lưu Cấu Hình
+					</button>
+				</div>
+			</div>
+
+			<div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+				<table className="w-full text-sm text-left min-w-[700px]">
+					<thead className="bg-gray-50 dark:bg-[#252525] text-gray-700 dark:text-gray-300">
+						<tr>
+							<th className="px-6 py-4 font-bold w-1/3">Tên Cơ Sở</th>
+							<th className="px-6 py-4 font-bold text-center">KPI Ngày thường (CN - T5)</th>
+							<th className="px-6 py-4 font-bold text-center">KPI Cuối tuần (T6 - T7)</th>
+							<th className="px-6 py-4 font-bold text-center w-20">Thao tác</th>
+						</tr>
+					</thead>
+					<tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+						{Object.values(kpis).map(k => (
+							<tr key={k.facility_id} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors">
+								<td className="px-6 py-4 font-bold text-gray-900 dark:text-white flex items-center gap-3">
+									<span className="w-2 h-2 rounded-full bg-teal-500"></span>
+									{k.name}
+								</td>
+								<td className="px-6 py-4">
+									<div className="relative max-w-[200px] mx-auto">
+										<input
+											type="text"
+											value={formatNum(k.weekday_target)}
+											onChange={e => handleInputChange(k.facility_id, 'weekday_target', e.target.value)}
+											className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-right outline-none focus:border-teal-500 font-medium text-gray-900 dark:text-white"
+											maxLength="15"
+										/>
+									</div>
+								</td>
+								<td className="px-6 py-4">
+									<div className="relative max-w-[200px] mx-auto">
+										<input
+											type="text"
+											value={formatNum(k.weekend_target)}
+											onChange={e => handleInputChange(k.facility_id, 'weekend_target', e.target.value)}
+											className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-right outline-none focus:border-teal-500 font-medium text-gray-900 dark:text-white"
+											maxLength="15"
+										/>
+									</div>
+								</td>
+								<td className="px-6 py-4 text-center">
+									<button onClick={() => handleArchiveFacility(k)} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Lưu trữ cơ sở">
+										<span className="material-symbols-outlined text-[20px]">archive</span>
+									</button>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+
+			{showAddFacModal && (
+				<div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+					<div className="bg-white dark:bg-[#1e1e1e] rounded-xl shadow-2xl w-full max-w-sm p-6 animate-fade-in border border-gray-200 dark:border-gray-800">
+						<h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Thêm Cơ Sở Mới</h3>
+						<input
+							type="text"
+							autoFocus
+							value={newFacName}
+							onChange={e => setNewFacName(e.target.value)}
+							placeholder="Nhập tên cơ sở (VD: DUBAI 88)"
+							className="w-full bg-gray-50 dark:bg-[#252525] border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2.5 outline-none focus:border-teal-500 font-medium text-gray-900 dark:text-white mb-6 uppercase"
+						/>
+						<div className="flex gap-3 justify-end">
+							<button onClick={() => setShowAddFacModal(false)} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition">Hủy</button>
+							<button onClick={handleAddFacility} disabled={isAddingFac} className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-bold transition flex items-center gap-2">
+								{isAddingFac ? 'Đang thêm...' : 'Lưu Cơ Sở'}
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+		</div>
+	);
+}
