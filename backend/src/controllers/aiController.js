@@ -714,9 +714,18 @@ const autoTaskingHandler = async (req, res) => {
       return res.status(400).json({ error: 'Vui lòng cung cấp biên bản cuộc họp.' });
     }
 
-    // [CẬP NHẬT] Tinh chỉnh System Prompt thép
-    const systemPrompt = `Bạn là một AI điều phối Công việc xuất sắc. Nhiệm vụ: Đọc biên bản cuộc họp và tự động trích xuất các công việc cần làm thành định dạng JSON strict.
-Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" (YYYY-MM-DDTHH:mm, mặc định 17:00 nếu không có giờ), "target_facility" (Tên cơ sở, ví dụ: Cơ sở 1), "priority_level" (Quét văn bản: Nếu có 'khẩn cấp', 'gấp', 'ngay', 'hỏa tốc' -> 'URGENT'. Nếu không -> 'PRIORITY'). \nLƯU Ý TỐI QUAN TRỌNG: Đối với trường 'pic' (Người phụ trách), CHỈ bóc tách tên khi có danh tính rõ ràng. Tuyệt đối cấm bóc chức danh (như 'kỹ thuật', 'lễ tân'). Nếu không rõ tên, trả về pic: "". Tuyệt đối không được tự bịa ra tên người hoặc dùng lại tên cơ sở.`;
+    // [v2] System Prompt hỗ trợ description + tách task nhiều cơ sở + PIC mã cơ sở
+    const systemPrompt = `Bạn là AI điều phối Công việc của hệ thống Hub Dubai. Nhiệm vụ: Đọc biên bản/chỉ thị và trích xuất thành JSON strict.
+
+TRẢ VỀ: Mảng "tasks", mỗi phần tử gồm:
+- "task_title": Tiêu đề ngắn gọn.
+- "description": Toàn bộ nội dung chi tiết, số liệu, ghi chú (giữ nguyên văn, KHÔNG để trống nếu có thông tin — đây là trường QUAN TRỌNG NHẤT).
+- "pic": Tên người phụ trách. CHỈ điền tên người thật có trong văn bản. KHÔNG điền chức danh, KHÔNG bịa tên. Nếu PIC là mã/tên cơ sở (db41, dbpq...) thì để "".
+- "target_facilities": MẢNG tên cơ sở nhận việc. Ánh xạ mã: db41→DUBAI 41, dbace→DUBAI ACE, dbpa→DUBAI PA, dbpak→DUBAI PAK, dbpav→DUBAI PAV, dbpq→DUBAI PQ. Ví dụ: ["DUBAI 41","DUBAI ACE"]. Chỉ 1 cơ sở vẫn dùng mảng: ["DUBAI 41"]. Không xác định được thì [].
+- "deadline": YYYY-MM-DDTHH:mm (mặc định 17:00).
+- "priority_level": URGENT nếu có từ khẩn cấp/gấp/ngay/hỏa tốc, ngược lại PRIORITY.
+
+QUY TẮC TÁCH TASK: Nếu 1 công việc giao cho NHIỀU cơ sở, hãy tạo NHIỀU task riêng biệt — mỗi task có target_facilities là mảng 1 phần tử cho 1 cơ sở. Các trường còn lại (task_title, description, deadline, priority_level) giữ nguyên giống nhau.`;
 
     const { rows: configRows } = await pool.query("SELECT data FROM system_config WHERE key = 'taskflow_ai_config'");
     const aiConfig = configRows.length > 0 ? configRows[0].data : {};
@@ -754,78 +763,92 @@ Trích xuất mảng "tasks" với cấu trúc: "task_title", "pic", "deadline" 
                 console.error("Lỗi khi load cache Users:", cacheErr.message);
             }
 
+            // [v2] Xử lý mảng task, hỗ trợ target_facilities (mảng nhiều cơ sở)
+            const expandedTasks = [];
+
             for (let t of extractedTasks) {
-               // Xử lý cơ sở
-               let mappedFacilityId = parseSafeFacilityId(facilityId) || parseSafeFacilityId(req.user.facility_id);
-               if (t.target_facility) {
-                   const { rows } = await pool.query('SELECT id FROM facilities WHERE name ILIKE $1 LIMIT 1', [`%${t.target_facility}%`]);
-                   if (rows.length > 0) {
-                       mappedFacilityId = rows[0].id;
-                   }
+               // Chuẩn hóa target_facilities: AI mới trả mảng, AI cũ có thể trả string target_facility
+               let facilitiesToProcess = [];
+               if (Array.isArray(t.target_facilities) && t.target_facilities.length > 0) {
+                   facilitiesToProcess = t.target_facilities;
+               } else if (t.target_facility) {
+                   facilitiesToProcess = [t.target_facility];
+               } else {
+                   facilitiesToProcess = [null]; // 1 task không xác định cơ sở
                }
-               
-               // Fallback lại để tương thích Frontend nếu không parse được
-               t.facility_id = mappedFacilityId || facilityId; 
-               t.priority_level = t.priority_level === 'URGENT' ? 'URGENT' : 'PRIORITY';
-               t.created_by_role = req.user.role;
 
-               // --- [MỚI] THUẬT TOÁN ĐIỀU PHỐI PIC LIÊN CƠ SỞ ---
-               let finalPicId = null;
-               let finalPicName = "";
+               for (const facilityName of facilitiesToProcess) {
+                   // --- Resolve Facility ID ---
+                   let mappedFacilityId = null;
+                   if (facilityName) {
+                       const { rows: fRows } = await pool.query('SELECT id, name FROM facilities WHERE name ILIKE $1 LIMIT 1', [`%${facilityName}%`]);
+                       if (fRows.length > 0) {
+                           mappedFacilityId = fRows[0].id;
+                       }
+                   }
+                   // Fallback về facility của người giao nếu không xác định được
+                   if (!mappedFacilityId) {
+                       mappedFacilityId = parseSafeFacilityId(facilityId) || parseSafeFacilityId(req.user.facility_id);
+                   }
 
-               // Lọc nhân sự theo cơ sở đích (nếu xác định được)
-               const facilityUsers = mappedFacilityId 
-                   ? cachedUsers.filter(u => u.facility_id == mappedFacilityId)
-                   : cachedUsers;
+                   // --- Lọc nhân sự theo cơ sở ĐÃ RESOLVE (đúng cơ sở đích, không dùng cơ sở gốc) ---
+                   const facilityUsers = mappedFacilityId
+                       ? cachedUsers.filter(u => u.facility_id == mappedFacilityId)
+                       : cachedUsers;
 
-               // Khớp tên từ AI
-               if (t.pic && typeof t.pic === 'string' && t.pic.trim() !== '') {
-                   const normalizedInput = normalizeName(t.pic);
-                   
-                   // Lọc tất cả nhân sự khớp tên trong cơ sở đích
-                   const matchedUsers = facilityUsers.filter(u => 
-                       normalizeName(u.full_name).includes(normalizedInput)
-                   );
+                   // --- Resolve PIC ---
+                   let finalPicId = null;
+                   let finalPicName = "";
 
-                   // Chỉ gán khi tìm thấy ĐÚNG 1 người
-                   if (matchedUsers.length === 1) {
-                       finalPicId = matchedUsers[0].id;
-                       finalPicName = matchedUsers[0].full_name;
-                   } else if (matchedUsers.length === 0 && mappedFacilityId) {
-                       // Mở rộng tìm kiếm toàn hệ thống nếu cơ sở đích không có (trường hợp Sếp gán việc chéo)
-                       const globalMatched = cachedUsers.filter(u => 
+                   if (t.pic && typeof t.pic === 'string' && t.pic.trim() !== '') {
+                       const normalizedInput = normalizeName(t.pic);
+                       const matchedUsers = facilityUsers.filter(u =>
                            normalizeName(u.full_name).includes(normalizedInput)
                        );
-                       if (globalMatched.length === 1) {
-                           finalPicId = globalMatched[0].id;
-                           finalPicName = globalMatched[0].full_name;
+                       if (matchedUsers.length === 1) {
+                           finalPicId = matchedUsers[0].id;
+                           finalPicName = matchedUsers[0].full_name;
+                       } else if (matchedUsers.length === 0) {
+                           // Mở rộng toàn hệ thống nếu không tìm thấy trong cơ sở đích
+                           const globalMatched = cachedUsers.filter(u =>
+                               normalizeName(u.full_name).includes(normalizedInput)
+                           );
+                           if (globalMatched.length === 1) {
+                               finalPicId = globalMatched[0].id;
+                               finalPicName = globalMatched[0].full_name;
+                           }
                        }
-                   } else if (matchedUsers.length > 1 && mappedFacilityId) {
-                       // Thêm logic: Nếu có nhiều người trùng tên trong cơ sở, ưu tiên người không phải quản lý nếu có, nhưng an toàn nhất là null
-                       // Tạm thời để null nếu không xác định được đích xác
+                       // Nếu matchedUsers.length > 1: không chắc → để null, Fallback sẽ xử lý
                    }
-               }
 
-               // FALLBACK (Nếu AI không mò ra tên, hoặc Khớp tên thất bại)
-               if (finalPicId === null) {
-                   // Tìm Quản lý cơ sở (role_id = 6) trong danh sách nhân sự khả dụng
-                   const facilityManager = facilityUsers.find(u => u.role_id === 6);
-                   
-                   if (facilityManager) {
-                       finalPicId = facilityManager.id;
-                       finalPicName = facilityManager.full_name;
-                   } else {
-                       console.warn(`[Auto-Tasking] Cảnh báo: Không có Facility Manager (role_id=6)`);
-                       finalPicId = null; 
-                       finalPicName = t.pic || ""; // Giữ nguyên tên gốc hoặc để trống
+                   // Fallback: AI không tìm ra PIC → Gán Quản lý cơ sở ĐÍ CH (đúng facility đã resolve)
+                   if (finalPicId === null) {
+                       const facilityManager = facilityUsers.find(u => u.role_id === 6);
+                       if (facilityManager) {
+                           finalPicId = facilityManager.id;
+                           finalPicName = facilityManager.full_name;
+                       } else {
+                           console.warn(`[Auto-Tasking] Không có Facility Manager (role_id=6) cho facility_id=${mappedFacilityId}`);
+                           finalPicName = t.pic || "";
+                       }
                    }
-               }
 
-               // Gán ngược dữ liệu đã chuẩn hóa vào task
-               t.pic_id = finalPicId;
-               t.pic = finalPicName;
-               // --------------------------------------------------
+                   // Tạo task đã chuẩn hóa
+                   expandedTasks.push({
+                       task_title: t.task_title,
+                       description: t.description || "",
+                       pic: finalPicName,
+                       pic_id: finalPicId,
+                       deadline: t.deadline,
+                       target_facility: facilityName || "",
+                       facility_id: mappedFacilityId || facilityId,
+                       priority_level: t.priority_level === 'URGENT' ? 'URGENT' : 'PRIORITY',
+                       created_by_role: req.user.role,
+                   });
+               }
             }
+
+            extractedTasks = expandedTasks;
         }
       } catch (e) {
         console.error("AI không trả về JSON hợp lệ:", e.message);
