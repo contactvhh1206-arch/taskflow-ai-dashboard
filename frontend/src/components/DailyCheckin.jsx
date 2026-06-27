@@ -1067,45 +1067,75 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
                                 <span className="text-gray-500">Giờ báo cáo:</span>
                                 <span className="font-bold dark:text-white">{checkinForDate.timestamp}</span>
                               </div>
-                              <div className="text-xs flex justify-between bg-error/10 dark:bg-error/20 text-error p-2 rounded-lg font-bold">
-                                <span>Nghỉ không phép:</span>
-                                <span>{checkinForDate.formData.manual_unauth || 0}</span>
+                              <div className="text-xs flex flex-col gap-1 bg-error/10 dark:bg-error/20 text-error p-2 rounded-lg font-bold">
+                                <div className="flex justify-between">
+                                  <span>Nghỉ không phép:</span>
+                                  <span>{checkinForDate.formData.manual_unauth || 0}</span>
+                                </div>
+                                {checkinForDate.formData.manual_unauth > 0 && checkinForDate.formData.manual_unauth_note && (
+                                  <span className="font-normal italic text-error/80 mt-1 border-t border-error/20 pt-1">Ghi chú: {checkinForDate.formData.manual_unauth_note}</span>
+                                )}
                               </div>
-                              <div className="text-xs flex justify-between bg-orange-500/10 dark:bg-orange-500/20 text-orange-500 p-2 rounded-lg font-bold">
-                                <span>Nghỉ có phép:</span>
-                                <span>{checkinForDate.formData.manual_auth || 0}</span>
+                              <div className="text-xs flex flex-col gap-1 bg-orange-500/10 dark:bg-orange-500/20 text-orange-500 p-2 rounded-lg font-bold">
+                                <div className="flex justify-between">
+                                  <span>Nghỉ có phép:</span>
+                                  <span>{checkinForDate.formData.manual_auth || 0}</span>
+                                </div>
+                                {checkinForDate.formData.manual_auth > 0 && checkinForDate.formData.manual_auth_note && (
+                                  <span className="font-normal italic text-orange-500/80 mt-1 border-t border-orange-500/20 pt-1">Ghi chú: {checkinForDate.formData.manual_auth_note}</span>
+                                )}
                               </div>
                               
-                              {['eq_camera', 'eq_maytinh', 'eq_den', 'eq_maylanh'].some(field => checkinForDate.formData[field] === 'su_co') && (
+                              {['eq_camera', 'eq_maytinh', 'eq_den', 'eq_maylanh'].some(field => checkinForDate.formData[field] === 'su_co' || checkinForDate.formData[field] === 'binh_thuong') && (
                                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                  <span className="text-xs font-bold text-gray-500 mb-2 block">Ghi nhận Sự cố:</span>
+                                  <span className="text-xs font-bold text-gray-500 mb-2 block">Cơ sở vật chất & Thiết bị:</span>
                                   {['eq_camera', 'eq_maytinh', 'eq_den', 'eq_maylanh'].map(field => {
-                                    if(checkinForDate.formData[field] === 'su_co') {
+                                    const status = checkinForDate.formData[field];
+                                    if (status) {
                                       const names = { eq_camera: 'Camera', eq_maytinh: 'Máy tính', eq_den: 'Đèn', eq_maylanh: 'Máy lạnh' };
-                                      return (
-                                        <div key={field} className="text-xs text-error mb-1 flex flex-col gap-1 bg-white dark:bg-[#1a1a1a] p-2 rounded border border-error/20">
-                                          <span className="font-bold">{names[field]}</span>
-                                          <span className="opacity-80 italic">{checkinForDate.formData[field + '_note']}</span>
-                                        </div>
-                                      )
+                                      if (status === 'su_co') {
+                                        return (
+                                          <div key={field} className="text-xs text-error mb-1 flex flex-col gap-1 bg-white dark:bg-[#1a1a1a] p-2 rounded border border-error/20">
+                                            <span className="font-bold">{names[field]} (Sự cố)</span>
+                                            <span className="opacity-80 italic">{checkinForDate.formData[field + '_note']}</span>
+                                          </div>
+                                        )
+                                      } else if (status === 'binh_thuong') {
+                                        return (
+                                          <div key={field} className="text-xs text-success mb-1 flex justify-between items-center bg-white dark:bg-[#1a1a1a] p-2 rounded border border-success/20">
+                                            <span className="font-bold">{names[field]}</span>
+                                            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                          </div>
+                                        )
+                                      }
                                     }
                                     return null;
                                   })}
                                 </div>
                               )}
                               
-                              {['hr_letan', 'hr_baove', 'hr_clocker', 'hr_ktv'].some(key => checkinForDate.formData[key].status === 'thieu') && (
+                              {['hr_letan', 'hr_baove', 'hr_clocker', 'hr_ktv'].some(key => checkinForDate.formData[key]?.status === 'thieu' || checkinForDate.formData[key]?.status === 'du') && (
                                 <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                  <span className="text-xs font-bold text-gray-500 mb-2 block">Cần hỗ trợ nhân sự:</span>
+                                  <span className="text-xs font-bold text-gray-500 mb-2 block">Tình trạng nhân sự:</span>
                                   {['hr_letan', 'hr_baove', 'hr_clocker', 'hr_ktv'].map(field => {
-                                    if(checkinForDate.formData[field].status === 'thieu') {
+                                    const hr = checkinForDate.formData[field];
+                                    if (hr?.status) {
                                       const names = { hr_letan: 'Lễ tân', hr_baove: 'Bảo vệ', hr_clocker: 'Clocker', hr_ktv: 'KTV' };
-                                      return (
-                                        <div key={field} className="text-xs text-orange-600 mb-1 flex flex-col gap-1 bg-white dark:bg-[#1a1a1a] p-2 rounded border border-orange-500/20">
-                                          <span className="font-bold">{names[field]}</span>
-                                          <span className="opacity-80 italic">{checkinForDate.formData[field].note}</span>
-                                        </div>
-                                      )
+                                      if (hr.status === 'thieu') {
+                                        return (
+                                          <div key={field} className="text-xs text-orange-600 mb-1 flex flex-col gap-1 bg-white dark:bg-[#1a1a1a] p-2 rounded border border-orange-500/20">
+                                            <span className="font-bold">{names[field]} (Cần hỗ trợ)</span>
+                                            <span className="opacity-80 italic">{hr.note}</span>
+                                          </div>
+                                        )
+                                      } else if (hr.status === 'du') {
+                                        return (
+                                          <div key={field} className="text-xs text-success mb-1 flex justify-between items-center bg-white dark:bg-[#1a1a1a] p-2 rounded border border-success/20">
+                                            <span className="font-bold">{names[field]}</span>
+                                            <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                          </div>
+                                        )
+                                      }
                                     }
                                     return null;
                                   })}
@@ -1236,45 +1266,75 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
                               <span className="text-gray-500">Giờ báo cáo:</span>
                               <span className="font-bold dark:text-white">{checkinForDate.timestamp}</span>
                             </div>
-                            <div className="text-xs flex justify-between bg-error/10 dark:bg-error/20 text-error p-2 rounded-lg font-bold">
-                              <span>Nghỉ không phép:</span>
-                              <span>{checkinForDate.formData.manual_unauth || 0}</span>
+                            <div className="text-xs flex flex-col gap-1 bg-error/10 dark:bg-error/20 text-error p-2 rounded-lg font-bold">
+                              <div className="flex justify-between">
+                                <span>Nghỉ không phép:</span>
+                                <span>{checkinForDate.formData.manual_unauth || 0}</span>
+                              </div>
+                              {checkinForDate.formData.manual_unauth > 0 && checkinForDate.formData.manual_unauth_note && (
+                                <span className="font-normal italic text-error/80 mt-1 border-t border-error/20 pt-1">Ghi chú: {checkinForDate.formData.manual_unauth_note}</span>
+                              )}
                             </div>
-                            <div className="text-xs flex justify-between bg-orange-500/10 dark:bg-orange-500/20 text-orange-500 p-2 rounded-lg font-bold">
-                              <span>Nghỉ có phép:</span>
-                              <span>{checkinForDate.formData.manual_auth || 0}</span>
+                            <div className="text-xs flex flex-col gap-1 bg-orange-500/10 dark:bg-orange-500/20 text-orange-500 p-2 rounded-lg font-bold">
+                              <div className="flex justify-between">
+                                <span>Nghỉ có phép:</span>
+                                <span>{checkinForDate.formData.manual_auth || 0}</span>
+                              </div>
+                              {checkinForDate.formData.manual_auth > 0 && checkinForDate.formData.manual_auth_note && (
+                                <span className="font-normal italic text-orange-500/80 mt-1 border-t border-orange-500/20 pt-1">Ghi chú: {checkinForDate.formData.manual_auth_note}</span>
+                              )}
                             </div>
                             
-                            {['eq_camera', 'eq_maytinh', 'eq_den', 'eq_maylanh'].some(field => checkinForDate.formData[field] === 'su_co') && (
+                            {['eq_camera', 'eq_maytinh', 'eq_den', 'eq_maylanh'].some(field => checkinForDate.formData[field] === 'su_co' || checkinForDate.formData[field] === 'binh_thuong') && (
                               <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                <span className="text-xs font-bold text-gray-500 mb-2 block">Ghi nhận Sự cố:</span>
+                                <span className="text-xs font-bold text-gray-500 mb-2 block">Cơ sở vật chất & Thiết bị:</span>
                                 {['eq_camera', 'eq_maytinh', 'eq_den', 'eq_maylanh'].map(field => {
-                                  if(checkinForDate.formData[field] === 'su_co') {
+                                  const status = checkinForDate.formData[field];
+                                  if (status) {
                                     const names = { eq_camera: 'Camera', eq_maytinh: 'Máy tính', eq_den: 'Đèn', eq_maylanh: 'Máy lạnh' };
-                                    return (
-                                      <div key={field} className="text-xs text-error mb-1 flex flex-col gap-1 bg-white dark:bg-[#1a1a1a] p-2 rounded border border-error/20">
-                                        <span className="font-bold">{names[field]}</span>
-                                        <span className="opacity-80 italic">{checkinForDate.formData[field + '_note']}</span>
-                                      </div>
-                                    )
+                                    if (status === 'su_co') {
+                                      return (
+                                        <div key={field} className="text-xs text-error mb-1 flex flex-col gap-1 bg-white dark:bg-[#1a1a1a] p-2 rounded border border-error/20">
+                                          <span className="font-bold">{names[field]} (Sự cố)</span>
+                                          <span className="opacity-80 italic">{checkinForDate.formData[field + '_note']}</span>
+                                        </div>
+                                      )
+                                    } else if (status === 'binh_thuong') {
+                                      return (
+                                        <div key={field} className="text-xs text-success mb-1 flex justify-between items-center bg-white dark:bg-[#1a1a1a] p-2 rounded border border-success/20">
+                                          <span className="font-bold">{names[field]}</span>
+                                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                        </div>
+                                      )
+                                    }
                                   }
                                   return null;
                                 })}
                               </div>
                             )}
                             
-                            {['hr_letan', 'hr_baove', 'hr_clocker', 'hr_ktv'].some(key => checkinForDate.formData[key].status === 'thieu') && (
+                            {['hr_letan', 'hr_baove', 'hr_clocker', 'hr_ktv'].some(key => checkinForDate.formData[key]?.status === 'thieu' || checkinForDate.formData[key]?.status === 'du') && (
                               <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                <span className="text-xs font-bold text-gray-500 mb-2 block">Cần hỗ trợ nhân sự:</span>
+                                <span className="text-xs font-bold text-gray-500 mb-2 block">Tình trạng nhân sự:</span>
                                 {['hr_letan', 'hr_baove', 'hr_clocker', 'hr_ktv'].map(field => {
-                                  if(checkinForDate.formData[field].status === 'thieu') {
+                                  const hr = checkinForDate.formData[field];
+                                  if (hr?.status) {
                                     const names = { hr_letan: 'Lễ tân', hr_baove: 'Bảo vệ', hr_clocker: 'Clocker', hr_ktv: 'KTV' };
-                                    return (
-                                      <div key={field} className="text-xs text-orange-600 mb-1 flex flex-col gap-1 bg-white dark:bg-[#1a1a1a] p-2 rounded border border-orange-500/20">
-                                        <span className="font-bold">{names[field]}</span>
-                                        <span className="opacity-80 italic">{checkinForDate.formData[field].note}</span>
-                                      </div>
-                                    )
+                                    if (hr.status === 'thieu') {
+                                      return (
+                                        <div key={field} className="text-xs text-orange-600 mb-1 flex flex-col gap-1 bg-white dark:bg-[#1a1a1a] p-2 rounded border border-orange-500/20">
+                                          <span className="font-bold">{names[field]} (Cần hỗ trợ)</span>
+                                          <span className="opacity-80 italic">{hr.note}</span>
+                                        </div>
+                                      )
+                                    } else if (hr.status === 'du') {
+                                      return (
+                                        <div key={field} className="text-xs text-success mb-1 flex justify-between items-center bg-white dark:bg-[#1a1a1a] p-2 rounded border border-success/20">
+                                          <span className="font-bold">{names[field]}</span>
+                                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                        </div>
+                                      )
+                                    }
                                   }
                                   return null;
                                 })}
