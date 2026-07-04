@@ -121,6 +121,110 @@ router.delete('/documents/:id', authGuard, rbacGuard, async (req, res) => {
     }
 });
 
+// ============================================================
+// QUẢN LÝ BÀI HỌC AI (ai_learned_insights) — Chỉ ADMIN
+// ============================================================
+
+// Middleware kiểm tra quyền ADMIN
+const adminOnly = (req, res, next) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+        return res.status(403).json({ success: false, message: 'Chỉ ADMIN mới có quyền truy cập.' });
+    }
+    next();
+};
+
+// GET /api/rag/insights — Lấy danh sách bài học (có phân trang + lọc)
+router.get('/insights', authGuard, adminOnly, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const offset = (page - 1) * limit;
+        const category = req.query.category || null;   // Lọc theo loại
+        const isActive = req.query.is_active;           // 'true' | 'false' | undefined
+
+        let conditions = [];
+        let params = [];
+        let paramIdx = 1;
+
+        if (category) {
+            conditions.push(`category = $${paramIdx++}`);
+            params.push(category);
+        }
+        if (isActive !== undefined) {
+            conditions.push(`is_active = $${paramIdx++}`);
+            params.push(isActive === 'true');
+        }
+
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+        // Lấy tổng số bản ghi
+        const countResult = await pool.query(
+            `SELECT COUNT(*) FROM ai_learned_insights ${whereClause}`,
+            params
+        );
+        const total = parseInt(countResult.rows[0].count);
+
+        // Lấy dữ liệu với phân trang
+        const { rows } = await pool.query(
+            `SELECT id, insight_text, category, importance, is_active,
+                    source_session_id, source_user_id, source_facility_id, created_at
+             FROM ai_learned_insights
+             ${whereClause}
+             ORDER BY created_at DESC
+             LIMIT $${paramIdx++} OFFSET $${paramIdx++}`,
+            [...params, limit, offset]
+        );
+
+        res.json({
+            success: true,
+            data: rows,
+            pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+        });
+    } catch (error) {
+        console.error('Lỗi GET insights:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// PATCH /api/rag/insights/:id/toggle — Bật/tắt bài học (soft delete)
+router.patch('/insights/:id/toggle', authGuard, adminOnly, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rows } = await pool.query(
+            `UPDATE ai_learned_insights
+             SET is_active = NOT is_active
+             WHERE id = $1
+             RETURNING id, is_active`,
+            [id]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy bài học.' });
+        }
+        res.json({ success: true, data: rows[0] });
+    } catch (error) {
+        console.error('Lỗi PATCH toggle insight:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// DELETE /api/rag/insights/:id — Xóa vĩnh viễn bài học
+router.delete('/insights/:id', authGuard, adminOnly, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            'DELETE FROM ai_learned_insights WHERE id = $1 RETURNING id',
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy bài học.' });
+        }
+        res.json({ success: true, message: 'Đã xóa bài học vĩnh viễn.' });
+    } catch (error) {
+        console.error('Lỗi DELETE insight:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Xử lý lỗi từ Multer (ví dụ: file quá lớn)
 router.use((err, req, res, next) => {
     if (err instanceof multer.MulterError || err.message === 'Chỉ chấp nhận file .txt') {

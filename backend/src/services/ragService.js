@@ -143,9 +143,70 @@ async function saveToKnowledgeBase(content, sourceType, metadata = {}) {
     }
 }
 
+/**
+ * Tra cứu tri thức AI đã học từ các cuộc hội thoại trước.
+ * Phân quyền:
+ *   - Global roles (SUPER_ADMIN, VICE_PRESIDENT, FINANCE_DEPT, Marketing): thấy toàn bộ bài học.
+ *   - Local roles: chỉ thấy bài học của cơ sở mình + bài học loại 'directive' (chỉ thị toàn hệ thống).
+ */
+async function searchLearnedInsights(queryText, user, limit = 5) {
+    try {
+        const perms = getAiPermissions(user);
+
+        // Không có facility và không phải global → không có cơ sở để lọc
+        if (!perms.isGlobal && !perms.facilityId) {
+            return [];
+        }
+
+        const queryEmbedding = await generateEmbedding(queryText);
+        if (!queryEmbedding) return [];
+
+        const formatEmbedding = `[${queryEmbedding.join(',')}]`;
+        let sql = '';
+        let params = [];
+
+        if (perms.isGlobal) {
+            // Global: thấy toàn bộ bài học đang active
+            sql = `
+                SELECT insight_text, category, importance,
+                       1 - (embedding <=> $1::vector) AS similarity
+                FROM ai_learned_insights
+                WHERE is_active = true
+                  AND 1 - (embedding <=> $1::vector) > 0.3
+                ORDER BY (embedding <=> $1::vector) ASC, importance DESC
+                LIMIT $2
+            `;
+            params = [formatEmbedding, limit];
+        } else {
+            // Local: thấy bài học của cơ sở mình HOẶC bài học 'directive' (áp dụng toàn hệ thống)
+            sql = `
+                SELECT insight_text, category, importance,
+                       1 - (embedding <=> $1::vector) AS similarity
+                FROM ai_learned_insights
+                WHERE is_active = true
+                  AND (
+                      category = 'directive'
+                      OR source_facility_id = $3
+                  )
+                  AND 1 - (embedding <=> $1::vector) > 0.3
+                ORDER BY (embedding <=> $1::vector) ASC, importance DESC
+                LIMIT $2
+            `;
+            params = [formatEmbedding, limit, perms.facilityId];
+        }
+
+        const { rows } = await pool.query(sql, params);
+        return rows;
+    } catch (error) {
+        console.error('searchLearnedInsights Error:', error);
+        return []; // Trả về mảng rỗng để không làm gián đoạn luồng chat chính
+    }
+}
+
 module.exports = {
     getAiPermissions,
     generateEmbedding,
     searchKnowledgeBase,
-    saveToKnowledgeBase
+    saveToKnowledgeBase,
+    searchLearnedInsights
 };

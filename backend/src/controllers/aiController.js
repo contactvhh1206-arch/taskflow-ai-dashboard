@@ -304,6 +304,16 @@ const chatStreamHandler = async (req, res) => {
                     dbContextStr += "\n\n[DỮ LIỆU NỘI BỘ THAM KHẢO (RAG)]:\n" + ragTexts.join('\n---\n');
                 }
             }
+
+            // [MỚI] TRUY VẤN TRÍ NHỚ DÀI HẠN (LEARNED INSIGHTS)
+            // AI tìm kiếm bài học liên quan từ các cuộc hội thoại trước của mọi người dùng
+            const learnedInsights = await ragService.searchLearnedInsights(message, userContext, 5);
+            if (learnedInsights && learnedInsights.length > 0) {
+                const insightTexts = learnedInsights.map(i =>
+                    `[${(i.category || 'operations').toUpperCase()}] ${i.insight_text}`
+                );
+                dbContextStr += "\n\n[KINH NGHIỆM & BÀI HỌC TỪ CÁC PHIÊN TRƯỚC]:\n" + insightTexts.join('\n---\n');
+            }
         } catch (e) {
             console.error("Lỗi chèn RAG tự động:", e.message);
         }
@@ -353,6 +363,14 @@ Sau mỗi câu trả lời, LUÔN kết thúc bằng phần gợi ý câu hỏi 
 - Dùng gạch đầu dòng (-) để liệt kê.
 - Dùng bảng markdown khi so sánh nhiều cơ sở hoặc nhiều ngày.
 - Tách rõ các khối thông tin bằng heading (###).
+
+### 7. SỬ DỤNG KINH NGHIỆM ĐÃ HỌC (TRÍ NHỚ DÀI HẠN)
+Nếu có phần [KINH NGHIỆM & BÀI HỌC TỪ CÁC PHIÊN TRƯỚC] ở dữ liệu hệ thống:
+- **Coi đây là tri thức nền của tổ chức**, tích lũy từ các cuộc hội thoại quản trị thực tế.
+- **Bài học [DIRECTIVE]**: Là chỉ thị trực tiếp từ Ban lãnh đạo — PHẢI tuân thủ tuyệt đối, ưu tiên cao nhất.
+- **Bài học [OPERATIONS/REVENUE/INCIDENT]**: Tham chiếu khi đưa ra đề xuất: "Dựa trên kinh nghiệm xử lý tương tự trước đó..."
+- **Bài học [PREFERENCE]**: Áp dụng phong cách trình bày phù hợp sở thích của sếp.
+- KHÔNG tự bịa thêm kinh nghiệm không có trong dữ liệu.
 
 ## HƯỚNG DẪN ĐỌC DỮ LIỆU NHẬT KÝ VẬN HÀNH
 Dữ liệu nhật ký có 2 loại:

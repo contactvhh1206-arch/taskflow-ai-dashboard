@@ -10,6 +10,7 @@ import AdminConfigPanel from './components/AdminConfigPanel.jsx';
 import ApiConfigPanel from './components/ApiConfigPanel.jsx';
 import AIUsageLogs from './components/AIUsageLogs.jsx';
 import RAGManagerPanel from './components/RAGManagerPanel.jsx';
+import AIInsightsManager from './components/AIInsightsManager.jsx';
 import FacilityDashboard from './components/FacilityDashboard.jsx';
 
 import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
@@ -1384,6 +1385,7 @@ function MainDashboard() {
               <NavItem icon="api" label="Cấu hình API & AI" active={activeTab === 'api_config'} onClick={() => setActiveTab('api_config')} />
               <NavItem icon="memory" label="Nhật ký Hoạt động AI" active={activeTab === 'ai_logs'} onClick={() => setActiveTab('ai_logs')} />
               <NavItem icon="database" label="Quản lý Tri thức (RAG)" active={activeTab === 'rag_manager'} onClick={() => setActiveTab('rag_manager')} />
+              <NavItem icon="psychology" label="Bài học AI" active={activeTab === 'ai_insights'} onClick={() => setActiveTab('ai_insights')} />
             </>
           )}
 
@@ -1618,6 +1620,10 @@ function MainDashboard() {
             ) : activeTab === 'rag_manager' && user.role === 'ADMIN' ? (
               <ErrorBoundary>
                 <RAGManagerPanel showToast={showToast} />
+              </ErrorBoundary>
+            ) : activeTab === 'ai_insights' && user.role === 'ADMIN' ? (
+              <ErrorBoundary>
+                <AIInsightsManager showToast={showToast} />
               </ErrorBoundary>
             ) : activeTab === 'dashboard' && (user.role === 'FACILITY_MANAGER' || user.role === 'SUPERVISOR' || ['SUPER_ADMIN', 'DEPARTMENT_HEAD', 'FINANCE_DEPT', 'VICE_PRESIDENT'].includes(user.role)) ? (
               <ErrorBoundary>

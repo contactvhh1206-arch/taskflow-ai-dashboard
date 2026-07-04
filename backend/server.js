@@ -13,7 +13,7 @@ app.use(express.json({ limit: '50mb' }));
 
 // 1.1 Auto-run Migrations khi server khởi động
 (async () => {
-    const migrationFiles = ['001_create_ai_chat_messages.sql', '002_task_audit_logs.sql', '003_task_extension_request.sql'];
+    const migrationFiles = ['001_create_ai_chat_messages.sql', '002_task_audit_logs.sql', '003_task_extension_request.sql', '005_create_ai_learned_insights.sql'];
     for (const file of migrationFiles) {
         const migPath = path.join(__dirname, 'migrations', file);
         if (fs.existsSync(migPath)) {
@@ -31,6 +31,7 @@ app.use(express.json({ limit: '50mb' }));
 
 // 1.5 Đề nổ Động cơ Cron
 require('./src/cron/aiPingJob');
+require('./src/cron/aiLearningJob'); // Trí nhớ dài hạn: trích xuất bài học mọi đêm
 
 // 2. Định tuyến Toàn cục (Mount The Iron Gateway)
 app.use('/api', require('./src/routes/index'));
