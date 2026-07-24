@@ -772,7 +772,7 @@ export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFa
                       </button>
                     )}
                   </div>
-                  <div className="bg-gray-50 dark:bg-[#252525] p-3.5 rounded-xl border border-gray-100 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 break-words relative">
+                  <div className="bg-gray-50 dark:bg-[#252525] p-3.5 rounded-xl border border-gray-100 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 break-words whitespace-pre-wrap relative">
                     {editingLogId === log.id ? (
                       <div className="flex flex-col gap-2">
                         <textarea 

@@ -665,7 +665,7 @@ export default function FacilityDashboard({ user, tasks, onOpenTask, globalFacil
                               {facShort || 'ALL'}
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{log.content}</p>
+                              <p className="text-sm font-medium text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">{log.content}</p>
                               <p className="text-xs text-gray-500 mt-1">{log.displayTime} - {log.date} {facName && `| ${facName}`}</p>
                             </div>
                           </div>
