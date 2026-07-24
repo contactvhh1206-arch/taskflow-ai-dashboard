@@ -53,7 +53,7 @@ ${chatLog}
             model: 'google/gemini-2.5-flash', // Model nhẹ, rẻ, đủ khả năng phân tích
             messages: [{ role: 'system', content: prompt }],
             response_format: { type: 'json_object' },
-            max_tokens: 1000
+            max_tokens: 4000
         })
     });
 
@@ -70,8 +70,8 @@ ${chatLog}
         const parsed = JSON.parse(data.choices[0].message.content);
         return Array.isArray(parsed.insights) ? parsed.insights : [];
     } catch (e) {
-        console.error('[AI Learning] JSON parse error từ LLM:', e.message);
-        return [];
+        // Ném lỗi để session KHÔNG bị đánh dấu đã xử lý — sẽ được thử lại đêm sau
+        throw new Error(`JSON parse error từ LLM (có thể bị cắt cụt): ${e.message}`);
     }
 };
 
@@ -79,20 +79,20 @@ ${chatLog}
  * Cron job chính: Quét các session hôm nay đủ điều kiện, trích xuất bài học, lưu DB.
  * Chạy mỗi đêm lúc 02:00 AM (giờ UTC+7, tương đương 19:00 UTC trước đó)
  */
-const runLearningJob = async () => {
-    console.log('[AI Learning Cron] Bắt đầu quét và trích xuất bài học...');
+const runLearningJob = async (hoursBack = 24) => {
+    console.log(`[AI Learning Cron] Bắt đầu quét và trích xuất bài học (cửa sổ ${hoursBack}h)...`);
     try {
-        // Lấy các session trong 24h qua chưa được xử lý, có >= 4 tin nhắn
+        // Lấy các session trong cửa sổ thời gian chưa được xử lý, có >= 4 tin nhắn
         // timestamp trong ai_chat_sessions lưu dạng Unix ms epoch
         const { rows: sessions } = await pool.query(`
             SELECT s.id, s.user_id, s.facility_id
             FROM ai_chat_sessions s
             WHERE s.learning_processed = false
-              AND s.timestamp >= EXTRACT(EPOCH FROM NOW() - INTERVAL '24 hours') * 1000
+              AND s.timestamp >= EXTRACT(EPOCH FROM NOW() - make_interval(hours => $1)) * 1000
               AND (
                   SELECT COUNT(*) FROM ai_chat_messages m WHERE m.session_id = s.id
               ) >= 4
-        `);
+        `, [hoursBack]);
 
         if (sessions.length === 0) {
             console.log('[AI Learning Cron] Không có session mới đủ điều kiện.');
@@ -184,7 +184,7 @@ const runLearningJob = async () => {
 };
 
 // Chạy mỗi đêm lúc 02:00 AM (giờ server, server đặt UTC+7)
-cron.schedule('0 2 * * *', runLearningJob, {
+cron.schedule('0 2 * * *', () => runLearningJob(), {
     timezone: 'Asia/Ho_Chi_Minh'
 });
 
