@@ -3,5 +3,13 @@ frontend/node_modules
 frontend/dist
 .env
 .gemini
-node_modules  
- 
+node_modules
+
+# File tam / luu tru cuc bo — khong push len repo
+_archive_cleanup/
+__pycache__/
+*.backup
+*.backup2
+tmp*.txt
+users_dump.json
+last_logs.jsonl
