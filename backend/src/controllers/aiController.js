@@ -184,49 +184,80 @@ const chatStreamHandler = async (req, res) => {
             const hasConfirmationKeyword = lowerMsg.includes('ok') || lowerMsg.includes('có') || lowerMsg.includes('đồng ý') || lowerMsg.includes('xem') || lowerMsg.includes('trích xuất');
 
             if (hasRevenueKeyword || (isRevenueContext && hasConfirmationKeyword)) {
-                // [FIX VẤN ĐỀ 1] Bước 1: Xác định đúng tháng mục tiêu
+                // [FIX] Bước 1: Xác định TẤT CẢ các tháng người dùng nhắc tới (hỗ trợ câu hỏi so sánh)
                 const now = new Date();
                 const currentMonth = now.getMonth() + 1; // 1-12
                 const currentYear = now.getFullYear();
 
-                let targetMonth = null;
-                let targetYear = currentYear;
+                // Năm dự phòng cho các tháng không ghi năm kèm theo:
+                // nếu câu hỏi chỉ nhắc đúng 1 năm (VD "tháng 6 và tháng 7 năm 2025") thì dùng năm đó.
+                const yearsInMsg = [...new Set((lowerMsg.match(/\b20\d{2}\b/g) || []).map(Number))];
+                const fallbackYear = yearsInMsg.length === 1 ? yearsInMsg[0] : currentYear;
 
-                // Ưu tiên 1: Trích xuất số tháng cụ thể (VD: "tháng 5", "tháng 12")
-                const monthMatch = lowerMsg.match(/tháng\s*(\d{1,2})/);
-                if (monthMatch) {
-                    targetMonth = parseInt(monthMatch[1], 10);
+                const targets = [];
+                const seenTargets = new Set();
+                const pushTarget = (m, y) => {
+                    if (!(m >= 1 && m <= 12)) return;
+                    const key = `${y}-${m}`;
+                    if (seenTargets.has(key)) return;
+                    seenTargets.add(key);
+                    targets.push({ month: m, year: y });
+                };
+
+                // Ưu tiên 1: Trích xuất MỌI mốc "tháng N" kèm năm nếu có (VD "tháng 6/2026", "tháng 12 - 2025").
+                // Dùng matchAll (cờ /g) thay cho match() — match() không cờ chỉ trả về kết quả ĐẦU TIÊN,
+                // khiến câu hỏi "so sánh tháng 6 và tháng 7" chỉ nạp dữ liệu tháng 6.
+                for (const mt of lowerMsg.matchAll(/th[áa]ng\s*(\d{1,2})(?:\s*[\/\-]\s*(\d{4}))?/g)) {
+                    pushTarget(parseInt(mt[1], 10), mt[2] ? parseInt(mt[2], 10) : fallbackYear);
                 }
 
                 // Ưu tiên 2: Nhận diện từ khóa mang nghĩa "tháng này" -> gán tháng hiện tại
                 const isCurrentMonthKeyword = lowerMsg.includes('tháng này') || lowerMsg.includes('tháng hiện tại') || lowerMsg.includes('trong tháng') || lowerMsg.includes('tháng hiện hành') || lowerMsg.includes('tháng nay');
-                if (!targetMonth && isCurrentMonthKeyword) {
-                    targetMonth = currentMonth;
+                if (targets.length === 0 && isCurrentMonthKeyword) {
+                    pushTarget(currentMonth, currentYear);
                 }
 
                 // Ưu tiên 3: Không có từ khóa thời gian nào -> mặc định về tháng hiện tại
-                if (!targetMonth) {
-                    targetMonth = currentMonth;
+                if (targets.length === 0) {
+                    pushTarget(currentMonth, currentYear);
                 }
 
-                // [FIX VẤN ĐỀ 1] Bước 2: Tính toán start_date/end_date chính xác cho tháng mục tiêu
-                const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
-                const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
-                const fmt = (d) => d.toISOString().split('T')[0]; // Định dạng YYYY-MM-DD
-                const targetStartDate = fmt(startOfMonth);
-                const targetEndDate = fmt(endOfMonth);
-
-                const revSummary = await aiService.processToolCall('fetch_revenue_summary', { month: targetMonth, year: targetYear }, userContext);
-                if (!revSummary.includes('Không có dữ liệu') && !revSummary.includes('không có dữ liệu')) {
-                    dbContextStr += "\n\n[DỮ LIỆU TỔNG DOANH THU CHUẨN (TỪ DASHBOARD)]:\n" + revSummary;
+                // Chặn trần: tránh một câu hỏi kéo hàng chục tháng làm phình context và quá tải DB
+                const MAX_REVENUE_MONTHS = 4;
+                let truncatedNote = '';
+                if (targets.length > MAX_REVENUE_MONTHS) {
+                    truncatedNote = `\n\n[LƯU Ý] Câu hỏi nhắc tới ${targets.length} tháng, hệ thống chỉ nạp dữ liệu ${MAX_REVENUE_MONTHS} tháng đầu tiên.`;
+                    targets.length = MAX_REVENUE_MONTHS;
                 }
 
-                // [FIX VẤN ĐỀ 1] Bước 3: Truyền đúng mốc thời gian vào fetch_financial_reports,
-                // tránh để trống khiến aiService quét toàn bộ DB rồi cộng dồn sai tháng
-                const revDetails = await aiService.processToolCall('fetch_financial_reports', { start_date: targetStartDate, end_date: targetEndDate, limit: 500 }, userContext);
-                if (!revDetails.includes('Không có dữ liệu') && !revDetails.includes('không có dữ liệu')) {
-                    dbContextStr += "\n\n[CHI TIẾT DOANH THU THEO TỪNG NGÀY]:\n" + revDetails;
+                // [FIX] Bước 2: Tự ghép chuỗi YYYY-MM-DD theo giờ địa phương.
+                // Không dùng toISOString() vì nó quy đổi sang UTC, làm lệch 1 ngày khi server chạy ở múi giờ dương.
+                const fmt = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const isMultiMonth = targets.length > 1;
+
+                // [FIX] Bước 3: Nạp dữ liệu cho từng tháng, gắn nhãn rõ ràng để AI không lẫn số liệu giữa các tháng
+                for (const t of targets) {
+                    const label = `THÁNG ${t.month}/${t.year}`;
+                    const targetStartDate = fmt(t.year, t.month, 1);
+                    const targetEndDate = fmt(t.year, t.month, new Date(t.year, t.month, 0).getDate());
+
+                    const revSummary = await aiService.processToolCall('fetch_revenue_summary', { month: t.month, year: t.year }, userContext);
+                    if (!revSummary.toLowerCase().includes('không có dữ liệu')) {
+                        dbContextStr += `\n\n[DỮ LIỆU TỔNG DOANH THU CHUẨN (TỪ DASHBOARD) — ${label}]:\n` + revSummary;
+                    } else if (isMultiMonth) {
+                        // Khi so sánh nhiều tháng, phải nói rõ tháng nào trống thay vì bỏ qua im lặng,
+                        // tránh việc AI tưởng tháng đó không tồn tại trong hệ thống.
+                        dbContextStr += `\n\n[DỮ LIỆU TỔNG DOANH THU CHUẨN (TỪ DASHBOARD) — ${label}]:\nHệ thống không có dữ liệu doanh thu cho ${label}.`;
+                    }
+
+                    // Truyền đúng mốc thời gian vào fetch_financial_reports,
+                    // tránh để trống khiến aiService quét toàn bộ DB rồi cộng dồn sai tháng
+                    const revDetails = await aiService.processToolCall('fetch_financial_reports', { start_date: targetStartDate, end_date: targetEndDate, limit: 500 }, userContext);
+                    if (!revDetails.toLowerCase().includes('không có dữ liệu')) {
+                        dbContextStr += `\n\n[CHI TIẾT DOANH THU THEO TỪNG NGÀY — ${label}]:\n` + revDetails;
+                    }
                 }
+                dbContextStr += truncatedNote;
             }
             
             // [FIX VẤN ĐỀ 2] Mở rộng từ khóa kích hoạt để bao gồm cả nhật ký vận hành

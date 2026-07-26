@@ -6,7 +6,11 @@ const authGuard = require('../middlewares/authGuard');
 router.get('/', authGuard, async (req, res) => {
     try {
         // Attempt to fetch from daily_financial_reports, fallback to empty array if table doesn't exist
-        const { rows } = await pool.query('SELECT * FROM daily_financial_reports ORDER BY created_at DESC LIMIT 100');
+        // LIMIT 1000: các component phía client (RevenueOverviewDashboard, HeatmapKPI, RevenueLog,
+        // DailyRevenueReport) tự lọc theo tháng/ngày trên toàn bộ mảng trả về. Trần quá thấp sẽ khiến
+        // dữ liệu cũ âm thầm biến mất khỏi dashboard mà không báo lỗi. Khi dữ liệu chạm mức này,
+        // cần chuyển sang lọc theo khoảng ngày ở SQL + phân trang cho RevenueLog.
+        const { rows } = await pool.query('SELECT * FROM daily_financial_reports ORDER BY created_at DESC LIMIT 1000');
         res.json({ success: true, data: rows });
     } catch (e) {
         res.json({ success: true, data: [] });
