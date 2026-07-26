@@ -24,6 +24,11 @@ export default function AIAdvisor(props) {
      }
   } catch(e) {}
   
+  // Cơ sở đang chọn trên thanh lọc của trang cha (App.jsx / FacilityDashboard).
+  // Với quản lý cơ sở thì lấy chính cơ sở của họ. Backend luôn kiểm tra lại quyền.
+  const activeFacilityScope = props.facilityScope
+    || (isFacilityMode ? (facilityName || user?.facility_id || null) : null);
+
   const inputRef = React.useRef(null);
   const abortControllerRef = React.useRef(null);
   const currentSessionIdRef = React.useRef(activeSessionId);
@@ -375,7 +380,8 @@ export default function AIAdvisor(props) {
     }
 
     let sessionId = props.activeSessionId || null;
-    sendMessage(userQuery, { sessionId: sessionId, attachment: currentAttachment });
+    // Gửi kèm cơ sở đang chọn trên thanh lọc để AI bám đúng cơ sở sếp đang xem
+    sendMessage(userQuery, { sessionId: sessionId, attachment: currentAttachment, facilityScope: activeFacilityScope });
     isSessionCreatedByMeRef.current = false;
   };
 

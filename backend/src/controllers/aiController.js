@@ -94,6 +94,14 @@ const chatStreamHandler = async (req, res) => {
     sessionId = sessionId || session_id;
     const userContext = req.user;
 
+    // [FIX] Cơ sở người dùng đang chọn trên thanh lọc của giao diện.
+    // Trước đây giá trị này không được gửi xuống nên AI hoàn toàn không biết
+    // sếp đang đứng ở cơ sở nào — chọn "DUBAI PAV" mà AI vẫn đọc dữ liệu toàn chuỗi.
+    // Đây chỉ là GỢI Ý THU HẸP: quyền thật vẫn do JWT quyết định (xem resolveFacilityScope).
+    const requestedFacility = req.body.facility_scope
+        || (req.body.context && req.body.context.facilityScope)
+        || null;
+
     if (!message) {
         return res.status(400).json({ success: false, message: "Bad Request: Thiếu message." });
     }
@@ -276,16 +284,44 @@ const chatStreamHandler = async (req, res) => {
                 const fmtDate = (d) => `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
                 let opsStartDate = fmtDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7));
                 let opsEndDate = fmtDate(now);
+                let opsRangeNote = '';
 
-                // Trích xuất ngày cụ thể nếu người dùng đề cập (VD: "ngày 19/06", "24/06", "24/06/2026"...)
-                const dateMatch = lowerMsg.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
-                if (dateMatch) {
-                    const d = parseInt(dateMatch[1]);
-                    const m = parseInt(dateMatch[2]);
-                    const y = dateMatch[3] ? (dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3]) : parseInt(dateMatch[3])) : now.getFullYear();
-                    const specificDate = new Date(y, m - 1, d);
-                    opsStartDate = fmtDate(specificDate);
-                    opsEndDate = fmtDate(specificDate);
+                // [FIX] Trích xuất MỌI mốc ngày hợp lệ trong câu hỏi, không chỉ mốc đầu tiên.
+                // Lỗi cũ: .match() không cờ /g chỉ lấy kết quả ĐẦU TIÊN rồi ép start = end = ngày đó.
+                // Câu "so sánh 01/07 - 25/07 ... 19/07 - 25/07 so với 12/07 - 18/07" chỉ nạp đúng ngày 01/07.
+                // Lỗi cũ 2: không kiểm tra ngày/tháng hợp lệ nên "tháng 7/2026" khớp nhầm thành ngày 7 tháng 20.
+                const yearsInMsgOps = [...new Set((lowerMsg.match(/\b20\d{2}\b/g) || []).map(Number))];
+                const opsFallbackYear = yearsInMsgOps.length === 1 ? yearsInMsgOps[0] : now.getFullYear();
+
+                const foundDates = [];
+                for (const mt of lowerMsg.matchAll(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/g)) {
+                    const d = parseInt(mt[1], 10);
+                    const m = parseInt(mt[2], 10);
+                    if (!(d >= 1 && d <= 31) || !(m >= 1 && m <= 12)) continue; // loại "7/2026", "19/25"...
+                    const y = mt[3]
+                        ? (mt[3].length === 2 ? 2000 + parseInt(mt[3], 10) : parseInt(mt[3], 10))
+                        : opsFallbackYear;
+                    const dt = new Date(y, m - 1, d);
+                    // Loại ngày không tồn tại thật (VD 31/02 bị JS tự cộng dồn sang tháng sau)
+                    if (dt.getDate() !== d || dt.getMonth() !== m - 1) continue;
+                    foundDates.push(dt);
+                }
+
+                if (foundDates.length > 0) {
+                    foundDates.sort((a, b) => a - b);
+                    let opsFrom = foundDates[0];
+                    const opsTo = foundDates[foundDates.length - 1];
+
+                    // Chặn trần độ dài khoảng: tránh một câu hỏi kéo cả năm làm phình context và quá tải DB
+                    const MAX_OPS_DAYS = 45;
+                    const spanDays = Math.round((opsTo - opsFrom) / 86400000);
+                    if (spanDays > MAX_OPS_DAYS) {
+                        opsFrom = new Date(opsTo.getFullYear(), opsTo.getMonth(), opsTo.getDate() - MAX_OPS_DAYS);
+                        opsRangeNote = `\n[LƯU Ý] Câu hỏi trải ${spanDays} ngày, hệ thống chỉ nạp nhật ký ${MAX_OPS_DAYS} ngày cuối của khoảng đó.`;
+                    }
+
+                    opsStartDate = fmtDate(opsFrom);
+                    opsEndDate = fmtDate(opsTo);
                 } else if (lowerMsg.includes('hôm nay') || lowerMsg.includes('hom nay')) {
                     opsStartDate = fmtDate(now);
                     opsEndDate = fmtDate(now);
@@ -297,10 +333,13 @@ const chatStreamHandler = async (req, res) => {
                     opsStartDate = fmtDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 3));
                 }
 
-                const dailyLogsData = await aiService.processToolCall('fetch_daily_logs', { start_date: opsStartDate, end_date: opsEndDate }, userContext);
-                if (dailyLogsData && !dailyLogsData.includes('Không có dữ liệu')) {
-                    dbContextStr += "\n\n[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA LÀM VIỆC THỰC TẾ]:\n" + dailyLogsData;
-                }
+                // [FIX] LUÔN gắn khối này vào context, kể cả khi rỗng.
+                // Trước đây khi không có dữ liệu thì khối bị bỏ qua im lặng — AI không biết là thiếu dữ liệu
+                // nên vẫn "phân tích" và tự bịa ra nhân sự trực ca.
+                const dailyLogsData = await aiService.processToolCall('fetch_daily_logs', { start_date: opsStartDate, end_date: opsEndDate, facility_scope: requestedFacility }, userContext);
+                dbContextStr += `\n\n[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA LÀM VIỆC THỰC TẾ — chỉ nạp khoảng ${opsStartDate} → ${opsEndDate}]:\n`
+                    + (dailyLogsData || 'KHÔNG CÓ BẢN GHI NÀO.')
+                    + opsRangeNote;
             }
 
             // [KPI] Kích hoạt phân tích KPI khi có từ khóa liên quan
@@ -351,9 +390,22 @@ const chatStreamHandler = async (req, res) => {
 
         // 4. Tạo System Prompt có RAG
         const currentTimeString = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+        // [FIX] Nói rõ cho AI biết đang xem cơ sở NÀO (theo TÊN, không phải id),
+        // lấy từ bộ chọn trên giao diện đã được đối chiếu với quyền trong JWT.
+        let facilityFocusLabel = 'Tất cả cơ sở';
+        try {
+            const scope = await aiService.resolveFacilityScope(userContext, requestedFacility);
+            if (scope && scope.label) facilityFocusLabel = scope.label;
+        } catch (e) {
+            console.error('[AI] Không xác định được phạm vi cơ sở:', e.message);
+        }
         // [V2 - SMART ADVISOR PROMPT] Cố vấn AI thông minh: biết đọc ý người hỏi,
         // liệt kê chi tiết khi cần, tóm tắt khi phù hợp, luôn gợi mở câu hỏi tiếp theo.
-        const systemPrompt = `Bạn là Cố vấn AI Cấp cao của hệ thống quản lý chuỗi cơ sở Hub Dubai. Thời gian hiện tại: ${currentTimeString}. Role người dùng: ${userContext.role}, Cơ sở: ${safeFacilityId || 'Tất cả'}.
+        const systemPrompt = `Bạn là Cố vấn AI Cấp cao của hệ thống quản lý chuỗi cơ sở Hub Dubai. Thời gian hiện tại: ${currentTimeString}. Role người dùng: ${userContext.role}.
+
+## CƠ SỞ ĐANG ĐƯỢC XEM: **${facilityFocusLabel}**
+Đây là cơ sở sếp đang chọn trên giao diện. Khi sếp hỏi trống không ("tình hình thế nào", "ai trực hôm nay") mà không nêu tên cơ sở → hiểu là đang hỏi về cơ sở này. Nếu dữ liệu bên dưới có nhiều cơ sở, hãy bám vào cơ sở này làm trọng tâm và chỉ nhắc cơ sở khác khi so sánh (phải gọi đúng tên cơ sở đó).
 
 ## TÍNH CÁCH & PHONG CÁCH
 Bạn là một cố vấn vận hành dày dạn kinh nghiệm — nói chuyện thẳng thắn, sắc sảo và thực chiến như một COO thực thụ. Bạn hiểu tầm quan trọng của việc đủ người trực ca, ai nghỉ không phép là rủi ro, doanh thu thấp ngày nào cần truy nguyên nhân.
@@ -365,7 +417,7 @@ Bạn là một cố vấn vận hành dày dạn kinh nghiệm — nói chuyệ
 - Khi sếp hỏi "ai nghỉ", "nghỉ phép" → PHẢI nêu rõ: nghỉ có phép (CP) gồm những ai, nghỉ không phép (KP) gồm những ai, lý do nếu có.
 - Khi sếp hỏi "tổng quan", "tình hình chung", "nhận xét" → Lúc này mới tổng hợp con số + nhận định quản trị.
 - Khi sếp hỏi "doanh thu" → Báo con số cụ thể từng cơ sở, có so sánh xu hướng.
-- Khi không chắc sếp muốn chi tiết hay tổng quan → MẶC ĐỊNH trả chi tiết. Thiếu thông tin nguy hiểm hơn thừa thông tin.
+- Khi không chắc sếp muốn chi tiết hay tổng quan → MẶC ĐỊNH trả chi tiết. Nhưng "chi tiết" nghĩa là liệt kê hết dữ liệu THẬT đang có, KHÔNG phải lấp đầy khoảng trống bằng thông tin tự nghĩ ra (xem Nguyên tắc 5).
 
 ### 2. TRÌNH BÀY THEO MỨC ĐỘ
 - **Câu hỏi yêu cầu danh sách/chi tiết**: Liệt kê ĐẦY ĐỦ dữ liệu có trong hệ thống, tổ chức rõ ràng theo nhóm (theo ca, theo vị trí, theo cơ sở). Sau đó mới thêm 1 nhận định ngắn nếu phát hiện bất thường.
@@ -385,9 +437,14 @@ Sau mỗi câu trả lời, LUÔN kết thúc bằng phần gợi ý câu hỏi 
 - [Gợi ý 2 mở rộng sang khía cạnh liên quan (doanh thu, thiết bị, công việc...)]
 - [Gợi ý 3 đào sâu vào điểm bất thường nếu có, hoặc góc nhìn so sánh]
 
-### 5. TRUNG THỰC TUYỆT ĐỐI
+### 5. TRUNG THỰC TUYỆT ĐỐI — QUY TẮC CAO NHẤT, ĐÈ LÊN MỌI QUY TẮC KHÁC
 - Chỉ dùng dữ liệu có trong phần [DỮ LIỆU HỆ THỐNG] bên dưới. Không bịa số liệu, không suy đoán.
-- Nếu thiếu dữ liệu → Nói rõ thiếu gì, đề xuất ai cần bổ sung.
+- **CẤM TUYỆT ĐỐI việc tự tạo ra dữ liệu nhân sự.** Tên người, mã số KTV, số hiệu nhân viên, ca trực, giờ làm, số người nghỉ — CHỈ được nhắc tới nếu chuỗi ký tự đó XUẤT HIỆN NGUYÊN VĂN trong [DỮ LIỆU HỆ THỐNG]. Nếu không thấy → KHÔNG ĐƯỢC VIẾT RA, kể cả dưới dạng ví dụ, minh họa hay "ước tính".
+- **Không được suy ra nhân sự từ doanh thu.** Doanh thu thấp KHÔNG cho phép bạn kết luận "thiếu người", "1 lễ tân đúp ca", "KTV nghỉ" nếu nhật ký không ghi.
+- **Nếu khối [NHẬT KÝ VẬN HÀNH...] trống, hoặc không chứa thông tin nhân sự** → Phải viết đúng một câu: "Không có dữ liệu nhật ký vận hành cho [cơ sở] trong khoảng [thời gian] — không thể đối chiếu nhân sự." Rồi BỎ HẲN phần phân tích nhân sự, chỉ phân tích phần nào có dữ liệu thật.
+- **Chỉ được phân tích đúng khoảng thời gian ghi trong nhãn của khối dữ liệu.** Nếu sếp hỏi tuần 19–25 mà nhật ký chỉ nạp được ngày 01/07 thì phải nói rõ điều đó, KHÔNG được trình bày dữ liệu 1 ngày như thể là của cả tuần.
+- **Mỗi dòng nhật ký đều ghi rõ [CƠ SỞ: tên]. Tuyệt đối không gán dòng của cơ sở này sang cơ sở khác.** Khi báo cáo về một cơ sở, chỉ dùng đúng những dòng mang tên cơ sở đó.
+- Thà trả lời ngắn và thiếu, còn hơn đầy đủ mà sai. Bịa một cái tên hay một mã KTV là lỗi nghiêm trọng nhất bạn có thể mắc.
 
 ### 6. ĐỊNH DẠNG
 - Dùng **in đậm** cho tên người, con số, chỉ số quan trọng.
@@ -408,9 +465,12 @@ Dữ liệu nhật ký có 2 loại:
 - **Operation_Log**: Ghi chép tự do của quản lý — gồm danh sách nhân viên trực ca (tên lễ tân, bảo vệ, KTV...), số hiệu KTV theo từng khung giờ, ghi chú vận hành trong ngày.
 - **Attendance (Báo cáo ca)**: Ghi nhận cuối ca — số người nghỉ có phép (CP), nghỉ không phép (KP), tình trạng thiết bị, vệ sinh.
 
+Mỗi dòng dữ liệu có dạng: [CƠ SỞ: tên cơ sở] [LOẠI bản ghi] [ngày giờ] nội dung.
+
 Khi sếp hỏi nhân viên đi làm hoặc danh sách nhân sự:
-→ Trích xuất TẤT CẢ tên người từ Operation_Log (Sáng/Tối/Ca...) VÀ số liệu nghỉ từ Attendance.
+→ Trích xuất TẤT CẢ tên người CÓ THẬT trong Operation_Log (Sáng/Tối/Ca...) VÀ số liệu nghỉ từ Attendance.
 → Tổ chức lại thành danh sách rõ ràng theo vị trí và ca làm.
+→ Nếu nhật ký chỉ là ghi chú vụn vặt (gửi ảnh, báo mã đơn, nhắc việc...) và KHÔNG có tên người hay mã KTV nào → Trả lời thẳng: "Nhật ký ngày đó không ghi nhận thông tin nhân sự trực ca." KHÔNG được tự dựng lên một ca trực.
 
 ## HƯỚNG DẪN PHÂN TÍCH KPI VÀ ĐỀ XUẤT PHƯƠNG ÁN KINH DOANH
 Khi có dữ liệu [PHÂN TÍCH KPI & HIỆU SUẤT CƠ SỞ]:

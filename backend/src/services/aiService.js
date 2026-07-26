@@ -1,6 +1,116 @@
 const pool = require('../config/database');
 const taskService = require('./taskService');
 
+// ==============================================================================
+// BỘ GIẢI PHẠM VI CƠ SỞ CHO AI (AI FACILITY SCOPE RESOLVER)
+// ------------------------------------------------------------------------------
+// Lý do tồn tại: trước đây mỗi tool tự lọc theo `userContext.facility_id`. Tài khoản
+// SUPERVISOR được tạo với facility_id = NULL (danh sách nằm ở `managed_facilities`),
+// nên điều kiện `if (facility_id)` bị bỏ qua → AI nhận nhật ký của TOÀN BỘ cơ sở.
+// Module này là nguồn chân lý duy nhất: không có quyền = KHÔNG thấy gì (fail-closed).
+// ==============================================================================
+
+const AI_GLOBAL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'];
+
+// Chuẩn hóa chuỗi để so khớp tên cơ sở: bỏ dấu, bỏ khoảng trắng thừa, về chữ thường
+const normFacilityKey = (s) => String(s == null ? '' : s)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+// Tách mọi định dạng đang tồn tại trong DB/JWT thành mảng token phẳng:
+// 5 | "5" | "ALL" | '["DUBAI PAV","DUBAI PA"]' | ["DUBAI PAV"] | "a, b"
+const parseFacilityTokens = (raw) => {
+    if (raw === null || raw === undefined || raw === '') return [];
+    if (Array.isArray(raw)) return raw.flatMap(parseFacilityTokens);
+    if (typeof raw === 'number') return [String(raw)];
+
+    const str = String(raw).trim();
+    if (str === '') return [];
+
+    if (str.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(str);
+            if (Array.isArray(parsed)) return parsed.flatMap(parseFacilityTokens);
+        } catch (e) { /* không phải JSON hợp lệ → xử lý như chuỗi thường bên dưới */ }
+    }
+
+    if (str.includes(',')) return str.split(',').map(s => s.trim()).filter(Boolean);
+    return [str];
+};
+
+/**
+ * Trả về danh sách ID cơ sở (dạng chuỗi) mà user được phép xem.
+ *   null  = xem được TẤT CẢ cơ sở (lãnh đạo / được gán 'ALL')
+ *   []    = KHÔNG được xem cơ sở nào (tài khoản chưa gán cơ sở → fail-closed)
+ * Token có thể là id hoặc TÊN cơ sở (SUPERVISOR lưu theo tên) nên khớp cả hai.
+ */
+const resolveAllowedFacilityIds = async (userContext) => {
+    if (!userContext || !userContext.role) return [];
+    if (AI_GLOBAL_ROLES.includes(userContext.role)) return null;
+
+    const tokens = [
+        ...parseFacilityTokens(userContext.facility_id),
+        ...parseFacilityTokens(userContext.managed_facilities)
+    ];
+
+    if (tokens.some(t => String(t).toUpperCase() === 'ALL')) return null;
+    if (tokens.length === 0) return [];
+
+    const { rows } = await pool.query('SELECT id::text AS id, name, code FROM facilities');
+    const wanted = new Set(tokens.map(normFacilityKey));
+
+    const matched = rows
+        .filter(f => wanted.has(normFacilityKey(f.id))
+                  || wanted.has(normFacilityKey(f.name))
+                  || (f.code && wanted.has(normFacilityKey(f.code))))
+        .map(f => f.id);
+
+    return [...new Set(matched)];
+};
+
+/**
+ * Gộp quyền (allowed) với cơ sở người dùng đang chọn trên giao diện (requested).
+ * Nguyên tắc: lựa chọn trên UI chỉ được THU HẸP phạm vi, KHÔNG BAO GIỜ mở rộng.
+ * Trả về { ids, label } — ids = null nghĩa là không lọc (tất cả cơ sở được phép).
+ */
+const resolveFacilityScope = async (userContext, requestedFacility) => {
+    const allowed = await resolveAllowedFacilityIds(userContext);
+    const { rows } = await pool.query('SELECT id::text AS id, name, code FROM facilities');
+
+    const nameOf = (ids) => rows.filter(f => ids.includes(f.id)).map(f => f.name).join(', ');
+    // Nhãn mô tả phạm vi khi người dùng KHÔNG chọn cơ sở cụ thể
+    const baseLabel = allowed === null
+        ? 'Tất cả cơ sở'
+        : (allowed.length === 0 ? 'CHƯA ĐƯỢC GÁN CƠ SỞ NÀO' : nameOf(allowed));
+
+    const reqTokens = parseFacilityTokens(requestedFacility)
+        .filter(t => String(t).toUpperCase() !== 'ALL');
+
+    if (reqTokens.length === 0) return { ids: allowed, label: baseLabel };
+
+    const wanted = new Set(reqTokens.map(normFacilityKey));
+    const requestedRows = rows.filter(f => wanted.has(normFacilityKey(f.id))
+                                        || wanted.has(normFacilityKey(f.name))
+                                        || (f.code && wanted.has(normFacilityKey(f.code))));
+
+    // Không khớp cơ sở nào (VD đang chọn "Phòng Truyền thông") → giữ nguyên quyền gốc
+    if (requestedRows.length === 0) return { ids: allowed, label: baseLabel };
+
+    // Giao với quyền được cấp: chọn cơ sở ngoài quyền thì bị bỏ qua, KHÔNG được nới quyền
+    const finalRows = allowed === null
+        ? requestedRows
+        : requestedRows.filter(f => allowed.includes(f.id));
+
+    if (finalRows.length === 0) return { ids: allowed, label: baseLabel };
+
+    return {
+        ids: finalRows.map(f => f.id),
+        label: finalRows.map(f => f.name).join(', ')
+    };
+};
+
 // 1. Schema Định nghĩa Tool (Hoàn toàn KHÔNG CÓ tham số định danh cơ sở)
 const AI_TOOLS = [
     {
@@ -327,10 +437,11 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
         }
 
         if (functionName === 'fetch_daily_logs') {
-            const { start_date, end_date, entry_type } = functionArgs || {};
+            const { start_date, end_date, entry_type, facility_scope } = functionArgs || {};
 
-            // Phân quyền: Global roles thấy tất cả, còn lại chỉ thấy cơ sở của mình
-            const isGlobal = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(userContext.role);
+            // [FIX] Phân quyền qua resolver dùng chung: hiểu cả facility_id lẫn managed_facilities,
+            // và tôn trọng cơ sở người dùng đang chọn trên giao diện (chỉ được thu hẹp, không nới quyền).
+            const scope = await resolveFacilityScope(userContext, facility_scope);
 
             // Mặc định lấy 3 ngày gần nhất nếu không truyền start_date
             // Định dạng ngày DD/MM/YYYY cho khớp với dữ liệu thực tế trong cột date của bảng daily_logs
@@ -340,41 +451,68 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             const effectiveStart = start_date || fmt(defaultStart);
             const effectiveEnd = end_date || fmt(new Date());
 
+            // [FIX] JOIN facilities để mỗi dòng log gửi cho AI đều mang TÊN CƠ SỞ.
+            // Trước đây chỉ trả `[ngày] nội dung` khiến AI nhận log của 6 cơ sở trộn lẫn
+            // mà không biết dòng nào của ai, dẫn tới gán nhầm dữ liệu cho cơ sở người dùng hỏi.
             let query = `
-                SELECT org_unit, entry_type, date, display_time, ai_vector_data
-                FROM daily_logs
-                WHERE TO_DATE(date, 'DD/MM/YYYY') >= TO_DATE($1, 'DD/MM/YYYY')
-                  AND TO_DATE(date, 'DD/MM/YYYY') <= TO_DATE($2, 'DD/MM/YYYY')
+                SELECT l.org_unit, l.entry_type, l.date, l.display_time, l.ai_vector_data,
+                       COALESCE(f.name, 'KHÔNG XÁC ĐỊNH (org_unit=' || COALESCE(l.org_unit::text, 'null') || ')') AS facility_name
+                FROM daily_logs l
+                LEFT JOIN facilities f ON f.id::text = l.org_unit::text
+                WHERE TO_DATE(l.date, 'DD/MM/YYYY') >= TO_DATE($1, 'DD/MM/YYYY')
+                  AND TO_DATE(l.date, 'DD/MM/YYYY') <= TO_DATE($2, 'DD/MM/YYYY')
             `;
             const params = [effectiveStart, effectiveEnd];
 
-            if (!isGlobal && userContext.facility_id) {
-                params.push(String(userContext.facility_id));
-                query += ` AND org_unit = $${params.length}`;
+            // scope.ids === null → được xem tất cả cơ sở, không thêm điều kiện lọc.
+            // scope.ids === []   → tài khoản chưa được gán cơ sở nào: CHẶN, không trả dữ liệu
+            //                      (trước đây trường hợp này lọt qua và trả log của toàn bộ chuỗi).
+            if (Array.isArray(scope.ids)) {
+                if (scope.ids.length === 0) {
+                    return 'KHÔNG CÓ QUYỀN: Tài khoản của bạn chưa được gán cơ sở nào nên hệ thống không nạp được nhật ký vận hành. Vui lòng liên hệ quản trị hệ thống để gán cơ sở.';
+                }
+                params.push(scope.ids);
+                query += ` AND l.org_unit::text = ANY($${params.length}::text[])`;
             }
 
             if (entry_type) {
                 params.push(entry_type);
-                query += ` AND entry_type = $${params.length}`;
+                query += ` AND l.entry_type = $${params.length}`;
             }
 
-            query += ` ORDER BY date DESC, display_time DESC LIMIT 200`;
+            // [FIX] Sắp xếp theo NGÀY THẬT. Cột date là TEXT 'DD/MM/YYYY' nên `ORDER BY date DESC`
+            // trước đây sắp theo thứ tự chữ cái (ngày trong tháng), làm LIMIT cắt nhầm dữ liệu.
+            // 400 ≈ đủ cho câu hỏi 7-9 ngày toàn chuỗi (thực đo: 311 bản ghi/tuần cho 6 cơ sở).
+            const ROW_LIMIT = 400;
+            query += ` ORDER BY TO_DATE(l.date, 'DD/MM/YYYY') DESC, l.org_unit, l.display_time DESC LIMIT ${ROW_LIMIT}`;
 
             const { rows } = await pool.query(query, params);
 
             if (!rows || rows.length === 0) {
-                return `Không có dữ liệu nhật ký/báo cáo ca trong khoảng ${effectiveStart} → ${effectiveEnd}.`;
+                return `KHÔNG CÓ BẢN GHI NÀO trong khoảng ${effectiveStart} → ${effectiveEnd}.`;
             }
+
+            const typeLabel = (t) => {
+                if (t === 'Attendance') return 'BÁO CÁO CA';
+                if (t === 'Operation_Log') return 'NHẬT KÝ VẬN HÀNH';
+                return t || 'KHÔNG RÕ LOẠI';
+            };
 
             const resultLines = rows
                 .filter(r => r.ai_vector_data && r.ai_vector_data.trim() !== '')
-                .map(r => `[${r.date}] ${r.ai_vector_data}`);
+                .map(r => `[CƠ SỞ: ${r.facility_name}] [${typeLabel(r.entry_type)}] [${r.date}${r.display_time ? ' ' + r.display_time : ''}] ${r.ai_vector_data}`);
 
             if (resultLines.length === 0) {
-                return `Có bản ghi nhưng trường ai_vector_data rỗng trong khoảng ${effectiveStart} → ${effectiveEnd}.`;
+                return `Có ${rows.length} bản ghi trong khoảng ${effectiveStart} → ${effectiveEnd} nhưng tất cả đều RỖNG NỘI DUNG (ai_vector_data trống).`;
             }
 
-            return `[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA (${effectiveStart} → ${effectiveEnd})]:\n` + resultLines.join('\n');
+            const truncatedWarn = rows.length >= ROW_LIMIT
+                ? `\n[CẢNH BÁO] Dữ liệu đã bị cắt ở ${ROW_LIMIT} bản ghi gần nhất — các ngày cũ hơn trong khoảng này CHƯA được nạp. Không được kết luận là "không có dữ liệu" cho những ngày đó.`
+                : '';
+
+            return `[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA — khoảng ${effectiveStart} → ${effectiveEnd}]\n`
+                + `(Mỗi dòng đã ghi rõ CƠ SỞ và LOẠI bản ghi. Tuyệt đối không gán dòng của cơ sở này cho cơ sở khác.)\n`
+                + resultLines.join('\n') + truncatedWarn;
         }
 
         if (functionName === 'fetch_kpi_analysis') {
@@ -540,5 +678,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
 module.exports = {
     AI_TOOLS,
-    processToolCall
+    processToolCall,
+    resolveFacilityScope,
+    resolveAllowedFacilityIds
 };

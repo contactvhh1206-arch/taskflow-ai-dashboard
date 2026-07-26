@@ -93,11 +93,14 @@ export function useAIChatStream(options?: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('taskflow_token') || ''}`
         },
-        body: JSON.stringify({ 
-          message: content, 
-          session_id: sessionIdRef.current || contextPayload?.sessionId, 
+        body: JSON.stringify({
+          message: content,
+          session_id: sessionIdRef.current || contextPayload?.sessionId,
           attachment: contextPayload?.attachment,
-          context: contextPayload 
+          // Cơ sở đang chọn trên thanh lọc — backend dùng để THU HẸP phạm vi dữ liệu.
+          // Backend luôn đối chiếu lại với quyền trong JWT nên giá trị này không thể nới quyền.
+          facility_scope: contextPayload?.facilityScope ?? null,
+          context: contextPayload
         }),
         signal: abortController.signal,
       });
