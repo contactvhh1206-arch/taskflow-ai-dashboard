@@ -111,6 +111,58 @@ const resolveFacilityScope = async (userContext, requestedFacility) => {
     };
 };
 
+// ==============================================================================
+// BỘ ĐỌC BÁO CÁO CA (ATTENDANCE) TỪ CỘT `content` DẠNG JSONB
+// ------------------------------------------------------------------------------
+// Trước đây AI chỉ nhận `ai_vector_data` — một chuỗi phẳng do frontend ghép sẵn.
+// Chuỗi đó bỏ rơi `eq_other` (sự cố thiết bị khác) và `cleaning_done` (vệ sinh),
+// đồng thời phụ thuộc vào định dạng chuỗi nên rất dễ vỡ. Cột `content` là jsonb
+// và ĐỦ KHÓA trên 100% bản ghi Attendance hiện có, nên đọc thẳng từ đó an toàn hơn.
+// Vẫn giữ fallback về `ai_vector_data` nếu gặp bản ghi có cấu trúc lạ.
+// ==============================================================================
+
+const HR_LABELS = { hr_letan: 'LỄ TÂN', hr_baove: 'BẢO VỆ', hr_clocker: 'LOCKER', hr_ktv: 'KTV' };
+const EQ_LABELS = { eq_camera: 'CAMERA', eq_maytinh: 'MÁY TÍNH', eq_den: 'ĐÈN', eq_maylanh: 'MÁY LẠNH' };
+
+// Kiểm tra một bản ghi Attendance có đọc được theo cấu trúc hay không
+const isUsableAttendanceContent = (c) =>
+    !!c && typeof c === 'object' && !Array.isArray(c)
+    && (c.manual_auth !== undefined || c.manual_unauth !== undefined);
+
+const cleanNote = (v) => String(v == null ? '' : v).trim();
+
+// Cụm "ai nghỉ" — dùng chung cho cả dòng chi tiết lẫn dòng bối cảnh trước kỳ.
+// LUÔN in ra cả 2 loại nghỉ kể cả khi bằng 0, để AI phân biệt được
+// "ca này ghi nhận 0 người nghỉ" với "ca này không được ghi nhận".
+const buildLeaveSegment = (c) => {
+    const kp = Number(c.manual_unauth || 0);
+    const cp = Number(c.manual_auth || 0);
+    const kpNote = cleanNote(c.manual_unauth_note);
+    const cpNote = cleanNote(c.manual_auth_note);
+    return `NGHỈ KHÔNG PHÉP: ${kp}${kp > 0 ? ` (${kpNote || 'không ghi chú'})` : ''}`
+        + ` | NGHỈ CÓ PHÉP: ${cp}${cp > 0 ? ` (${cpNote || 'không ghi chú'})` : ''}`;
+};
+
+// Dòng chi tiết đầy đủ của một bản ghi Attendance
+const buildAttendanceDetail = (c) => {
+    const parts = [];
+    parts.push(buildLeaveSegment(c));
+
+    const hrNotes = Object.entries(HR_LABELS)
+        .filter(([k]) => c[k] && c[k].status === 'thieu')
+        .map(([k, label]) => `${label}: ${cleanNote(c[k].note) || 'không ghi chú'}`);
+    parts.push(`VỊ TRÍ THIẾU NGƯỜI: ${hrNotes.length ? hrNotes.join(' ; ') : 'không có'}`);
+
+    const eqNotes = Object.entries(EQ_LABELS)
+        .filter(([k]) => c[k] === 'su_co')
+        .map(([k, label]) => `${label}: ${cleanNote(c[`${k}_note`]) || 'không ghi chú'}`);
+    if (cleanNote(c.eq_other)) eqNotes.push(`KHÁC: ${cleanNote(c.eq_other)}`);
+    parts.push(`SỰ CỐ THIẾT BỊ: ${eqNotes.length ? eqNotes.join(' ; ') : 'không có'}`);
+
+    parts.push(`VỆ SINH: ${c.cleaning_done ? 'đã hoàn thành' : 'CHƯA hoàn thành'}`);
+    return `${c.shift ? `[${c.shift}] ` : ''}${parts.join(' | ')}`;
+};
+
 // 1. Schema Định nghĩa Tool (Hoàn toàn KHÔNG CÓ tham số định danh cơ sở)
 const AI_TOOLS = [
     {
@@ -451,11 +503,24 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             const effectiveStart = start_date || fmt(defaultStart);
             const effectiveEnd = end_date || fmt(new Date());
 
+            // scope.ids === null → được xem tất cả cơ sở, không thêm điều kiện lọc.
+            // scope.ids === []   → tài khoản chưa được gán cơ sở nào: CHẶN, không trả dữ liệu
+            //                      (trước đây trường hợp này lọt qua và trả log của toàn bộ chuỗi).
+            if (Array.isArray(scope.ids) && scope.ids.length === 0) {
+                return 'KHÔNG CÓ QUYỀN: Tài khoản của bạn chưa được gán cơ sở nào nên hệ thống không nạp được nhật ký vận hành. Vui lòng liên hệ quản trị hệ thống để gán cơ sở.';
+            }
+
             // [FIX] JOIN facilities để mỗi dòng log gửi cho AI đều mang TÊN CƠ SỞ.
             // Trước đây chỉ trả `[ngày] nội dung` khiến AI nhận log của 6 cơ sở trộn lẫn
             // mà không biết dòng nào của ai, dẫn tới gán nhầm dữ liệu cho cơ sở người dùng hỏi.
-            let query = `
-                SELECT l.org_unit, l.entry_type, l.date, l.display_time, l.ai_vector_data,
+            //
+            // [FIX] DISTINCT ON để khử bản ghi trùng. Mỗi lần quản lý bấm lưu nhật ký là một
+            // dòng MỚI, nên cùng một nội dung có thể nằm 3-4 dòng (thực đo tuần 24-30/07:
+            // 285 dòng nhưng chỉ 257 nội dung khác nhau). Trùng lặp ăn hạn mức ROW_LIMIT.
+            let innerQuery = `
+                SELECT DISTINCT ON (l.org_unit, l.date, l.entry_type, l.ai_vector_data)
+                       l.org_unit, l.entry_type, l.date, l.display_time, l.ai_vector_data, l.content,
+                       TO_DATE(l.date, 'DD/MM/YYYY') AS real_date,
                        COALESCE(f.name, 'KHÔNG XÁC ĐỊNH (org_unit=' || COALESCE(l.org_unit::text, 'null') || ')') AS facility_name
                 FROM daily_logs l
                 LEFT JOIN facilities f ON f.id::text = l.org_unit::text
@@ -464,33 +529,28 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             `;
             const params = [effectiveStart, effectiveEnd];
 
-            // scope.ids === null → được xem tất cả cơ sở, không thêm điều kiện lọc.
-            // scope.ids === []   → tài khoản chưa được gán cơ sở nào: CHẶN, không trả dữ liệu
-            //                      (trước đây trường hợp này lọt qua và trả log của toàn bộ chuỗi).
             if (Array.isArray(scope.ids)) {
-                if (scope.ids.length === 0) {
-                    return 'KHÔNG CÓ QUYỀN: Tài khoản của bạn chưa được gán cơ sở nào nên hệ thống không nạp được nhật ký vận hành. Vui lòng liên hệ quản trị hệ thống để gán cơ sở.';
-                }
                 params.push(scope.ids);
-                query += ` AND l.org_unit::text = ANY($${params.length}::text[])`;
+                innerQuery += ` AND l.org_unit::text = ANY($${params.length}::text[])`;
             }
 
             if (entry_type) {
                 params.push(entry_type);
-                query += ` AND l.entry_type = $${params.length}`;
+                innerQuery += ` AND l.entry_type = $${params.length}`;
             }
 
             // [FIX] Sắp xếp theo NGÀY THẬT. Cột date là TEXT 'DD/MM/YYYY' nên `ORDER BY date DESC`
             // trước đây sắp theo thứ tự chữ cái (ngày trong tháng), làm LIMIT cắt nhầm dữ liệu.
-            // 400 ≈ đủ cho câu hỏi 7-9 ngày toàn chuỗi (thực đo: 311 bản ghi/tuần cho 6 cơ sở).
-            const ROW_LIMIT = 400;
-            query += ` ORDER BY TO_DATE(l.date, 'DD/MM/YYYY') DESC, l.org_unit, l.display_time DESC LIMIT ${ROW_LIMIT}`;
+            // 900 ≈ đủ cho câu hỏi ~20 ngày toàn chuỗi (thực đo: 285 bản ghi/tuần cho 6 cơ sở).
+            // Bảng daily_logs chỉ ~3.000 dòng nên nâng trần không gây rủi ro tải.
+            const ROW_LIMIT = 900;
+            innerQuery += ` ORDER BY l.org_unit, l.date, l.entry_type, l.ai_vector_data, l.id DESC`;
+            const query = `SELECT * FROM (${innerQuery}) d
+                           ORDER BY d.real_date DESC, d.org_unit, d.display_time DESC
+                           LIMIT ${ROW_LIMIT}`;
 
-            const { rows } = await pool.query(query, params);
-
-            if (!rows || rows.length === 0) {
-                return `KHÔNG CÓ BẢN GHI NÀO trong khoảng ${effectiveStart} → ${effectiveEnd}.`;
-            }
+            const queryResult = await pool.query(query, params);
+            const rows = (queryResult && queryResult.rows) || [];
 
             const typeLabel = (t) => {
                 if (t === 'Attendance') return 'BÁO CÁO CA';
@@ -498,12 +558,94 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 return t || 'KHÔNG RÕ LOẠI';
             };
 
-            const resultLines = rows
-                .filter(r => r.ai_vector_data && r.ai_vector_data.trim() !== '')
-                .map(r => `[CƠ SỞ: ${r.facility_name}] [${typeLabel(r.entry_type)}] [${r.date}${r.display_time ? ' ' + r.display_time : ''}] ${r.ai_vector_data}`);
+            // [FIX] Báo cáo ca giờ đọc thẳng từ cột `content` (jsonb) thay vì chuỗi ai_vector_data.
+            // Nhờ vậy AI thấy được cả sự cố thiết bị "khác" và tình trạng vệ sinh — hai trường
+            // mà chuỗi ai_vector_data do frontend ghép sẵn không bao giờ chứa.
+            const resultLines = [];
+            for (const r of rows) {
+                const head = `[CƠ SỞ: ${r.facility_name}] [${typeLabel(r.entry_type)}] [${r.date}${r.display_time ? ' ' + r.display_time : ''}]`;
+                if (r.entry_type === 'Attendance' && isUsableAttendanceContent(r.content)) {
+                    resultLines.push(`${head} ${buildAttendanceDetail(r.content)}`);
+                } else if (r.ai_vector_data && r.ai_vector_data.trim() !== '') {
+                    resultLines.push(`${head} ${r.ai_vector_data}`);
+                }
+            }
+
+            // ------------------------------------------------------------------
+            // [MỚI] BỐI CẢNH NGHỈ TRƯỚC KỲ
+            // Lý do: cửa sổ dữ liệu bị cắt cứng theo câu hỏi. Nếu một người đã nghỉ
+            // từ TRƯỚC ngày bắt đầu cửa sổ, AI đọc ngày đầu cửa sổ thành ngày bắt đầu
+            // nghỉ (thực tế: KTV 219 nghỉ từ 19/07 nhưng cửa sổ 24-30/07 khiến AI kết
+            // luận "nghỉ 3 ngày rồi quay lại"). Nạp thêm 14 ngày báo cáo ca phía trước,
+            // gắn nhãn rõ là NGOÀI kỳ để AI biết chuỗi nghỉ bắt đầu từ bao giờ.
+            // ------------------------------------------------------------------
+            const LOOKBACK_DAYS = 14;
+            const MAX_LOOKBACK_LINES = 60;
+            let lookbackBlock = '';
+
+            if (entry_type !== 'Operation_Log') {
+                try {
+                    let lbInner = `
+                        SELECT DISTINCT ON (l.org_unit, l.date, l.ai_vector_data)
+                               l.org_unit, l.date, l.content,
+                               TO_DATE(l.date, 'DD/MM/YYYY') AS real_date,
+                               COALESCE(f.name, 'KHÔNG XÁC ĐỊNH') AS facility_name
+                        FROM daily_logs l
+                        LEFT JOIN facilities f ON f.id::text = l.org_unit::text
+                        WHERE l.entry_type = 'Attendance'
+                          AND TO_DATE(l.date, 'DD/MM/YYYY') < TO_DATE($1, 'DD/MM/YYYY')
+                          AND TO_DATE(l.date, 'DD/MM/YYYY') >= TO_DATE($1, 'DD/MM/YYYY') - ${LOOKBACK_DAYS}
+                    `;
+                    const lbParams = [effectiveStart];
+                    if (Array.isArray(scope.ids)) {
+                        lbParams.push(scope.ids);
+                        lbInner += ` AND l.org_unit::text = ANY($${lbParams.length}::text[])`;
+                    }
+                    lbInner += ` ORDER BY l.org_unit, l.date, l.ai_vector_data, l.id DESC`;
+
+                    const lbResult = await pool.query(
+                        `SELECT * FROM (${lbInner}) d ORDER BY d.real_date DESC, d.org_unit LIMIT 300`,
+                        lbParams
+                    );
+                    const lbRows = (lbResult && lbResult.rows) || [];
+
+                    // Chỉ giữ những ca THỰC SỰ có người nghỉ — ca ghi 0 người nghỉ không nói lên
+                    // điều gì về chuỗi nghỉ và chỉ làm phình context.
+                    const lbLines = [];
+                    let lbTruncated = false;
+                    for (const r of lbRows) {
+                        if (!isUsableAttendanceContent(r.content)) continue;
+                        const total = Number(r.content.manual_auth || 0) + Number(r.content.manual_unauth || 0);
+                        if (total <= 0) continue;
+                        if (lbLines.length >= MAX_LOOKBACK_LINES) { lbTruncated = true; break; }
+                        const shift = r.content.shift ? ` [${r.content.shift}]` : '';
+                        lbLines.push(`[CƠ SỞ: ${r.facility_name}] [${r.date}]${shift} ${buildLeaveSegment(r.content)}`);
+                    }
+
+                    if (lbLines.length > 0) {
+                        lookbackBlock = `\n\n[BỐI CẢNH NGHỈ TRƯỚC KỲ — ${LOOKBACK_DAYS} ngày ngay trước ${effectiveStart}, NẰM NGOÀI khoảng đang hỏi]\n`
+                            + `(Khối này CHỈ dùng để biết một người đã nghỉ từ trước hay chưa. TUYỆT ĐỐI KHÔNG cộng những ngày này vào thống kê của kỳ đang hỏi và KHÔNG đưa vào bảng báo cáo.)\n`
+                            + lbLines.join('\n')
+                            + (lbTruncated
+                                ? `\n(Chỉ hiển thị ${MAX_LOOKBACK_LINES} ca gần ${effectiveStart} nhất — các ngày xa hơn chưa được nạp, không kết luận là "không ai nghỉ" cho những ngày đó.)`
+                                : '');
+                    }
+                } catch (lbErr) {
+                    // Bối cảnh trước kỳ là phần bổ trợ — hỏng thì bỏ qua, không được làm chết luồng chính
+                    console.error('[AI Service] Lỗi nạp bối cảnh nghỉ trước kỳ:', lbErr.message);
+                }
+            }
+
+            // Ranh giới cửa sổ: đặt ở CUỐI khối để AI đọc thấy ngay trước khi kết luận
+            const boundaryNote = `\n\n[RANH GIỚI DỮ LIỆU] Nhật ký chi tiết chỉ được nạp từ ${effectiveStart} đến ${effectiveEnd}.`
+                + ` Nếu một chuỗi ngày nghỉ chạm mép ${effectiveStart} hoặc ${effectiveEnd} thì KHÔNG được kết luận đó là ngày bắt đầu hoặc ngày kết thúc nghỉ`
+                + ` — phải nói rõ "chuỗi có thể kéo dài ra ngoài khoảng đang xem".`;
 
             if (resultLines.length === 0) {
-                return `Có ${rows.length} bản ghi trong khoảng ${effectiveStart} → ${effectiveEnd} nhưng tất cả đều RỖNG NỘI DUNG (ai_vector_data trống).`;
+                const emptyMsg = rows.length === 0
+                    ? `KHÔNG CÓ BẢN GHI NÀO trong khoảng ${effectiveStart} → ${effectiveEnd}.`
+                    : `Có ${rows.length} bản ghi trong khoảng ${effectiveStart} → ${effectiveEnd} nhưng tất cả đều RỖNG NỘI DUNG.`;
+                return emptyMsg + lookbackBlock + boundaryNote;
             }
 
             const truncatedWarn = rows.length >= ROW_LIMIT
@@ -512,7 +654,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
             return `[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA — khoảng ${effectiveStart} → ${effectiveEnd}]\n`
                 + `(Mỗi dòng đã ghi rõ CƠ SỞ và LOẠI bản ghi. Tuyệt đối không gán dòng của cơ sở này cho cơ sở khác.)\n`
-                + resultLines.join('\n') + truncatedWarn;
+                + resultLines.join('\n') + truncatedWarn + lookbackBlock + boundaryNote;
         }
 
         if (functionName === 'fetch_kpi_analysis') {

@@ -463,14 +463,28 @@ Nếu có phần [KINH NGHIỆM & BÀI HỌC TỪ CÁC PHIÊN TRƯỚC] ở dữ
 ## HƯỚNG DẪN ĐỌC DỮ LIỆU NHẬT KÝ VẬN HÀNH
 Dữ liệu nhật ký có 2 loại:
 - **Operation_Log**: Ghi chép tự do của quản lý — gồm danh sách nhân viên trực ca (tên lễ tân, bảo vệ, KTV...), số hiệu KTV theo từng khung giờ, ghi chú vận hành trong ngày.
-- **Attendance (Báo cáo ca)**: Ghi nhận cuối ca — số người nghỉ có phép (CP), nghỉ không phép (KP), tình trạng thiết bị, vệ sinh.
+- **Attendance (Báo cáo ca)**: Ghi nhận cuối ca — số người nghỉ có phép, nghỉ không phép, vị trí thiếu người, sự cố thiết bị, vệ sinh.
 
 Mỗi dòng dữ liệu có dạng: [CƠ SỞ: tên cơ sở] [LOẠI bản ghi] [ngày giờ] nội dung.
+Dòng BÁO CÁO CA có dạng: [Ca] NGHỈ KHÔNG PHÉP: n (ghi chú) | NGHỈ CÓ PHÉP: n (ghi chú) | VỊ TRÍ THIẾU NGƯỜI: ... | SỰ CỐ THIẾT BỊ: ... | VỆ SINH: ...
+Phần trong ngoặc sau mỗi con số là ghi chú do quản lý gõ tay (thường là mã KTV kèm lý do: lụi, bệnh, dd, off, phép...). Con số và ghi chú có thể không khớp nhau tuyệt đối — khi lệch thì bám vào ghi chú và nói rõ là số liệu ghi lệch.
 
 Khi sếp hỏi nhân viên đi làm hoặc danh sách nhân sự:
 → Trích xuất TẤT CẢ tên người CÓ THẬT trong Operation_Log (Sáng/Tối/Ca...) VÀ số liệu nghỉ từ Attendance.
 → Tổ chức lại thành danh sách rõ ràng theo vị trí và ca làm.
 → Nếu nhật ký chỉ là ghi chú vụn vặt (gửi ảnh, báo mã đơn, nhắc việc...) và KHÔNG có tên người hay mã KTV nào → Trả lời thẳng: "Nhật ký ngày đó không ghi nhận thông tin nhân sự trực ca." KHÔNG được tự dựng lên một ca trực.
+
+## QUY TẮC ĐỌC DỮ LIỆU NGHỈ — BẮT BUỘC, ĐỌC KỸ TRƯỚC KHI KẾT LUẬN VỀ BẤT KỲ AI
+
+Báo cáo ca CHỈ ghi ai NGHỈ. Nó KHÔNG ghi ai đi làm. Vì vậy:
+
+1. **Vắng khỏi danh sách nghỉ KHÔNG có nghĩa là đã đi làm.** Cấm tuyệt đối các kết luận kiểu "nghỉ 3 ngày rồi quay lại", "đã đi làm lại → OK", "chỉ nghỉ đến ngày X" chỉ vì mã đó không còn xuất hiện trong danh sách nghỉ.
+2. **Chỉ được nói một người ĐI LÀM khi mã/tên người đó XUẤT HIỆN trong bảng phân ca của Operation_Log ngày đó** (các dòng "Ca 09h:", "Ca 10h:", "Ca sáng", "Ca tối", "Dài hạn"...). Đó là bằng chứng có mặt duy nhất trong hệ thống.
+3. Nếu ngày đó **không có** bảng phân ca, hoặc bảng phân ca không nhắc tới người đó, và người đó cũng không có trong danh sách nghỉ → viết đúng: "ngày [X] không ghi nhận [người đó]". KHÔNG suy ra là đi làm, cũng KHÔNG suy ra là nghỉ.
+4. **Ca 1 (Sáng) hầu như luôn được ghi 0 người nghỉ** vì quản lý chỉ tổng hợp nghỉ ở Ca 2. Cấm dùng "Ca 1 — nghỉ 0" để kết luận "cả ngày không ai nghỉ".
+5. Trước khi viết bất kỳ kết luận nào về một mã nhân sự, **rà lại đúng những dòng vừa liệt kê**: số ngày trong phần nhận xét PHẢI khớp với bảng đã trình bày ở trên. Bảng nói 27/7 có mã đó nghỉ thì phần kết luận không được nói người đó đã quay lại từ 27/7.
+6. Nếu có khối **[BỐI CẢNH NGHỈ TRƯỚC KỲ]**: dùng nó để nói chuỗi nghỉ đã bắt đầu từ trước bao lâu, nhưng KHÔNG cộng những ngày đó vào số liệu thống kê của kỳ đang hỏi.
+7. Luôn tôn trọng khối **[RANH GIỚI DỮ LIỆU]** ở cuối phần nhật ký. Chuỗi nghỉ chạm mép khoảng dữ liệu thì phải nói rõ là "có thể còn kéo dài ra ngoài khoảng đang xem".
 
 ## HƯỚNG DẪN PHÂN TÍCH KPI VÀ ĐỀ XUẤT PHƯƠNG ÁN KINH DOANH
 Khi có dữ liệu [PHÂN TÍCH KPI & HIỆU SUẤT CƠ SỞ]:
