@@ -513,16 +513,17 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             const weekIndexOf = (d) => Math.max(0, Math.floor((toUTC(d) - anchorMs) / 604800000));
             const ddmm = (s) => { const p = String(s).split('-'); return `${p[2]}/${p[1]}`; };
 
-            // summary[cơ sở] = { total, days:Set, weeks: { chỉ số tuần: { total, days:Set } } }
+            // summary[cơ sở] = { total, days:Set, zeroDays:Set, weeks: { chỉ số tuần: { total, days:Set } } }
             const summary = {};
             for (const r of rows) {
                 const fac = r.facility_name;
-                if (!summary[fac]) summary[fac] = { total: 0, days: new Set(), weeks: {} };
+                if (!summary[fac]) summary[fac] = { total: 0, days: new Set(), zeroDays: new Set(), weeks: {} };
                 const s = summary[fac];
                 const amount = Number(r.revenue_amount || 0);
                 const day = String(r.formatted_date);
                 s.total += amount;
                 s.days.add(day);
+                if (amount === 0) s.zeroDays.add(day);
                 const wi = weekIndexOf(day);
                 if (!s.weeks[wi]) s.weeks[wi] = { total: 0, days: new Set() };
                 s.weeks[wi].total += amount;
@@ -535,6 +536,36 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             resultLines.push(`[BẮT BUỘC KHI TÍNH TOÁN] Mọi trung bình/ngày và mọi dự báo phải chia đúng cho số ngày có dữ liệu ghi ở trên,`
                 + ` hoặc số ngày riêng của từng cơ sở ghi trong bảng tổng. TUYỆT ĐỐI không chia theo ngày hiện tại, không chia theo số ngày của tháng,`
                 + ` và không coi những ngày chưa có số liệu là doanh thu bằng 0.`);
+
+            // ------------------------------------------------------------------
+            // [MỚI] CẢNH BÁO NGÀY GHI 0 ĐỒNG
+            // Thực tế 30/07 và 31/07/2026 được ghi 0 đồng ở CẢ 6 cơ sở — quản lý quên nhập
+            // báo cáo chứ không phải nghỉ bán. Hai ngày rỗng đó kéo TB/ngày tháng 7 xuống ~7%,
+            // đủ để lật kết luận cả chuỗi tháng 8 từ "+3,7%" thành "-3,0%" mà không ai hay.
+            // Ngày 0 đồng vẫn là một dòng dữ liệu hợp lệ nên không thể tự động loại — nhưng
+            // bắt buộc phải đập vào mắt AI để nó nêu ra thay vì lặng lẽ chia trung bình.
+            // ------------------------------------------------------------------
+            const totalByDate = {};
+            for (const r of rows) {
+                const day = String(r.formatted_date);
+                totalByDate[day] = (totalByDate[day] || 0) + Number(r.revenue_amount || 0);
+            }
+            const zeroAllDates = allDates.filter(d => (totalByDate[d] || 0) === 0);
+            const facZeroLines = Object.entries(summary)
+                .map(([fac, s]) => {
+                    const z = [...s.zeroDays].filter(d => !zeroAllDates.includes(d)).sort();
+                    return z.length ? `${fac}: ${z.map(ddmm).join(', ')}` : null;
+                })
+                .filter(Boolean);
+
+            if (zeroAllDates.length > 0) {
+                resultLines.push(`[CẢNH BÁO THIẾU SỐ LIỆU] Các ngày sau ghi 0 đồng ở TẤT CẢ cơ sở: ${zeroAllDates.map(ddmm).join(', ')}.`
+                    + ` Cả chuỗi cùng bằng 0 trong một ngày gần như luôn là quản lý CHƯA NHẬP báo cáo, không phải nghỉ bán.`
+                    + ` BẮT BUỘC nêu rõ điều này trong câu trả lời, và khi so sánh giữa các kỳ phải nói thêm con số nếu loại những ngày đó ra khỏi mẫu số.`);
+            }
+            if (facZeroLines.length > 0) {
+                resultLines.push(`[LƯU Ý] Ngày ghi 0 đồng ở riêng từng cơ sở (các cơ sở khác vẫn có doanh thu) — ${facZeroLines.join(' ; ')}.`);
+            }
             resultLines.push('');
             resultLines.push("=== TỔNG DOANH THU TRONG KỲ (BACKEND ĐÃ CỘNG SẴN — AI PHẢI DÙNG ĐÚNG SỐ NÀY, CẤM TỰ CỘNG LẠI) ===");
             for (const [fac, s] of Object.entries(summary)) {
