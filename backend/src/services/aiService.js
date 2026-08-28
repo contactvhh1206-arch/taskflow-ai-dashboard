@@ -560,11 +560,13 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
             if (zeroAllDates.length > 0) {
                 resultLines.push(`[CẢNH BÁO THIẾU SỐ LIỆU] Các ngày sau ghi 0 đồng ở TẤT CẢ cơ sở: ${zeroAllDates.map(ddmm).join(', ')}.`
-                    + ` Cả chuỗi cùng bằng 0 trong một ngày gần như luôn là quản lý CHƯA NHẬP báo cáo, không phải nghỉ bán.`
+                    + ` Doanh thu do BỘ PHẬN KẾ TOÁN nhập tập trung cho cả chuỗi, nên cả 6 cơ sở cùng bằng 0 trong một ngày gần như chắc chắn là`
+                    + ` KẾ TOÁN CHƯA NHẬP số liệu ngày đó — KHÔNG phải cơ sở nghỉ bán, và TUYỆT ĐỐI KHÔNG được quy trách nhiệm cho quản lý cơ sở.`
                     + ` BẮT BUỘC nêu rõ điều này trong câu trả lời, và khi so sánh giữa các kỳ phải nói thêm con số nếu loại những ngày đó ra khỏi mẫu số.`);
             }
             if (facZeroLines.length > 0) {
-                resultLines.push(`[LƯU Ý] Ngày ghi 0 đồng ở riêng từng cơ sở (các cơ sở khác vẫn có doanh thu) — ${facZeroLines.join(' ; ')}.`);
+                resultLines.push(`[LƯU Ý] Ngày ghi 0 đồng ở riêng từng cơ sở, các cơ sở khác vẫn có doanh thu — ${facZeroLines.join(' ; ')}.`
+                    + ` Trường hợp này có thể là cơ sở đó nghỉ thật, cũng có thể là kế toán nhập thiếu cho riêng cơ sở đó. Nêu ra để sếp kiểm chứng, KHÔNG tự kết luận là cơ sở ế hay quản lý yếu.`);
             }
             resultLines.push('');
             resultLines.push("=== TỔNG DOANH THU TRONG KỲ (BACKEND ĐÃ CỘNG SẴN — AI PHẢI DÙNG ĐÚNG SỐ NÀY, CẤM TỰ CỘNG LẠI) ===");
