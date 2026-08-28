@@ -406,18 +406,30 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                     }
                 });
 
+                // [FIX] Ghi rõ PHẠM VI DỮ LIỆU THỰC CÓ và tính sẵn TB/ngày.
+                // Trước đây khối này chỉ ghi nhãn "THÁNG 8" rồi liệt kê tổng, không hề nói
+                // dữ liệu dừng ở ngày nào. AI lấy ngày hiện tại (28) làm mẫu số trong khi
+                // hệ thống mới có 26 ngày số liệu -> mọi TB/ngày và dự báo lệch ~7,7%.
+                const coveredDays = [...new Set(timeFiltered.map(r => String(r.date)))].sort();
+                const dayCount = coveredDays.length;
+
                 const displayMonth = month || (new Date().getMonth() + 1);
-                let resultStr = `[TỔNG DOANH THU THÁNG ${displayMonth}/${targetYear}]\n`;
+                const facLines = [];
                 for (const fac of Object.values(aggregated)) {
                     if (fac.revenue > 0) {
-                        resultStr += `- Cơ sở: ${fac.name} | TỔNG DOANH THU: ${fac.revenue} VNĐ\n`;
+                        const avg = dayCount > 0 ? Math.round(fac.revenue / dayCount) : 0;
+                        facLines.push(`- Cơ sở: ${fac.name} | TỔNG DOANH THU: ${fac.revenue} VNĐ | TB/ngày: ${avg} VNĐ`);
                     }
                 }
-                
-                if (resultStr === `[TỔNG DOANH THU THÁNG ${displayMonth}/${targetYear}]\n`) {
+
+                if (facLines.length === 0) {
                     return "Hệ thống không có dữ liệu doanh thu cho thời gian này.";
                 }
-                return resultStr;
+
+                return `[TỔNG DOANH THU THÁNG ${displayMonth}/${targetYear}]\n`
+                    + `[PHẠM VI DỮ LIỆU THỰC CÓ] ${dayCount} ngày có số liệu, từ ${coveredDays[0]} đến ${coveredDays[dayCount - 1]}.`
+                    + ` Mọi trung bình/ngày và mọi dự báo PHẢI chia cho ${dayCount} — KHÔNG chia theo ngày hiện tại, KHÔNG chia theo số ngày của tháng.\n`
+                    + facLines.join('\n') + '\n';
             } catch (e) {
                 console.error("Lỗi fetch_revenue_summary:", e);
                 return "Hệ thống gặp lỗi khi tính toán tổng doanh thu.";
@@ -467,17 +479,73 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 return "Hệ thống báo cáo: Không có dữ liệu doanh thu cho khoảng thời gian này.";
             }
 
-            // Tự động tính tổng kỳ bằng Javascript
+            // ------------------------------------------------------------------
+            // [FIX] PHẠM VI DỮ LIỆU THỰC CÓ + TỔNG TỪNG TUẦN ĐƯỢC TÍNH SẴN
+            //
+            // Hai lỗi thực đo ngày 28/08/2026 mà khối này gây ra:
+            //  (1) Nhãn khối ghi "THÁNG 8" nhưng dữ liệu chỉ tới 26/08. AI chia trung bình
+            //      cho 28 (ngày hiện tại) -> TB/ngày và dự báo của cả 6 cơ sở thấp hơn
+            //      thực tế ~7,7%. Nay ghi thẳng số ngày CÓ dữ liệu vào context.
+            //  (2) Context chỉ có 1 con số tổng kỳ + ~156 dòng ngày, nên mọi mốc nhỏ hơn
+            //      (tuần 1, tuần 2...) đều do AI cộng nhẩm -> sai tới 3.000 VNĐ/tuần
+            //      (ACE tuần 4: AI 102.080 / thực 105.080, đảo ngược cả nhận định xu hướng).
+            //      Nay backend cộng sẵn theo tuần, AI chỉ việc đọc.
+            // ------------------------------------------------------------------
+            const allDates = [...new Set(rows.map(r => String(r.formatted_date)))].sort();
+            const coverStart = allDates[0];
+            const coverEnd = allDates[allDates.length - 1];
+
+            // Mốc chia tuần lấy theo ngày bắt đầu người dùng hỏi (nếu có) để "Tuần 1"
+            // luôn là 01-07 của tháng, đúng cách quản lý cơ sở vẫn đọc số.
+            const toUTC = (s) => { const p = String(s).split('-'); return Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])); };
+            const anchorMs = toUTC(start_date || coverStart);
+            const weekIndexOf = (d) => Math.max(0, Math.floor((toUTC(d) - anchorMs) / 604800000));
+            const ddmm = (s) => { const p = String(s).split('-'); return `${p[2]}/${p[1]}`; };
+
+            // summary[cơ sở] = { total, days:Set, weeks: { chỉ số tuần: { total, days:Set } } }
             const summary = {};
             for (const r of rows) {
-                if (!summary[r.facility_name]) summary[r.facility_name] = 0;
-                summary[r.facility_name] += Number(r.revenue_amount || 0);
+                const fac = r.facility_name;
+                if (!summary[fac]) summary[fac] = { total: 0, days: new Set(), weeks: {} };
+                const s = summary[fac];
+                const amount = Number(r.revenue_amount || 0);
+                const day = String(r.formatted_date);
+                s.total += amount;
+                s.days.add(day);
+                const wi = weekIndexOf(day);
+                if (!s.weeks[wi]) s.weeks[wi] = { total: 0, days: new Set() };
+                s.weeks[wi].total += amount;
+                s.weeks[wi].days.add(day);
             }
 
-            let resultLines = ["=== TỔNG DOANH THU TRONG KỲ (AI HÃY ƯU TIÊN DÙNG SỐ NÀY ĐỂ BÁO CÁO) ==="];
-            for (const [fac, total] of Object.entries(summary)) {
-                resultLines.push(`- Cơ sở: ${fac} | TỔNG DOANH THU: ${total} VNĐ`);
+            const resultLines = [];
+            resultLines.push(`[PHẠM VI DỮ LIỆU THỰC CÓ] Khoảng được hỏi: ${start_date || 'không giới hạn'} → ${end_date || 'không giới hạn'}.`
+                + ` Hệ thống CHỈ có số liệu từ ${coverStart} đến ${coverEnd} = ${allDates.length} ngày.`);
+            resultLines.push(`[BẮT BUỘC KHI TÍNH TOÁN] Mọi trung bình/ngày và mọi dự báo phải chia đúng cho số ngày có dữ liệu ghi ở trên,`
+                + ` hoặc số ngày riêng của từng cơ sở ghi trong bảng tổng. TUYỆT ĐỐI không chia theo ngày hiện tại, không chia theo số ngày của tháng,`
+                + ` và không coi những ngày chưa có số liệu là doanh thu bằng 0.`);
+            resultLines.push('');
+            resultLines.push("=== TỔNG DOANH THU TRONG KỲ (BACKEND ĐÃ CỘNG SẴN — AI PHẢI DÙNG ĐÚNG SỐ NÀY, CẤM TỰ CỘNG LẠI) ===");
+            for (const [fac, s] of Object.entries(summary)) {
+                const d = s.days.size || 1;
+                resultLines.push(`- Cơ sở: ${fac} | TỔNG DOANH THU: ${s.total} VNĐ | Số ngày có dữ liệu: ${s.days.size} | TB/ngày: ${Math.round(s.total / d)} VNĐ`);
             }
+
+            const weekIdxs = [...new Set(allDates.map(weekIndexOf))].sort((a, b) => a - b);
+            if (weekIdxs.length > 1) {
+                resultLines.push('');
+                resultLines.push("=== TỔNG THEO TỪNG TUẦN (BACKEND ĐÃ CỘNG SẴN — CẤM TỰ CỘNG LẠI TỪ BẢNG NGÀY BÊN DƯỚI) ===");
+                for (const [fac, s] of Object.entries(summary)) {
+                    for (const wi of weekIdxs) {
+                        const w = s.weeks[wi];
+                        if (!w) continue;
+                        const wd = [...w.days].sort();
+                        resultLines.push(`- ${fac} | Tuần ${wi + 1} (${ddmm(wd[0])}–${ddmm(wd[wd.length - 1])}, ${wd.length} ngày):`
+                            + ` TỔNG ${w.total} VNĐ | TB/ngày ${Math.round(w.total / wd.length)} VNĐ`);
+                    }
+                }
+            }
+
             resultLines.push("======================================================================");
             resultLines.push("=== CHI TIẾT DOANH THU TỪNG NGÀY ===");
 
@@ -541,9 +609,11 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
             // [FIX] Sắp xếp theo NGÀY THẬT. Cột date là TEXT 'DD/MM/YYYY' nên `ORDER BY date DESC`
             // trước đây sắp theo thứ tự chữ cái (ngày trong tháng), làm LIMIT cắt nhầm dữ liệu.
-            // 900 ≈ đủ cho câu hỏi ~20 ngày toàn chuỗi (thực đo: 285 bản ghi/tuần cho 6 cơ sở).
+            // [FIX] 900 không đủ cho câu hỏi cả tháng: thực đo 01→28/08/2026 toàn chuỗi có
+            // 928 dòng sau khi khử trùng (1.043 dòng thô). Nâng lên 1.600 để phủ trọn một
+            // tháng; phần chặn thực sự là ngân sách ký tự bên dưới, không phải số dòng.
             // Bảng daily_logs chỉ ~3.000 dòng nên nâng trần không gây rủi ro tải.
-            const ROW_LIMIT = 900;
+            const ROW_LIMIT = 1600;
             innerQuery += ` ORDER BY l.org_unit, l.date, l.entry_type, l.ai_vector_data, l.id DESC`;
             const query = `SELECT * FROM (${innerQuery}) d
                            ORDER BY d.real_date DESC, d.org_unit, d.display_time DESC
@@ -561,15 +631,41 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
             // [FIX] Báo cáo ca giờ đọc thẳng từ cột `content` (jsonb) thay vì chuỗi ai_vector_data.
             // Nhờ vậy AI thấy được cả sự cố thiết bị "khác" và tình trạng vệ sinh — hai trường
             // mà chuỗi ai_vector_data do frontend ghép sẵn không bao giờ chứa.
+            //
+            // [FIX] NGÂN SÁCH KÝ TỰ. Câu hỏi cả tháng cho 6 cơ sở nặng ~280.000 ký tự nhật ký.
+            // Cắt cứng theo số dòng sẽ chặt mất nguyên nửa đầu tháng mà không ai biết. Nay:
+            //  - BÁO CÁO CA luôn giữ đủ (chỉ ~270 dòng/tháng, ngắn, và là nơi ghi ai nghỉ);
+            //  - NHẬT KÝ VẬN HÀNH (dài, chiếm ~90% dung lượng) mới bị cắt, cắt từ ngày CŨ NHẤT
+            //    trở lui, và phải khai báo rõ đã cắt từ ngày nào để AI không kết luận "không có".
+            const CHAR_BUDGET = 150000;
+            let usedChars = 0;
+            let droppedOpLogs = 0;
+            let oldestOpLogKept = null;
+
             const resultLines = [];
             for (const r of rows) {
                 const head = `[CƠ SỞ: ${r.facility_name}] [${typeLabel(r.entry_type)}] [${r.date}${r.display_time ? ' ' + r.display_time : ''}]`;
+                let line = null;
                 if (r.entry_type === 'Attendance' && isUsableAttendanceContent(r.content)) {
-                    resultLines.push(`${head} ${buildAttendanceDetail(r.content)}`);
+                    line = `${head} ${buildAttendanceDetail(r.content)}`;
                 } else if (r.ai_vector_data && r.ai_vector_data.trim() !== '') {
-                    resultLines.push(`${head} ${r.ai_vector_data}`);
+                    line = `${head} ${r.ai_vector_data}`;
                 }
+                if (!line) continue;
+
+                if (r.entry_type !== 'Attendance') {
+                    if (usedChars + line.length > CHAR_BUDGET) { droppedOpLogs++; continue; }
+                    oldestOpLogKept = r.date;
+                }
+                usedChars += line.length;
+                resultLines.push(line);
             }
+
+            const budgetWarn = droppedOpLogs > 0
+                ? `\n\n[CẢNH BÁO CẮT DỮ LIỆU] Khoảng hỏi quá dài: ${droppedOpLogs} dòng NHẬT KÝ VẬN HÀNH cũ nhất KHÔNG được nạp.`
+                    + ` Nhật ký vận hành chỉ đầy đủ từ ngày ${oldestOpLogKept || effectiveStart} trở về sau (toàn bộ BÁO CÁO CA vẫn được nạp đủ cả kỳ).`
+                    + ` Với những ngày trước ${oldestOpLogKept || effectiveStart}, CẤM kết luận "không có nhật ký" hay "không ghi nhận nhân sự" — phải nói rõ là dữ liệu chưa được nạp.`
+                : '';
 
             // ------------------------------------------------------------------
             // [MỚI] BỐI CẢNH NGHỈ TRƯỚC KỲ
@@ -654,7 +750,7 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
 
             return `[NHẬT KÝ VẬN HÀNH & BÁO CÁO CA — khoảng ${effectiveStart} → ${effectiveEnd}]\n`
                 + `(Mỗi dòng đã ghi rõ CƠ SỞ và LOẠI bản ghi. Tuyệt đối không gán dòng của cơ sở này cho cơ sở khác.)\n`
-                + resultLines.join('\n') + truncatedWarn + lookbackBlock + boundaryNote;
+                + resultLines.join('\n') + truncatedWarn + budgetWarn + lookbackBlock + boundaryNote;
         }
 
         if (functionName === 'fetch_kpi_analysis') {

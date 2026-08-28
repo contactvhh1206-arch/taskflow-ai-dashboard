@@ -230,6 +230,21 @@ const chatStreamHandler = async (req, res) => {
                     pushTarget(currentMonth, currentYear);
                 }
 
+                // [FIX] Ưu tiên 4: Nhận diện yêu cầu SO SÁNH VỚI THÁNG TRƯỚC.
+                // Regex ở Ưu tiên 1 bắt buộc phải có chữ số sau "tháng", nên câu
+                // "so sánh dữ liệu tháng trước" không khớp gì cả -> tháng liền trước
+                // KHÔNG BAO GIỜ được nạp. Thực đo 28/08/2026: sếp hỏi so sánh với tháng
+                // trước, hệ thống chỉ nạp tháng 8, AI kết luận "hệ thống không có dữ liệu
+                // doanh thu tháng 7/2026" trong khi DB có đủ 31 ngày của tháng 7.
+                const wantsPrevMonth = ['tháng trước', 'tháng rồi', 'tháng vừa rồi', 'tháng liền trước', 'thang truoc', 'thang roi', 'kỳ trước', 'cùng kỳ']
+                    .some(k => lowerMsg.includes(k));
+                const wantsCompare = ['so sánh', 'so với', 'so voi', 'đối chiếu', 'tăng trưởng', 'tăng hay giảm']
+                    .some(k => lowerMsg.includes(k));
+                if (wantsPrevMonth || (wantsCompare && targets.length === 1)) {
+                    const anchor = targets[0] || { month: currentMonth, year: currentYear };
+                    pushTarget(anchor.month === 1 ? 12 : anchor.month - 1, anchor.month === 1 ? anchor.year - 1 : anchor.year);
+                }
+
                 // Chặn trần: tránh một câu hỏi kéo hàng chục tháng làm phình context và quá tải DB
                 const MAX_REVENUE_MONTHS = 4;
                 let truncatedNote = '';
@@ -322,6 +337,15 @@ const chatStreamHandler = async (req, res) => {
 
                     opsStartDate = fmtDate(opsFrom);
                     opsEndDate = fmtDate(opsTo);
+                } else if (['từ đầu tháng', 'tu dau thang', 'đầu tháng đến', 'đầu tháng tới', 'cả tháng', 'tháng này', 'thang nay', 'tháng hiện tại', 'trong tháng', 'tháng nay']
+                    .some(k => lowerMsg.includes(k))) {
+                    // [FIX] Câu "từ đầu tháng đến thời điểm hiện tại" / "trong tháng này" không chứa
+                    // mốc dạng dd/mm nên trước đây rơi thẳng về mặc định 7 NGÀY GẦN NHẤT.
+                    // Thực đo 28/08/2026: sếp hỏi cả tháng, hệ thống chỉ nạp 21→28/08 = 285/1.043
+                    // bản ghi (73% nhật ký tháng 8 không tới tay AI), nhưng AI vẫn trình bày như
+                    // thể đó là đánh giá nhân sự của cả tháng.
+                    opsStartDate = fmtDate(new Date(now.getFullYear(), now.getMonth(), 1));
+                    opsEndDate = fmtDate(now);
                 } else if (lowerMsg.includes('hôm nay') || lowerMsg.includes('hom nay')) {
                     opsStartDate = fmtDate(now);
                     opsEndDate = fmtDate(now);
@@ -485,6 +509,14 @@ Báo cáo ca CHỈ ghi ai NGHỈ. Nó KHÔNG ghi ai đi làm. Vì vậy:
 5. Trước khi viết bất kỳ kết luận nào về một mã nhân sự, **rà lại đúng những dòng vừa liệt kê**: số ngày trong phần nhận xét PHẢI khớp với bảng đã trình bày ở trên. Bảng nói 27/7 có mã đó nghỉ thì phần kết luận không được nói người đó đã quay lại từ 27/7.
 6. Nếu có khối **[BỐI CẢNH NGHỈ TRƯỚC KỲ]**: dùng nó để nói chuỗi nghỉ đã bắt đầu từ trước bao lâu, nhưng KHÔNG cộng những ngày đó vào số liệu thống kê của kỳ đang hỏi.
 7. Luôn tôn trọng khối **[RANH GIỚI DỮ LIỆU]** ở cuối phần nhật ký. Chuỗi nghỉ chạm mép khoảng dữ liệu thì phải nói rõ là "có thể còn kéo dài ra ngoài khoảng đang xem".
+
+## QUY TẮC ĐỌC SỐ LIỆU DOANH THU — BẮT BUỘC, ĐỌC KỸ TRƯỚC KHI VIẾT BẤT KỲ CON SỐ NÀO
+
+1. **CẤM TỰ CỘNG LẠI những con số backend đã cộng sẵn.** Các khối "TỔNG DOANH THU TRONG KỲ" và "TỔNG THEO TỪNG TUẦN" là số máy tính ra, chính xác tuyệt đối. Phải chép đúng nguyên số. Cộng nhẩm lại từ bảng chi tiết hàng trăm dòng LUÔN cho ra số sai.
+2. **Mốc nào chưa được tính sẵn thì không được tự tính.** Nếu sếp hỏi một mốc không có trong hai khối trên (VD nửa tháng, 10 ngày đầu) → nói rõ "hệ thống chưa tính sẵn mốc này" rồi trình bày bằng các mốc đã có sẵn.
+3. **Số ngày dùng để chia trung bình PHẢI lấy đúng từ dòng [PHẠM VI DỮ LIỆU THỰC CÓ]** hoặc cột "Số ngày có dữ liệu" của từng cơ sở. Cấm chia theo ngày hôm nay, cấm chia theo số ngày của tháng. Dự báo cả tháng = TB/ngày đúng × số ngày của tháng, và phải ghi rõ là ước tính.
+4. **So sánh hai tháng có số ngày lệch nhau thì bắt buộc so bằng TB/ngày**, đồng thời nói rõ tháng đang chạy mới có bao nhiêu ngày dữ liệu. Cấm kết luận "sụt giảm" chỉ vì tháng hiện tại chưa kết thúc.
+5. **Phân biệt "chưa được nạp" với "không tồn tại".** Trước khi viết "hệ thống không có dữ liệu tháng X", phải soi lại xem trong [DỮ LIỆU HỆ THỐNG] có khối nào mang nhãn tháng X không. Nếu không thấy khối đó → viết đúng: "Dữ liệu tháng X chưa được nạp vào ngữ cảnh câu hỏi này, sếp hỏi lại kèm chữ 'tháng X' để hệ thống nạp." TUYỆT ĐỐI không tuyên bố hệ thống không có dữ liệu.
 
 ## HƯỚNG DẪN PHÂN TÍCH KPI VÀ ĐỀ XUẤT PHƯƠNG ÁN KINH DOANH
 Khi có dữ liệu [PHÂN TÍCH KPI & HIỆU SUẤT CƠ SỞ]:
