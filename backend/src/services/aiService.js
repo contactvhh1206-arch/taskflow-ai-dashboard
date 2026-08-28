@@ -366,7 +366,18 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 const facRes = await pool.query('SELECT * FROM facilities');
                 const facilityList = facRes.rows;
                 
-                const repRes = await pool.query('SELECT * FROM daily_financial_reports ORDER BY created_at DESC LIMIT 500');
+                // [FIX] Lọc THẲNG theo ngày trong SQL thay vì bốc 500 dòng mới nhất rồi lọc bằng JS.
+                // Bảng daily_financial_reports mỗi ngày sinh đúng 1 dòng, nên `LIMIT 500` = 500 ngày
+                // gần nhất. Khi bảng vượt 500 dòng (khoảng 09/2027) thì tháng cũ rơi ra ngoài cửa sổ
+                // TRONG IM LẶNG: tháng vắt ngang ranh giới sẽ trả về tổng THIẾU nhưng vẫn được dán
+                // nhãn "TỔNG DOANH THU CHUẨN" — đúng loại lỗi số sai mà trông chắc chắn.
+                // Cột date là chuỗi 'YYYY-MM-DD' nên so sánh chuỗi chính là so sánh thời gian;
+                // không ép kiểu ::date để một dòng lỡ ghi sai định dạng không làm chết cả truy vấn.
+                const fmtSqlDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const repRes = await pool.query(
+                    'SELECT * FROM daily_financial_reports WHERE date >= $1 AND date <= $2 ORDER BY date DESC',
+                    [fmtSqlDate(startDate), fmtSqlDate(endDate)]
+                );
                 const allReports = repRes.rows;
 
                 const isAllowedAll = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'].includes(userContext.role);
@@ -791,10 +802,14 @@ const processToolCall = async (functionName, functionArgs, userContext) => {
                 // 3. Lấy doanh thu thực tế cùng tháng
                 const startOfMonth = new Date(targetYear, targetMonth - 1, 1);
                 const endOfMonth = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
-                const fmtISO = (d) => d.toISOString().split('T')[0];
+                // [FIX] Cùng lỗi `LIMIT 500` như fetch_revenue_summary: lọc thẳng theo ngày trong SQL.
+                // (Hàm fmtISO cũ dùng toISOString() — quy đổi sang UTC nên lệch 1 ngày ở múi giờ dương;
+                //  nó vốn là code chết, nay thay bằng bộ định dạng theo giờ địa phương và dùng thật.)
+                const fmtSqlDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
                 const revRes = await pool.query(
-                    'SELECT * FROM daily_financial_reports ORDER BY created_at DESC LIMIT 500'
+                    'SELECT * FROM daily_financial_reports WHERE date >= $1 AND date <= $2 ORDER BY date DESC',
+                    [fmtSqlDate(startOfMonth), fmtSqlDate(endOfMonth)]
                 );
                 const allReports = revRes.rows;
 
