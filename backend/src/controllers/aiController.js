@@ -178,20 +178,88 @@ const chatStreamHandler = async (req, res) => {
         let dbContextStr = "";
         try {
             // FIX BUG 1: Chỉ quét trên câu hỏi hiện tại, tránh Double Coding gọi DB 1000 lần liên tục do dư âm từ khóa cũ
-            const lowerMsg = message.toLowerCase();
-            
-            let isRevenueContext = false;
-            if (historyRows.length > 0) {
-                const lastMsg = historyRows[historyRows.length - 1].content.toLowerCase();
-                if (lastMsg.includes('doanh thu') || lastMsg.includes('tài chính') || lastMsg.includes('báo cáo')) {
-                    isRevenueContext = true;
+            const currentMsgLower = message.toLowerCase();
+
+            // Bộ dò từ khóa tách thành hàm để dùng lại được cho câu hỏi GỐC khi sếp bảo "trình bày thêm".
+            const detectRevenueKeyword = (t) => t.includes('doanh thu') || t.includes('tài chính') || t.includes('tiền') || t.includes('báo cáo') || t.includes('chi tiết') || t.includes('tuần') || t.includes('ngày') || t.includes('tháng');
+            const detectTaskKeyword = (t) => t.includes('công việc') || t.includes('task') || t.includes('tiến độ') || t.includes('chưa làm');
+            const detectOpsKeyword = (t) => t.includes('nhật ký') || t.includes('vận hành') || t.includes('chuyên cần') || t.includes('ca làm') || t.includes('thiết bị') || t.includes('sự cố') || t.includes('vệ sinh') || t.includes('ktv') || t.includes('lễ tân') || t.includes('chấm công') || t.includes('tổng quan') || t.includes('nhân sự') || t.includes('check in') || t.includes('checkin') || t.includes('báo cáo ca') || t.includes('trực ca') || t.includes('đi làm') || t.includes('danh sách') || t.includes('ai nghỉ') || t.includes('nghỉ phép') || t.includes('nghỉ không phép') || t.includes('có mặt') || t.includes('vắng mặt') || t.includes('điểm danh') || t.includes('nhân viên') || t.includes('bảo vệ') || t.includes('lao công') || t.includes('ca sáng') || t.includes('ca tối') || t.includes('ca 1') || t.includes('ca 2');
+            const detectKpiKeyword = (t) => t.includes('kpi') || t.includes('chỉ tiêu') || t.includes('chi tieu') ||
+                t.includes('mục tiêu') || t.includes('muc tieu') || t.includes('hiệu suất') ||
+                t.includes('hieu suat') || t.includes('phương án kinh doanh') || t.includes('phuong an') ||
+                t.includes('đạt chỉ tiêu') || t.includes('đạt kpi') || t.includes('dat kpi') ||
+                t.includes('tư vấn doanh thu') || t.includes('target') || t.includes('đánh giá cơ sở') ||
+                t.includes('cơ sở nào tốt') || t.includes('cơ sở nào yếu') || t.includes('so sánh cơ sở') ||
+                t.includes('cải thiện doanh thu') || t.includes('giải pháp doanh thu') || t.includes('chiến lược');
+            const hasAnyDataKeyword = (t) => detectRevenueKeyword(t) || detectTaskKeyword(t) || detectOpsKeyword(t) || detectKpiKeyword(t);
+
+            // [FIX 29/08/2026 — MỤC 1+2] Câu "trình bày thêm" không chứa từ khóa nào nên trước đây
+            // KHÔNG khối dữ liệu nào được nạp: AI phải trả lời tay không, rồi theo Nguyên tắc 5 nó
+            // quay ra tự đính chính rằng báo cáo lượt trước là bịa. Đo thực tế phiên 29/08: câu 1 nạp
+            // đủ doanh thu + nhật ký + KPI, câu "trình bày thêm" chỉ còn RAG và bài học.
+            //
+            // Cơ chế cũ (isRevenueContext) định làm việc này nhưng hỏng: nó đọc historyRows[length-1],
+            // mà bước 1 đã INSERT câu hỏi hiện tại vào DB TRƯỚC khi bước 2 query lịch sử — nên phần tử
+            // cuối chính là câu hỏi hiện tại, tức nó đang tự soi lại chính mình.
+            //
+            // Cách vá: khi câu hiện tại không có từ khóa dữ liệu nào VÀ là câu yêu cầu viết tiếp,
+            // truy ngược lịch sử tìm câu hỏi GỐC của sếp rồi nạp lại đúng bộ dữ liệu của câu đó.
+            const containsPhrase = (text, phrase) => {
+                // Cụm ngắn ("ok", "có", "tiếp") phải khớp trọn từ, nếu không "có" sẽ dính vào "khó",
+                // "tiếp" dính vào "tiếp thị", làm kích hoạt nhầm hàng loạt.
+                if (phrase.length <= 4) {
+                    return new RegExp(`(^|[^\\p{L}\\p{N}])${phrase}([^\\p{L}\\p{N}]|$)`, 'u').test(text);
+                }
+                return text.includes(phrase);
+            };
+            // Cụm rõ nghĩa: gặp ở đâu trong câu cũng chắc chắn là yêu cầu viết tiếp.
+            const CONTINUATION_PHRASES = [
+                'trình bày thêm', 'trinh bay them', 'trình bày tiếp', 'viết tiếp', 'viet tiep',
+                'tiếp tục', 'tiep tuc', 'tiếp đi', 'tiep di', 'nói tiếp', 'nói thêm', 'noi them',
+                'còn lại', 'con lai', 'còn thiếu', 'con thieu', 'phần 2', 'phan 2', 'phần tiếp',
+                'nữa đi', 'nua di', 'thêm đi', 'them di', 'đầy đủ', 'day du', 'hoàn thiện',
+                'chi tiết thêm', 'cụ thể hơn', 'cu the hon', 'rõ hơn', 'ro hon', 'giải thích thêm',
+                'trích xuất', 'đồng ý'
+            ];
+            // Từ mơ hồ: chỉ tính là "viết tiếp" khi CẢ CÂU chỉ gồm từ ra lệnh cộc lốc.
+            // "tiếp thị thế nào" hay "xem lại chiến lược marketing" là câu hỏi mới,
+            // dù có chứa chữ "tiếp" / "xem".
+            const CONTINUATION_SHORT_TOKENS = ['tiếp', 'tiep', 'ok', 'oke', 'okay', 'có', 'xem', 'ừ', 'uh'];
+            const CONTINUATION_FILLERS = ['đi', 'di', 'nhé', 'nhe', 'nha', 'nữa', 'nua', 'thêm', 'them',
+                'luôn', 'luon', 'nốt', 'not', 'hết', 'het', 'cái', 'cai', 'em', 'anh', 'ạ', 'a', 'ok', 'với', 'voi'];
+            const msgWords = currentMsgLower.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+            const isBareCommand = msgWords.length > 0
+                && msgWords.some(w => CONTINUATION_SHORT_TOKENS.includes(w))
+                && msgWords.every(w => CONTINUATION_SHORT_TOKENS.includes(w) || CONTINUATION_FILLERS.includes(w));
+            const isContinuationMsg = CONTINUATION_PHRASES.some(p => containsPhrase(currentMsgLower, p)) || isBareCommand;
+
+            let lowerMsg = currentMsgLower;
+            if (!hasAnyDataKeyword(currentMsgLower) && isContinuationMsg) {
+                let sourceQuestion = null;
+                for (let i = historyRows.length - 1; i >= 0; i--) {
+                    const row = historyRows[i];
+                    if (row.role !== 'user' || !row.content) continue;
+                    // Bỏ qua chính câu hỏi hiện tại (bước 1 đã INSERT nó vào lịch sử).
+                    if (row.content.trim() === message.trim()) continue;
+                    if (hasAnyDataKeyword(row.content.toLowerCase())) {
+                        sourceQuestion = row.content;
+                        break;
+                    }
+                }
+                if (sourceQuestion) {
+                    // Ghép câu gốc vào nguồn quét: mọi từ khóa, mốc tháng và mốc ngày của câu gốc
+                    // đều được dùng lại, nên dữ liệu nạp cho lượt viết tiếp giống hệt lượt đầu.
+                    lowerMsg = sourceQuestion.toLowerCase() + '\n' + currentMsgLower;
+                    dbContextStr += `\n\n[BỐI CẢNH TIẾP NỐI — ĐỌC TRƯỚC TIÊN]:\n`
+                        + `Câu "${message.trim()}" là yêu cầu VIẾT TIẾP câu trả lời đang dở, không phải câu hỏi mới.\n`
+                        + `Câu hỏi gốc: "${sourceQuestion.trim().slice(0, 400)}"\n`
+                        + `Hệ thống đã NẠP LẠI ĐÚNG bộ dữ liệu của câu hỏi gốc vào các khối bên dưới. `
+                        + `Vì vậy: TUYỆT ĐỐI không nói là thiếu dữ liệu, không đính chính, không xin lỗi, không viết lại phần đã trình bày. `
+                        + `Hãy rà lại lượt trả lời trước của chính mình, xác định phần nào CHƯA viết, và viết tiếp đúng từ chỗ đó.`;
                 }
             }
 
-            const hasRevenueKeyword = lowerMsg.includes('doanh thu') || lowerMsg.includes('tài chính') || lowerMsg.includes('tiền') || lowerMsg.includes('báo cáo') || lowerMsg.includes('chi tiết') || lowerMsg.includes('tuần') || lowerMsg.includes('ngày') || lowerMsg.includes('tháng');
-            const hasConfirmationKeyword = lowerMsg.includes('ok') || lowerMsg.includes('có') || lowerMsg.includes('đồng ý') || lowerMsg.includes('xem') || lowerMsg.includes('trích xuất');
-
-            if (hasRevenueKeyword || (isRevenueContext && hasConfirmationKeyword)) {
+            if (detectRevenueKeyword(lowerMsg)) {
                 // [FIX] Bước 1: Xác định TẤT CẢ các tháng người dùng nhắc tới (hỗ trợ câu hỏi so sánh)
                 const now = new Date();
                 const currentMonth = now.getMonth() + 1; // 1-12
@@ -284,8 +352,8 @@ const chatStreamHandler = async (req, res) => {
             }
             
             // [FIX VẤN ĐỀ 2] Mở rộng từ khóa kích hoạt để bao gồm cả nhật ký vận hành
-            const hasTaskKeyword = lowerMsg.includes('công việc') || lowerMsg.includes('task') || lowerMsg.includes('tiến độ') || lowerMsg.includes('chưa làm');
-            const hasOpsKeyword = lowerMsg.includes('nhật ký') || lowerMsg.includes('vận hành') || lowerMsg.includes('chuyên cần') || lowerMsg.includes('ca làm') || lowerMsg.includes('thiết bị') || lowerMsg.includes('sự cố') || lowerMsg.includes('vệ sinh') || lowerMsg.includes('ktv') || lowerMsg.includes('lễ tân') || lowerMsg.includes('chấm công') || lowerMsg.includes('tổng quan') || lowerMsg.includes('nhân sự') || lowerMsg.includes('check in') || lowerMsg.includes('checkin') || lowerMsg.includes('báo cáo ca') || lowerMsg.includes('trực ca') || lowerMsg.includes('đi làm') || lowerMsg.includes('danh sách') || lowerMsg.includes('ai nghỉ') || lowerMsg.includes('nghỉ phép') || lowerMsg.includes('nghỉ không phép') || lowerMsg.includes('có mặt') || lowerMsg.includes('vắng mặt') || lowerMsg.includes('điểm danh') || lowerMsg.includes('nhân viên') || lowerMsg.includes('bảo vệ') || lowerMsg.includes('lao công') || lowerMsg.includes('ca sáng') || lowerMsg.includes('ca tối') || lowerMsg.includes('ca 1') || lowerMsg.includes('ca 2');
+            const hasTaskKeyword = detectTaskKeyword(lowerMsg);
+            const hasOpsKeyword = detectOpsKeyword(lowerMsg);
             if (hasTaskKeyword) {
                 const taskData = await aiService.processToolCall('fetch_kanban_tasks', { limit: 500 }, userContext);
                 if (!taskData.includes('Không có công việc nào')) {
@@ -367,13 +435,7 @@ const chatStreamHandler = async (req, res) => {
             }
 
             // [KPI] Kích hoạt phân tích KPI khi có từ khóa liên quan
-            const hasKpiKeyword = lowerMsg.includes('kpi') || lowerMsg.includes('chỉ tiêu') || lowerMsg.includes('chi tieu') ||
-                lowerMsg.includes('mục tiêu') || lowerMsg.includes('muc tieu') || lowerMsg.includes('hiệu suất') ||
-                lowerMsg.includes('hieu suat') || lowerMsg.includes('phương án kinh doanh') || lowerMsg.includes('phuong an') ||
-                lowerMsg.includes('đạt chỉ tiêu') || lowerMsg.includes('đạt kpi') || lowerMsg.includes('dat kpi') ||
-                lowerMsg.includes('tư vấn doanh thu') || lowerMsg.includes('target') || lowerMsg.includes('đánh giá cơ sở') ||
-                lowerMsg.includes('cơ sở nào tốt') || lowerMsg.includes('cơ sở nào yếu') || lowerMsg.includes('so sánh cơ sở') ||
-                lowerMsg.includes('cải thiện doanh thu') || lowerMsg.includes('giải pháp doanh thu') || lowerMsg.includes('chiến lược');
+            const hasKpiKeyword = detectKpiKeyword(lowerMsg);
             if (hasKpiKeyword) {
                 // Trích xuất tháng/năm từ câu hỏi nếu có (tái dụng logic từ block revenue)
                 const now = new Date();
@@ -484,6 +546,13 @@ Nếu có phần [KINH NGHIỆM & BÀI HỌC TỪ CÁC PHIÊN TRƯỚC] ở dữ
 - **Bài học [PREFERENCE]**: Áp dụng phong cách trình bày phù hợp sở thích của sếp.
 - KHÔNG tự bịa thêm kinh nghiệm không có trong dữ liệu.
 
+### 8. VIẾT TIẾP KHI CÂU TRẢ LỜI TRƯỚC BỊ CẮT NGANG
+Câu trả lời có giới hạn độ dài. Một báo cáo nhiều cơ sở rất dễ bị cắt giữa chừng, khi đó cuối tin nhắn của bạn có dòng "⚠️ (Phản hồi bị giới hạn độ dài...)".
+- **Trước khi viết bất kỳ lượt trả lời nào, hãy đọc lại lượt trả lời gần nhất của chính bạn trong hội thoại.** Nếu nó bị cắt dở, và sếp nói "trình bày thêm" / "tiếp" / "còn lại" / "ok" — đó là lệnh VIẾT TIẾP, không phải câu hỏi mới.
+- **Xác định chính xác mình đã trình bày tới đâu** (VD: đã xong Cơ sở 1-2-3) rồi **viết tiếp đúng từ mục kế tiếp** (Cơ sở 4-5-6). KHÔNG viết lại tiêu đề báo cáo, KHÔNG lặp lại phần đã trình bày, KHÔNG tóm tắt lại phần cũ.
+- Nếu có khối [BỐI CẢNH TIẾP NỐI] trong [DỮ LIỆU HỆ THỐNG]: hệ thống đã nạp lại đúng bộ dữ liệu của câu hỏi gốc. Trong trường hợp đó **TUYỆT ĐỐI không được nói thiếu dữ liệu, không được đính chính hay xin lỗi về lượt trả lời trước** — cứ dùng dữ liệu đang có và viết tiếp.
+- Khi biết nội dung còn dài, hãy **chủ động chia phần**: làm trọn vẹn một số mục rồi ghi rõ "Còn lại: Cơ sở 4, 5, 6 — sếp nhắn 'tiếp' để tôi trình bày nốt", thay vì để bị cắt giữa một bảng.
+
 ## HƯỚNG DẪN ĐỌC DỮ LIỆU NHẬT KÝ VẬN HÀNH
 Dữ liệu nhật ký có 2 loại:
 - **Operation_Log**: Ghi chép tự do của quản lý — gồm danh sách nhân viên trực ca (tên lễ tân, bảo vệ, KTV...), số hiệu KTV theo từng khung giờ, ghi chú vận hành trong ngày.
@@ -550,28 +619,41 @@ ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG]:\n' + dbContextStr : ''}`;
         
         // FIX BUG 2: Chống Double Coding ghép dính chữ User vào mảng gửi LLM
         // Đảm bảo tin nhắn hiện tại có trong mảng (phòng hờ historyRows thiếu)
-        let lastUserMsgContent = message;
-        let isContentArray = false;
-        
-        // Xử lý đính kèm nếu có
+        // [FIX 29/08/2026 — MỤC 5] Trước đây tệp/ảnh đính kèm KHÔNG BAO GIỜ tới được LLM.
+        // Bước 1 đã INSERT câu hỏi vào DB nên lịch sử luôn kết thúc bằng chính câu đó,
+        // khiến điều kiện cũ `!content.includes(message)` luôn sai và cả nhánh đính kèm bị bỏ qua.
+        // Giờ tách riêng phần đính kèm rồi gắn thẳng vào ĐÚNG lượt user hiện tại.
+        let attachmentText = '';
+        let imagePart = null;
         if (attachment) {
             if (attachment.isDoc && attachment.extractedText) {
-                lastUserMsgContent += `\n\n[DỮ LIỆU TỪ TỆP ĐÍNH KÈM ${attachment.name}]:\n${attachment.extractedText}`;
+                attachmentText = `\n\n[DỮ LIỆU TỪ TỆP ĐÍNH KÈM ${attachment.name}]:\n${attachment.extractedText}`;
             } else if (attachment.url && (attachment.type?.startsWith('image/') || attachment.type?.startsWith('image'))) {
-                lastUserMsgContent = [
-                    { type: "text", text: message },
-                    { type: "image_url", image_url: { url: attachment.url } }
-                ];
-                isContentArray = true;
+                imagePart = { type: "image_url", image_url: { url: attachment.url } };
             }
         }
 
-        if (messages.length === 1 || (typeof messages[messages.length - 1].content === 'string' && !messages[messages.length - 1].content.includes(message))) {
-            if (messages[messages.length - 1].role === 'user' && !isContentArray && typeof messages[messages.length - 1].content === 'string') {
-                messages[messages.length - 1].content += "\n\n" + lastUserMsgContent;
-            } else {
-                messages.push({ role: 'user', content: lastUserMsgContent });
+        const lastEntry = messages[messages.length - 1];
+        const lastEntryIsCurrentMsg = lastEntry && lastEntry.role === 'user'
+            && typeof lastEntry.content === 'string' && lastEntry.content.includes(message);
+
+        if (lastEntryIsCurrentMsg) {
+            if (attachmentText) {
+                lastEntry.content += attachmentText;
             }
+            if (imagePart) {
+                messages[messages.length - 1] = {
+                    role: 'user',
+                    content: [{ type: 'text', text: lastEntry.content }, imagePart]
+                };
+            }
+        } else {
+            // Phòng hờ historyRows thiếu câu hỏi hiện tại (lỗi ghi DB, phiên mới...)
+            const fallbackText = message + attachmentText;
+            messages.push({
+                role: 'user',
+                content: imagePart ? [{ type: 'text', text: fallbackText }, imagePart] : fallbackText
+            });
         }
 
         // FIX BUG 3: Chặn crash Node.js (Cannot set headers after they are sent)
@@ -609,13 +691,15 @@ ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG]:\n' + dbContextStr : ''}`;
         const aiModel = req.body.model || aiConfig.model;
         const openRouterKey = aiConfig.apiKey;
 
-        // [FIX VẤN ĐỀ 3 - NGUYÊN NHÂN 2] Tăng max_tokens lên 4000 để tránh cắt ngang
-        // giữa câu khi phản hồi dài, gây ra hiện tượng văn bản đứt ở giữa ký tự
+        // [FIX VẤN ĐỀ 3 - NGUYÊN NHÂN 2] Tăng max_tokens để tránh cắt ngang
+        // giữa câu khi phản hồi dài, gây ra hiện tượng văn bản đứt ở giữa ký tự.
+        // [FIX 29/08/2026 — MỤC 3] 4000 vẫn quá chật: đo thực tế báo cáo tổng quan 6 cơ sở
+        // bị cắt ngay sau cơ sở thứ 3 (6.906 ký tự). Nâng lên 8000 để một lượt đi trọn 6 cơ sở.
         const llmPayload = {
             model: aiModel,
             messages: messages,
             stream: true,
-            max_tokens: 4000
+            max_tokens: 8000
         };
 
         const controller = new AbortController();
@@ -642,9 +726,13 @@ ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG]:\n' + dbContextStr : ''}`;
 
         if (!req.aborted && !res.writableEnded) {
             const reader = response.body;
-            let streamBuffer = ""; 
+            let streamBuffer = "";
             const decoder = new TextDecoder("utf-8");
-            
+            // [FIX 29/08/2026 — MỤC 4] OpenRouter gửi finish_reason kèm nhiều chunk cuối
+            // (chunk kết + chunk usage), trước đây không có cờ chặn nên dòng cảnh báo
+            // bị nối vào 2 lần — thấy rõ cả trên giao diện lẫn trong bản ghi DB.
+            let finishWarningSent = false;
+
             for await (const chunkBuffer of reader) {
                 if (req.aborted || res.writableEnded) break;
                 
@@ -681,14 +769,15 @@ ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG]:\n' + dbContextStr : ''}`;
                                 // [FIX VẤN ĐỀ 3 - NGUYÊN NHÂN 3] Bắt finish_reason để thông báo
                                 // rõ ràng ra Frontend thay vì im lặng cắt stream giữa chừng
                                 const finishReason = choice.finish_reason;
-                                if (finishReason && finishReason !== 'stop' && finishReason !== 'end_turn') {
+                                if (finishReason && finishReason !== 'stop' && finishReason !== 'end_turn' && !finishWarningSent) {
                                     let warningMsg = '';
                                     if (finishReason === 'length') {
-                                        warningMsg = '\n\n⚠️ *(Phản hồi bị giới hạn độ dài. Bạn có thể hỏi tiếp để AI trình bày thêm.)*';
+                                        warningMsg = '\n\n⚠️ *(Phản hồi bị giới hạn độ dài. Nhắn "trình bày thêm" để AI viết tiếp phần còn lại.)*';
                                     } else if (finishReason === 'content_filter' || finishReason === 'safety') {
                                         warningMsg = '\n\n⚠️ *(Phần nội dung này bị bộ lọc an toàn của mô hình kiểm duyệt. Vui lòng thử diễn đạt lại câu hỏi.)*';
                                     }
                                     if (warningMsg) {
+                                        finishWarningSent = true;
                                         fullAiReply += warningMsg;
                                         res.write(`data: ${JSON.stringify({ content: warningMsg })}\n\n`);
                                     }
