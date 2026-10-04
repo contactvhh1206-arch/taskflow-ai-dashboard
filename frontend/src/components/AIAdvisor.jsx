@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import supabase from '../utils/supabaseClient';
+import { uploadFile } from '../utils/uploadFile.js';
 import axiosClient from '../api/axiosClient';
 import { fetchHistory, fetchAiSessions, saveAiSession, streamAIChat } from '../services/dataService.js';
 import { useAIChatStream } from '../hooks/useAIChatStream';
@@ -355,14 +355,8 @@ export default function AIAdvisor(props) {
     if (currentAttachment && currentAttachment.file) {
         setIsUploadingFile(true);
         try {
-            const file = currentAttachment.file;
-            const fileName = `chat_${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name}`;
-            const { error } = await supabase.storage.from('attachments').upload(fileName, file, {
-                contentType: file.type || 'application/octet-stream'
-            });
-            if (error) throw error;
-            const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
-            
+            const publicUrl = await uploadFile(currentAttachment.file);
+
             // Cập nhật lại attachment với publicUrl từ Supabase và xóa base64 cũ để tiết kiệm băng thông
             currentAttachment = {
                 ...currentAttachment,

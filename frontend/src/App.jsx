@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext, useRef, useCallback, useMemo } from 'react';
 import axiosClient from './api/axiosClient.js';
-import supabase from './utils/supabaseClient';
+import { uploadFile } from './utils/uploadFile.js';
 import Login from './components/Login.jsx';
 import DailyCheckin from './components/DailyCheckin.jsx';
 import AITaskModal from './components/AITaskModal.jsx';
@@ -2154,13 +2154,7 @@ function MainDashboard() {
                                     try {
                                       const uploadedUrls = [];
                                       for (const file of evidenceFiles) {
-                                        const fileName = `evidence_${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name}`;
-                                        const { error } = await supabase.storage.from('attachments').upload(fileName, file, {
-                                          contentType: file.type || 'application/octet-stream'
-                                        });
-                                        if (error) throw error;
-                                        const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(fileName);
-                                        uploadedUrls.push(publicUrl);
+                                        uploadedUrls.push(await uploadFile(file));
                                       }
                                       handleUpdateTaskStatus(selectedTask.id, 'done', JSON.stringify(uploadedUrls));
                                     } catch (err) {

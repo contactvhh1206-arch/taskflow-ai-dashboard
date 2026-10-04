@@ -1,28 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext.jsx';
 import { saveData, updateData, fetchHistory } from '../services/dataService.js';
+import { uploadFile } from '../utils/uploadFile.js';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
 
-/**
- * Upload file lên backend proxy (backend dùng service_role key → Supabase Storage)
- * Trả về publicUrl string, hoặc throw Error nếu thất bại
- */
-const uploadFileViaBackend = async (blob, mimeType, ext) => {
-  const token = localStorage.getItem('taskflow_token');
-  const formData = new FormData();
-  const fileName = `upload_${Date.now()}.${ext}`;
-  formData.append('file', new File([blob], fileName, { type: mimeType }));
-
-  const res = await fetch(`${API_BASE_URL}/api/upload/attachment`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData
-  });
-
-  const json = await res.json();
-  if (!res.ok || !json.success) throw new Error(json.message || 'Upload thất bại');
-  return json.url;
-};
+const uploadFileViaBackend = (blob, mimeType, ext) =>
+  uploadFile(new File([blob], `upload_${Date.now()}.${ext}`, { type: mimeType }));
 
 export default function DailyCheckin({ onCheckinSuccess, showToast, supervisorFacilityId }) {
   const { user } = useContext(AuthContext);

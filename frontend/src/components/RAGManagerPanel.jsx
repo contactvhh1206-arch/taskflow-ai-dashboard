@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import supabase from '../utils/supabaseClient';
+import { uploadFile } from '../utils/uploadFile.js';
 
 export default function RAGManagerPanel({ showToast }) {
       const [documents, setDocuments] = useState([]);
@@ -79,10 +79,7 @@ export default function RAGManagerPanel({ showToast }) {
 
         try {
             // Upload file to Supabase first
-            const sbFileName = `rag_${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name}`;
-            const { error: uploadError } = await supabase.storage.from('attachments').upload(sbFileName, file, { contentType: 'text/plain' });
-            if (uploadError) throw uploadError;
-            const { data: { publicUrl } } = supabase.storage.from('attachments').getPublicUrl(sbFileName);
+            const publicUrl = await uploadFile(new File([file], file.name, { type: 'text/plain' }));
 
             const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
             const response = await fetch(`${API_BASE_URL}/api/rag/upload`, {
