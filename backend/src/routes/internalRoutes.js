@@ -181,75 +181,87 @@ Your entire response must be parseable by JSON.parse() immediately.
   }
 });
 
-// [ADMIN] Lấy tất cả attachment URLs đang được dùng trong database
-// Dùng cho tính năng "Dọn Storage" trong Admin Panel
-router.get('/storage/used-urls', authGuard, async (req, res) => {
-  // Chỉ cho ADMIN
+// File mới upload chưa kịp lưu vào database sẽ không bị coi là rác trong khoảng thời gian này
+const ORPHAN_MIN_AGE_MS = 24 * 60 * 60 * 1000;
+
+// Tìm file trong bucket 'attachments' không còn được tham chiếu ở bất kỳ cột text/json nào của schema public.
+// Quét mọi cột thay vì liệt kê tay từng bảng, để bảng/cột mới chứa URL không bị xóa nhầm file.
+const findOrphanFiles = async () => {
+  const pool = require('../config/database');
+  const { listAllFiles } = require('../config/supabaseAdmin');
+
+  const { rows: columns } = await pool.query(
+    `SELECT c.table_name, c.column_name
+       FROM information_schema.columns c
+       JOIN information_schema.tables t
+         ON t.table_schema = c.table_schema AND t.table_name = c.table_name AND t.table_type = 'BASE TABLE'
+      WHERE c.table_schema = 'public'
+        AND c.data_type IN ('text', 'character varying', 'json', 'jsonb', 'ARRAY')`
+  );
+
+  const quoteIdent = (name) => '"' + name.replace(/"/g, '""') + '"';
+  const usedNames = new Set();
+  for (const { table_name, column_name } of columns) {
+    const col = quoteIdent(column_name);
+    const { rows } = await pool.query(
+      `SELECT DISTINCT m[1] AS name
+         FROM public.${quoteIdent(table_name)},
+              regexp_matches(${col}::text, '/attachments/([^"\\s?#\\\\]+)', 'g') AS m
+        WHERE ${col}::text LIKE '%/attachments/%'`
+    );
+    for (const { name } of rows) {
+      usedNames.add(name);
+      try { usedNames.add(decodeURIComponent(name)); } catch { /* tên file không phải URL-encoded hợp lệ */ }
+    }
+  }
+
+  const files = await listAllFiles('attachments');
+  const cutoff = Date.now() - ORPHAN_MIN_AGE_MS;
+  const orphans = files.filter(f => !usedNames.has(f.name) && new Date(f.created_at).getTime() < cutoff);
+
+  return { orphans, totalFiles: files.length };
+};
+
+// [ADMIN] Quét file rác trong Storage — dùng cho tính năng "Dọn Storage" trong Admin Panel
+router.get('/storage/orphans', authGuard, async (req, res) => {
   if (!req.user || req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Không có quyền truy cập.' });
   }
   try {
-    const pool = require('../config/database');
-    const usedUrls = new Set();
-
-    // 1. Thu thập từ daily_logs.attachments (JSON array of URLs)
-    try {
-      const logsResult = await pool.query(
-        `SELECT attachments FROM daily_logs WHERE attachments IS NOT NULL AND attachments != '[]' AND attachments != 'null'`
-      );
-      for (const row of logsResult.rows) {
-        let arr = row.attachments;
-        if (typeof arr === 'string') {
-          try { arr = JSON.parse(arr); } catch { continue; }
-        }
-        if (Array.isArray(arr)) {
-          arr.forEach(url => { if (typeof url === 'string' && url.includes('/attachments/')) usedUrls.add(url); });
-        }
-      }
-    } catch (e) {
-      console.warn('[storage/used-urls] Không đọc được daily_logs.attachments:', e.message);
-    }
-
-    // 2. Thu thập từ tasks.evidence_url
-    try {
-      const tasksResult = await pool.query(
-        `SELECT evidence_url FROM tasks WHERE evidence_url IS NOT NULL AND evidence_url != ''`
-      );
-      for (const row of tasksResult.rows) {
-        if (row.evidence_url && row.evidence_url.includes('/attachments/')) {
-          usedUrls.add(row.evidence_url);
-        }
-      }
-    } catch (e) {
-      console.warn('[storage/used-urls] Không đọc được tasks.evidence_url:', e.message);
-    }
-
-    // 3. Thu thập từ ai_sessions (chat messages có attachment url)
-    try {
-      const sessionsResult = await pool.query(
-        `SELECT chat_log FROM ai_sessions WHERE chat_log IS NOT NULL`
-      );
-      for (const row of sessionsResult.rows) {
-        let log = row.chat_log;
-        if (typeof log === 'string') {
-          try { log = JSON.parse(log); } catch { continue; }
-        }
-        if (Array.isArray(log)) {
-          log.forEach(msg => {
-            if (msg && msg.attachment && msg.attachment.url && msg.attachment.url.includes('/attachments/')) {
-              usedUrls.add(msg.attachment.url);
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('[storage/used-urls] Không đọc được ai_sessions:', e.message);
-    }
-
-    res.json({ success: true, urls: Array.from(usedUrls), count: usedUrls.size });
+    const { orphans, totalFiles } = await findOrphanFiles();
+    res.json({
+      success: true,
+      total_files: totalFiles,
+      orphans: orphans.map(f => ({ name: f.name, metadata: { size: f.metadata?.size || 0 }, created_at: f.created_at }))
+    });
   } catch (error) {
-    console.error('[storage/used-urls] Lỗi:', error);
-    res.status(500).json({ error: 'Lỗi server khi quét attachment URLs.' });
+    console.error('[storage/orphans] Lỗi:', error);
+    res.status(500).json({ error: 'Lỗi server khi quét Storage.' });
+  }
+});
+
+// [ADMIN] Xóa file rác. Server tự quét lại và chỉ xóa file vẫn còn là rác tại thời điểm xóa.
+router.post('/storage/orphans/delete', authGuard, express.json(), async (req, res) => {
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Không có quyền truy cập.' });
+  }
+  try {
+    const requested = Array.isArray(req.body?.names) ? req.body.names : [];
+    if (!requested.length) {
+      return res.status(400).json({ error: 'Thiếu danh sách file cần xóa.' });
+    }
+
+    const { removeFromStorage } = require('../config/supabaseAdmin');
+    const { orphans } = await findOrphanFiles();
+    const stillOrphan = new Set(orphans.map(f => f.name));
+    const toDelete = requested.filter(name => stillOrphan.has(name));
+
+    const deleted = await removeFromStorage('attachments', toDelete);
+    console.log(`[storage/orphans/delete] user=${req.user.id} yêu cầu=${requested.length} đã xóa=${deleted}`);
+    res.json({ success: true, deleted, skipped: requested.length - toDelete.length });
+  } catch (error) {
+    console.error('[storage/orphans/delete] Lỗi:', error);
+    res.status(500).json({ error: 'Lỗi server khi xóa file rác.' });
   }
 });
 
@@ -276,6 +288,9 @@ router.post('/log-tokens', authGuard, async (req, res) => {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+
+    // Chặn truy cập qua anon key (PostgREST); backend dùng role postgres nên không bị ảnh hưởng
+    await pool.query(`ALTER TABLE ai_token_usage_logs ENABLE ROW LEVEL SECURITY`);
 
     // Migration: Thêm cột còn thiếu nếu bảng đã tồn tại với schema cũ (cột "role" thay vì "user_role")
     await pool.query(`ALTER TABLE ai_token_usage_logs ADD COLUMN IF NOT EXISTS user_role TEXT`);

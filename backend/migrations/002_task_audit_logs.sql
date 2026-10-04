@@ -13,3 +13,6 @@ CREATE TABLE IF NOT EXISTS task_audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_audit_task_id ON task_audit_logs(task_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created_at ON task_audit_logs(created_at DESC);
+
+-- Chặn truy cập qua anon key (PostgREST); backend dùng role postgres nên không bị ảnh hưởng
+ALTER TABLE task_audit_logs ENABLE ROW LEVEL SECURITY;

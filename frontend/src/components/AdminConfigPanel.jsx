@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ErrorBoundary from './ErrorBoundary.jsx';
 import { fetchAiSessions } from '../services/dataService.js';
-import supabase from '../utils/supabaseClient';
 
 const HIGH_LEVEL_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'ADMIN'];
 
@@ -87,36 +86,25 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
       const [storageOrphans, setStorageOrphans] = useState([]); // danh sách file rác
       const [storageCleanupResult, setStorageCleanupResult] = useState(null); // kết quả
 
+      const storageApi = (path, options = {}) => {
+        const token = localStorage.getItem('taskflow_token');
+        const API_BASE = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
+        return fetch(API_BASE + '/api/internal/storage/' + path, {
+          ...options,
+          headers: { 'Authorization': token ? 'Bearer ' + token : '', 'x-user-role': user?.role || '', ...options.headers }
+        });
+      };
+
+      // Quét và xóa đều chạy ở backend: anon key của trình duyệt không có quyền liệt kê hay xóa file trong bucket
       const handleStorageCleanup = async () => {
         setStorageCleanupStatus('scanning');
         setStorageOrphans([]);
         setStorageCleanupResult(null);
         try {
-          const token = localStorage.getItem('taskflow_token');
-          const API_BASE = import.meta.env.VITE_API_URL || 'https://taskflow-ai-dashboard.onrender.com';
-
-          // Bước 1: Lấy danh sách URLs đang dùng từ DB
-          const urlsRes = await fetch(`${API_BASE}/api/internal/storage/used-urls`, {
-            headers: { 'Authorization': token ? `Bearer ${token}` : '', 'x-user-role': user?.role || '' }
-          });
-          if (!urlsRes.ok) throw new Error('Không thể lấy danh sách URLs từ server.');
-          const { urls: usedUrls } = await urlsRes.json();
-
-          // Trích xuất tên file từ URL (phần sau /attachments/)
-          const usedFileNames = new Set(
-            usedUrls.map(url => {
-              try { return decodeURIComponent(url.split('/attachments/')[1]?.split('?')[0] || ''); }
-              catch { return ''; }
-            }).filter(Boolean)
-          );
-
-          // Bước 2: Liệt kê tất cả file trong bucket attachments
-          const { data: allFiles, error: listError } = await supabase.storage.from('attachments').list('', { limit: 1000, offset: 0 });
-          if (listError) throw new Error('Không thể liệt kê file trong Storage: ' + listError.message);
-
-          // Bước 3: Tìm orphan files (file không được dùng)
-          const orphans = (allFiles || []).filter(file => !usedFileNames.has(file.name));
-          setStorageOrphans(orphans);
+          const res = await storageApi('orphans');
+          if (!res.ok) throw new Error('Không thể quét Storage từ server.');
+          const { orphans } = await res.json();
+          setStorageOrphans(orphans || []);
           setStorageCleanupStatus('preview');
         } catch (err) {
           console.error('[Storage Cleanup]', err);
@@ -129,20 +117,17 @@ export default function AdminConfigPanel({ showToast, tasks, setTasks, setTaskCo
         if (!storageOrphans.length) return;
         setStorageCleanupStatus('deleting');
         try {
-          const fileNames = storageOrphans.map(f => f.name);
-          // Xóa theo batch 100 file một lần
-          const BATCH_SIZE = 100;
-          let totalDeleted = 0;
-          for (let i = 0; i < fileNames.length; i += BATCH_SIZE) {
-            const batch = fileNames.slice(i, i + BATCH_SIZE);
-            const { error } = await supabase.storage.from('attachments').remove(batch);
-            if (error) throw error;
-            totalDeleted += batch.length;
-          }
-          setStorageCleanupResult({ deleted: totalDeleted });
+          const res = await storageApi('orphans/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ names: storageOrphans.map(f => f.name) })
+          });
+          if (!res.ok) throw new Error('Server không xóa được file.');
+          const { deleted } = await res.json();
+          setStorageCleanupResult({ deleted });
           setStorageOrphans([]);
           setStorageCleanupStatus('done');
-          if (showToast) showToast(`Đã xóa thành công ${totalDeleted} file rác khỏi Storage!`);
+          if (showToast) showToast('Đã xóa thành công ' + deleted + ' file rác khỏi Storage!');
         } catch (err) {
           console.error('[Storage Cleanup Delete]', err);
           if (showToast) showToast('Lỗi khi xóa file: ' + err.message, 'error');
