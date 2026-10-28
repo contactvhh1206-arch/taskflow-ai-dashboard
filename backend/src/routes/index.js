@@ -25,4 +25,5 @@ router.use('/users', require('./userRoutes'));
 router.use('/rag', require('./ragRoutes'));
 router.use('/internal', require('./internalRoutes'));
 router.use('/upload', require('./uploadRoutes'));
+router.use('/finance', require('./financeRoutes'));
 module.exports = router;

@@ -174,3 +174,27 @@ export const streamAIChat = async (message, sessionId, token, onChunk, onDone, o
         if (onError) onError(error);
     }
 };
+
+// --- Nhập file tổng tháng & đối chiếu tài chính (/api/finance) ---
+export const fetchFinanceConfig = async () => {
+  const result = await axiosClient.get('/api/finance/config');
+  return result.data;
+};
+
+export const saveFinanceConfig = async (config) => {
+  return axiosClient.put('/api/finance/config', config);
+};
+
+export const fetchFinanceMonths = async () => {
+  const result = await axiosClient.get('/api/finance/months');
+  return result.data || [];
+};
+
+export const fetchFinanceMonth = async (month) => {
+  const result = await axiosClient.get(`/api/finance/month?month=${encodeURIComponent(month)}`);
+  return result.data;
+};
+
+export const importFinanceWorkbook = async (payload) => {
+  return axiosClient.post('/api/finance/import', payload);
+};
