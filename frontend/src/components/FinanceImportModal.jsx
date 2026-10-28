@@ -86,7 +86,7 @@ export default function FinanceImportModal({ parsed, fileName, facilityList, use
             <table className="w-full text-sm border border-gray-200 dark:border-gray-800">
               <thead className="bg-[#e2eaf5] dark:bg-blue-900/30 text-gray-700 dark:text-gray-300">
                 <tr>
-                  {['Cơ sở', 'Số vé', 'Khách', 'Doanh thu vé', 'Chi', 'Lợi nhuận', 'Quẹt thẻ', 'Vé KM', 'Vé 0 đồng', 'Đang có trên Hub', 'Chênh lệch'].map((h, i) => (
+                  {['Cơ sở', 'Số vé', 'Khách', 'Doanh thu', 'Trong đó dịch vụ', 'Tiền dư', 'Chi', 'Lợi nhuận', 'Quẹt thẻ', 'Vé KM', 'Vé 0 đồng', 'Đang có trên Hub', 'Chênh lệch'].map((h, i) => (
                     <th key={h} className={`px-3 py-2 font-bold whitespace-nowrap ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
                   ))}
                 </tr>
@@ -102,6 +102,8 @@ export default function FinanceImportModal({ parsed, fileName, facilityList, use
                       <td className="px-3 py-2 text-right">{fmt(s.tickets)}</td>
                       <td className="px-3 py-2 text-right">{fmt(s.guests)}</td>
                       <td className="px-3 py-2 text-right font-semibold text-teal-700 dark:text-teal-400">{fmt(s.revenue)}</td>
+                      <td className="px-3 py-2 text-right">{s.serviceRevenue ? fmt(s.serviceRevenue) : ''}</td>
+                      <td className="px-3 py-2 text-right">{s.surplus ? fmt(s.surplus) : ''}</td>
                       <td className="px-3 py-2 text-right text-red-600 dark:text-red-400">{fmt(s.expense)}</td>
                       <td className="px-3 py-2 text-right font-semibold">{fmt(s.profit)}</td>
                       <td className="px-3 py-2 text-right">{fmt(s.card)}</td>
@@ -117,6 +119,8 @@ export default function FinanceImportModal({ parsed, fileName, facilityList, use
                   <td className="px-3 py-2 text-right">{fmt(total('tickets'))}</td>
                   <td className="px-3 py-2 text-right">{fmt(total('guests'))}</td>
                   <td className="px-3 py-2 text-right">{fmt(total('revenue'))}</td>
+                  <td className="px-3 py-2 text-right">{fmt(total('serviceRevenue'))}</td>
+                  <td className="px-3 py-2 text-right">{fmt(total('surplus'))}</td>
                   <td className="px-3 py-2 text-right">{fmt(total('expense'))}</td>
                   <td className="px-3 py-2 text-right">{fmt(total('profit'))}</td>
                   <td className="px-3 py-2 text-right">{fmt(total('card'))}</td>

@@ -39,6 +39,7 @@ export default function FinanceReconciliation({ user }) {
   const [config, setConfig] = React.useState({ prices: [], promoCodes: [] });
   const [facility, setFacility] = React.useState('ALL');
   const [expenseCategory, setExpenseCategory] = React.useState('');
+  const [promoView, setPromoView] = React.useState('facility'); // facility | chain
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
 
@@ -65,7 +66,11 @@ export default function FinanceReconciliation({ user }) {
       .finally(() => setLoading(false));
   }, [month]);
 
-  const priceMap = React.useMemo(() => Object.fromEntries(config.prices.map(p => [p.ticket_type, Number(p.list_price)])), [config]);
+  const priceMap = React.useMemo(() => Object.fromEntries(config.prices
+    .filter(p => p.kind !== 'service' && p.list_price !== null && p.list_price !== '')
+    .map(p => [p.ticket_type, Number(p.list_price)])), [config]);
+  const serviceName = React.useMemo(() => Object.fromEntries(config.prices
+    .filter(p => p.kind === 'service').map(p => [p.ticket_type, p.name || p.ticket_type])), [config]);
   const codeName = React.useMemo(() => Object.fromEntries(config.promoCodes.map(c => [c.code, c.name])), [config]);
 
   const view = React.useMemo(() => {
@@ -73,45 +78,72 @@ export default function FinanceReconciliation({ user }) {
     const inFac = (r) => facility === 'ALL' || r.facility_code === facility;
     const facilities = [...new Set(data.daily.map(d => d.facility_code))].sort(sortFac);
     const daily = data.daily.filter(inFac);
-    const tickets = data.tickets.filter(inFac);
+    // Vé thật vs dịch vụ (MS, LG...) vs tiền dư (dòng không ghi loại). Đếm vé/khách từ đây chứ không
+    // từ finance_daily, để dữ liệu đã nhập trước khi có phân loại dịch vụ vẫn hiển thị đúng.
+    const isTicket = (t) => t.ticket_type && serviceName[t.ticket_type] === undefined;
+    const allTickets = data.tickets.filter(isTicket);
+    const tickets = allTickets.filter(inFac);
+    const nonTickets = data.tickets.filter(t => !isTicket(t)).filter(inFac);
     const expenses = data.expenses.filter(inFac);
 
     // Theo cơ sở
     const byFac = {};
-    for (const code of facilities) byFac[code] = { tickets: 0, guests: 0, revenue: 0, expense: 0, card: 0 };
+    for (const code of facilities) byFac[code] = { tickets: 0, guests: 0, ticketRevenue: 0, revenue: 0, expense: 0, card: 0 };
     for (const d of data.daily) {
       const f = byFac[d.facility_code];
-      f.tickets += d.ticket_count; f.guests += d.guest_count; f.revenue += d.ticket_revenue; f.expense += d.expense; f.card += d.card_amount;
+      f.revenue += d.ticket_revenue; f.expense += d.expense; f.card += d.card_amount;
+    }
+    for (const t of allTickets) {
+      const f = byFac[t.facility_code];
+      if (f) { f.tickets += t.ticket_count; f.guests += t.guest_count; f.ticketRevenue += t.revenue; }
     }
 
     // Vé theo loại
     const types = {};
     for (const t of tickets) {
-      const k = t.ticket_type || '(không ghi)';
+      const k = t.ticket_type;
       const x = (types[k] = types[k] || { count: 0, revenue: 0, free: 0, byFac: {} });
       x.count += t.ticket_count; x.revenue += t.revenue; x.free += t.free_count;
       x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.ticket_count;
     }
 
-    // Khuyến mãi: theo mã nếu có, không có mã thì theo kiểu KM. HH là kênh môi giới, không tính tiền giảm.
-    const promos = {};
-    for (const t of tickets) {
-      if (!t.promo_code && !t.km_kind) continue;
-      const key = t.promo_code || `kind:${t.km_kind}`;
-      const x = (promos[key] = promos[key] || {
-        key, code: t.promo_code, kind: t.km_kind, count: 0, revenue: 0, listValue: 0, unpriced: 0, free: 0, byFac: {},
+    // Dịch vụ & tiền dư: tính vào doanh thu, không phải vé
+    const extras = {};
+    for (const t of nonTickets) {
+      const k = t.ticket_type || '';
+      const x = (extras[k] = extras[k] || {
+        key: k, label: k ? `${k} — ${serviceName[k]}` : 'Tiền dư (không ghi loại vé)', revenue: 0, byFac: {},
       });
-      x.count += t.ticket_count; x.revenue += t.revenue; x.free += t.free_count;
-      x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.ticket_count;
-      const price = priceMap[t.ticket_type];
-      if (price === undefined) x.unpriced += t.ticket_count;
-      else x.listValue += price * t.ticket_count;
+      x.revenue += t.revenue;
+      x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.revenue;
     }
-    const promoRows = Object.values(promos).map(p => ({
-      ...p,
-      name: p.code ? (codeName[p.code] || 'Chưa đặt tên') : KM_KIND_LABEL[p.kind] || p.kind,
-      discount: p.kind === 'commission' && !p.code ? null : Math.max(0, p.listValue - p.revenue),
-    })).sort((a, b) => b.count - a.count);
+
+    // Khuyến mãi: theo mã nếu có, không có mã thì theo kiểu KM. HH là kênh môi giới, không tính tiền giảm.
+    const buildPromoRows = (list) => {
+      const promos = {};
+      for (const t of list) {
+        if (!t.promo_code && !t.km_kind) continue;
+        const key = t.promo_code || `kind:${t.km_kind}`;
+        const x = (promos[key] = promos[key] || {
+          key, code: t.promo_code, kind: t.km_kind, count: 0, revenue: 0, listValue: 0, unpriced: 0, free: 0, byFac: {},
+        });
+        x.count += t.ticket_count; x.revenue += t.revenue; x.free += t.free_count;
+        x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.ticket_count;
+        const price = priceMap[t.ticket_type];
+        if (price === undefined) x.unpriced += t.ticket_count;
+        else x.listValue += price * t.ticket_count;
+      }
+      return Object.values(promos).map(p => ({
+        ...p,
+        name: p.code ? (codeName[p.code] || 'Chưa đặt tên') : KM_KIND_LABEL[p.kind] || p.kind,
+        discount: p.kind === 'commission' && !p.code ? null : Math.max(0, p.listValue - p.revenue),
+      })).sort((a, b) => b.count - a.count);
+    };
+    const promoRows = buildPromoRows(tickets);
+    // Mỗi cơ sở một nhóm riêng: số vé, thực thu, giảm ước tính của riêng cơ sở đó
+    const promoByFac = (facility === 'ALL' ? facilities : [facility])
+      .map(code => ({ code, rows: buildPromoRows(tickets.filter(t => t.facility_code === code)) }))
+      .filter(g => g.rows.length > 0);
 
     // Chi theo loại
     const cats = {};
@@ -124,10 +156,12 @@ export default function FinanceReconciliation({ user }) {
 
     // Theo ngày
     const days = {};
+    const day = (date) => (days[date] = days[date] || { tickets: 0, revenue: 0, expense: 0 });
     for (const d of daily) {
-      const x = (days[d.date] = days[d.date] || { tickets: 0, revenue: 0, expense: 0 });
-      x.tickets += d.ticket_count; x.revenue += d.ticket_revenue; x.expense += d.expense;
+      const x = day(d.date);
+      x.revenue += d.ticket_revenue; x.expense += d.expense;
     }
+    for (const t of tickets) day(t.date).tickets += t.ticket_count;
 
     // Hàng bán kèm (đối chiếu)
     const addons = {};
@@ -142,18 +176,18 @@ export default function FinanceReconciliation({ user }) {
     return {
       facilities,
       shownFacs: facility === 'ALL' ? facilities : [facility],
-      byFac, types, promoRows, cats, days, addons,
+      byFac, types, extras: Object.values(extras).sort((a, b) => b.revenue - a.revenue), promoRows, promoByFac, cats, days, addons,
       totals: {
         revenue: sum(daily, 'ticket_revenue'),
         expense: sum(daily, 'expense'),
-        tickets: sum(daily, 'ticket_count'),
-        guests: sum(daily, 'guest_count'),
+        tickets: sum(tickets, 'ticket_count'),
+        guests: sum(tickets, 'guest_count'),
         promoTickets: promoRows.filter(p => p.kind !== 'commission' || p.code).reduce((a, p) => a + p.count, 0),
         discount: promoRows.reduce((a, p) => a + (p.discount || 0), 0),
       },
       expenseItems: expenses.filter(e => !expenseCategory || (e.category || '(không ghi loại)') === expenseCategory),
     };
-  }, [data, facility, expenseCategory, priceMap, codeName]);
+  }, [data, facility, expenseCategory, priceMap, serviceName, codeName]);
 
   const lastImport = data?.imports?.[0];
 
@@ -191,7 +225,7 @@ export default function FinanceReconciliation({ user }) {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {[
-              ['Doanh thu vé', view.totals.revenue, 'text-teal-600 dark:text-teal-400'],
+              ['Doanh thu', view.totals.revenue, 'text-teal-600 dark:text-teal-400'],
               ['Chi phí', view.totals.expense, 'text-red-600 dark:text-red-400'],
               ['Lợi nhuận', view.totals.revenue - view.totals.expense, 'text-gray-900 dark:text-white'],
               [`Số vé (${fmt(view.totals.guests)} khách)`, view.totals.tickets, 'text-blue-600 dark:text-blue-400'],
@@ -207,7 +241,7 @@ export default function FinanceReconciliation({ user }) {
           <Card title="Kết quả theo cơ sở">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                <Th left>Cơ sở</Th><Th>Số vé</Th><Th>Khách</Th><Th>Doanh thu vé</Th><Th>Chi</Th><Th>Lợi nhuận</Th><Th>Chi/DT</Th><Th>Giá TB/vé</Th><Th>Quẹt thẻ</Th>
+                <Th left>Cơ sở</Th><Th>Số vé</Th><Th>Khách</Th><Th>Doanh thu</Th><Th>Chi</Th><Th>Lợi nhuận</Th><Th>Chi/DT</Th><Th>Giá TB/vé</Th><Th>Quẹt thẻ</Th>
               </tr></thead>
               <tbody className="text-gray-800 dark:text-gray-200">
                 {view.facilities.map(code => {
@@ -218,7 +252,7 @@ export default function FinanceReconciliation({ user }) {
                       <Td className="font-semibold text-teal-700 dark:text-teal-400">{fmt(f.revenue)}</Td>
                       <Td className="text-red-600 dark:text-red-400">{fmt(f.expense)}</Td>
                       <Td className="font-semibold">{fmt(f.revenue - f.expense)}</Td>
-                      <Td>{pct(f.expense, f.revenue)}</Td><Td>{fmt(f.tickets ? f.revenue / f.tickets : 0)}</Td><Td>{fmt(f.card)}</Td>
+                      <Td>{pct(f.expense, f.revenue)}</Td><Td>{fmt(f.tickets ? f.ticketRevenue / f.tickets : 0)}</Td><Td>{fmt(f.card)}</Td>
                     </tr>
                   );
                 })}
@@ -226,7 +260,7 @@ export default function FinanceReconciliation({ user }) {
             </table>
           </Card>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             <Card title="Vé theo loại">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-200 dark:border-gray-700">
@@ -245,26 +279,102 @@ export default function FinanceReconciliation({ user }) {
               </table>
             </Card>
 
-            <Card title="Khuyến mãi & kênh bán">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                  <Th left>Mã / kiểu</Th><Th left>Chương trình</Th><Th>Số vé</Th><Th>Vé 0 đ</Th><Th>Thực thu</Th><Th>Giảm ước tính</Th>
-                </tr></thead>
-                <tbody className="text-gray-800 dark:text-gray-200">
-                  {view.promoRows.map(p => (
-                    <tr key={p.key} className="border-b border-gray-100 dark:border-gray-800" title={Object.entries(p.byFac).map(([f, n]) => `${f}: ${n}`).join(' · ')}>
-                      <Td left className="font-bold">{p.code || (p.kind === 'combo' ? 'CB' : p.kind === 'commission' ? 'HH' : '–')}</Td>
-                      <Td left className={p.code && !codeName[p.code] ? 'text-amber-600' : ''}>{p.name}</Td>
-                      <Td>{fmt(p.count)}</Td><Td>{p.free ? fmt(p.free) : ''}</Td><Td>{fmt(p.revenue)}</Td>
-                      <Td className="text-amber-700 dark:text-amber-400">
-                        {p.discount === null ? 'không áp dụng' : `${fmt(p.discount)}${p.unpriced ? ` (${p.unpriced} vé chưa có giá)` : ''}`}
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {view.extras.length > 0 && (
+              <Card title="Dịch vụ & tiền dư — tổng tiền theo cơ sở (tính vào doanh thu, không phải vé)">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b border-gray-200 dark:border-gray-700">
+                    <Th left>Khoản</Th>{view.shownFacs.map(f => <Th key={f}>{f}</Th>)}<Th>Tổng tiền</Th>
+                  </tr></thead>
+                  <tbody className="text-gray-800 dark:text-gray-200">
+                    {view.extras.map(x => (
+                      <tr key={x.key} className="border-b border-gray-100 dark:border-gray-800">
+                        <Td left className="font-medium">{x.label}</Td>
+                        {view.shownFacs.map(f => <Td key={f}>{x.byFac[f] ? fmt(x.byFac[f]) : ''}</Td>)}
+                        <Td className="font-semibold">{fmt(x.revenue)}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            )}
+
+            <Card title="Khuyến mãi & kênh bán" right={
+              <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-bold">
+                {[['facility', 'Theo từng cơ sở'], ['chain', 'Gộp cả chuỗi']].map(([v, label]) => (
+                  <button key={v} onClick={() => setPromoView(v)}
+                    className={`px-3 py-1.5 ${promoView === v ? 'bg-teal-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            }>
+              {(() => {
+                const promoCells = (p) => (
+                  <>
+                    <Td left className="font-bold">{p.code || (p.kind === 'combo' ? 'CB' : p.kind === 'commission' ? 'HH' : '–')}</Td>
+                    <Td left className={p.code && !codeName[p.code] ? 'text-amber-600' : ''}>{p.name}</Td>
+                  </>
+                );
+                const valueCells = (p) => (
+                  <>
+                    <Td className="font-semibold">{fmt(p.count)}</Td><Td>{p.free ? fmt(p.free) : ''}</Td><Td>{fmt(p.revenue)}</Td>
+                    <Td className="text-amber-700 dark:text-amber-400">
+                      {p.discount === null ? 'không áp dụng' : `${fmt(p.discount)}${p.unpriced ? ` (${p.unpriced} vé chưa có giá)` : ''}`}
+                    </Td>
+                  </>
+                );
+                if (promoView === 'chain') {
+                  return (
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-b border-gray-200 dark:border-gray-700">
+                        <Th left>Mã / kiểu</Th><Th left>Chương trình</Th>{view.shownFacs.map(f => <Th key={f}>{f}</Th>)}
+                        <Th>Tổng vé</Th><Th>Vé 0 đ</Th><Th>Thực thu</Th><Th>Giảm ước tính</Th>
+                      </tr></thead>
+                      <tbody className="text-gray-800 dark:text-gray-200">
+                        {view.promoRows.map(p => (
+                          <tr key={p.key} className="border-b border-gray-100 dark:border-gray-800">
+                            {promoCells(p)}
+                            {view.shownFacs.map(f => <Td key={f}>{p.byFac[f] ? fmt(p.byFac[f]) : ''}</Td>)}
+                            {valueCells(p)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                }
+                return (
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-gray-200 dark:border-gray-700">
+                      <Th left>Mã / kiểu</Th><Th left>Chương trình</Th><Th>Số vé</Th><Th>Vé 0 đ</Th><Th>Thực thu</Th><Th>Giảm ước tính</Th>
+                    </tr></thead>
+                    {view.promoByFac.map(g => {
+                      const promoOnly = g.rows.filter(p => p.discount !== null);
+                      const sumBy = (k) => promoOnly.reduce((a, p) => a + (p[k] || 0), 0);
+                      return (
+                        <tbody key={g.code} className="text-gray-800 dark:text-gray-200">
+                          <tr className="bg-gray-50 dark:bg-[#252525] border-y border-gray-200 dark:border-gray-700">
+                            <Td left className="font-black text-gray-900 dark:text-white">{g.code}</Td>
+                            <Td left className="text-xs text-gray-500 dark:text-gray-400">
+                              {fmt(sumBy('count'))} vé KM · {pct(sumBy('count'), view.byFac[g.code]?.tickets)} số vé của cơ sở
+                            </Td>
+                            <Td className="font-semibold">{fmt(sumBy('count'))}</Td><Td>{sumBy('free') ? fmt(sumBy('free')) : ''}</Td>
+                            <Td className="font-semibold">{fmt(sumBy('revenue'))}</Td>
+                            <Td className="font-semibold text-amber-700 dark:text-amber-400">{fmt(sumBy('discount'))}</Td>
+                          </tr>
+                          {g.rows.map(p => (
+                            <tr key={p.key} className="border-b border-gray-100 dark:border-gray-800">
+                              {promoCells(p)}{valueCells(p)}
+                            </tr>
+                          ))}
+                        </tbody>
+                      );
+                    })}
+                  </table>
+                );
+              })()}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Giảm ước tính = giá niêm yết × số vé − thực thu. HH là vé bán qua môi giới: tiền hoa hồng nằm ở chi "HH dẫn khách", không tính là giảm giá.
+                Giảm ước tính = giá niêm yết × số vé − thực thu. HH là vé bán qua môi giới: tiền hoa hồng nằm ở chi "HH dẫn khách", không tính là giảm giá
+                (dòng tổng của mỗi cơ sở không cộng HH).
               </p>
             </Card>
           </div>
@@ -381,7 +491,7 @@ function FinanceSettings({ config, onSaved }) {
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   React.useEffect(() => {
-    setPrices(config.prices.map(p => ({ ...p })));
+    setPrices(config.prices.map(p => ({ ...p, kind: p.kind || 'ticket', list_price: p.list_price ?? '', name: p.name || '' })));
     setCodes(config.promoCodes.map(c => ({ ...c })));
   }, [config]);
 
@@ -389,7 +499,15 @@ function FinanceSettings({ config, onSaved }) {
     setSaving(true);
     setMsg('');
     try {
-      const cleanPrices = prices.filter(p => p.ticket_type && p.list_price !== '').map(p => ({ ticket_type: p.ticket_type.trim().toUpperCase(), list_price: Number(p.list_price) }));
+      // Vé cần giá niêm yết; dịch vụ thì không
+      const cleanPrices = prices
+        .filter(p => p.ticket_type && (p.kind === 'service' || p.list_price !== ''))
+        .map(p => ({
+          ticket_type: p.ticket_type.trim().toUpperCase(),
+          kind: p.kind,
+          name: p.name?.trim() || null,
+          list_price: p.list_price === '' ? null : Number(p.list_price),
+        }));
       const cleanCodes = codes.filter(c => c.code && c.name).map(c => ({ code: c.code.trim().toUpperCase(), name: c.name.trim() }));
       await saveFinanceConfig({ prices: cleanPrices, promoCodes: cleanCodes });
       onSaved(await fetchFinanceConfig());
@@ -409,19 +527,41 @@ function FinanceSettings({ config, onSaved }) {
         <button onClick={save} disabled={saving} className="px-4 py-1.5 rounded-lg text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50">Lưu cài đặt</button>
       </div>
     }>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-2">Giá niêm yết theo loại vé (chung mọi cơ sở)</h4>
-          <div className="space-y-1.5">
-            {prices.map((p, i) => (
-              <div key={i} className="flex gap-2">
-                <input className={`${input} w-24`} value={p.ticket_type} onChange={e => setPrices(ps => ps.map((x, j) => j === i ? { ...x, ticket_type: e.target.value } : x))} />
-                <input className={`${input} w-32 text-right`} type="number" value={p.list_price} onChange={e => setPrices(ps => ps.map((x, j) => j === i ? { ...x, list_price: e.target.value } : x))} />
-              </div>
-            ))}
-            <button onClick={() => setPrices(ps => [...ps, { ticket_type: '', list_price: '' }])} className="text-xs font-bold text-teal-700 dark:text-teal-400">+ Thêm loại vé</button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {[
+          {
+            kind: 'ticket',
+            title: 'Giá niêm yết vé (chung mọi cơ sở)',
+            hint: 'Dùng để ước tính tiền giảm của vé có khuyến mãi.',
+            add: '+ Thêm loại vé',
+          },
+          {
+            kind: 'service',
+            title: 'Dịch vụ (chỉ ghi nhận tổng tiền)',
+            hint: 'Mã ở cột Loại vé mà file ghi tổng tiền dịch vụ, không phải vé. Tính vào doanh thu, không đếm vé, không cần giá.',
+            add: '+ Thêm dịch vụ',
+          },
+        ].map(group => (
+          <div key={group.kind}>
+            <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-1">{group.title}</h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{group.hint}</p>
+            <div className="space-y-1.5">
+              {prices.map((p, i) => {
+                if (p.kind !== group.kind) return null;
+                const set = (patch) => setPrices(ps => ps.map((x, j) => j === i ? { ...x, ...patch } : x));
+                return (
+                  <div key={i} className="flex gap-2">
+                    <input className={`${input} w-20`} value={p.ticket_type} placeholder="Mã" onChange={e => set({ ticket_type: e.target.value })} />
+                    {group.kind === 'service'
+                      ? <input className={`${input} flex-1`} value={p.name} placeholder="Tên dịch vụ" onChange={e => set({ name: e.target.value })} />
+                      : <input className={`${input} w-32 text-right`} type="number" value={p.list_price} placeholder="Giá" onChange={e => set({ list_price: e.target.value })} />}
+                  </div>
+                );
+              })}
+              <button onClick={() => setPrices(ps => [...ps, { ticket_type: '', kind: group.kind, list_price: '', name: '' }])} className="text-xs font-bold text-teal-700 dark:text-teal-400">{group.add}</button>
+            </div>
           </div>
-        </div>
+        ))}
         <div>
           <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-2">Mã khuyến mãi (cột Code)</h4>
           <div className="space-y-1.5">
