@@ -88,7 +88,7 @@ const readExpenseCategories = (XLSX, wb) => {
   return cats.size ? cats : null;
 };
 
-export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [] } = {}) {
+export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [], priceOverrides = [] } = {}) {
   const warnings = [];
   const warn = (level, facility, message) => warnings.push({ level, facility, message });
 
@@ -137,6 +137,8 @@ export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [] } 
   const priceMap = Object.fromEntries(prices
     .filter(p => p.kind !== 'service' && p.list_price !== null && p.list_price !== undefined && p.list_price !== '')
     .map(p => [norm(p.ticket_type), Number(p.list_price)]));
+  // Giá riêng theo cơ sở (vd SK ở 41, ACE, PAK khác nhau)
+  const overrideSet = new Set(priceOverrides.map(o => `${norm(o.ticket_type)}|${norm(o.facility_code)}`));
   const codeSet = new Set(promoCodes.map(c => norm(c.code)));
   const categories = readExpenseCategories(XLSX, wb);
 
@@ -202,7 +204,7 @@ export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [] } 
       t.revenue += net;
       if (isTicket && net === 0) t.free_count += 1;
 
-      if (isTicket && priceMap[type] === undefined) unknownTypes[type] = (unknownTypes[type] || 0) + 1;
+      if (isTicket && priceMap[type] === undefined && !overrideSet.has(`${type}|${code}`)) unknownTypes[type] = (unknownTypes[type] || 0) + 1;
       if (promo && !codeSet.has(promo)) unknownCodes[promo] = (unknownCodes[promo] || 0) + 1;
     }
     outOfMonth(code, sheet, skippedOut);

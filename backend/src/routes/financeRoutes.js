@@ -18,12 +18,14 @@ const badRequest = (res, error) => res.status(400).json({ success: false, error 
 
 router.get('/config', authGuard, requireRoles(...READ_ROLES), async (req, res) => {
     try {
-        const [prices, codes] = await Promise.all([
+        const [prices, codes, overrides] = await Promise.all([
             // kind/name cần migration 008_finance_service_types.sql
             pool.query('SELECT ticket_type, list_price, kind, name FROM finance_ticket_prices ORDER BY kind DESC, list_price NULLS LAST, ticket_type'),
             pool.query('SELECT code, name FROM finance_promo_codes ORDER BY code'),
+            // Giá riêng theo cơ sở — cần migration 009_finance_price_overrides.sql
+            pool.query('SELECT ticket_type, facility_code, list_price FROM finance_ticket_price_overrides ORDER BY ticket_type, facility_code'),
         ]);
-        res.json({ success: true, data: { prices: prices.rows, promoCodes: codes.rows } });
+        res.json({ success: true, data: { prices: prices.rows, promoCodes: codes.rows, priceOverrides: overrides.rows } });
     } catch (e) {
         console.error('Lỗi GET /api/finance/config:', e);
         res.status(500).json({ success: false, error: e.message });
@@ -31,9 +33,15 @@ router.get('/config', authGuard, requireRoles(...READ_ROLES), async (req, res) =
 });
 
 router.put('/config', authGuard, requireRoles(...WRITE_ROLES), async (req, res) => {
-    const { prices, promoCodes } = req.body || {};
+    const { prices, promoCodes, priceOverrides } = req.body || {};
     if (prices !== undefined && !Array.isArray(prices)) return badRequest(res, 'prices phải là mảng');
     if (promoCodes !== undefined && !Array.isArray(promoCodes)) return badRequest(res, 'promoCodes phải là mảng');
+    if (priceOverrides !== undefined && !Array.isArray(priceOverrides)) return badRequest(res, 'priceOverrides phải là mảng');
+    for (const o of priceOverrides || []) {
+        if (!o.ticket_type || !o.facility_code || o.list_price === null || o.list_price === '' || !(Number(o.list_price) >= 0)) {
+            return badRequest(res, `Giá riêng không hợp lệ: ${JSON.stringify(o)}`);
+        }
+    }
     for (const p of prices || []) {
         const kind = p.kind || 'ticket';
         const priceOk = kind === 'service'
@@ -68,6 +76,18 @@ router.put('/config', authGuard, requireRoles(...WRITE_ROLES), async (req, res) 
                  ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()`,
                 [String(c.code).trim().toUpperCase(), String(c.name).trim()]
             );
+        }
+        // Danh sách giá riêng gửi lên là toàn bộ: thay hết để xoá được dòng đã bỏ
+        if (priceOverrides !== undefined) {
+            await client.query('DELETE FROM finance_ticket_price_overrides');
+            for (const o of priceOverrides) {
+                await client.query(
+                    `INSERT INTO finance_ticket_price_overrides (ticket_type, facility_code, list_price, updated_at)
+                     VALUES ($1, $2, $3, NOW())
+                     ON CONFLICT (ticket_type, facility_code) DO UPDATE SET list_price = EXCLUDED.list_price, updated_at = NOW()`,
+                    [String(o.ticket_type).trim().toUpperCase(), String(o.facility_code).trim().toUpperCase(), Number(o.list_price)]
+                );
+            }
         }
         await client.query('COMMIT');
         res.json({ success: true });
