@@ -13,8 +13,8 @@ export default function RevenueLog({ user, showToast }) {
       const token = localStorage.getItem('taskflow_token');
       const { fetchReports } = await import('../services/dataService.js');
       const allReports = await fetchReports(token, user?.role, user?.facility_id) || [];
-      // Sort descending by timestamp
-      allReports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      // Mới nhập lên đầu; cùng lần nhập (vd. Trích xuất bằng AI lưu cả tháng) thì ngày mới hơn lên trước
+      allReports.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0) || String(b.date).localeCompare(String(a.date)));
       setReports(allReports);
     } catch (e) {
       console.error(e);
