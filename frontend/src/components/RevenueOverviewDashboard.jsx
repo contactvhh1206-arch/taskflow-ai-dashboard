@@ -182,7 +182,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
          const { saveReport } = await import('../services/dataService.js');
          
          const newReports = [];
-         
+         const skippedDates = [];
+
          // Bươc 2: Chạy lệnh BULK INSERT toàn bô mảng data mơi
          data.forEach(row => {
             const dateStr = row.date;
@@ -196,7 +197,14 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                };
             });
             const totalRev = revData.reduce((acc, curr) => acc + Number(curr.revenue), 0);
-            
+
+            // File thường có sẵn dòng cho cả tháng; ngày chưa có số (mọi cơ sở = 0) thì không lưu,
+            // tránh tạo bản ghi 0 đồng khiến Cố vấn AI cảnh báo nhầm là kế toán ghi 0.
+            if (totalRev === 0) {
+               skippedDates.push(dateStr);
+               return;
+            }
+
             newReports.push({
                id: 'rep_' + Date.now() + Math.random().toString(36).substr(2, 5),
                date: dateStr,
@@ -207,9 +215,14 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
             });
          });
          
-         await saveReport(newReports, token, user?.role, user?.facility_id);
+         if (newReports.length > 0) {
+            await saveReport(newReports, token, user?.role, user?.facility_id);
+         }
          setBatchData(null);
-         alert(`Đã lưu thành công ${data.length} báo cáo lên Database!`);
+         const skippedNote = skippedDates.length > 0
+            ? `\nBỏ qua ${skippedDates.length} ngày chưa có số liệu: ${skippedDates.map(d => d.split('-').reverse().slice(0, 2).join('/')).join(', ')}`
+            : '';
+         alert(`Đã lưu thành công ${newReports.length} báo cáo lên Database!${skippedNote}`);
          setRefreshToggle(prev => prev + 1);
       };
 

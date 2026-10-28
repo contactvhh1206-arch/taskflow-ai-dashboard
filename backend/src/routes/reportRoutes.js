@@ -27,12 +27,16 @@ router.post('/', authGuard, requireRoles(...REPORT_WRITE_ROLES), async (req, res
         const items = Array.isArray(payload) ? payload : [payload];
         const results = [];
 
+        // $7 = lịch sử sửa (lý do, người sửa, tổng cũ/mới) từ Nhật ký doanh thu.
+        // Không gửi (vd. Trích xuất bằng AI, Báo cáo hằng ngày) thì giữ nguyên lịch sử đang có.
+        // Cần migration 006_add_edit_history_to_daily_financial_reports.sql.
         const query = `
-            INSERT INTO daily_financial_reports (id, date, total_revenue, data, created_by, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (date) DO UPDATE 
+            INSERT INTO daily_financial_reports (id, date, total_revenue, data, created_by, timestamp, edit_history)
+            VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7::jsonb, '[]'::jsonb))
+            ON CONFLICT (date) DO UPDATE
             SET total_revenue = EXCLUDED.total_revenue,
                 data = EXCLUDED.data,
+                edit_history = COALESCE($7::jsonb, daily_financial_reports.edit_history),
                 updated_at = CURRENT_TIMESTAMP
             RETURNING *;
         `;
@@ -44,7 +48,8 @@ router.post('/', authGuard, requireRoles(...REPORT_WRITE_ROLES), async (req, res
                 item.totalRevenue,
                 JSON.stringify(item.data),
                 item.createdBy,
-                item.timestamp
+                item.timestamp,
+                Array.isArray(item.editHistory) ? JSON.stringify(item.editHistory) : null
             ]);
             if (rows.length > 0) {
                 results.push(rows[0]);

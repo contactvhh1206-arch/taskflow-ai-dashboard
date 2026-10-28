@@ -100,6 +100,7 @@ const normalizeReport = (r) => ({
   ...r,
   totalRevenue: Number(r.totalRevenue ?? r.total_revenue ?? 0),
   createdBy: r.createdBy ?? r.created_by ?? '',
+  editHistory: Array.isArray(r.editHistory) ? r.editHistory : (Array.isArray(r.edit_history) ? r.edit_history : []),
   timestamp: Number(r.timestamp) || Date.parse(r.updated_at || r.created_at) || null,
 });
 
