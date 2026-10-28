@@ -1,7 +1,10 @@
 ﻿import React from 'react';
 import HeatmapKPI from './HeatmapKPI';
 import AIBatchPreviewModal from './AIBatchPreviewModal';
+import FinanceImportModal from './FinanceImportModal';
 import { uploadFile } from '../utils/uploadFile.js';
+import { parseFinanceWorkbook } from '../utils/financeWorkbook.js';
+import { fetchFinanceConfig } from '../services/dataService.js';
 
 export default function RevenueOverviewDashboard({ user, facilityList }) {
       const [selectedMonth, setSelectedMonth] = React.useState(new Date().toISOString().substring(0, 7));
@@ -12,7 +15,17 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
       const [aiLoading, setAiLoading] = React.useState(false);
       const [aiError, setAiError] = React.useState('');
       const [batchData, setBatchData] = React.useState(null);
+      const [workbookImport, setWorkbookImport] = React.useState(null); // { parsed, fileName }
       const fileInputRef = React.useRef(null);
+
+      // File tổng tháng (.xlsx): đọc chính xác từng sheet, không qua AI
+      const processWorkbook = async (file) => {
+         const buf = await file.arrayBuffer();
+         const wb = window.XLSX.read(new Uint8Array(buf), { type: 'array' });
+         const config = await fetchFinanceConfig();
+         const parsed = parseFinanceWorkbook(window.XLSX, wb, config);
+         setWorkbookImport({ parsed, fileName: file.name });
+      };
 
       const handleAIExtractClick = () => {
          fileInputRef.current?.click();
@@ -29,6 +42,19 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
          }
          
          setAiError('');
+         if (/\.xlsx$/i.test(file.name)) {
+            setAiLoading(true);
+            try {
+               await processWorkbook(file);
+            } catch (err) {
+               console.error('Lỗi đọc file tổng:', err);
+               setAiError(err.message || 'Không đọc được file Excel.');
+            } finally {
+               setAiLoading(false);
+               e.target.value = '';
+            }
+            return;
+         }
          setAiLoading(true);
          try {
             const isImage = file.type.startsWith('image/');
@@ -314,8 +340,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                      <>
                         <input type="file" accept=".png,.jpg,.jpeg,.xlsx,.csv" className="hidden" ref={fileInputRef} onChange={processAIExtract} />
                         <button onClick={handleAIExtractClick} className="px-4 py-2 w-full sm:w-auto justify-center bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-400 rounded-lg text-sm font-bold transition flex items-center gap-2 border border-purple-200 dark:border-purple-800">
-                          <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-                          Trích xuất bằng AI
+                          <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                          Nhập dữ liệu
                         </button>
                      </>
                    )}
@@ -360,11 +386,26 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
            {aiLoading && (
              <div className="fixed inset-0 z-[100] bg-white/80 dark:bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-               <p className="mt-4 text-purple-700 dark:text-purple-400 font-bold text-lg animate-pulse">AI đang phân tích số liệu...</p>
+               <p className="mt-4 text-purple-700 dark:text-purple-400 font-bold text-lg animate-pulse">Đang đọc số liệu...</p>
              </div>
            )}
            {batchData && (
              <AIBatchPreviewModal data={batchData} facilities={facilityList} onCancel={() => setBatchData(null)} onConfirm={handleBatchUpsert} />
+           )}
+           {workbookImport && (
+             <FinanceImportModal
+               parsed={workbookImport.parsed}
+               fileName={workbookImport.fileName}
+               facilityList={facilityList}
+               user={user}
+               onCancel={() => setWorkbookImport(null)}
+               onDone={(month) => {
+                  setWorkbookImport(null);
+                  setSelectedMonth(month);
+                  setRefreshToggle(prev => prev + 1);
+                  alert(`Đã lưu dữ liệu tháng ${month.split('-').reverse().join('/')}. Xem chi tiết ở mục "Đối chiếu tài chính".`);
+               }}
+             />
            )}
          </div>
       );

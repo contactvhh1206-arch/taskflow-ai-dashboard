@@ -17,6 +17,7 @@ import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx'
 import DailyRevenueReport from './components/DailyRevenueReport.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import RevenueLog from './components/RevenueLog.jsx';
+import FinanceReconciliation from './components/FinanceReconciliation.jsx';
 import KPISettings from './components/KPISettings.jsx';
 import ArchivedFacilitiesDashboard from './components/ArchivedFacilitiesDashboard.jsx';
 import TaskHistory from './components/TaskHistory.jsx';
@@ -1339,6 +1340,7 @@ function MainDashboard() {
             <>
               <NavItem icon="dashboard" label={['SUPER_ADMIN', 'VICE_PRESIDENT'].includes(user.role) ? 'Tổng quan BĐH' : 'Tổng quan phòng ban'} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
               <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
+              <NavItem icon="fact_check" label="Đối chiếu tài chính" active={activeTab === 'finance-recon'} onClick={() => setActiveTab('finance-recon')} />
               <NavItem icon="assignment" label="Công việc" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
               <NavItem icon="history_toggle_off" label="Lịch sử CV" active={activeTab === 'task-history'} onClick={() => setActiveTab('task-history')} />
               <NavItem icon="smart_toy" label="Cố vấn AI" active={activeTab === 'ai-advisor'} onClick={() => { setActiveAiSessionId(null); setActiveTab('ai-advisor'); }} />
@@ -1354,6 +1356,7 @@ function MainDashboard() {
               <NavItem icon="pie_chart" label="Tổng quan doanh thu" active={activeTab === 'revenue-overview'} onClick={() => setActiveTab('revenue-overview')} />
               <NavItem icon="assessment" label="Báo cáo hằng ngày" active={activeTab === 'daily-reports'} onClick={() => setActiveTab('daily-reports')} />
               <NavItem icon="history" label="Nhật ký doanh thu" active={activeTab === 'revenue-log'} onClick={() => setActiveTab('revenue-log')} />
+              <NavItem icon="fact_check" label="Đối chiếu tài chính" active={activeTab === 'finance-recon'} onClick={() => setActiveTab('finance-recon')} />
               <NavItem icon="target" label="Cài đặt KPI" active={activeTab === 'kpi-settings'} onClick={() => setActiveTab('kpi-settings')} />
               <NavItem icon="archive" label="Dữ liệu lưu trữ" active={activeTab === 'archives'} onClick={() => setActiveTab('archives')} />
             </>
@@ -1662,6 +1665,10 @@ function MainDashboard() {
             ) : activeTab === 'revenue-log' && ['FINANCE_DEPT', 'DEPARTMENT_HEAD', 'SUPER_ADMIN'].includes(user.role) ? (
               <ErrorBoundary>
                 <RevenueLog user={user} showToast={showToast} />
+              </ErrorBoundary>
+            ) : activeTab === 'finance-recon' && ['SUPER_ADMIN', 'FINANCE_DEPT', 'DEPARTMENT_HEAD', 'VICE_PRESIDENT'].includes(user.role) ? (
+              <ErrorBoundary>
+                <FinanceReconciliation user={user} />
               </ErrorBoundary>
 
             ) : activeTab === 'deleted-history' && user.role === 'SUPER_ADMIN' ? (
