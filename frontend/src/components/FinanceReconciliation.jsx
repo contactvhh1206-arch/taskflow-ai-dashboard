@@ -111,9 +111,9 @@ export default function FinanceReconciliation({ user }) {
     for (const t of nonTickets) {
       const k = t.ticket_type || '';
       const x = (extras[k] = extras[k] || {
-        key: k, label: k ? `${k} — ${serviceName[k]}` : 'Tiền dư (không ghi loại vé)', revenue: 0, lines: 0, byFac: {},
+        key: k, label: k ? `${k} — ${serviceName[k]}` : 'Tiền dư (không ghi loại vé)', revenue: 0, byFac: {},
       });
-      x.revenue += t.revenue; x.lines += t.ticket_count;
+      x.revenue += t.revenue;
       x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.revenue;
     }
 
@@ -272,17 +272,17 @@ export default function FinanceReconciliation({ user }) {
             </Card>
 
             {view.extras.length > 0 && (
-              <Card title="Dịch vụ & tiền dư (tính vào doanh thu, không phải vé)">
+              <Card title="Dịch vụ & tiền dư — tổng tiền theo cơ sở (tính vào doanh thu, không phải vé)">
                 <table className="w-full text-sm">
                   <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                    <Th left>Khoản</Th>{view.shownFacs.map(f => <Th key={f}>{f}</Th>)}<Th>Tổng tiền</Th><Th>Số dòng ghi</Th>
+                    <Th left>Khoản</Th>{view.shownFacs.map(f => <Th key={f}>{f}</Th>)}<Th>Tổng tiền</Th>
                   </tr></thead>
                   <tbody className="text-gray-800 dark:text-gray-200">
                     {view.extras.map(x => (
                       <tr key={x.key} className="border-b border-gray-100 dark:border-gray-800">
                         <Td left className="font-medium">{x.label}</Td>
                         {view.shownFacs.map(f => <Td key={f}>{x.byFac[f] ? fmt(x.byFac[f]) : ''}</Td>)}
-                        <Td className="font-semibold">{fmt(x.revenue)}</Td><Td>{x.lines}</Td>
+                        <Td className="font-semibold">{fmt(x.revenue)}</Td>
                       </tr>
                     ))}
                   </tbody>
@@ -464,29 +464,41 @@ function FinanceSettings({ config, onSaved }) {
         <button onClick={save} disabled={saving} className="px-4 py-1.5 rounded-lg text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50">Lưu cài đặt</button>
       </div>
     }>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-1">Loại vé & dịch vụ (cột Loại vé, chung mọi cơ sở)</h4>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Vé: cần giá niêm yết để ước tính tiền giảm. Dịch vụ: tính vào doanh thu nhưng không đếm là vé.</p>
-          <div className="space-y-1.5">
-            {prices.map((p, i) => {
-              const set = (patch) => setPrices(ps => ps.map((x, j) => j === i ? { ...x, ...patch } : x));
-              return (
-                <div key={i} className="flex gap-2">
-                  <input className={`${input} w-20`} value={p.ticket_type} placeholder="Mã" onChange={e => set({ ticket_type: e.target.value })} />
-                  <select className={`${input} w-24`} value={p.kind} onChange={e => set({ kind: e.target.value })}>
-                    <option value="ticket">Vé</option>
-                    <option value="service">Dịch vụ</option>
-                  </select>
-                  {p.kind === 'service'
-                    ? <input className={`${input} flex-1`} value={p.name} placeholder="Tên dịch vụ" onChange={e => set({ name: e.target.value })} />
-                    : <input className={`${input} w-32 text-right`} type="number" value={p.list_price} placeholder="Giá niêm yết" onChange={e => set({ list_price: e.target.value })} />}
-                </div>
-              );
-            })}
-            <button onClick={() => setPrices(ps => [...ps, { ticket_type: '', kind: 'ticket', list_price: '', name: '' }])} className="text-xs font-bold text-teal-700 dark:text-teal-400">+ Thêm loại vé / dịch vụ</button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {[
+          {
+            kind: 'ticket',
+            title: 'Giá niêm yết vé (chung mọi cơ sở)',
+            hint: 'Dùng để ước tính tiền giảm của vé có khuyến mãi.',
+            add: '+ Thêm loại vé',
+          },
+          {
+            kind: 'service',
+            title: 'Dịch vụ (chỉ ghi nhận tổng tiền)',
+            hint: 'Mã ở cột Loại vé mà file ghi tổng tiền dịch vụ, không phải vé. Tính vào doanh thu, không đếm vé, không cần giá.',
+            add: '+ Thêm dịch vụ',
+          },
+        ].map(group => (
+          <div key={group.kind}>
+            <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-1">{group.title}</h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{group.hint}</p>
+            <div className="space-y-1.5">
+              {prices.map((p, i) => {
+                if (p.kind !== group.kind) return null;
+                const set = (patch) => setPrices(ps => ps.map((x, j) => j === i ? { ...x, ...patch } : x));
+                return (
+                  <div key={i} className="flex gap-2">
+                    <input className={`${input} w-20`} value={p.ticket_type} placeholder="Mã" onChange={e => set({ ticket_type: e.target.value })} />
+                    {group.kind === 'service'
+                      ? <input className={`${input} flex-1`} value={p.name} placeholder="Tên dịch vụ" onChange={e => set({ name: e.target.value })} />
+                      : <input className={`${input} w-32 text-right`} type="number" value={p.list_price} placeholder="Giá" onChange={e => set({ list_price: e.target.value })} />}
+                  </div>
+                );
+              })}
+              <button onClick={() => setPrices(ps => [...ps, { ticket_type: '', kind: group.kind, list_price: '', name: '' }])} className="text-xs font-bold text-teal-700 dark:text-teal-400">{group.add}</button>
+            </div>
           </div>
-        </div>
+        ))}
         <div>
           <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-2">Mã khuyến mãi (cột Code)</h4>
           <div className="space-y-1.5">
