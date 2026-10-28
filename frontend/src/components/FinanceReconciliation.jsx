@@ -36,7 +36,7 @@ export default function FinanceReconciliation({ user }) {
   const [months, setMonths] = React.useState([]);
   const [month, setMonth] = React.useState('');
   const [data, setData] = React.useState(null);
-  const [config, setConfig] = React.useState({ prices: [], promoCodes: [] });
+  const [config, setConfig] = React.useState({ prices: [], promoCodes: [], priceOverrides: [] });
   const [facility, setFacility] = React.useState('ALL');
   const [expenseCategory, setExpenseCategory] = React.useState('');
   const [promoView, setPromoView] = React.useState('facility'); // facility | chain
@@ -69,6 +69,13 @@ export default function FinanceReconciliation({ user }) {
   const priceMap = React.useMemo(() => Object.fromEntries(config.prices
     .filter(p => p.kind !== 'service' && p.list_price !== null && p.list_price !== '')
     .map(p => [p.ticket_type, Number(p.list_price)])), [config]);
+  // Giá riêng theo cơ sở được ưu tiên hơn giá chung
+  const overrideMap = React.useMemo(() => Object.fromEntries((config.priceOverrides || [])
+    .map(o => [`${o.ticket_type}|${o.facility_code}`, Number(o.list_price)])), [config]);
+  const priceFor = React.useCallback(
+    (type, code) => overrideMap[`${type}|${code}`] ?? priceMap[type],
+    [overrideMap, priceMap]
+  );
   const serviceName = React.useMemo(() => Object.fromEntries(config.prices
     .filter(p => p.kind === 'service').map(p => [p.ticket_type, p.name || p.ticket_type])), [config]);
   const codeName = React.useMemo(() => Object.fromEntries(config.promoCodes.map(c => [c.code, c.name])), [config]);
@@ -125,18 +132,19 @@ export default function FinanceReconciliation({ user }) {
         if (!t.promo_code && !t.km_kind) continue;
         const key = t.promo_code || `kind:${t.km_kind}`;
         const x = (promos[key] = promos[key] || {
-          key, code: t.promo_code, kind: t.km_kind, count: 0, revenue: 0, listValue: 0, unpriced: 0, free: 0, byFac: {},
+          key, code: t.promo_code, kind: t.km_kind, count: 0, revenue: 0, listValue: 0, pricedRevenue: 0, unpriced: 0, free: 0, byFac: {},
         });
         x.count += t.ticket_count; x.revenue += t.revenue; x.free += t.free_count;
         x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.ticket_count;
-        const price = priceMap[t.ticket_type];
+        const price = priceFor(t.ticket_type, t.facility_code);
         if (price === undefined) x.unpriced += t.ticket_count;
-        else x.listValue += price * t.ticket_count;
+        else { x.listValue += price * t.ticket_count; x.pricedRevenue += t.revenue; }
       }
       return Object.values(promos).map(p => ({
         ...p,
         name: p.code ? (codeName[p.code] || 'Chưa đặt tên') : KM_KIND_LABEL[p.kind] || p.kind,
-        discount: p.kind === 'commission' && !p.code ? null : Math.max(0, p.listValue - p.revenue),
+        // Chỉ so trên vé có giá niêm yết; vé chưa có giá không được trừ thực thu vào tiền giảm
+        discount: p.kind === 'commission' && !p.code ? null : Math.max(0, p.listValue - p.pricedRevenue),
       })).sort((a, b) => b.count - a.count);
     };
     const promoRows = buildPromoRows(tickets);
@@ -187,7 +195,7 @@ export default function FinanceReconciliation({ user }) {
       },
       expenseItems: expenses.filter(e => !expenseCategory || (e.category || '(không ghi loại)') === expenseCategory),
     };
-  }, [data, facility, expenseCategory, priceMap, serviceName, codeName]);
+  }, [data, facility, expenseCategory, priceFor, serviceName, codeName]);
 
   const lastImport = data?.imports?.[0];
 
@@ -272,7 +280,13 @@ export default function FinanceReconciliation({ user }) {
                       <Td left className="font-bold">{type}</Td>
                       {view.shownFacs.map(f => <Td key={f}>{x.byFac[f] ? fmt(x.byFac[f]) : ''}</Td>)}
                       <Td className="font-semibold">{fmt(x.count)}</Td><Td>{fmt(x.revenue)}</Td><Td>{fmt(x.revenue / x.count)}</Td>
-                      <Td className="text-gray-500">{priceMap[type] !== undefined ? fmt(priceMap[type]) : '–'}</Td>
+                      <Td className="text-gray-500">{(() => {
+                        // Giá riêng theo cơ sở: hiện giá của từng cơ sở đang xem
+                        const facPrices = view.shownFacs.filter(f => x.byFac[f]).map(f => [f, priceFor(type, f)]);
+                        const distinct = [...new Set(facPrices.map(([, p]) => p))];
+                        if (distinct.length <= 1) return distinct[0] !== undefined ? fmt(distinct[0]) : '–';
+                        return facPrices.map(([f, p]) => `${f}: ${p !== undefined ? fmt(p) : '–'}`).join(' · ');
+                      })()}</Td>
                     </tr>
                   ))}
                 </tbody>
@@ -488,11 +502,13 @@ export default function FinanceReconciliation({ user }) {
 function FinanceSettings({ config, onSaved }) {
   const [prices, setPrices] = React.useState([]);
   const [codes, setCodes] = React.useState([]);
+  const [overrides, setOverrides] = React.useState([]);
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   React.useEffect(() => {
     setPrices(config.prices.map(p => ({ ...p, kind: p.kind || 'ticket', list_price: p.list_price ?? '', name: p.name || '' })));
     setCodes(config.promoCodes.map(c => ({ ...c })));
+    setOverrides((config.priceOverrides || []).map(o => ({ ...o })));
   }, [config]);
 
   const save = async () => {
@@ -509,7 +525,10 @@ function FinanceSettings({ config, onSaved }) {
           list_price: p.list_price === '' ? null : Number(p.list_price),
         }));
       const cleanCodes = codes.filter(c => c.code && c.name).map(c => ({ code: c.code.trim().toUpperCase(), name: c.name.trim() }));
-      await saveFinanceConfig({ prices: cleanPrices, promoCodes: cleanCodes });
+      const cleanOverrides = overrides
+        .filter(o => o.ticket_type && o.facility_code && o.list_price !== '' && o.list_price !== null)
+        .map(o => ({ ticket_type: o.ticket_type.trim().toUpperCase(), facility_code: o.facility_code, list_price: Number(o.list_price) }));
+      await saveFinanceConfig({ prices: cleanPrices, promoCodes: cleanCodes, priceOverrides: cleanOverrides });
       onSaved(await fetchFinanceConfig());
       setMsg('Đã lưu.');
     } catch (e) {
@@ -527,7 +546,7 @@ function FinanceSettings({ config, onSaved }) {
         <button onClick={save} disabled={saving} className="px-4 py-1.5 rounded-lg text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50">Lưu cài đặt</button>
       </div>
     }>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-6">
         {[
           {
             kind: 'ticket',
@@ -562,6 +581,29 @@ function FinanceSettings({ config, onSaved }) {
             </div>
           </div>
         ))}
+        <div>
+          <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-1">Giá riêng theo cơ sở</h4>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Cho loại vé có giá khác nhau giữa các cơ sở (vd SK). Được ưu tiên hơn giá chung.</p>
+          <div className="space-y-1.5">
+            {overrides.map((o, i) => {
+              const set = (patch) => setOverrides(os => os.map((x, j) => j === i ? { ...x, ...patch } : x));
+              return (
+                <div key={i} className="flex gap-2 items-center">
+                  <input className={`${input} w-20`} value={o.ticket_type} placeholder="Loại vé" onChange={e => set({ ticket_type: e.target.value })} />
+                  <select className={`${input} w-24`} value={o.facility_code} onChange={e => set({ facility_code: e.target.value })}>
+                    <option value="">Cơ sở…</option>
+                    {FAC_ORDER.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                  <input className={`${input} w-28 text-right`} type="number" value={o.list_price} placeholder="Giá" onChange={e => set({ list_price: e.target.value })} />
+                  <button onClick={() => setOverrides(os => os.filter((_, j) => j !== i))} title="Xoá" className="text-gray-400 hover:text-red-600">
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+              );
+            })}
+            <button onClick={() => setOverrides(os => [...os, { ticket_type: '', facility_code: '', list_price: '' }])} className="text-xs font-bold text-teal-700 dark:text-teal-400">+ Thêm giá riêng</button>
+          </div>
+        </div>
         <div>
           <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-2">Mã khuyến mãi (cột Code)</h4>
           <div className="space-y-1.5">
