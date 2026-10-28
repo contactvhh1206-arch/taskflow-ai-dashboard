@@ -94,10 +94,19 @@ export const saveAiSession = async (sessionData) => {
   }
 };
 
+// API trả cột DB dạng snake_case (total_revenue, created_by) và timestamp là chuỗi số (BIGINT),
+// còn frontend đọc/ghi camelCase. Thêm bí danh camelCase, giữ nguyên trường gốc.
+const normalizeReport = (r) => ({
+  ...r,
+  totalRevenue: Number(r.totalRevenue ?? r.total_revenue ?? 0),
+  createdBy: r.createdBy ?? r.created_by ?? '',
+  timestamp: Number(r.timestamp) || Date.parse(r.updated_at || r.created_at) || null,
+});
+
 export const fetchReports = async () => {
   try {
     const result = await axiosClient.get('/api/reports');
-    if (result.success) return result.data;
+    if (result.success) return (result.data || []).map(normalizeReport);
   } catch (error) {
     console.error('Lỗi lấy báo cáo doanh thu:', error);
   }
