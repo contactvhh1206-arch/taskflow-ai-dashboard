@@ -3,6 +3,10 @@ const router = express.Router();
 const pool = require('../config/database');
 
 const authGuard = require('../middlewares/authGuard');
+const requireRoles = require('../middlewares/requireRoles');
+
+// Khớp với quyền mở tab "Cài đặt KPI" ở frontend (App.jsx).
+const KPI_WRITE_ROLES = ['SUPER_ADMIN', 'FINANCE_DEPT', 'VICE_PRESIDENT'];
 
 // GET /api/kpi?month=6/2026  → lấy KPI theo tháng cụ thể
 // GET /api/kpi               → lấy bản ghi mới nhất
@@ -45,7 +49,7 @@ router.get('/months', authGuard, async (req, res) => {
     }
 });
 
-router.post('/', authGuard, async (req, res) => {
+router.post('/', authGuard, requireRoles(...KPI_WRITE_ROLES), async (req, res) => {
     try {
         const { apply_month, data } = req.body;
         

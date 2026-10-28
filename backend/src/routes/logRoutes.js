@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const authGuard = require('../middlewares/authGuard');
 
-router.get('/', async (req, res) => {
+router.get('/', authGuard, async (req, res) => {
     try {
         let query = 'SELECT * FROM daily_logs';
         let values = [];
@@ -30,7 +31,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authGuard, async (req, res) => {
     try {
         const { org_unit, entry_type, content, attachments, ai_vector_data, date, display_time } = req.body;
         
@@ -49,7 +50,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authGuard, async (req, res) => {
     try {
         const { id } = req.params;
         const { content, attachments, ai_vector_data, display_time, edit_history } = req.body;
