@@ -226,7 +226,7 @@ export default function FinanceReconciliation({ user }) {
             </table>
           </Card>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             <Card title="Vé theo loại">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-200 dark:border-gray-700">
@@ -248,14 +248,16 @@ export default function FinanceReconciliation({ user }) {
             <Card title="Khuyến mãi & kênh bán">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                  <Th left>Mã / kiểu</Th><Th left>Chương trình</Th><Th>Số vé</Th><Th>Vé 0 đ</Th><Th>Thực thu</Th><Th>Giảm ước tính</Th>
+                  <Th left>Mã / kiểu</Th><Th left>Chương trình</Th>{view.shownFacs.map(f => <Th key={f}>{f}</Th>)}
+                  <Th>Tổng vé</Th><Th>Vé 0 đ</Th><Th>Thực thu</Th><Th>Giảm ước tính</Th>
                 </tr></thead>
                 <tbody className="text-gray-800 dark:text-gray-200">
                   {view.promoRows.map(p => (
-                    <tr key={p.key} className="border-b border-gray-100 dark:border-gray-800" title={Object.entries(p.byFac).map(([f, n]) => `${f}: ${n}`).join(' · ')}>
+                    <tr key={p.key} className="border-b border-gray-100 dark:border-gray-800">
                       <Td left className="font-bold">{p.code || (p.kind === 'combo' ? 'CB' : p.kind === 'commission' ? 'HH' : '–')}</Td>
                       <Td left className={p.code && !codeName[p.code] ? 'text-amber-600' : ''}>{p.name}</Td>
-                      <Td>{fmt(p.count)}</Td><Td>{p.free ? fmt(p.free) : ''}</Td><Td>{fmt(p.revenue)}</Td>
+                      {view.shownFacs.map(f => <Td key={f}>{p.byFac[f] ? fmt(p.byFac[f]) : ''}</Td>)}
+                      <Td className="font-semibold">{fmt(p.count)}</Td><Td>{p.free ? fmt(p.free) : ''}</Td><Td>{fmt(p.revenue)}</Td>
                       <Td className="text-amber-700 dark:text-amber-400">
                         {p.discount === null ? 'không áp dụng' : `${fmt(p.discount)}${p.unpriced ? ` (${p.unpriced} vé chưa có giá)` : ''}`}
                       </Td>
