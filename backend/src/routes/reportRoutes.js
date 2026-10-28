@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const authGuard = require('../middlewares/authGuard');
+const requireRoles = require('../middlewares/requireRoles');
+
+// Chỉ kế toán nhập/sửa doanh thu; SUPER_ADMIN giữ quyền can thiệp.
+const REPORT_WRITE_ROLES = ['FINANCE_DEPT', 'SUPER_ADMIN'];
 
 router.get('/', authGuard, async (req, res) => {
     try {
@@ -17,7 +21,7 @@ router.get('/', authGuard, async (req, res) => {
     }
 });
 
-router.post('/', authGuard, async (req, res) => {
+router.post('/', authGuard, requireRoles(...REPORT_WRITE_ROLES), async (req, res) => {
     try {
         const payload = req.body;
         const items = Array.isArray(payload) ? payload : [payload];

@@ -5,6 +5,8 @@ export default function RevenueLog({ user, showToast }) {
   const [editingReport, setEditingReport] = useState(null);
   const [editFormData, setEditFormData] = useState([]);
   const [editReason, setEditReason] = useState('');
+  // Khớp REPORT_WRITE_ROLES ở backend/src/routes/reportRoutes.js — vai trò khác chỉ được xem
+  const canEdit = ['FINANCE_DEPT', 'SUPER_ADMIN'].includes(user?.role);
 
   const loadReports = useCallback(async () => {
     try {
@@ -139,15 +141,15 @@ export default function RevenueLog({ user, showToast }) {
             Lịch sử lưu trữ các bản ghi doanh thu theo ngày trên Database.
           </p>
         </div>
-        <div>
-          <button 
+        {canEdit && <div>
+          <button
             onClick={handleMigrateData}
             className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 rounded-lg font-bold text-sm transition-colors border border-orange-200 dark:border-orange-800"
           >
             <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
             Đồng bộ LocalStorage lên Database
           </button>
-        </div>
+        </div>}
       </div>
 
       <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-outline-variant dark:border-gray-800 shadow-sm overflow-hidden flex-1 flex flex-col">
@@ -200,12 +202,12 @@ export default function RevenueLog({ user, showToast }) {
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button 
+                      {canEdit ? <button
                         onClick={() => handleEditClick(report)}
                         className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors inline-flex items-center gap-1"
                       >
                         <span className="material-symbols-outlined text-[18px]">edit</span> Sửa đổi
-                      </button>
+                      </button> : <span className="text-gray-400 text-xs">Chỉ xem</span>}
                     </td>
                   </tr>
                 ))
