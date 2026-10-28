@@ -39,6 +39,7 @@ export default function FinanceReconciliation({ user }) {
   const [config, setConfig] = React.useState({ prices: [], promoCodes: [] });
   const [facility, setFacility] = React.useState('ALL');
   const [expenseCategory, setExpenseCategory] = React.useState('');
+  const [promoView, setPromoView] = React.useState('facility'); // facility | chain
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
 
@@ -118,24 +119,31 @@ export default function FinanceReconciliation({ user }) {
     }
 
     // Khuyến mãi: theo mã nếu có, không có mã thì theo kiểu KM. HH là kênh môi giới, không tính tiền giảm.
-    const promos = {};
-    for (const t of tickets) {
-      if (!t.promo_code && !t.km_kind) continue;
-      const key = t.promo_code || `kind:${t.km_kind}`;
-      const x = (promos[key] = promos[key] || {
-        key, code: t.promo_code, kind: t.km_kind, count: 0, revenue: 0, listValue: 0, unpriced: 0, free: 0, byFac: {},
-      });
-      x.count += t.ticket_count; x.revenue += t.revenue; x.free += t.free_count;
-      x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.ticket_count;
-      const price = priceMap[t.ticket_type];
-      if (price === undefined) x.unpriced += t.ticket_count;
-      else x.listValue += price * t.ticket_count;
-    }
-    const promoRows = Object.values(promos).map(p => ({
-      ...p,
-      name: p.code ? (codeName[p.code] || 'Chưa đặt tên') : KM_KIND_LABEL[p.kind] || p.kind,
-      discount: p.kind === 'commission' && !p.code ? null : Math.max(0, p.listValue - p.revenue),
-    })).sort((a, b) => b.count - a.count);
+    const buildPromoRows = (list) => {
+      const promos = {};
+      for (const t of list) {
+        if (!t.promo_code && !t.km_kind) continue;
+        const key = t.promo_code || `kind:${t.km_kind}`;
+        const x = (promos[key] = promos[key] || {
+          key, code: t.promo_code, kind: t.km_kind, count: 0, revenue: 0, listValue: 0, unpriced: 0, free: 0, byFac: {},
+        });
+        x.count += t.ticket_count; x.revenue += t.revenue; x.free += t.free_count;
+        x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.ticket_count;
+        const price = priceMap[t.ticket_type];
+        if (price === undefined) x.unpriced += t.ticket_count;
+        else x.listValue += price * t.ticket_count;
+      }
+      return Object.values(promos).map(p => ({
+        ...p,
+        name: p.code ? (codeName[p.code] || 'Chưa đặt tên') : KM_KIND_LABEL[p.kind] || p.kind,
+        discount: p.kind === 'commission' && !p.code ? null : Math.max(0, p.listValue - p.revenue),
+      })).sort((a, b) => b.count - a.count);
+    };
+    const promoRows = buildPromoRows(tickets);
+    // Mỗi cơ sở một nhóm riêng: số vé, thực thu, giảm ước tính của riêng cơ sở đó
+    const promoByFac = (facility === 'ALL' ? facilities : [facility])
+      .map(code => ({ code, rows: buildPromoRows(tickets.filter(t => t.facility_code === code)) }))
+      .filter(g => g.rows.length > 0);
 
     // Chi theo loại
     const cats = {};
@@ -168,7 +176,7 @@ export default function FinanceReconciliation({ user }) {
     return {
       facilities,
       shownFacs: facility === 'ALL' ? facilities : [facility],
-      byFac, types, extras: Object.values(extras).sort((a, b) => b.revenue - a.revenue), promoRows, cats, days, addons,
+      byFac, types, extras: Object.values(extras).sort((a, b) => b.revenue - a.revenue), promoRows, promoByFac, cats, days, addons,
       totals: {
         revenue: sum(daily, 'ticket_revenue'),
         expense: sum(daily, 'expense'),
@@ -290,28 +298,83 @@ export default function FinanceReconciliation({ user }) {
               </Card>
             )}
 
-            <Card title="Khuyến mãi & kênh bán">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b border-gray-200 dark:border-gray-700">
-                  <Th left>Mã / kiểu</Th><Th left>Chương trình</Th>{view.shownFacs.map(f => <Th key={f}>{f}</Th>)}
-                  <Th>Tổng vé</Th><Th>Vé 0 đ</Th><Th>Thực thu</Th><Th>Giảm ước tính</Th>
-                </tr></thead>
-                <tbody className="text-gray-800 dark:text-gray-200">
-                  {view.promoRows.map(p => (
-                    <tr key={p.key} className="border-b border-gray-100 dark:border-gray-800">
-                      <Td left className="font-bold">{p.code || (p.kind === 'combo' ? 'CB' : p.kind === 'commission' ? 'HH' : '–')}</Td>
-                      <Td left className={p.code && !codeName[p.code] ? 'text-amber-600' : ''}>{p.name}</Td>
-                      {view.shownFacs.map(f => <Td key={f}>{p.byFac[f] ? fmt(p.byFac[f]) : ''}</Td>)}
-                      <Td className="font-semibold">{fmt(p.count)}</Td><Td>{p.free ? fmt(p.free) : ''}</Td><Td>{fmt(p.revenue)}</Td>
-                      <Td className="text-amber-700 dark:text-amber-400">
-                        {p.discount === null ? 'không áp dụng' : `${fmt(p.discount)}${p.unpriced ? ` (${p.unpriced} vé chưa có giá)` : ''}`}
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <Card title="Khuyến mãi & kênh bán" right={
+              <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-bold">
+                {[['facility', 'Theo từng cơ sở'], ['chain', 'Gộp cả chuỗi']].map(([v, label]) => (
+                  <button key={v} onClick={() => setPromoView(v)}
+                    className={`px-3 py-1.5 ${promoView === v ? 'bg-teal-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            }>
+              {(() => {
+                const promoCells = (p) => (
+                  <>
+                    <Td left className="font-bold">{p.code || (p.kind === 'combo' ? 'CB' : p.kind === 'commission' ? 'HH' : '–')}</Td>
+                    <Td left className={p.code && !codeName[p.code] ? 'text-amber-600' : ''}>{p.name}</Td>
+                  </>
+                );
+                const valueCells = (p) => (
+                  <>
+                    <Td className="font-semibold">{fmt(p.count)}</Td><Td>{p.free ? fmt(p.free) : ''}</Td><Td>{fmt(p.revenue)}</Td>
+                    <Td className="text-amber-700 dark:text-amber-400">
+                      {p.discount === null ? 'không áp dụng' : `${fmt(p.discount)}${p.unpriced ? ` (${p.unpriced} vé chưa có giá)` : ''}`}
+                    </Td>
+                  </>
+                );
+                if (promoView === 'chain') {
+                  return (
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-b border-gray-200 dark:border-gray-700">
+                        <Th left>Mã / kiểu</Th><Th left>Chương trình</Th>{view.shownFacs.map(f => <Th key={f}>{f}</Th>)}
+                        <Th>Tổng vé</Th><Th>Vé 0 đ</Th><Th>Thực thu</Th><Th>Giảm ước tính</Th>
+                      </tr></thead>
+                      <tbody className="text-gray-800 dark:text-gray-200">
+                        {view.promoRows.map(p => (
+                          <tr key={p.key} className="border-b border-gray-100 dark:border-gray-800">
+                            {promoCells(p)}
+                            {view.shownFacs.map(f => <Td key={f}>{p.byFac[f] ? fmt(p.byFac[f]) : ''}</Td>)}
+                            {valueCells(p)}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                }
+                return (
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b border-gray-200 dark:border-gray-700">
+                      <Th left>Mã / kiểu</Th><Th left>Chương trình</Th><Th>Số vé</Th><Th>Vé 0 đ</Th><Th>Thực thu</Th><Th>Giảm ước tính</Th>
+                    </tr></thead>
+                    {view.promoByFac.map(g => {
+                      const promoOnly = g.rows.filter(p => p.discount !== null);
+                      const sumBy = (k) => promoOnly.reduce((a, p) => a + (p[k] || 0), 0);
+                      return (
+                        <tbody key={g.code} className="text-gray-800 dark:text-gray-200">
+                          <tr className="bg-gray-50 dark:bg-[#252525] border-y border-gray-200 dark:border-gray-700">
+                            <Td left className="font-black text-gray-900 dark:text-white">{g.code}</Td>
+                            <Td left className="text-xs text-gray-500 dark:text-gray-400">
+                              {fmt(sumBy('count'))} vé KM · {pct(sumBy('count'), view.byFac[g.code]?.tickets)} số vé của cơ sở
+                            </Td>
+                            <Td className="font-semibold">{fmt(sumBy('count'))}</Td><Td>{sumBy('free') ? fmt(sumBy('free')) : ''}</Td>
+                            <Td className="font-semibold">{fmt(sumBy('revenue'))}</Td>
+                            <Td className="font-semibold text-amber-700 dark:text-amber-400">{fmt(sumBy('discount'))}</Td>
+                          </tr>
+                          {g.rows.map(p => (
+                            <tr key={p.key} className="border-b border-gray-100 dark:border-gray-800">
+                              {promoCells(p)}{valueCells(p)}
+                            </tr>
+                          ))}
+                        </tbody>
+                      );
+                    })}
+                  </table>
+                );
+              })()}
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Giảm ước tính = giá niêm yết × số vé − thực thu. HH là vé bán qua môi giới: tiền hoa hồng nằm ở chi "HH dẫn khách", không tính là giảm giá.
+                Giảm ước tính = giá niêm yết × số vé − thực thu. HH là vé bán qua môi giới: tiền hoa hồng nằm ở chi "HH dẫn khách", không tính là giảm giá
+                (dòng tổng của mỗi cơ sở không cộng HH).
               </p>
             </Card>
           </div>
