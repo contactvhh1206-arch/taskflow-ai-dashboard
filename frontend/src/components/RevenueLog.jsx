@@ -64,13 +64,12 @@ export default function RevenueLog({ user, showToast }) {
       const updatedReport = {
         ...editingReport,
         totalRevenue: newTotal,
-        data: editFormData.map(d => ({ ...d, revenue: Number(d.revenue || 0) }))
+        data: editFormData.map(d => ({ ...d, revenue: Number(d.revenue || 0) })),
+        // Bản sao để không sửa thẳng vào state; backend lưu mảng này vào cột edit_history
+        editHistory: [...(editingReport.editHistory || [])]
       };
 
       // Add to edit history
-      if (!updatedReport.editHistory) {
-        updatedReport.editHistory = [];
-      }
       updatedReport.editHistory.push({
         editedAt: Date.now(),
         editedBy: user?.name || user?.username || 'Finance Dept',
