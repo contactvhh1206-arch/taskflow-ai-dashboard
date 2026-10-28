@@ -151,7 +151,7 @@ flowchart LR
 | File | Tự chạy khi khởi động? | Ghi chú |
 |---|---|---|
 | `001`, `002`, `003`, `005` | Có (mảng `migrationFiles` trong `server.js`) | |
-| `004_add_edit_history_to_daily_logs.sql` | Không | phải chạy tay (`logRoutes.js` đang ghi cột `edit_history`) |
+| `004_add_edit_history_to_daily_logs.sql` | Không | đã chạy tay (kiểm tra 2026-10-28: cột có, 27/5.416 dòng có lịch sử sửa) |
 | `006_add_edit_history_to_daily_financial_reports.sql` | Không | đã chạy tay (2026-10-28) |
 | `007_finance_workbook_import.sql` | Không | đã chạy tay — tạo bảng `finance_*`, nạp giá + mã KM |
 | `008_finance_service_types.sql` | Không | đã chạy tay — `kind`/`name`, MS, LG là dịch vụ |
