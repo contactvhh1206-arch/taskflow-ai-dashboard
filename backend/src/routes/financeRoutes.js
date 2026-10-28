@@ -19,7 +19,8 @@ const badRequest = (res, error) => res.status(400).json({ success: false, error 
 router.get('/config', authGuard, requireRoles(...READ_ROLES), async (req, res) => {
     try {
         const [prices, codes] = await Promise.all([
-            pool.query('SELECT ticket_type, list_price FROM finance_ticket_prices ORDER BY list_price'),
+            // kind/name cần migration 008_finance_service_types.sql
+            pool.query('SELECT ticket_type, list_price, kind, name FROM finance_ticket_prices ORDER BY kind DESC, list_price NULLS LAST, ticket_type'),
             pool.query('SELECT code, name FROM finance_promo_codes ORDER BY code'),
         ]);
         res.json({ success: true, data: { prices: prices.rows, promoCodes: codes.rows } });
@@ -34,7 +35,13 @@ router.put('/config', authGuard, requireRoles(...WRITE_ROLES), async (req, res) 
     if (prices !== undefined && !Array.isArray(prices)) return badRequest(res, 'prices phải là mảng');
     if (promoCodes !== undefined && !Array.isArray(promoCodes)) return badRequest(res, 'promoCodes phải là mảng');
     for (const p of prices || []) {
-        if (!p.ticket_type || !(Number(p.list_price) >= 0)) return badRequest(res, `Giá không hợp lệ: ${JSON.stringify(p)}`);
+        const kind = p.kind || 'ticket';
+        const priceOk = kind === 'service'
+            ? (p.list_price === null || p.list_price === undefined || p.list_price === '' || Number(p.list_price) >= 0)
+            : Number(p.list_price) >= 0 && p.list_price !== null && p.list_price !== '';
+        if (!p.ticket_type || !['ticket', 'service'].includes(kind) || !priceOk) {
+            return badRequest(res, `Loại vé/dịch vụ không hợp lệ: ${JSON.stringify(p)}`);
+        }
     }
     for (const c of promoCodes || []) {
         if (!c.code || !c.name) return badRequest(res, `Mã KM không hợp lệ: ${JSON.stringify(c)}`);
@@ -44,9 +51,15 @@ router.put('/config', authGuard, requireRoles(...WRITE_ROLES), async (req, res) 
         await client.query('BEGIN');
         for (const p of prices || []) {
             await client.query(
-                `INSERT INTO finance_ticket_prices (ticket_type, list_price, updated_at) VALUES ($1, $2, NOW())
-                 ON CONFLICT (ticket_type) DO UPDATE SET list_price = EXCLUDED.list_price, updated_at = NOW()`,
-                [String(p.ticket_type).trim().toUpperCase(), Number(p.list_price)]
+                `INSERT INTO finance_ticket_prices (ticket_type, list_price, kind, name, updated_at) VALUES ($1, $2, $3, $4, NOW())
+                 ON CONFLICT (ticket_type) DO UPDATE
+                 SET list_price = EXCLUDED.list_price, kind = EXCLUDED.kind, name = EXCLUDED.name, updated_at = NOW()`,
+                [
+                    String(p.ticket_type).trim().toUpperCase(),
+                    p.list_price === null || p.list_price === undefined || p.list_price === '' ? null : Number(p.list_price),
+                    p.kind || 'ticket',
+                    p.name ? String(p.name).trim() : null,
+                ]
             );
         }
         for (const c of promoCodes || []) {

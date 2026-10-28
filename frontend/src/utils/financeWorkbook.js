@@ -2,6 +2,8 @@
 // Mỗi cơ sở có 3 sheet: "N.DT-xx" (tổng theo ngày), "N.VÉ-xx" (mỗi dòng 1 vé), "N.CHIxx" (từng khoản chi).
 // Các cơ sở xếp cột khác nhau nên luôn dò cột theo tên tiêu đề, không theo vị trí.
 // Tinh dầu, khăn, đồ uống là hàng bán kèm: chỉ ghi để đối chiếu, KHÔNG cộng vào doanh thu.
+// Trong sheet VÉ, dòng có tiền mà không ghi loại là tiền dư; loại có kind = 'service' trong bảng giá
+// (MS, LG...) là dịch vụ. Hai loại này tính vào doanh thu nhưng không đếm là vé/khách.
 // Hàm thuần, nhận thư viện SheetJS (window.XLSX) làm tham số để chạy được cả ngoài trình duyệt.
 
 // Hậu tố tên sheet → mã cơ sở trên Hub
@@ -131,7 +133,10 @@ export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [] } 
   if (!month) throw new Error('Không đọc được ngày nào trong các sheet vé.');
   const year = month.slice(0, 4);
 
-  const priceMap = Object.fromEntries(prices.map(p => [norm(p.ticket_type), Number(p.list_price)]));
+  const serviceTypes = new Set(prices.filter(p => p.kind === 'service').map(p => norm(p.ticket_type)));
+  const priceMap = Object.fromEntries(prices
+    .filter(p => p.kind !== 'service' && p.list_price !== null && p.list_price !== undefined && p.list_price !== '')
+    .map(p => [norm(p.ticket_type), Number(p.list_price)]));
   const codeSet = new Set(promoCodes.map(c => norm(c.code)));
   const categories = readExpenseCategories(XLSX, wb);
 
@@ -169,13 +174,16 @@ export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [] } 
       const date = toIsoDate(XLSX, rawDate, year);
       if (!date) { noDate++; continue; }
       if (!date.startsWith(month)) { skippedOut++; continue; }
+      // Dòng có tiền mà không ghi loại = tiền dư cơ sở báo về; loại là dịch vụ (MS, LG...) = tiền dịch vụ.
+      // Cả hai vẫn tính vào doanh thu nhưng không phải vé: không đếm vào số vé/khách.
+      const isTicket = type !== '' && !serviceTypes.has(type);
       if (!type) { noType++; noTypeMoney += net; }
       const promo = c['CODE'] !== undefined ? norm(row[c['CODE']]) : '';
       const km = c['KM'] !== undefined ? norm(row[c['KM']]) : '';
-      const guests = guestCol !== undefined ? num(row[guestCol]) : 0;
+      const guests = isTicket && guestCol !== undefined ? num(row[guestCol]) : 0;
 
       const d = dayRow(date, code);
-      d.ticket_count += 1;
+      if (isTicket) d.ticket_count += 1;
       d.guest_count += guests;
       d.ticket_revenue += net;
       d.card_amount += card;
@@ -189,17 +197,17 @@ export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [] } 
         date, facility_code: code, ticket_type: type, promo_code: promo, km, km_kind: kmKind(km),
         ticket_count: 0, guest_count: 0, revenue: 0, free_count: 0,
       });
-      t.ticket_count += 1;
+      t.ticket_count += 1; // với dịch vụ / tiền dư: số dòng ghi trong file
       t.guest_count += guests;
       t.revenue += net;
-      if (net === 0) t.free_count += 1;
+      if (isTicket && net === 0) t.free_count += 1;
 
-      if (type && priceMap[type] === undefined) unknownTypes[type] = (unknownTypes[type] || 0) + 1;
+      if (isTicket && priceMap[type] === undefined) unknownTypes[type] = (unknownTypes[type] || 0) + 1;
       if (promo && !codeSet.has(promo)) unknownCodes[promo] = (unknownCodes[promo] || 0) + 1;
     }
     outOfMonth(code, sheet, skippedOut);
     if (noDate) warn('warn', code, `Sheet "${sheet}": ${noDate} vé không đọc được ngày, đã bỏ qua.`);
-    if (noType) warn('warn', code, `Sheet "${sheet}": ${noType} vé không ghi loại vé (tổng ${noTypeMoney.toLocaleString('vi-VN')}).`);
+    if (noType) warn('info', code, `Tiền dư (dòng có tiền không ghi loại vé): ${noType} dòng, tổng ${noTypeMoney.toLocaleString('vi-VN')}. Tính vào doanh thu, không tính là vé.`);
   }
 
   // 4. Sheet chi
@@ -269,7 +277,8 @@ export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [] } 
   const summary = {};
   for (const code of facilities) {
     const ds = dailyRows.filter(d => d.facility_code === code);
-    const ts = ticketRows.filter(t => t.facility_code === code);
+    const fs = ticketRows.filter(t => t.facility_code === code);
+    const ts = fs.filter(t => t.ticket_type && !serviceTypes.has(t.ticket_type));
     const sum = (arr, k) => arr.reduce((a, x) => a + (x[k] || 0), 0);
     summary[code] = {
       tickets: sum(ds, 'ticket_count'),
@@ -280,6 +289,8 @@ export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [] } 
       card: sum(ds, 'card_amount'),
       promoTickets: sum(ts.filter(t => t.promo_code || ['percent', 'amount', 'combo'].includes(t.km_kind)), 'ticket_count'),
       freeTickets: sum(ts, 'free_count'),
+      serviceRevenue: sum(fs.filter(t => serviceTypes.has(t.ticket_type)), 'revenue'),
+      surplus: sum(fs.filter(t => !t.ticket_type), 'revenue'),
       days: new Set(ds.filter(d => d.ticket_revenue > 0).map(d => d.date)).size,
     };
   }
