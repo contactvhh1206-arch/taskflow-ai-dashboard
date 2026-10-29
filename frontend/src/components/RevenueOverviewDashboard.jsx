@@ -22,7 +22,9 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
       const processWorkbook = async (file) => {
          const buf = await file.arrayBuffer();
          const wb = window.XLSX.read(new Uint8Array(buf), { type: 'array' });
-         const config = await fetchFinanceConfig();
+         // Đọc lần đầu chỉ để biết file thuộc tháng nào, rồi đọc lại với cài đặt của đúng tháng đó
+         const { month } = parseFinanceWorkbook(window.XLSX, wb);
+         const config = await fetchFinanceConfig(month);
          const parsed = parseFinanceWorkbook(window.XLSX, wb, config);
          setWorkbookImport({ parsed, fileName: file.name });
       };

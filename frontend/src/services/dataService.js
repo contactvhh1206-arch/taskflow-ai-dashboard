@@ -176,8 +176,9 @@ export const streamAIChat = async (message, sessionId, token, onChunk, onDone, o
 };
 
 // --- Nhập file tổng tháng & đối chiếu tài chính (/api/finance) ---
-export const fetchFinanceConfig = async () => {
-  const result = await axiosClient.get('/api/finance/config');
+// Cài đặt (giá vé, dịch vụ, giá riêng, mã KM) theo tháng; tháng chưa có bộ riêng nhận bộ của tháng gần nhất trước đó
+export const fetchFinanceConfig = async (month) => {
+  const result = await axiosClient.get(`/api/finance/config?month=${encodeURIComponent(month)}`);
   return result.data;
 };
 
