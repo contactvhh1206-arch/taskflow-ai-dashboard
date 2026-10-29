@@ -16,33 +16,71 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const badRequest = (res, error) => res.status(400).json({ success: false, error });
 
+// --- Cài đặt đối chiếu theo THÁNG (migration 010_finance_config_per_month.sql) ---
+// Mỗi tháng có bộ riêng: giá niêm yết / dịch vụ, giá riêng theo cơ sở, mã khuyến mãi.
+// Tháng chưa có bộ riêng dùng tháng gần nhất trước đó (nếu không có thì tháng sớm nhất).
+const resolveConfigMonth = async (db, month) => {
+    const before = await db.query('SELECT month FROM finance_config_months WHERE month <= $1 ORDER BY month DESC LIMIT 1', [month]);
+    if (before.rows[0]) return before.rows[0].month;
+    const after = await db.query('SELECT month FROM finance_config_months ORDER BY month ASC LIMIT 1');
+    return after.rows[0]?.month || null;
+};
+
+const loadConfig = async (db, month) => {
+    const sourceMonth = await resolveConfigMonth(db, month);
+    if (!sourceMonth) return { month, sourceMonth: null, prices: [], promoCodes: [], priceOverrides: [] };
+    const [prices, codes, overrides] = await Promise.all([
+        db.query(`SELECT ticket_type, list_price, kind, name FROM finance_ticket_prices WHERE month = $1
+                  ORDER BY kind DESC, list_price NULLS LAST, ticket_type`, [sourceMonth]),
+        db.query('SELECT code, name FROM finance_promo_codes WHERE month = $1 ORDER BY code', [sourceMonth]),
+        db.query(`SELECT ticket_type, facility_code, list_price FROM finance_ticket_price_overrides WHERE month = $1
+                  ORDER BY ticket_type, facility_code`, [sourceMonth]),
+    ]);
+    return { month, sourceMonth, prices: prices.rows, promoCodes: codes.rows, priceOverrides: overrides.rows };
+};
+
+// Tạo bộ cài đặt riêng cho tháng bằng cách sao chép từ tháng nguồn (nếu tháng chưa có). Gọi trong transaction.
+const ensureOwnConfig = async (client, month) => {
+    const own = await client.query('SELECT 1 FROM finance_config_months WHERE month = $1', [month]);
+    if (own.rows.length) return;
+    const src = await resolveConfigMonth(client, month);
+    await client.query('INSERT INTO finance_config_months (month, copied_from) VALUES ($1, $2)', [month, src]);
+    if (!src) return;
+    await client.query(
+        `INSERT INTO finance_ticket_prices (month, ticket_type, list_price, kind, name, updated_at)
+         SELECT $1, ticket_type, list_price, kind, name, NOW() FROM finance_ticket_prices WHERE month = $2`, [month, src]);
+    await client.query(
+        `INSERT INTO finance_promo_codes (month, code, name, updated_at)
+         SELECT $1, code, name, NOW() FROM finance_promo_codes WHERE month = $2`, [month, src]);
+    await client.query(
+        `INSERT INTO finance_ticket_price_overrides (month, ticket_type, facility_code, list_price, updated_at)
+         SELECT $1, ticket_type, facility_code, list_price, NOW() FROM finance_ticket_price_overrides WHERE month = $2`, [month, src]);
+};
+
 router.get('/config', authGuard, requireRoles(...READ_ROLES), async (req, res) => {
+    const { month } = req.query;
+    if (!MONTH_RE.test(month || '')) return badRequest(res, 'Tháng phải có dạng YYYY-MM');
     try {
-        const [prices, codes, overrides] = await Promise.all([
-            // kind/name cần migration 008_finance_service_types.sql
-            pool.query('SELECT ticket_type, list_price, kind, name FROM finance_ticket_prices ORDER BY kind DESC, list_price NULLS LAST, ticket_type'),
-            pool.query('SELECT code, name FROM finance_promo_codes ORDER BY code'),
-            // Giá riêng theo cơ sở — cần migration 009_finance_price_overrides.sql
-            pool.query('SELECT ticket_type, facility_code, list_price FROM finance_ticket_price_overrides ORDER BY ticket_type, facility_code'),
-        ]);
-        res.json({ success: true, data: { prices: prices.rows, promoCodes: codes.rows, priceOverrides: overrides.rows } });
+        res.json({ success: true, data: await loadConfig(pool, month) });
     } catch (e) {
         console.error('Lỗi GET /api/finance/config:', e);
         res.status(500).json({ success: false, error: e.message });
     }
 });
 
+// Lưu = thay toàn bộ cài đặt của đúng tháng đó (tháng khác không đổi)
 router.put('/config', authGuard, requireRoles(...WRITE_ROLES), async (req, res) => {
-    const { prices, promoCodes, priceOverrides } = req.body || {};
-    if (prices !== undefined && !Array.isArray(prices)) return badRequest(res, 'prices phải là mảng');
-    if (promoCodes !== undefined && !Array.isArray(promoCodes)) return badRequest(res, 'promoCodes phải là mảng');
-    if (priceOverrides !== undefined && !Array.isArray(priceOverrides)) return badRequest(res, 'priceOverrides phải là mảng');
-    for (const o of priceOverrides || []) {
+    const { month, prices = [], promoCodes = [], priceOverrides = [] } = req.body || {};
+    if (!MONTH_RE.test(month || '')) return badRequest(res, 'Tháng phải có dạng YYYY-MM');
+    if (!Array.isArray(prices)) return badRequest(res, 'prices phải là mảng');
+    if (!Array.isArray(promoCodes)) return badRequest(res, 'promoCodes phải là mảng');
+    if (!Array.isArray(priceOverrides)) return badRequest(res, 'priceOverrides phải là mảng');
+    for (const o of priceOverrides) {
         if (!o.ticket_type || !o.facility_code || o.list_price === null || o.list_price === '' || !(Number(o.list_price) >= 0)) {
             return badRequest(res, `Giá riêng không hợp lệ: ${JSON.stringify(o)}`);
         }
     }
-    for (const p of prices || []) {
+    for (const p of prices) {
         const kind = p.kind || 'ticket';
         const priceOk = kind === 'service'
             ? (p.list_price === null || p.list_price === undefined || p.list_price === '' || Number(p.list_price) >= 0)
@@ -51,18 +89,23 @@ router.put('/config', authGuard, requireRoles(...WRITE_ROLES), async (req, res) 
             return badRequest(res, `Loại vé/dịch vụ không hợp lệ: ${JSON.stringify(p)}`);
         }
     }
-    for (const c of promoCodes || []) {
+    for (const c of promoCodes) {
         if (!c.code || !c.name) return badRequest(res, `Mã KM không hợp lệ: ${JSON.stringify(c)}`);
     }
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        for (const p of prices || []) {
+        await client.query('INSERT INTO finance_config_months (month) VALUES ($1) ON CONFLICT (month) DO NOTHING', [month]);
+        for (const table of ['finance_ticket_prices', 'finance_promo_codes', 'finance_ticket_price_overrides']) {
+            await client.query(`DELETE FROM ${table} WHERE month = $1`, [month]);
+        }
+        for (const p of prices) {
             await client.query(
-                `INSERT INTO finance_ticket_prices (ticket_type, list_price, kind, name, updated_at) VALUES ($1, $2, $3, $4, NOW())
-                 ON CONFLICT (ticket_type) DO UPDATE
+                `INSERT INTO finance_ticket_prices (month, ticket_type, list_price, kind, name, updated_at) VALUES ($1, $2, $3, $4, $5, NOW())
+                 ON CONFLICT (month, ticket_type) DO UPDATE
                  SET list_price = EXCLUDED.list_price, kind = EXCLUDED.kind, name = EXCLUDED.name, updated_at = NOW()`,
                 [
+                    month,
                     String(p.ticket_type).trim().toUpperCase(),
                     p.list_price === null || p.list_price === undefined || p.list_price === '' ? null : Number(p.list_price),
                     p.kind || 'ticket',
@@ -70,24 +113,20 @@ router.put('/config', authGuard, requireRoles(...WRITE_ROLES), async (req, res) 
                 ]
             );
         }
-        for (const c of promoCodes || []) {
+        for (const c of promoCodes) {
             await client.query(
-                `INSERT INTO finance_promo_codes (code, name, updated_at) VALUES ($1, $2, NOW())
-                 ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()`,
-                [String(c.code).trim().toUpperCase(), String(c.name).trim()]
+                `INSERT INTO finance_promo_codes (month, code, name, updated_at) VALUES ($1, $2, $3, NOW())
+                 ON CONFLICT (month, code) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()`,
+                [month, String(c.code).trim().toUpperCase(), String(c.name).trim()]
             );
         }
-        // Danh sách giá riêng gửi lên là toàn bộ: thay hết để xoá được dòng đã bỏ
-        if (priceOverrides !== undefined) {
-            await client.query('DELETE FROM finance_ticket_price_overrides');
-            for (const o of priceOverrides) {
-                await client.query(
-                    `INSERT INTO finance_ticket_price_overrides (ticket_type, facility_code, list_price, updated_at)
-                     VALUES ($1, $2, $3, NOW())
-                     ON CONFLICT (ticket_type, facility_code) DO UPDATE SET list_price = EXCLUDED.list_price, updated_at = NOW()`,
-                    [String(o.ticket_type).trim().toUpperCase(), String(o.facility_code).trim().toUpperCase(), Number(o.list_price)]
-                );
-            }
+        for (const o of priceOverrides) {
+            await client.query(
+                `INSERT INTO finance_ticket_price_overrides (month, ticket_type, facility_code, list_price, updated_at)
+                 VALUES ($1, $2, $3, $4, NOW())
+                 ON CONFLICT (month, ticket_type, facility_code) DO UPDATE SET list_price = EXCLUDED.list_price, updated_at = NOW()`,
+                [month, String(o.ticket_type).trim().toUpperCase(), String(o.facility_code).trim().toUpperCase(), Number(o.list_price)]
+            );
         }
         await client.query('COMMIT');
         res.json({ success: true });
@@ -164,6 +203,8 @@ router.post('/import', authGuard, requireRoles(...WRITE_ROLES), async (req, res)
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        // Tháng mới: chốt bộ cài đặt riêng (sao chép từ tháng trước) để sửa tháng khác không ảnh hưởng tháng này
+        await ensureOwnConfig(client, month);
         const { rows: [imp] } = await client.query(
             `INSERT INTO finance_imports (month, file_name, imported_by, summary, warnings)
              VALUES ($1, $2, $3, $4, $5) RETURNING id, imported_at`,

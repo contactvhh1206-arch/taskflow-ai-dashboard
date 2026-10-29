@@ -3,6 +3,7 @@ import { fetchFinanceConfig, fetchFinanceMonth, fetchFinanceMonths, saveFinanceC
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0));
 const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(1)}%` : '–');
+const monthLabel = (m) => (m ? m.split('-').reverse().join('/') : '');
 const FAC_ORDER = ['41', 'ACE', 'PQ', 'PA', 'PAV', 'PAK'];
 const sortFac = (a, b) => (FAC_ORDER.indexOf(a) + 1 || 99) - (FAC_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b);
 const KM_KIND_LABEL = {
@@ -46,9 +47,8 @@ export default function FinanceReconciliation({ user }) {
   React.useEffect(() => {
     (async () => {
       try {
-        const [ms, cfg] = await Promise.all([fetchFinanceMonths(), fetchFinanceConfig()]);
+        const ms = await fetchFinanceMonths();
         setMonths(ms);
-        setConfig(cfg);
         setMonth(ms[0]?.month || new Date().toISOString().slice(0, 7));
       } catch (e) {
         setError(e.response?.data?.error || e.message);
@@ -57,11 +57,12 @@ export default function FinanceReconciliation({ user }) {
     })();
   }, []);
 
+  // Dữ liệu và cài đặt đều theo tháng đang xem
   React.useEffect(() => {
     if (!month) return;
     setLoading(true);
-    fetchFinanceMonth(month)
-      .then(d => { setData(d); setError(''); })
+    Promise.all([fetchFinanceMonth(month), fetchFinanceConfig(month)])
+      .then(([d, cfg]) => { setData(d); setConfig(cfg); setError(''); })
       .catch(e => setError(e.response?.data?.error || e.message))
       .finally(() => setLoading(false));
   }, [month]);
@@ -528,8 +529,8 @@ function FinanceSettings({ config, onSaved }) {
       const cleanOverrides = overrides
         .filter(o => o.ticket_type && o.facility_code && o.list_price !== '' && o.list_price !== null)
         .map(o => ({ ticket_type: o.ticket_type.trim().toUpperCase(), facility_code: o.facility_code, list_price: Number(o.list_price) }));
-      await saveFinanceConfig({ prices: cleanPrices, promoCodes: cleanCodes, priceOverrides: cleanOverrides });
-      onSaved(await fetchFinanceConfig());
+      await saveFinanceConfig({ month: config.month, prices: cleanPrices, promoCodes: cleanCodes, priceOverrides: cleanOverrides });
+      onSaved(await fetchFinanceConfig(config.month));
       setMsg('Đã lưu.');
     } catch (e) {
       setMsg(e.response?.data?.error || e.message);
@@ -540,13 +541,20 @@ function FinanceSettings({ config, onSaved }) {
 
   const input = 'bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-sm dark:text-white';
   return (
-    <Card title="Cài đặt đối chiếu (kế toán)" right={
+    <Card title={`Cài đặt đối chiếu tháng ${monthLabel(config.month)} (kế toán)`} right={
       <div className="flex items-center gap-3">
         {msg && <span className="text-xs text-gray-500">{msg}</span>}
-        <button onClick={save} disabled={saving} className="px-4 py-1.5 rounded-lg text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50">Lưu cài đặt</button>
+        <button onClick={save} disabled={saving} className="px-4 py-1.5 rounded-lg text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50">Lưu cài đặt tháng {monthLabel(config.month)}</button>
       </div>
     }>
-      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-6">
+      <p className={`text-sm mb-4 rounded-lg px-3 py-2 border ${config.sourceMonth && config.sourceMonth !== config.month
+        ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/40'
+        : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-[#252525] dark:text-gray-400 dark:border-gray-700'}`}>
+        {config.sourceMonth && config.sourceMonth !== config.month
+          ? <>Tháng {monthLabel(config.month)} chưa có cài đặt riêng — đang dùng cài đặt tháng {monthLabel(config.sourceMonth)}. Bấm Lưu để tạo cài đặt riêng cho tháng này (khi nhập file tháng này hệ thống cũng tự tạo).</>
+          : <>Cài đặt chỉ áp dụng cho tháng {monthLabel(config.month)}. Sửa ở đây không làm đổi số liệu các tháng khác.</>}
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
         {[
           {
             kind: 'ticket',
@@ -572,7 +580,7 @@ function FinanceSettings({ config, onSaved }) {
                   <div key={i} className="flex gap-2">
                     <input className={`${input} w-20`} value={p.ticket_type} placeholder="Mã" onChange={e => set({ ticket_type: e.target.value })} />
                     {group.kind === 'service'
-                      ? <input className={`${input} flex-1`} value={p.name} placeholder="Tên dịch vụ" onChange={e => set({ name: e.target.value })} />
+                      ? <input className={`${input} flex-1 min-w-0`} value={p.name} placeholder="Tên dịch vụ" onChange={e => set({ name: e.target.value })} />
                       : <input className={`${input} w-32 text-right`} type="number" value={p.list_price} placeholder="Giá" onChange={e => set({ list_price: e.target.value })} />}
                   </div>
                 );
@@ -610,7 +618,7 @@ function FinanceSettings({ config, onSaved }) {
             {codes.map((c, i) => (
               <div key={i} className="flex gap-2">
                 <input className={`${input} w-24`} value={c.code} onChange={e => setCodes(cs => cs.map((x, j) => j === i ? { ...x, code: e.target.value } : x))} />
-                <input className={`${input} flex-1`} value={c.name} onChange={e => setCodes(cs => cs.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                <input className={`${input} flex-1 min-w-0`} value={c.name} onChange={e => setCodes(cs => cs.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
               </div>
             ))}
             <button onClick={() => setCodes(cs => [...cs, { code: '', name: '' }])} className="text-xs font-bold text-teal-700 dark:text-teal-400">+ Thêm mã</button>

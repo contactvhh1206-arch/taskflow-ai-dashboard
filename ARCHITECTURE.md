@@ -62,13 +62,13 @@ flowchart LR
     T1[("finance_daily<br/>finance_ticket_daily<br/>finance_expense_items<br/>finance_imports")]
     T2[("daily_financial_reports<br/>Heatmap · Nhật ký DT · Cố vấn AI")]
     RECON["Đối chiếu tài chính<br/>GET /api/finance/month"]
-    CFG[("finance_ticket_prices<br/>finance_ticket_price_overrides<br/>finance_promo_codes")]
+    CFG[("Cài đặt theo THÁNG<br/>finance_ticket_prices · finance_ticket_price_overrides<br/>finance_promo_codes · finance_config_months")]
 
     XLSX --> PARSE --> PREVIEW --> API
     API --> T1
     API --> T2
     T1 --> RECON
-    CFG -->|"GET/PUT /api/finance/config"| PARSE
+    CFG -->|"GET/PUT /api/finance/config?month="| PARSE
     CFG --> RECON
 ```
 
@@ -117,10 +117,12 @@ flowchart LR
 | `finance_daily` | ngày × cơ sở: số vé, khách, doanh thu, chi, quẹt thẻ, hàng bán kèm (`addons`) | `/api/finance/import` |
 | `finance_ticket_daily` | ngày × cơ sở × loại vé × mã KM × KM: số vé, khách, thực thu, vé 0 đồng | `/api/finance/import` |
 | `finance_expense_items` | từng khoản chi: ngày, cơ sở, nội dung, số tiền, loại chi phí | `/api/finance/import` |
-| `finance_ticket_prices` | loại vé (`kind=ticket`, giá chung) hoặc dịch vụ (`kind=service`, chỉ tên) | `PUT /api/finance/config` |
-| `finance_ticket_price_overrides` | giá riêng theo cơ sở (vd SK) — ưu tiên hơn giá chung | `PUT /api/finance/config` |
-| `finance_promo_codes` | tên chương trình theo mã ở cột Code | `PUT /api/finance/config` |
+| `finance_config_months` | tháng nào đã có bộ cài đặt riêng (`copied_from` = tháng nguồn khi tự sao chép) | `PUT /api/finance/config`, `/api/finance/import` |
+| `finance_ticket_prices` | theo tháng: loại vé (`kind=ticket`, giá chung) hoặc dịch vụ (`kind=service`, chỉ tên) | `PUT /api/finance/config` |
+| `finance_ticket_price_overrides` | theo tháng: giá riêng theo cơ sở (vd SK) — ưu tiên hơn giá chung | `PUT /api/finance/config` |
+| `finance_promo_codes` | theo tháng: tên chương trình theo mã ở cột Code | `PUT /api/finance/config` |
 
+- **Cài đặt theo tháng**: mỗi tháng một bộ giá vé / dịch vụ / giá riêng / mã KM. Tháng chưa có bộ riêng dùng tháng gần nhất trước đó; `POST /api/finance/import` tự sao chép thành bộ riêng của tháng được nhập. Sửa cài đặt tháng này không đổi giảm ước tính hay tên chương trình của tháng khác — cần cho so sánh và dự đoán theo thời gian.
 - **Quy ước file tổng** (xem `financeWorkbook.js`): hậu tố sheet `01` = cơ sở PAK; tinh dầu, khăn, đồ uống là hàng bán kèm, **không** tính doanh thu; dòng có tiền mà không ghi loại vé là **tiền dư**; loại `kind=service` (MS, LG) là **dịch vụ** — cả hai tính doanh thu nhưng không đếm vé/khách; KM `HH` là kênh môi giới, không phải giảm giá.
 
 ### 4. AI — OpenRouter
@@ -156,8 +158,9 @@ flowchart LR
 | `007_finance_workbook_import.sql` | Không | đã chạy tay — tạo bảng `finance_*`, nạp giá + mã KM |
 | `008_finance_service_types.sql` | Không | đã chạy tay — `kind`/`name`, MS, LG là dịch vụ |
 | `009_finance_price_overrides.sql` | Không | đã chạy tay — giá SK theo cơ sở |
+| `010_finance_config_per_month.sql` | Không | chạy tay một lần — cài đặt tách theo tháng, gán cài đặt cũ cho 2026-10 |
 
-**Không** thêm 007–009 vào `migrationFiles`: chúng nạp dữ liệu cấu hình (giá, tên dịch vụ, giá riêng SK); chạy lại mỗi lần khởi động sẽ ghi đè/khôi phục những gì kế toán đã sửa trên Hub.
+**Không** thêm 007–010 vào `migrationFiles`: chúng nạp dữ liệu cấu hình (giá, tên dịch vụ, giá riêng SK); chạy lại mỗi lần khởi động sẽ ghi đè/khôi phục những gì kế toán đã sửa trên Hub.
 
 ## Triển khai
 
