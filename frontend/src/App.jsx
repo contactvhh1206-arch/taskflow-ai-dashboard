@@ -425,7 +425,7 @@ function MainDashboard() {
     if (!user) return 'tasks';
     
     if (user.role === 'ADMIN') return 'admin';
-    if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD'].includes(user.role)) return 'ai-advisor';
+    if (['SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPARTMENT_HEAD'].includes(user.role)) return 'revenue-overview';
     if (user.role === 'FINANCE_DEPT') return 'dashboard';
     if (user.role === 'FACILITY_MANAGER') return 'checkin';
     if (user.role === 'SUPERVISOR') return 'checkin';
