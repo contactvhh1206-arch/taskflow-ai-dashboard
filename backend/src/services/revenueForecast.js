@@ -10,6 +10,7 @@ const TET_AFTER = 10;
 const TET_WEIGHT = 0.77; // Đo được −23,5% (2025) và −23,3% (2026) trong đợt 18 ngày
 const FULL_MONTH_MIN_DAYS = 20;
 const NOWCAST_MIN_DAYS = 5;
+const SHORT_TICKETS_MIN_DAYS = 3; // Còn ít ngày hơn thì số vé thiếu/ngày phóng đại, không có ý nghĩa
 const DEFAULT_FLAT_BAND_PCT = 3;
 
 // Khoảng dao động lấy từ sai số đo trên T01/2025–T10/2026 (tháng sau: 6/7 tháng thử nằm trong ±6%)
@@ -152,7 +153,7 @@ const forecastFacility = (code, series, month, ctx) => {
     let shortTicketsPerDay = null;
     if (ly !== null && remaining > 0) {
         needPerDay = Math.max(0, (ly - done) / remaining);
-        if (forecast !== null && ticketPrice) {
+        if (forecast !== null && ticketPrice && remaining >= SHORT_TICKETS_MIN_DAYS) {
             shortTicketsPerDay = Math.max(0, (ly - forecast) / remaining / ticketPrice);
         }
     }
@@ -177,6 +178,7 @@ const forecastFacility = (code, series, month, ctx) => {
         trend: classify(yoyPct, flatBandPct),
         needPerDay,
         shortTicketsPerDay,
+        ticketPrice,
     };
 };
 
@@ -204,6 +206,13 @@ const chainRow = (rows, month, flatBandPct) => {
     const minDays = valid.length ? Math.min(...valid.map(r => r.daysWithData)) : 0;
     const remaining = daysInMonth(month) - minDays;
     const method = valid.length && valid.every(r => r.method === 'actual_run_rate') ? 'actual_run_rate' : 'seasonal';
+    // Tính trên tổng chuỗi, không cộng từng cơ sở: cơ sở vượt bù được cho cơ sở thiếu
+    const priced = comparable.filter(r => r.ticketPrice);
+    const chainTickets = priced.reduce((a, r) => a + r.forecast / r.ticketPrice, 0);
+    const chainPrice = chainTickets ? sum(priced, 'forecast') / chainTickets : null;
+    const shortTicketsPerDay = ly !== null && chainPrice && remaining >= SHORT_TICKETS_MIN_DAYS
+        ? Math.max(0, (ly - forecastComparable) / remaining / chainPrice)
+        : null;
     return {
         facility: 'ALL',
         method,
@@ -216,7 +225,7 @@ const chainRow = (rows, month, flatBandPct) => {
         yoyPct,
         trend: classify(yoyPct, flatBandPct),
         needPerDay: ly !== null && remaining > 0 ? Math.max(0, (ly - sum(comparable, 'done')) / remaining) : null,
-        shortTicketsPerDay: sum(comparable, 'shortTicketsPerDay'),
+        shortTicketsPerDay,
         comparedFacilities: comparable.map(r => r.facility),
         excludedFromComparison: valid.filter(r => r.lastYear === null).map(r => r.facility),
     };

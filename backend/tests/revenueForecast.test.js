@@ -108,6 +108,29 @@ test('mức cần đạt và số vé còn thiếu', () => {
     close(r.shortTicketsPerDay, 20 / 100);
 });
 
+test('toàn chuỗi đạt năm trước thì không báo thiếu vé dù có cơ sở thiếu', () => {
+    const rows = [
+        ...dailyRows('41', '2025-08-01', '2025-11-30', 120, 1),
+        ...dailyRows('ACE', '2025-08-01', '2025-11-30', 100, 1),
+        ...dailyRows('41', '2026-08-01', '2026-10-31', 100, 1),
+        ...dailyRows('ACE', '2026-08-01', '2026-10-31', 200, 1),
+    ];
+    const n = buildRevenueForecast(rows, { today: '2026-10-31' }).next;
+    assert.ok(n.facilities.find(r => r.facility === '41').shortTicketsPerDay > 0);
+    assert.strictEqual(n.chain.shortTicketsPerDay, 0);
+});
+
+test('còn dưới 3 ngày thì không tính số vé thiếu mỗi ngày', () => {
+    const rows = [
+        ...dailyRows('41', '2025-10-01', '2025-10-31', 200, 1),
+        ...dailyRows('41', '2026-10-01', '2026-10-30', 100, 1),
+    ];
+    const c = buildRevenueForecast(rows, { today: '2026-10-31' }).current;
+    assert.strictEqual(c.facilities[0].shortTicketsPerDay, null);
+    assert.strictEqual(c.chain.shortTicketsPerDay, null);
+    close(c.facilities[0].needPerDay, 6200 - 3000);
+});
+
 test('không dùng số sau ngày hôm nay', () => {
     const rows = [...dailyRows('41', '2026-10-01', '2026-10-10', 100), ...dailyRows('41', '2026-10-11', '2026-10-20', 900)];
     const r = buildRevenueForecast(rows, { today: '2026-10-10' }).current.facilities[0];
