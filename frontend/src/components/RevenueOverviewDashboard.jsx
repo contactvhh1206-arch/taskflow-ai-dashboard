@@ -2,6 +2,7 @@
 import HeatmapKPI from './HeatmapKPI';
 import RevenueSummaryCharts from './RevenueSummaryCharts';
 import RevenueForecastPanel from './RevenueForecastPanel';
+import RevenueSourcesPanel from './RevenueSourcesPanel';
 import AIBatchPreviewModal from './AIBatchPreviewModal';
 import FinanceImportModal from './FinanceImportModal';
 import { FINANCE_MONTH_KEY } from './FinanceReconciliation';
@@ -364,6 +365,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
            <RevenueForecastPanel user={user} refreshToggle={refreshToggle} />
 
            <RevenueSummaryCharts selectedMonth={selectedMonth} facilityList={data} refreshToggle={refreshToggle} />
+
+           <RevenueSourcesPanel selectedMonth={selectedMonth} refreshToggle={refreshToggle} />
 
            <button
              onClick={() => setShowHeatmap(v => !v)}

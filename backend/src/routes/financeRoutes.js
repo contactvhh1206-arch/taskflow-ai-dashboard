@@ -4,6 +4,7 @@ const pool = require('../config/database');
 const authGuard = require('../middlewares/authGuard');
 const requireRoles = require('../middlewares/requireRoles');
 const { scoreSnapshots } = require('../services/revenueForecast');
+const { buildRevenueSources } = require('../services/revenueSources');
 const { computeForecast, TABLE_MISSING, FINANCE_READ_ROLES } = require('../services/financeInsights');
 
 // Nhập file tổng tháng (TỔNG Txx.xlsx). Frontend đọc file và gửi dữ liệu đã bóc tách;
@@ -225,6 +226,30 @@ router.get('/forecast', authGuard, requireRoles(...READ_ROLES), async (req, res)
         res.json({ success: true, data: { ...forecast, accuracy, snapshotsReady } });
     } catch (e) {
         console.error('Lỗi GET /api/finance/forecast:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+router.get('/revenue-sources', authGuard, requireRoles(...READ_ROLES), async (req, res) => {
+    const { month } = req.query;
+    if (!MONTH_RE.test(month || '')) return badRequest(res, 'Tháng phải có dạng YYYY-MM');
+    const lyMonth = `${Number(month.slice(0, 4)) - 1}${month.slice(4)}`;
+    try {
+        const [tickets, days, services] = await Promise.all([
+            pool.query(
+                `SELECT month, facility_code, ticket_type, promo_code, km_kind,
+                        SUM(ticket_count)::int AS ticket_count, SUM(revenue)::float AS revenue
+                 FROM finance_ticket_daily WHERE month = ANY($1)
+                 GROUP BY month, facility_code, ticket_type, promo_code, km_kind`, [[month, lyMonth]]),
+            pool.query(
+                `SELECT month, facility_code, COUNT(*) FILTER (WHERE ticket_revenue > 0)::int AS days
+                 FROM finance_daily WHERE month = ANY($1) GROUP BY month, facility_code`, [[month, lyMonth]]),
+            pool.query(`SELECT DISTINCT ticket_type FROM finance_ticket_prices WHERE kind = 'service'`),
+        ]);
+        const serviceTypes = services.rows.map(r => r.ticket_type);
+        res.json({ success: true, data: buildRevenueSources(tickets.rows, days.rows, { month, serviceTypes }) });
+    } catch (e) {
+        console.error('Lỗi GET /api/finance/revenue-sources:', e);
         res.status(500).json({ success: false, error: e.message });
     }
 });
