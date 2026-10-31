@@ -88,6 +88,34 @@ const readExpenseCategories = (XLSX, wb) => {
   return cats.size ? cats : null;
 };
 
+// Cột tổng của sheet "TỔNG (DT+CP)" phải bằng tổng các cột cơ sở. File từng bỏ sót cột DB01 khi thêm cơ sở mới.
+// Chỉ cảnh báo: số trên Hub lấy từ sheet VÉ và CHI, không lấy từ sheet này.
+const checkSummarySheet = (XLSX, wb, warn) => {
+  const name = wb.SheetNames.find(n => norm(n).startsWith('TỔNG'));
+  if (!name) return;
+  const rows = sheetRows(XLSX, wb.Sheets[name]);
+  const hdr = findHeader(rows, ['HẠN MỤC']);
+  if (!hdr) return;
+  const labelCol = hdr.cols['HẠN MỤC'];
+  const totalCol = labelCol + 1;
+  const facilityCols = (rows[hdr.row] || []).map((h, i) => (i > totalCol && norm(h) ? i : -1)).filter(i => i >= 0);
+  const isError = (v) => typeof v === 'string' && v.startsWith('#');
+  for (let r = hdr.row + 1; r < rows.length; r++) {
+    const row = rows[r] || [];
+    const label = norm(row[labelCol]);
+    if (!['DOANH THU BÁN VÉ', 'CHI PHÍ PHÁT SINH', 'LỢI NHUẬN'].includes(label)) continue;
+    if (isError(row[totalCol])) {
+      warn('warn', '', `Sheet "${name}": ô tổng dòng "${row[labelCol]}" bị lỗi ${row[totalCol]}.`);
+    } else {
+      const sum = facilityCols.reduce((a, i) => a + num(row[i]), 0);
+      if (Math.abs(num(row[totalCol]) - sum) > 0.5) {
+        warn('warn', '', `Sheet "${name}": dòng "${row[labelCol]}" có cột tổng ${num(row[totalCol]).toLocaleString('vi-VN')} ≠ tổng các cơ sở ${sum.toLocaleString('vi-VN')}. Có thể công thức tổng bỏ sót cột. Số trên Hub không bị ảnh hưởng.`);
+      }
+    }
+    if (label === 'LỢI NHUẬN') break;
+  }
+};
+
 export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [], priceOverrides = [] } = {}) {
   const warnings = [];
   const warn = (level, facility, message) => warnings.push({ level, facility, message });
@@ -265,6 +293,8 @@ export function parseFinanceWorkbook(XLSX, wb, { prices = [], promoCodes = [], p
     }
     if (diffs.length) warn('warn', code, `Sheet "${sheet}" lệch với dữ liệu gốc: ${diffs.slice(0, 4).join('; ')}${diffs.length > 4 ? ` (+${diffs.length - 4})` : ''}.`);
   }
+
+  checkSummarySheet(XLSX, wb, warn);
 
   if (Object.keys(unknownTypes).length) {
     warn('info', '', `Loại vé chưa có giá niêm yết (không ước tính được tiền giảm): ${Object.entries(unknownTypes).map(([t, n]) => `${t} (${n})`).join(', ')}.`);
