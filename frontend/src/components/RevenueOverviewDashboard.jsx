@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import HeatmapKPI from './HeatmapKPI';
+import RevenueSummaryCharts from './RevenueSummaryCharts';
 import AIBatchPreviewModal from './AIBatchPreviewModal';
 import FinanceImportModal from './FinanceImportModal';
 import { uploadFile } from '../utils/uploadFile.js';
@@ -9,7 +10,7 @@ import { fetchFinanceConfig } from '../services/dataService.js';
 export default function RevenueOverviewDashboard({ user, facilityList }) {
       const [selectedMonth, setSelectedMonth] = React.useState(new Date().toISOString().substring(0, 7));
       const [data, setData] = React.useState([]);
-      const [loading, setLoading] = React.useState(true);
+      const [showHeatmap, setShowHeatmap] = React.useState(true);
       const [refreshToggle, setRefreshToggle] = React.useState(0);
       
       const [aiLoading, setAiLoading] = React.useState(false);
@@ -255,7 +256,6 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
       };
 
       React.useEffect(() => {
-        setLoading(true);
         const loadData = async () => {
              try {
                 const token = localStorage.getItem('taskflow_token');
@@ -308,10 +308,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
              
              const finalData = Object.values(aggregated).filter(f => f.is_active || f.revenue > 0);
              setData(finalData);
-             setLoading(false);
              } catch (e) {
                 console.error(e);
-                setLoading(false);
              }
         };
         loadData();
@@ -361,30 +359,18 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
              </div>
            </div>
 
-           <HeatmapKPI user={user} facilityList={data} selectedMonth={selectedMonth} refreshToggle={refreshToggle} />
+           <RevenueSummaryCharts selectedMonth={selectedMonth} facilityList={data} refreshToggle={refreshToggle} />
 
-           {/* Cards */}
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 shrink-0 pb-6">
-             {loading ? Array.from({length: 6}).map((_, i) => (
-               <div key={i} className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-gray-200 dark:border-gray-800 p-6 h-36 animate-pulse flex flex-col justify-between shadow-sm">
-                 <div className="w-1/2 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                 <div className="space-y-3 mt-4">
-                   <div className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                   <div className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                 </div>
-               </div>
-             )) : data.map(fac => (
-               <div key={fac.name} className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm hover:shadow-md transition-shadow group flex flex-col items-center justify-center text-center h-36">
-                 <h4 className="font-bold text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2 mb-2 uppercase text-sm tracking-wide">
-                   <span className="w-2 h-2 rounded-full bg-teal-500 group-hover:scale-125 transition-transform"></span> {fac.name}
-                 </h4>
-                 <div className="text-2xl font-black text-teal-600 dark:text-teal-400">
-                   {new Intl.NumberFormat('vi-VN').format(fac.revenue)} đ
-                 </div>
-               </div>
-             ))}
-           </div>
-           
+           <button
+             onClick={() => setShowHeatmap(v => !v)}
+             aria-expanded={showHeatmap}
+             className="self-start flex items-center gap-1 text-sm font-bold text-gray-700 dark:text-gray-300 hover:text-teal-700 dark:hover:text-teal-400 shrink-0"
+           >
+             <span className="material-symbols-outlined text-[20px]">{showHeatmap ? 'expand_less' : 'expand_more'}</span>
+             {showHeatmap ? 'Thu gọn Heatmap KPI' : 'Xem Heatmap KPI'}
+           </button>
+           {showHeatmap && <HeatmapKPI user={user} facilityList={data} selectedMonth={selectedMonth} refreshToggle={refreshToggle} />}
+
            {aiLoading && (
              <div className="fixed inset-0 z-[100] bg-white/80 dark:bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>

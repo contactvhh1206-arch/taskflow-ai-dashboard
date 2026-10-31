@@ -82,6 +82,7 @@ flowchart LR
 - **AI streaming**: `frontend/src/hooks/useAIChatStream.ts` và `useAIStream.js` — nhận SSE từ `/api/ai/chat`.
 - **Tài chính**:
   - `RevenueOverviewDashboard` (Tổng quan doanh thu) — nút **Nhập dữ liệu**: file `.xlsx` → `utils/financeWorkbook.js` + `FinanceImportModal`; ảnh/CSV vẫn qua AI (`/api/internal/extract-revenue*`).
+  - `RevenueSummaryCharts` + `utils/financeSummary.js` — tóm tắt bằng biểu đồ ở đầu Tổng quan doanh thu (vẽ bằng HTML, không dùng thư viện): doanh thu từ `daily_financial_reports`, chi phí/vé/khuyến mãi từ `finance_*`; so với cùng kỳ tháng trước theo ngày cuối đã có số.
   - `FinanceReconciliation` (Đối chiếu tài chính) — kết quả theo cơ sở, vé theo loại, dịch vụ & tiền dư, khuyến mãi theo cơ sở, chi theo loại/từng khoản, theo ngày, hàng bán kèm, lịch sử nhập, cài đặt giá/mã KM.
   - `RevenueLog` (Nhật ký doanh thu) — sửa doanh thu có lý do, lưu vào `edit_history`.
   - `services/dataService.js` — `fetchReports` thêm bí danh camelCase (`totalRevenue`, `createdBy`, `editHistory`) cho dữ liệu snake_case từ API.
