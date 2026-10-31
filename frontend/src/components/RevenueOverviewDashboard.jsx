@@ -3,6 +3,7 @@ import HeatmapKPI from './HeatmapKPI';
 import RevenueSummaryCharts from './RevenueSummaryCharts';
 import AIBatchPreviewModal from './AIBatchPreviewModal';
 import FinanceImportModal from './FinanceImportModal';
+import { FINANCE_MONTH_KEY } from './FinanceReconciliation';
 import { uploadFile } from '../utils/uploadFile.js';
 import { parseFinanceWorkbook } from '../utils/financeWorkbook.js';
 import { fetchFinanceConfig } from '../services/dataService.js';
@@ -390,6 +391,7 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                onDone={(month) => {
                   setWorkbookImport(null);
                   setSelectedMonth(month);
+                  try { sessionStorage.setItem(FINANCE_MONTH_KEY, month); } catch { /* bỏ qua */ }
                   setRefreshToggle(prev => prev + 1);
                   alert(`Đã lưu dữ liệu tháng ${month.split('-').reverse().join('/')}. Xem chi tiết ở mục "Đối chiếu tài chính".`);
                }}

@@ -4,6 +4,14 @@ import { fetchFinanceConfig, fetchFinanceMonth, fetchFinanceMonths, saveFinanceC
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0));
 const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(1)}%` : '–');
 const monthLabel = (m) => (m ? m.split('-').reverse().join('/') : '');
+// Tháng đang xem, giữ trong phiên: nhập file xong mở đúng tháng đó thay vì tháng mới nhất
+export const FINANCE_MONTH_KEY = 'finance_recon_month';
+const readSavedMonth = () => {
+  try { return sessionStorage.getItem(FINANCE_MONTH_KEY); } catch { return null; }
+};
+const saveMonth = (m) => {
+  try { sessionStorage.setItem(FINANCE_MONTH_KEY, m); } catch { /* không lưu được thì mở tháng mới nhất */ }
+};
 const FAC_ORDER = ['41', 'ACE', 'PQ', 'PA', 'PAV', 'PAK'];
 const sortFac = (a, b) => (FAC_ORDER.indexOf(a) + 1 || 99) - (FAC_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b);
 const KM_KIND_LABEL = {
@@ -49,7 +57,7 @@ export default function FinanceReconciliation({ user }) {
       try {
         const ms = await fetchFinanceMonths();
         setMonths(ms);
-        setMonth(ms[0]?.month || new Date().toISOString().slice(0, 7));
+        setMonth(readSavedMonth() || ms[0]?.month || new Date().toISOString().slice(0, 7));
       } catch (e) {
         setError(e.response?.data?.error || e.message);
         setLoading(false);
@@ -207,7 +215,7 @@ export default function FinanceReconciliation({ user }) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-[#1e1e1e] p-4 md:p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <span className="material-symbols-outlined text-teal-600">fact_check</span> Đối chiếu tài chính
+            <span className="material-symbols-outlined text-teal-600">fact_check</span> Đối chiếu tài chính{month ? ` — tháng ${monthLabel(month)}` : ''}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {lastImport
@@ -220,7 +228,7 @@ export default function FinanceReconciliation({ user }) {
             <option value="ALL">Tất cả cơ sở</option>
             {(view?.facilities || []).map(f => <option key={f} value={f}>{f}</option>)}
           </select>
-          <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm dark:text-white" />
+          <input type="month" value={month} onChange={e => { setMonth(e.target.value); saveMonth(e.target.value); }} className="bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm dark:text-white" />
         </div>
       </div>
 
