@@ -196,6 +196,15 @@ export const fetchFinanceMonth = async (month) => {
   return result.data;
 };
 
+export const fetchRevenueForecast = async () => {
+  const result = await axiosClient.get('/api/finance/forecast');
+  return result.data;
+};
+
+export const saveForecastSettings = async (flatBandPct) => {
+  return axiosClient.put('/api/finance/forecast/settings', { flatBandPct });
+};
+
 export const importFinanceWorkbook = async (payload) => {
   return axiosClient.post('/api/finance/import', payload);
 };
