@@ -14,6 +14,7 @@ import AIInsightsManager from './components/AIInsightsManager.jsx';
 import FacilityDashboard from './components/FacilityDashboard.jsx';
 
 import RevenueOverviewDashboard from './components/RevenueOverviewDashboard.jsx';
+import { FORECAST_ALERT_ROLES, syncForecastAlerts } from './utils/forecastAlerts.js';
 import DailyRevenueReport from './components/DailyRevenueReport.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import RevenueLog from './components/RevenueLog.jsx';
@@ -675,6 +676,16 @@ function MainDashboard() {
   const [notifications, setNotifications] = useState(() => {
     try { return JSON.parse(localStorage.getItem('taskflow_notifications') || '[]'); } catch { return []; }
   });
+
+  // Cảnh báo sớm doanh thu vào chuông: kiểm tra khi mở app và mỗi 30 phút
+  useEffect(() => {
+    if (!user || !FORECAST_ALERT_ROLES.includes(user.role)) return undefined;
+    const check = () => syncForecastAlerts(user.username || user.name || 'user')
+      .catch(e => console.error('Lỗi kiểm tra cảnh báo doanh thu:', e));
+    check();
+    const interval = setInterval(check, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user?.role, user?.username]);
 
   useEffect(() => {
     const checkNotifications = () => {
@@ -1521,7 +1532,16 @@ function MainDashboard() {
                     ) : (
                       <div className="divide-y divide-outline-variant dark:divide-gray-800">
                         {notifications.map((notif, idx) => (
-                          <div key={idx} className="p-4 hover:bg-surface-variant dark:hover:bg-gray-800/50 transition-colors cursor-pointer group">
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              if (notif.targetTab) {
+                                setActiveTab(notif.targetTab);
+                                setShowNotifications(false);
+                              }
+                            }}
+                            className="p-4 hover:bg-surface-variant dark:hover:bg-gray-800/50 transition-colors cursor-pointer group"
+                          >
                             <p className="text-sm text-gray-800 dark:text-gray-200 font-medium group-hover:text-primary transition-colors">{notif.title}</p>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{notif.message}</p>
                             <p className="text-[10px] text-gray-400 mt-2 flex items-center gap-1">

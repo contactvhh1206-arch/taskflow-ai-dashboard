@@ -205,6 +205,11 @@ export const saveForecastSettings = async (flatBandPct) => {
   return axiosClient.put('/api/finance/forecast/settings', { flatBandPct });
 };
 
+export const fetchForecastWarnings = async () => {
+  const result = await axiosClient.get('/api/finance/forecast/warnings');
+  return result.data || [];
+};
+
 export const importFinanceWorkbook = async (payload) => {
   return axiosClient.post('/api/finance/import', payload);
 };

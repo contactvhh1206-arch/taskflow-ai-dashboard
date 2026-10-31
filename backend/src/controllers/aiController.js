@@ -2,6 +2,7 @@ const pool = require('../config/database');
 const aiService = require('../services/aiService');
 const crypto = require('crypto');
 const ragService = require('../services/ragService');
+const financeInsights = require('../services/financeInsights');
 
 // [FIX VẤN ĐỀ 4] Cache cấu hình AI từ DB (Singleton Pattern, TTL = 5 phút)
 // Tránh gọi DB mỗi request — chỉ tải lại khi cache hết hạn hoặc chưa có
@@ -191,7 +192,8 @@ const chatStreamHandler = async (req, res) => {
                 t.includes('tư vấn doanh thu') || t.includes('target') || t.includes('đánh giá cơ sở') ||
                 t.includes('cơ sở nào tốt') || t.includes('cơ sở nào yếu') || t.includes('so sánh cơ sở') ||
                 t.includes('cải thiện doanh thu') || t.includes('giải pháp doanh thu') || t.includes('chiến lược');
-            const hasAnyDataKeyword = (t) => detectRevenueKeyword(t) || detectTaskKeyword(t) || detectOpsKeyword(t) || detectKpiKeyword(t);
+            const hasAnyDataKeyword = (t) => detectRevenueKeyword(t) || detectTaskKeyword(t) || detectOpsKeyword(t) || detectKpiKeyword(t)
+                || financeInsights.detectForecastKeyword(t) || financeInsights.detectExpenseKeyword(t);
 
             // [FIX 29/08/2026 — MỤC 1+2] Câu "trình bày thêm" không chứa từ khóa nào nên trước đây
             // KHÔNG khối dữ liệu nào được nạp: AI phải trả lời tay không, rồi theo Nguyên tắc 5 nó
@@ -351,6 +353,37 @@ const chatStreamHandler = async (req, res) => {
                 dbContextStr += truncatedNote;
             }
             
+            // Dự đoán doanh thu và chi phí: chỉ nạp khi câu hỏi liên quan, để đỡ tốn token.
+            // Lỗi ở đây không được làm mất các khối dữ liệu khác.
+            const wantsForecast = financeInsights.detectForecastKeyword(lowerMsg) || detectKpiKeyword(lowerMsg);
+            const wantsExpense = financeInsights.detectExpenseKeyword(lowerMsg);
+            if ((wantsForecast || wantsExpense) && !financeInsights.canReadFinance(userContext.role)) {
+                dbContextStr += `\n\n[QUYỀN XEM TÀI CHÍNH]:\nTài khoản này không có quyền xem dự đoán doanh thu và chi phí. Nếu được hỏi, hãy nói rõ là không có quyền xem, KHÔNG tự ước tính.`;
+            } else {
+                if (wantsForecast) {
+                    try {
+                        const { forecast } = await financeInsights.computeForecast();
+                        dbContextStr += `\n\n[DỰ ĐOÁN DOANH THU — HỆ THỐNG TÍNH SẴN]:\n` + financeInsights.formatForecastBlock(forecast);
+                    } catch (e) {
+                        console.error('[AI] Lỗi nạp dự đoán doanh thu:', e.message);
+                        dbContextStr += `\n\n[DỰ ĐOÁN DOANH THU — HỆ THỐNG TÍNH SẴN]:\nKhông tải được dự đoán lúc này. KHÔNG tự tính, hãy báo sếp thử lại sau.`;
+                    }
+                }
+                if (wantsExpense) {
+                    try {
+                        const latest = await financeInsights.loadLatestExpenseMonth();
+                        const months = financeInsights.parseExpenseMonths(lowerMsg, new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }), latest);
+                        if (months.length) {
+                            const summary = await financeInsights.loadExpenseSummary(months);
+                            dbContextStr += `\n\n[CHI PHÁT SINH THEO FILE TỔNG — HỆ THỐNG TÍNH SẴN]:\n` + financeInsights.formatExpenseBlock(months, summary);
+                        }
+                    } catch (e) {
+                        console.error('[AI] Lỗi nạp chi phí:', e.message);
+                        dbContextStr += `\n\n[CHI PHÁT SINH THEO FILE TỔNG — HỆ THỐNG TÍNH SẴN]:\nKhông tải được số chi lúc này. KHÔNG tự tính, hãy báo sếp thử lại sau.`;
+                    }
+                }
+            }
+
             // [FIX VẤN ĐỀ 2] Mở rộng từ khóa kích hoạt để bao gồm cả nhật ký vận hành
             const hasTaskKeyword = detectTaskKeyword(lowerMsg);
             const hasOpsKeyword = detectOpsKeyword(lowerMsg);
@@ -583,10 +616,18 @@ Báo cáo ca CHỈ ghi ai NGHỈ. Nó KHÔNG ghi ai đi làm. Vì vậy:
 
 1. **CẤM TỰ CỘNG LẠI những con số backend đã cộng sẵn.** Các khối "TỔNG DOANH THU TRONG KỲ" và "TỔNG THEO TỪNG TUẦN" là số máy tính ra, chính xác tuyệt đối. Phải chép đúng nguyên số. Cộng nhẩm lại từ bảng chi tiết hàng trăm dòng LUÔN cho ra số sai.
 2. **Mốc nào chưa được tính sẵn thì không được tự tính.** Nếu sếp hỏi một mốc không có trong hai khối trên (VD nửa tháng, 10 ngày đầu) → nói rõ "hệ thống chưa tính sẵn mốc này" rồi trình bày bằng các mốc đã có sẵn.
-3. **Số ngày dùng để chia trung bình PHẢI lấy đúng từ dòng [PHẠM VI DỮ LIỆU THỰC CÓ]** hoặc cột "Số ngày có dữ liệu" của từng cơ sở. Cấm chia theo ngày hôm nay, cấm chia theo số ngày của tháng. Dự báo cả tháng = TB/ngày đúng × số ngày của tháng, và phải ghi rõ là ước tính.
+3. **Số ngày dùng để chia trung bình PHẢI lấy đúng từ dòng [PHẠM VI DỮ LIỆU THỰC CÓ]** hoặc cột "Số ngày có dữ liệu" của từng cơ sở. Cấm chia theo ngày hôm nay, cấm chia theo số ngày của tháng. **Cấm tự tính dự đoán doanh thu**: số dự đoán chỉ được lấy từ khối [DỰ ĐOÁN DOANH THU]. Nếu không có khối đó thì viết: "Sếp hỏi kèm chữ 'dự đoán' để hệ thống nạp số."
 4. **So sánh hai tháng có số ngày lệch nhau thì bắt buộc so bằng TB/ngày**, đồng thời nói rõ tháng đang chạy mới có bao nhiêu ngày dữ liệu. Cấm kết luận "sụt giảm" chỉ vì tháng hiện tại chưa kết thúc.
 5. **Ngày ghi 0 đồng ở cả chuỗi là KẾ TOÁN CHƯA NHẬP SỐ LIỆU, không phải cơ sở nghỉ bán.** Doanh thu do bộ phận kế toán nhập tập trung, nên cả 6 cơ sở cùng bằng 0 một ngày là lỗi nhập liệu ở khâu kế toán — **CẤM quy trách nhiệm cho quản lý cơ sở** hay kết luận cơ sở ế ngày đó. Nếu khối dữ liệu có mục **[CẢNH BÁO THIẾU SỐ LIỆU]**: bắt buộc nêu thẳng những ngày đó trong câu trả lời, và khi so sánh giữa các kỳ phải đưa thêm con số sau khi loại các ngày rỗng ra khỏi mẫu số — vì vài ngày rỗng cuối tháng đủ sức lật ngược kết luận tăng thành giảm. Không tự ý xoá chúng khỏi bảng, chỉ nói rõ ảnh hưởng.
 6. **Phân biệt "chưa được nạp" với "không tồn tại".** Trước khi viết "hệ thống không có dữ liệu tháng X", phải soi lại xem trong [DỮ LIỆU HỆ THỐNG] có khối nào mang nhãn tháng X không. Nếu không thấy khối đó → viết đúng: "Dữ liệu tháng X chưa được nạp vào ngữ cảnh câu hỏi này, sếp hỏi lại kèm chữ 'tháng X' để hệ thống nạp." TUYỆT ĐỐI không tuyên bố hệ thống không có dữ liệu.
+
+## QUY TẮC ĐỌC DỰ ĐOÁN VÀ CHI PHÍ
+1. **Mọi số trong khối [DỰ ĐOÁN DOANH THU] và [CHI PHÁT SINH THEO FILE TỔNG] phải chép nguyên.** Cấm tự tính lại, cấm tự làm tròn thành số khác, cấm tự đưa ra khoảng dao động hay nhận định tăng/giảm/bằng khác với khối dữ liệu.
+2. **Luôn nói đây là ước tính** và nêu khoảng dao động. Từng cơ sở chỉ là hướng tham khảo.
+3. **Được giải thích, không được khẳng định nguyên nhân khi dữ liệu không có.** Viết "có thể do..." và nêu điều cần kiểm tra. Cấm tự đưa ra thời tiết, sự kiện hay tin tức bên ngoài.
+4. **"Doanh thu trừ chi phát sinh" không phải lợi nhuận thật**, vì chưa có lương và mặt bằng. Cấm gọi đó là lợi nhuận hay kết luận cơ sở lãi/lỗ thật. Nếu sếp hỏi lợi nhuận thì trả lời bằng số này và nói rõ giới hạn đó.
+5. **Khi có cơ sở trong mục Cảnh báo sớm**, nêu ra dù sếp không hỏi.
+6. Nếu có khối [QUYỀN XEM TÀI CHÍNH] thì nói rõ không có quyền xem, không đưa số dự đoán hay chi phí.
 
 ## HƯỚNG DẪN PHÂN TÍCH KPI VÀ ĐỀ XUẤT PHƯƠNG ÁN KINH DOANH
 Khi có dữ liệu [PHÂN TÍCH KPI & HIỆU SUẤT CƠ SỞ]:
@@ -596,7 +637,7 @@ Khi có dữ liệu [PHÂN TÍCH KPI & HIỆU SUẤT CƠ SỞ]:
 - **Nếu cơ sở đang VÀNG (cần cố gắng)**: Đề xuất 2-3 phương án thúc đẩy nhẹ: tối ưu khung giờ cao điểm, upsell dịch vụ, tăng cường chăm sóc khách cũ.
 - **Nếu cơ sở đang XANH hoặc vượt KPI**: Khen và phân tích yếu tố đang hoạt động tốt, cảnh báo nếu tốc độ đang có xu hướng giảm.
 - **Khi có nhiều cơ sở**: So sánh tổng thể, xếp hạng hiệu suất, chỉ ra cơ sở cần ưu tiên hỗ trợ nhất.
-- **Dự báo cuối tháng**: Dựa vào tốc độ TB hiện tại và ngày còn lại để tính dự báo doanh thu cuối tháng.
+- **Dự báo cuối tháng**: Chép đúng số từ khối [DỰ ĐOÁN DOANH THU], không tự tính.
 - Kết thúc bằng **1 hành động cần làm ngay trong 24h** cho từng cơ sở đang cần cải thiện.
 ${dbContextStr ? '\n\n[DỮ LIỆU HỆ THỐNG]:\n' + dbContextStr : ''}`;
 
