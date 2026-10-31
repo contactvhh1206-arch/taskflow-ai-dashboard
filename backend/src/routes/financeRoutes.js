@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const authGuard = require('../middlewares/authGuard');
 const requireRoles = require('../middlewares/requireRoles');
+const { buildRevenueForecast, scoreSnapshots, DEFAULT_FLAT_BAND_PCT } = require('../services/revenueForecast');
 
 // Nhập file tổng tháng (TỔNG Txx.xlsx). Frontend đọc file và gửi dữ liệu đã bóc tách;
 // backend chỉ kiểm tra hình dạng rồi thay toàn bộ dữ liệu tháng đó trong một transaction.
@@ -179,6 +180,112 @@ router.get('/month', authGuard, requireRoles(...READ_ROLES), async (req, res) =>
         });
     } catch (e) {
         console.error('Lỗi GET /api/finance/month:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// --- Dự đoán doanh thu (migration 011_finance_revenue_forecast.sql) ---
+// Chưa chạy migration thì vẫn trả dự đoán, chỉ chưa lưu lại được và dùng mức "bằng" mặc định.
+const FACILITY_CODES = new Set(['41', 'ACE', 'PQ', 'PA', 'PAV', 'PAK']);
+const TABLE_MISSING = '42P01';
+const vietnamToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+const facilityCodeFromName = (name) => String(name || '').normalize('NFC').trim().toUpperCase().replace(/^DUBAI\s*/, '');
+
+// File tổng là số chốt; ngày file chưa có thì lấy doanh thu kế toán nhập hằng ngày
+const loadForecastRows = async (fromDate) => {
+    const [finance, reports] = await Promise.all([
+        pool.query(
+            `SELECT to_char(date, 'YYYY-MM-DD') AS date, facility_code, ticket_revenue::float AS revenue, ticket_count AS tickets
+             FROM finance_daily WHERE date >= $1::date`, [fromDate]),
+        pool.query('SELECT date, data FROM daily_financial_reports WHERE date >= $1', [fromDate]),
+    ]);
+    const rows = new Map();
+    for (const r of reports.rows) {
+        const data = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+        if (!Array.isArray(data)) continue;
+        for (const item of data) {
+            const code = facilityCodeFromName(item.name);
+            if (FACILITY_CODES.has(code)) {
+                rows.set(`${r.date}|${code}`, { date: r.date, facility_code: code, revenue: Number(item.revenue) || 0, tickets: 0 });
+            }
+        }
+    }
+    for (const r of finance.rows) {
+        if (FACILITY_CODES.has(r.facility_code)) rows.set(`${r.date}|${r.facility_code}`, r);
+    }
+    return [...rows.values()];
+};
+
+const loadFlatBand = async () => {
+    try {
+        const { rows } = await pool.query('SELECT flat_band_pct::float AS value FROM finance_forecast_settings WHERE id = 1');
+        return rows[0] ? rows[0].value : DEFAULT_FLAT_BAND_PCT;
+    } catch (e) {
+        if (e.code === TABLE_MISSING) return DEFAULT_FLAT_BAND_PCT;
+        throw e;
+    }
+};
+
+const saveSnapshots = async (forecast) => {
+    const list = [forecast.current, forecast.next].flatMap(m =>
+        [m.chain, ...m.facilities].filter(r => r.forecast !== null).map(r => ({
+            target_month: m.month, facility_code: r.facility, forecast: r.forecast, low: r.low, high: r.high,
+            last_year: r.lastYear, method: r.method,
+        })));
+    await pool.query(
+        `INSERT INTO finance_forecast_snapshots (made_on, target_month, facility_code, forecast, low, high, last_year, method)
+         SELECT $1::date, x.target_month, x.facility_code, x.forecast, x.low, x.high, x.last_year, x.method
+         FROM jsonb_to_recordset($2::jsonb) AS x(target_month text, facility_code text, forecast numeric, low numeric,
+              high numeric, last_year numeric, method text)
+         ON CONFLICT (made_on, target_month, facility_code) DO UPDATE
+         SET forecast = EXCLUDED.forecast, low = EXCLUDED.low, high = EXCLUDED.high,
+             last_year = EXCLUDED.last_year, method = EXCLUDED.method`,
+        [forecast.asOf, JSON.stringify(list)]
+    );
+};
+
+router.get('/forecast', authGuard, requireRoles(...READ_ROLES), async (req, res) => {
+    try {
+        const today = vietnamToday();
+        // Cần 3 tháng nền + cùng kỳ năm trước của tháng sau; riêng chấm điểm đọc thêm tới 24 tháng
+        const fromDate = `${Number(today.slice(0, 4)) - 2}-01-01`;
+        const rows = await loadForecastRows(fromDate);
+        const flatBandPct = await loadFlatBand();
+        const forecast = buildRevenueForecast(rows, { today, flatBandPct });
+
+        let accuracy = [];
+        let snapshotsReady = true;
+        try {
+            await saveSnapshots(forecast);
+            const saved = await pool.query(
+                `SELECT to_char(made_on, 'YYYY-MM-DD') AS made_on, target_month, facility_code, forecast::float AS forecast,
+                        low::float AS low, high::float AS high
+                 FROM finance_forecast_snapshots WHERE method = 'seasonal'`
+            );
+            accuracy = scoreSnapshots(saved.rows, rows, { today });
+        } catch (e) {
+            if (e.code !== TABLE_MISSING) throw e;
+            snapshotsReady = false;
+        }
+        res.json({ success: true, data: { ...forecast, accuracy, snapshotsReady } });
+    } catch (e) {
+        console.error('Lỗi GET /api/finance/forecast:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+router.put('/forecast/settings', authGuard, requireRoles(...WRITE_ROLES), async (req, res) => {
+    const flatBandPct = Number(req.body?.flatBandPct);
+    if (!(flatBandPct > 0 && flatBandPct <= 20)) return badRequest(res, 'Mức "bằng" phải lớn hơn 0 và không quá 20%');
+    try {
+        await pool.query(
+            `INSERT INTO finance_forecast_settings (id, flat_band_pct, updated_by, updated_at) VALUES (1, $1, $2, NOW())
+             ON CONFLICT (id) DO UPDATE SET flat_band_pct = EXCLUDED.flat_band_pct, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+            [flatBandPct, req.user?.username || null]
+        );
+        res.json({ success: true, data: { flatBandPct } });
+    } catch (e) {
+        console.error('Lỗi PUT /api/finance/forecast/settings:', e);
         res.status(500).json({ success: false, error: e.message });
     }
 });
