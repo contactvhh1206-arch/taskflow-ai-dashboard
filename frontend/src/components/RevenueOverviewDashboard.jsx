@@ -1,6 +1,7 @@
 ﻿import React from 'react';
 import HeatmapKPI from './HeatmapKPI';
 import RevenueSummaryCharts from './RevenueSummaryCharts';
+import RevenueForecastPanel from './RevenueForecastPanel';
 import AIBatchPreviewModal from './AIBatchPreviewModal';
 import FinanceImportModal from './FinanceImportModal';
 import { FINANCE_MONTH_KEY } from './FinanceReconciliation';
@@ -359,6 +360,8 @@ export default function RevenueOverviewDashboard({ user, facilityList }) {
                 {aiError && <div className="text-red-500 text-xs mt-1 font-medium">{aiError}</div>}
              </div>
            </div>
+
+           <RevenueForecastPanel user={user} refreshToggle={refreshToggle} />
 
            <RevenueSummaryCharts selectedMonth={selectedMonth} facilityList={data} refreshToggle={refreshToggle} />
 
