@@ -8,7 +8,7 @@ const FAC_ORDER = ['41', 'ACE', 'PQ', 'PA', 'PAV', 'PAK'];
 const sortFac = (a, b) => (FAC_ORDER.indexOf(a) + 1 || 99) - (FAC_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b);
 const KM_KIND_LABEL = {
   percent: 'Giảm % (không mã)',
-  amount: 'Trừ tiền (không mã)',
+  amount: 'Lễ tân tự giảm',
   combo: 'Combo (CB)',
   commission: 'Môi giới hoa hồng (HH)',
   other: 'KM khác (không mã)',
@@ -131,9 +131,11 @@ export default function FinanceReconciliation({ user }) {
       const promos = {};
       for (const t of list) {
         if (!t.promo_code && !t.km_kind) continue;
-        const key = t.promo_code || `kind:${t.km_kind}`;
+        // Lễ tân tự giảm (KM âm): mỗi mức một dòng, mức mới tự xuất hiện
+        const isDesk = !t.promo_code && t.km_kind === 'amount';
+        const key = t.promo_code || (isDesk ? `kind:amount:${t.km}` : `kind:${t.km_kind}`);
         const x = (promos[key] = promos[key] || {
-          key, code: t.promo_code, kind: t.km_kind, count: 0, revenue: 0, listValue: 0, pricedRevenue: 0, unpriced: 0, free: 0, byFac: {},
+          key, code: t.promo_code, kind: t.km_kind, km: isDesk ? t.km : '', count: 0, revenue: 0, listValue: 0, pricedRevenue: 0, unpriced: 0, free: 0, byFac: {},
         });
         x.count += t.ticket_count; x.revenue += t.revenue; x.free += t.free_count;
         x.byFac[t.facility_code] = (x.byFac[t.facility_code] || 0) + t.ticket_count;
@@ -143,7 +145,7 @@ export default function FinanceReconciliation({ user }) {
       }
       return Object.values(promos).map(p => ({
         ...p,
-        name: p.code ? (codeName[p.code] || 'Chưa đặt tên') : KM_KIND_LABEL[p.kind] || p.kind,
+        name: p.code ? (codeName[p.code] || 'Chưa đặt tên') : (p.km ? `${KM_KIND_LABEL.amount} ${fmt(Math.abs(Number(p.km)))}` : KM_KIND_LABEL[p.kind] || p.kind),
         // Chỉ so trên vé có giá niêm yết; vé chưa có giá không được trừ thực thu vào tiền giảm
         discount: p.kind === 'commission' && !p.code ? null : Math.max(0, p.listValue - p.pricedRevenue),
       })).sort((a, b) => b.count - a.count);
@@ -326,7 +328,7 @@ export default function FinanceReconciliation({ user }) {
               {(() => {
                 const promoCells = (p) => (
                   <>
-                    <Td left className="font-bold">{p.code || (p.kind === 'combo' ? 'CB' : p.kind === 'commission' ? 'HH' : '–')}</Td>
+                    <Td left className="font-bold">{p.code || p.km || (p.kind === 'combo' ? 'CB' : p.kind === 'commission' ? 'HH' : '–')}</Td>
                     <Td left className={p.code && !codeName[p.code] ? 'text-amber-600' : ''}>{p.name}</Td>
                   </>
                 );
