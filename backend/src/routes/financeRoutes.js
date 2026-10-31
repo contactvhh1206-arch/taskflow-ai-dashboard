@@ -3,14 +3,14 @@ const router = express.Router();
 const pool = require('../config/database');
 const authGuard = require('../middlewares/authGuard');
 const requireRoles = require('../middlewares/requireRoles');
-const { buildRevenueForecast, scoreSnapshots, DEFAULT_FLAT_BAND_PCT } = require('../services/revenueForecast');
+const { scoreSnapshots } = require('../services/revenueForecast');
+const { computeForecast, TABLE_MISSING, FINANCE_READ_ROLES } = require('../services/financeInsights');
 
 // Nhập file tổng tháng (TỔNG Txx.xlsx). Frontend đọc file và gửi dữ liệu đã bóc tách;
 // backend chỉ kiểm tra hình dạng rồi thay toàn bộ dữ liệu tháng đó trong một transaction.
 // Cần migration 007_finance_workbook_import.sql.
 const WRITE_ROLES = ['FINANCE_DEPT', 'SUPER_ADMIN'];
-// Khớp quyền mở tab "Tổng quan doanh thu" ở frontend
-const READ_ROLES = ['SUPER_ADMIN', 'VICE_PRESIDENT', 'FINANCE_DEPT', 'DEPARTMENT_HEAD'];
+const READ_ROLES = FINANCE_READ_ROLES;
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -186,46 +186,6 @@ router.get('/month', authGuard, requireRoles(...READ_ROLES), async (req, res) =>
 
 // --- Dự đoán doanh thu (migration 011_finance_revenue_forecast.sql) ---
 // Chưa chạy migration thì vẫn trả dự đoán, chỉ chưa lưu lại được và dùng mức "bằng" mặc định.
-const FACILITY_CODES = new Set(['41', 'ACE', 'PQ', 'PA', 'PAV', 'PAK']);
-const TABLE_MISSING = '42P01';
-const vietnamToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
-const facilityCodeFromName = (name) => String(name || '').normalize('NFC').trim().toUpperCase().replace(/^DUBAI\s*/, '');
-
-// File tổng là số chốt; ngày file chưa có thì lấy doanh thu kế toán nhập hằng ngày
-const loadForecastRows = async (fromDate) => {
-    const [finance, reports] = await Promise.all([
-        pool.query(
-            `SELECT to_char(date, 'YYYY-MM-DD') AS date, facility_code, ticket_revenue::float AS revenue, ticket_count AS tickets
-             FROM finance_daily WHERE date >= $1::date`, [fromDate]),
-        pool.query('SELECT date, data FROM daily_financial_reports WHERE date >= $1', [fromDate]),
-    ]);
-    const rows = new Map();
-    for (const r of reports.rows) {
-        const data = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
-        if (!Array.isArray(data)) continue;
-        for (const item of data) {
-            const code = facilityCodeFromName(item.name);
-            if (FACILITY_CODES.has(code)) {
-                rows.set(`${r.date}|${code}`, { date: r.date, facility_code: code, revenue: Number(item.revenue) || 0, tickets: 0 });
-            }
-        }
-    }
-    for (const r of finance.rows) {
-        if (FACILITY_CODES.has(r.facility_code)) rows.set(`${r.date}|${r.facility_code}`, r);
-    }
-    return [...rows.values()];
-};
-
-const loadFlatBand = async () => {
-    try {
-        const { rows } = await pool.query('SELECT flat_band_pct::float AS value FROM finance_forecast_settings WHERE id = 1');
-        return rows[0] ? rows[0].value : DEFAULT_FLAT_BAND_PCT;
-    } catch (e) {
-        if (e.code === TABLE_MISSING) return DEFAULT_FLAT_BAND_PCT;
-        throw e;
-    }
-};
-
 const saveSnapshots = async (forecast) => {
     const list = [forecast.current, forecast.next].flatMap(m =>
         [m.chain, ...m.facilities].filter(r => r.forecast !== null).map(r => ({
@@ -246,12 +206,7 @@ const saveSnapshots = async (forecast) => {
 
 router.get('/forecast', authGuard, requireRoles(...READ_ROLES), async (req, res) => {
     try {
-        const today = vietnamToday();
-        // Cần 3 tháng nền + cùng kỳ năm trước của tháng sau; riêng chấm điểm đọc thêm tới 24 tháng
-        const fromDate = `${Number(today.slice(0, 4)) - 2}-01-01`;
-        const rows = await loadForecastRows(fromDate);
-        const flatBandPct = await loadFlatBand();
-        const forecast = buildRevenueForecast(rows, { today, flatBandPct });
+        const { today, rows, forecast } = await computeForecast();
 
         let accuracy = [];
         let snapshotsReady = true;
@@ -270,6 +225,17 @@ router.get('/forecast', authGuard, requireRoles(...READ_ROLES), async (req, res)
         res.json({ success: true, data: { ...forecast, accuracy, snapshotsReady } });
     } catch (e) {
         console.error('Lỗi GET /api/finance/forecast:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Cho chuông thông báo: chỉ đọc, không lưu bản dự đoán
+router.get('/forecast/warnings', authGuard, requireRoles(...READ_ROLES), async (req, res) => {
+    try {
+        const { forecast } = await computeForecast();
+        res.json({ success: true, data: forecast.warnings });
+    } catch (e) {
+        console.error('Lỗi GET /api/finance/forecast/warnings:', e);
         res.status(500).json({ success: false, error: e.message });
     }
 });
